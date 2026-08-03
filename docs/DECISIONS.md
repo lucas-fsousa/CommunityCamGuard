@@ -1,9 +1,12 @@
 # Decisions & Context Log
 
-Durable record of everything decided for **Community Cam Guard (CCG)** (local folder still
-`yousee_camera_control`; repo/package = `community-cam-guard`), so no context is lost
-across WSL restarts or new chat sessions. This is the source of truth; the README is the
-user-facing summary. Last updated: **2026-07-28**.
+The chronological engineering journal for **Community Cam Guard** — the full narrative behind each
+change. The distilled, load-bearing architecture decisions are being migrated into focused **ADRs**
+under [`internal/`](internal/); those are authoritative for what they cover. This log remains the
+fuller record and the source for anything not yet migrated.
+
+> Examples here use de-identified placeholders (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`) — never real
+> device data.
 
 ---
 
@@ -247,7 +250,7 @@ documents "set the secret before adding cameras, don't change it after".
 
 **Ports & deployment (2026-07-27):** all services bind **loopback only** (`127.0.0.1`, never
 0.0.0.0) in the **32xx** prototype range, per the user's `ports_doc.md` convention (30xx/31xx
-already taken). Allocation (mirrored in repo `temp_ports.md`): app **3200**, go2rtc API **3201**,
+already taken). Allocation (see `.env` / `config.py`): app **3200**, go2rtc API **3201**,
 WebRTC **3202**, RTSP restream **3203**. Config: `host/port`, `go2rtc_api/go2rtc_host/
 go2rtc_rtsp_port/go2rtc_webrtc_port` (env-overridable). `go2rtc.build_config` binds `go2rtc_host`
 on those ports; recorder consumes `restream_rtsp_url` (3203). Run: `python -m backend.app.main`
@@ -324,8 +327,8 @@ isn't ours) and SEO/discoverability for the open-source repo. **Name: Community 
 Applied: `pyproject.name`, FastAPI title, cookie `ccg_session`, DB `data/ccg.db` (renamed the
 existing file to keep registered cameras), USER_AGENT, Docker `ccg_app`/`ccg_go2rtc` +
 image `community-cam-guard-app`, compose project `ccg`, README rebrand (generic-first, Yoosee
-as example, SEO keywords), frontend titles, `temp_ports.md`. The **local folder stays
-`yousee_camera_control`** (just the checkout path; not the project identity).
+as example, SEO keywords) and frontend titles. The local checkout folder name is not the project
+identity — the repo/package is `community-cam-guard`.
 
 **Extensibility (contributor-friendly):** the ad-hoc RTSP whitelist `discovery/endpoints.py`
 became **`discovery/profiles.py`** — a list of `CameraProfile`s (key, label, ordered RTSP path

@@ -48,7 +48,7 @@ máximo que a câmera + host sustentam. Referência de diagnóstico: `docs/DECIS
 
 | Prioridade | Item | Status |
 |---|---|---|
-| P1 | Estrutura `docs/public/` + `docs/internal/` criada + índice `docs/README.md`; **quebrar `DECISIONS.md` em ADRs** ainda pendente | wip |
+| P1 | Estrutura `docs/public/` + `docs/internal/` + índice. **ADRs iniciados** (6 fundacionais: drivers, identidade-MAC, discovery, gravação, live-view, OOM); migração das demais decisões do `DECISIONS.md` segue em lotes | wip |
 | P1 | **Doc de API/endpoints** — `docs/public/api.md` (referência) + Swagger/ReDoc em `/api/docs`,`/api/redoc`, schema em `/api/openapi.json` | done |
 | P2 | README com índice/documentação apontando pra `docs/`; roadmap desduplicado; fatos atualizados | done |
 | P2 | `CONTRIBUTING.md`: padrões (ruff/mypy/pytest), fluxo de PR, regra de segredos, plug-in de driver | done |
