@@ -9,15 +9,27 @@ config and the recorder is re-synced to the new camera list.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import urllib.parse
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import websockets
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.websockets import WebSocketState
 
 from .. import drivers
-from ..auth import COOKIE_NAME, MAX_AGE, check_key, is_authenticated, issue_token, require_auth
+from ..auth import (
+    COOKIE_NAME,
+    MAX_AGE,
+    check_key,
+    is_authenticated,
+    issue_token,
+    require_auth,
+    verify_token,
+)
 from ..config import get_settings
 from ..db import registry
 from ..discovery import active_scan, rtsp
@@ -283,6 +295,65 @@ def media_activity(request: Request) -> dict:
     """Per-stream video-packet liveness, for the dashboard's freeze watchdog (see go2rtc)."""
     media = getattr(request.app.state, "media", None)
     return media.stream_activity() if media else {}
+
+
+@router.websocket("/go2rtc/ws")
+async def go2rtc_ws(websocket: WebSocket) -> None:
+    """Authenticated same-origin proxy to go2rtc's stream WebSocket.
+
+    The live player (``frontend/player.js``) is served from the app origin so the dashboard can
+    read the real ``<video>`` for the freeze watchdog — but go2rtc rejects a cross-origin WS
+    handshake (403 on any foreign ``Origin``). Rather than open go2rtc up with ``api.origin: "*"``
+    (go2rtc has no auth and can run ``exec:`` sources — a CSRF/RCE surface reachable through the
+    user's tunnel), we bridge here: the browser connects to this same-origin endpoint (carrying the
+    session cookie, so only a logged-in dashboard can use it), and we relay to go2rtc **without**
+    forwarding the browser ``Origin`` header (go2rtc accepts an origin-less handshake). Bonus: only
+    the app port needs to be reachable/tunnelled for signalling — go2rtc stays fully loopback-bound.
+    """
+    if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
+        await websocket.close(code=1008)   # policy violation (unauthenticated)
+        return
+    src = websocket.query_params.get("src", "")
+    if not src:
+        await websocket.close(code=1008)
+        return
+
+    api = get_settings().go2rtc_api.rstrip("/")
+    upstream_url = "ws" + api[4:] + "/api/ws?src=" + urllib.parse.quote(src)  # http->ws, no Origin
+    await websocket.accept()
+    try:
+        async with websockets.connect(upstream_url, open_timeout=5, max_size=None) as up:
+            async def browser_to_go2rtc() -> None:
+                while True:
+                    msg = await websocket.receive()
+                    if msg["type"] == "websocket.disconnect":
+                        return
+                    if msg.get("text") is not None:
+                        await up.send(msg["text"])
+                    elif msg.get("bytes") is not None:
+                        await up.send(msg["bytes"])
+
+            async def go2rtc_to_browser() -> None:
+                async for frame in up:
+                    if isinstance(frame, (bytes, bytearray)):
+                        await websocket.send_bytes(bytes(frame))
+                    else:
+                        await websocket.send_text(frame)
+
+            tasks = [asyncio.create_task(browser_to_go2rtc()), asyncio.create_task(go2rtc_to_browser())]
+            _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+    except Exception as exc:   # upstream connect/relay failure — just close the browser socket
+        log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
+    finally:
+        # Best-effort close: the browser is usually already gone (that is what ended the relay),
+        # so closing can itself raise ClientDisconnected/WebSocketDisconnect — which is not an error.
+        if websocket.application_state != WebSocketState.DISCONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
 
 
 @router.post("/media/restart", dependencies=[Depends(require_auth)])

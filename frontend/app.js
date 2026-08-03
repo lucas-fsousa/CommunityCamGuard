@@ -58,8 +58,12 @@ async function loadStorage() {
 // to rebuffer on any jitter/loss ("travando toda hora"); WebRTC's UDP + jitter buffer rides over it.
 // Diagnostics showed the HD tile landing on MSE while the substream got WebRTC, so we stop leaving
 // it to chance. MSE stays as the fallback so a WebRTC-hostile network still gets a picture.
-function playerUrl(streamId) {
-  return `${state.go2rtc}/stream.html?src=${encodeURIComponent(streamId)}&mode=webrtc,mse`;
+// The <cam-player> element (player.js) sets mode="webrtc,mse"; here we only hand it the signalling
+// WebSocket. We point it at the app's OWN origin (/api/go2rtc/ws), which proxies to go2rtc: this
+// keeps the player same-origin (so the freeze watchdog can read the real <video>) without opening
+// go2rtc's unauthenticated API cross-origin. A leading "/" makes VideoRTC build ws://<app-origin>/…
+function wsFor(streamId) {
+  return `/api/go2rtc/ws?src=${encodeURIComponent(streamId)}`;
 }
 
 const svgIcon = (id) => `<svg class="icon"><use href="#${id}" /></svg>`;
@@ -198,11 +202,18 @@ function streamFor(cam) {
 }
 
 function camFrame(cam) {
-  const frame = el("iframe", { className: "frame", src: playerUrl(streamFor(cam)),
-                               allow: "autoplay" });
-  frame.dataset.src = streamFor(cam);   // so a view switch can tell if it must reconnect
+  const sid = streamFor(cam);
+  const frame = el("cam-player", { className: "frame" });
+  frame.dataset.src = sid;   // so a view switch can tell if it must reconnect
+  frame.src = wsFor(sid);    // VideoRTC .src setter kicks off the WebSocket/WebRTC connect
   applyZoom(cam.mac, frame);   // a rebuilt frame (restart / resume) keeps its zoom
   return frame;
+}
+
+// A black stand-in that holds the tile's firstChild slot while the live player is torn down (under
+// Recordings, so live audio/CPU stops). Resuming replaces it with a fresh camFrame.
+function suspendedFrame() {
+  return el("div", { className: "frame" });
 }
 
 
@@ -232,7 +243,7 @@ function clampPan(z, frame) {
 function applyZoom(mac, frame) {
   const tile = tiles.get(mac);
   frame = frame || (tile && tile.el.firstChild);
-  if (!frame || frame.tagName !== "IFRAME") return;
+  if (!frame || frame.tagName !== "CAM-PLAYER") return;
   const z = zoomOf(mac);
   clampPan(z, frame);
   frame.style.transform = `translate(${z.x}px, ${z.y}px) scale(${z.scale})`;
@@ -337,43 +348,40 @@ function refreshPlayer(mac, btn) {
   t.el.firstChild.replaceWith(camFrame(cam));
 }
 
-// Freeze watchdog. go2rtc leaves a stalled WebRTC/MSE consumer attached to a **dead producer**, so
-// the player's on-screen timer keeps advancing while the picture is frozen (visible via the camera's
-// burnt-in timestamp) — and it only recovers on a manual reload. We can't read the cross-origin
-// iframe's <video>, so we poll go2rtc's per-stream **video packet** counter (through the backend): a
-// watched stream whose video packets stop advancing for a few polls is frozen upstream, so we rebuild
-// that one player automatically — exactly what the manual reload does.
-const STALL_POLL_MS = 5000, STALL_STRIKES = 3;   // ~15s of no new video frames before we reload
-const _stall = new Map();   // mac -> { sid, packets, strikes }
-async function freezeWatchdog() {
-  if (_playersSuspended || (state.view !== "grid" && state.view !== "single")) return;
-  let activity;
-  try { activity = await api("/media/activity"); } catch { return; }
+// Freeze watchdog. The failure we actually see: a WebRTC PeerConnection wedges (lost keyframe, stuck
+// decoder) — the picture freezes while go2rtc keeps "sending" packets and the player's timer keeps
+// advancing, so no server-side counter (producer OR consumer) reflects it. The only truthful signal
+// is the real decoded-frame progress of the <video>, which we can now read because the player is
+// same-origin (player.js / <cam-player>, tracked via requestVideoFrameCallback). A watched tile whose
+// presented frames stop advancing past FREEZE_MS is rebuilt — a fresh PeerConnection gets a new
+// keyframe and recovers. Purely client-side: the freeze is client-side, and recording is independent.
+const STALL_POLL_MS = 3000;       // how often we check
+const FREEZE_MS = 10000;          // no newly-presented frame for this long (while playing) = frozen
+function freezeWatchdog() {
+  if (_playersSuspended || document.hidden) return;
+  if (state.view !== "grid" && state.view !== "single") return;
   tiles.forEach((t, mac) => {
     const frame = t.el.firstChild;
-    if (!frame || frame.tagName !== "IFRAME" || frame.src === "about:blank") return;
-    const a = activity[frame.dataset.src];
-    if (!a || a.consumers === 0) { _stall.delete(mac); return; }     // not currently watched
-    const prev = _stall.get(mac);
-    if (!prev || prev.sid !== frame.dataset.src || a.video_packets > prev.packets) {
-      _stall.set(mac, { sid: frame.dataset.src, packets: a.video_packets, strikes: 0 });
-      return;                                                        // fresh or still flowing
-    }
-    const strikes = prev.strikes + 1;
-    if (strikes >= STALL_STRIKES) {
-      _stall.delete(mac);
-      console.warn(`freeze watchdog: ${frame.dataset.src} stalled — reloading`);
-      refreshPlayer(mac);                                            // rebuild the frozen player
-    } else {
-      _stall.set(mac, { sid: frame.dataset.src, packets: a.video_packets, strikes });
+    if (!frame || frame.tagName !== "CAM-PLAYER" || typeof frame.frozenMs !== "function") return;
+    if (frame.frozenMs() > FREEZE_MS) {
+      console.warn(`freeze watchdog: ${frame.dataset.src} frozen ${Math.round(frame.frozenMs())}ms — rebuilding`);
+      refreshPlayer(mac);   // rebuild only this player → fresh WebRTC session + keyframe
     }
   });
 }
+// When the tab returns to the foreground, rVFC was paused while hidden — reset each player's freeze
+// clock so we don't rebuild a perfectly healthy stream on the first check after unhide.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  tiles.forEach((t) => {
+    const frame = t.el.firstChild;
+    if (frame && frame.tagName === "CAM-PLAYER" && typeof frame.markSeen === "function") frame.markSeen();
+  });
+});
 
-// Suspend/resume the live players. The go2rtc players are cross-origin iframes, so we can't
-// script their volume — to stop their audio (e.g. when viewing Recordings, so live sound doesn't
-// overlap the recording) we unload the iframe; resuming rebuilds it to reconnect. Grid<->Single
-// stay live (no-op) so those switches never re-buffer.
+// Suspend/resume the live players. To stop their audio + CPU (e.g. when viewing Recordings, so live
+// sound doesn't overlap the recording) we tear down the <cam-player> and drop in a black placeholder;
+// resuming rebuilds it to reconnect. Grid<->Single stay live (no-op) so those switches never rebuffer.
 let _playersSuspended = false;
 function setPlayersLive(live) {
   if (live === !_playersSuspended) return;   // already in the desired state
@@ -383,8 +391,8 @@ function setPlayersLive(live) {
     if (live) {
       const cam = state.cameras.find((c) => c.mac === mac);
       if (cam) frame.replaceWith(camFrame(cam));   // reconnect the stream
-    } else if (frame && frame.tagName === "IFRAME") {
-      frame.src = "about:blank";                   // tear down the stream + its audio
+    } else if (frame && frame.tagName === "CAM-PLAYER") {
+      frame.replaceWith(suspendedFrame());         // tear down the stream + its audio
     }
   });
 }
@@ -409,7 +417,7 @@ function renderPlayers() {
       // setPlayersLive and the bar refresh below all address the tile by those positions).
       const elx = el("div", { className: "cam" }, camFrame(cam), zoomOverlay(cam.mac), camBar(cam));
       elx.dataset.mac = cam.mac;
-      if (_playersSuspended) elx.firstChild.src = "about:blank";  // don't start audio under Recordings
+      if (_playersSuspended) elx.firstChild.replaceWith(suspendedFrame());  // don't start audio under Recordings
       tiles.set(cam.mac, { el: elx });
       players.append(elx);
     } else {
