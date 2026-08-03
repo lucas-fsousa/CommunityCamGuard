@@ -8,10 +8,12 @@ Status: `todo` · `wip` · `done` · `blocked`.
 
 ---
 
-## Milestone M1 — Live video quality (Feature 1)  ⟶ IN PROGRESS
+## Milestone M1 — Live video quality (Feature 1)  ⟶ CORE DONE
 
 Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the most
-the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
+the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`. Core delivered
+(quality levels, per-camera selector, both freezing bugs fixed); the remaining rows are P2/P3 polish
+or wait on hardware/a human eye.
 
 | Priority | Item | Status |
 |---|---|---|
@@ -41,7 +43,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 |---|---|---|
 | P1 | Tooling: `ruff` (focused ruleset) + `mypy` (clean, 31 files) + CI running lint+types+tests | done |
 | P1 | `black` — config kept in pyproject, but **deliberately not applied**: a repo-wide format is ~887 lines of pure churn that undoes the author's intentional compact style (which the `ruff` ruleset is configured to allow). Lint/format bar is met by ruff+mypy. Available for anyone who wants it. | done |
-| P1 | Test coverage ≥ 90% — **REACHED: 65% → 91%** (302 tests). Major modules ≥ 90% (drivers/device/media 100%, storage 97%, recorder 93%, rtsp 92%, ws_discovery 89%). Remaining tails: `playback.py`, `main.py` (lifespan), some `routes.py` branches | done |
+| P1 | Test coverage ≥ 90% — **REACHED: 65% → 91%** (302 tests). Every module ≥ 89% (drivers/device/media 100%, storage 97%, recorder 93%, main/rtsp 92%, playback 91%, ws_discovery/routes 88–89%). Only scattered error-branch lines remain uncovered | done |
 | P1 | Formalise the driver layer (Strategy + Factory) — **already done**: `CameraDriver` + ordered registry + `detect`/`for_camera`/`get` + generic fallback | done |
 | P1 | Dependency injection for services — **already in place**: created in the lifespan, injected via `app.state`, no global service singletons; clean layer direction (registry never imports recording) | done |
 | P2 | Per-vendor conditionals isolated — **already done**: audit found **zero** vendor `if`-branches outside `drivers/`; all family logic lives in drivers | done |
@@ -51,7 +53,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 
 | Priority | Item | Status |
 |---|---|---|
-| P1 | `docs/public/` + `docs/internal/` structure + index. **ADRs 0001–0014** cover the load-bearing decisions (pillars, control, storage, audio, zoom, playback, i18n); `DECISIONS.md` kept as the historical journal | wip |
+| P1 | `docs/public/` + `docs/internal/` structure + index. **ADRs 0001–0014** cover every load-bearing decision (pillars, control, storage, audio, zoom, playback, i18n); `DECISIONS.md` kept as the historical journal by design (status/UX/bugfix notes aren't ADRs) | done |
 | P1 | **API/endpoint docs** — `docs/public/api.md` (reference) + Swagger/ReDoc at `/api/docs`, `/api/redoc`, schema at `/api/openapi.json` | done |
 | P2 | README with a documentation index pointing to `docs/`; roadmap de-duplicated; facts updated | done |
 | P2 | `CONTRIBUTING.md`: standards (ruff/mypy/pytest), PR flow, no-secrets rule, driver plug-in guide | done |

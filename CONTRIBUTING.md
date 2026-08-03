@@ -87,8 +87,9 @@ pytest                     # tests (throwaway DB, no cameras/network)
 - **Types:** annotate public functions; `mypy` must pass. New modules should be typed.
 - **Style:** `ruff` enforces imports, pyupgrade and bugbear rules; line length 100. (`black` is
   configured in `pyproject.toml` but not yet enforced repo-wide — don't mass-reformat existing files.)
-- **Tests:** every bug fix gets a regression test; we're working toward **≥90% coverage**
-  (`pytest --cov=backend/app`). Tests must be fast and offline — mock the network/subprocess layer.
+- **Tests:** every bug fix gets a regression test; keep coverage **≥90%**
+  (`pytest --cov=backend/app` — currently ~91%). Tests must be fast and offline — mock the
+  network/subprocess layer.
 - **Secrets:** never commit real camera credentials, IPs/MACs, tokens or `.env`. Use fake examples
   (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`). The `.gitignore` already excludes `data/`, `re/`, `.env`.
 

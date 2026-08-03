@@ -141,7 +141,7 @@ pytest                    # the suite in tests/
 ruff check backend tests  # lint
 mypy backend/app          # type-check
 ```
-The suite (290 tests) covers the logic — camera drivers, RTSP parsing/auth + credential
+The suite (300+ tests, ~91% coverage) covers the logic — camera drivers, RTSP parsing/auth + credential
 verification, encryption, capability probe, PTZ/reboot control, storage policy, retention + playback
 cache, recordings pagination, the REST endpoints and go2rtc config — against a throwaway DB, no
 cameras or network needed. Lint and types are enforced in CI (`.github/workflows/ci.yml`).

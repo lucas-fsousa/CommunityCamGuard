@@ -113,6 +113,7 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/api/media/streams` | Media-engine status + live-view settings (below). |
+| GET | `/api/media/activity` | Per-stream `{video_packets, consumers}` — liveness for a client freeze watchdog (a watched stream whose video packets stop advancing is frozen upstream). |
 | POST | `/api/media/restart` | Regenerate go2rtc config and restart it (after registry changes). |
 
 `GET /api/media/streams` returns:
