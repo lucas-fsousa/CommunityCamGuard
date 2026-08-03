@@ -38,7 +38,7 @@ máximo que a câmera + host sustentam. Referência de diagnóstico: `docs/DECIS
 |---|---|---|
 | P1 | Tooling: `ruff` (lint, ruleset focado) + `mypy` (limpo, 31 arquivos) + CI rodando lint+type+testes | done |
 | P1 | `black` configurado no pyproject — **aplicar** formatação em massa (37 arquivos) = passo deliberado à parte | todo |
-| P1 | Cobertura de testes ≥ 90% — **65% → 72%** (221 testes). Feito: `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py` ~75-82%. Falta: discovery (`ws_discovery` 24%, `active_scan` 37%), `recorder.py` 66%, `drivers/base.py` 62% | wip |
+| P1 | Cobertura de testes ≥ 90% — **65% → 76%** (233 testes). Feito: `drivers/base.py` 100%, `rtsp.py` 92%, `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py`. Falta: `ws_discovery` 24%, `active_scan` 37%, `recorder.py` 66% | wip |
 | P1 | Formalizar camada de drivers (Strategy + Factory) — **já pronto**: `CameraDriver` + registry ordenado + `detect`/`for_camera`/`get` + fallback genérico | done |
 | P1 | Injeção de dependência p/ serviços (go2rtc, recorder, registry) — remover singletons/acoplamento | todo |
 | P2 | Remover condicionais por fabricante espalhadas; isolar em drivers/adapters | todo |
