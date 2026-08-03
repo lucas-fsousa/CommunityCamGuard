@@ -40,9 +40,9 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 | P1 | `black` configured in pyproject — **applying** a repo-wide format (37 files) is a separate deliberate step | todo |
 | P1 | Test coverage ≥ 90% — **REACHED: 65% → 90%** (290 tests). Major modules ≥ 90% (drivers/device/media 100%, storage 97%, recorder 93%, rtsp 92%, ws_discovery 89%). Remaining tails: `playback.py`, `main.py` (lifespan), some `routes.py` branches | done |
 | P1 | Formalise the driver layer (Strategy + Factory) — **already done**: `CameraDriver` + ordered registry + `detect`/`for_camera`/`get` + generic fallback | done |
-| P1 | Dependency injection for services (go2rtc, recorder, registry) — remove singletons/coupling | todo |
-| P2 | Remove scattered per-vendor conditionals; isolate them in drivers/adapters | todo |
-| P2 | Split large files by single responsibility (audit `recorder.py`, `routes.py`) | todo |
+| P1 | Dependency injection for services — **already in place**: created in the lifespan, injected via `app.state`, no global service singletons; clean layer direction (registry never imports recording) | done |
+| P2 | Per-vendor conditionals isolated — **already done**: audit found **zero** vendor `if`-branches outside `drivers/`; all family logic lives in drivers | done |
+| P2 | Split large files / avoid God classes — **audited, OK**: largest is `recorder.py` (439 lines, one cohesive class); `routes.py` is 15 flat handlers; no God class. Optional future polish: split routes into per-domain sub-routers | done |
 
 ## Milestone M3 — Documentation & cross-platform (Feature 3)
 
