@@ -21,6 +21,8 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 | P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
 | P0 | **HD freezing FIXED** — it was MSE-over-internet (remote viewer). Forcing `mode=webrtc,mse` in the player fixed it (confirmed smooth on both cameras). Diagnosed via `scripts/diagnose_streams.sh` | done |
 | P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
+| P0 | **Frozen-player auto-recovery** (feedback): go2rtc keeps a stalled consumer on a dead producer (timer runs, picture frozen). Watchdog polls `/api/media/activity` (per-stream video packets); reloads a player stalled ~15s | done³ |
+| — | **Invariant:** recording always uses the base (main) feed at full quality (`-c:v copy`), decoupled from the live quality selector — guard tests lock it | done |
 | P2 | **Hardware acceleration** (`live_hwaccel`: vaapi/cuda/v4l2m2m/…) — plumbing + tests done | done¹ |
 | P1 | **Visual validation** of the bitrate levels + hwaccel against the real go2rtc | blocked² |
 | P2 | `high` profile/preset on the encoder — go2rtc ships UPX-packed, template not inspectable; validate first | blocked² |
@@ -31,6 +33,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 
 ¹ Gated (default `""` = software, current behaviour); needs a GPU to matter.
 ² Depends on hardware / a human eye on the real streams.
+³ Applied; needs the user to confirm a real freeze now auto-recovers instead of needing a manual reload.
 
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
