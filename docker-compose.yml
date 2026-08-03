@@ -1,0 +1,53 @@
+# Community Cam Guard (CCG) — local stack.
+# Both services use HOST networking: go2rtc must reach the LAN cameras (RTSP + WebRTC) and,
+# under WSL mirrored, host networking keeps everything on 127.0.0.1 (reachable from the
+# Windows browser) exactly like the host run. Ports (loopback, 32xx) come from the app's
+# settings / .env and the generated data/go2rtc.yaml.
+#
+# Bring up:  docker compose up -d --build
+# The app binds 127.0.0.1:3200; go2rtc binds 127.0.0.1:3201/3202/3203.
+
+name: ccg
+
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: ccg-go2rtc
+    network_mode: host          # reach LAN cameras + WebRTC; binds 127.0.0.1:32xx from config
+    volumes:
+      - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro   # generated from the registry by the app
+    restart: unless-stopped
+    # See the `app` service below for why these caps exist. go2rtc's ceiling is driven by the
+    # per-viewed-camera `_web` transcode (~140 MB each, measured), NOT by idle usage (~8 MB) —
+    # sizing it off an idle reading would OOM-kill the transcodes as soon as a few cameras are
+    # watched at once, killing the live players. 1g covers roughly six simultaneous viewers.
+    mem_limit: 1g
+    memswap_limit: 1g
+
+  app:
+    build: .
+    image: community-cam-guard-app:latest
+    container_name: ccg-app
+    network_mode: host          # serves 127.0.0.1:3200; reaches go2rtc at 127.0.0.1:3201/3203
+    env_file: .env
+    environment:
+      MANAGE_GO2RTC: "false"    # go2rtc is the container above — don't spawn the binary here
+    volumes:
+      - ./recordings:/app/recordings
+      - ./data:/app/data
+      - ./frontend:/app/frontend      # live-editable dashboard (no rebuild for UI tweaks)
+    depends_on:
+      - go2rtc
+    restart: unless-stopped
+    # Without a cgroup cap, a runaway recorder ffmpeg made the *kernel* OOM-kill globally: it
+    # picked victims outside the container (the WSL session's dbus-daemon), which dropped the
+    # user's console. With a cap the same runaway is contained — only the container's own
+    # process is killed, and the recorder's supervisor respawns it. `memswap_limit` equal to
+    # `mem_limit` means no extra swap: fail fast instead of thrashing the 2 GB swap of a 6 GB
+    # WSL. mem_limit works normally under `network_mode: host`.
+    mem_limit: 1g
+    memswap_limit: 1g
+    # Cap the container's own json log too, so a chatty crash loop can't fill the disk.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

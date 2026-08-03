@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.py[cod]
+.git/
+recordings/
+data/
+bin/
+.env
+node_modules/
+frontend/dist/

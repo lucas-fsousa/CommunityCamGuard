@@ -1,0 +1,272 @@
+:root {
+  --bg: #0e1116; --panel: #171c24; --panel-2: #1e242e; --line: #2b323d;
+  --text: #e8ebf0; --muted: #8a94a3; --accent: #5b8cff; --accent-2: #3f6fe0;
+  --ok: #35c46a; --alert: #f2a53a; --full: #ef5350;
+  --radius: 9px; --shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.error { color: var(--full); min-height: 1.2em; }
+
+.icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+
+/* Buttons */
+button {
+  display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 8px 13px; cursor: pointer; font-size: 13.5px;
+  font-weight: 600; transition: background .15s, border-color .15s, transform .05s, filter .15s;
+}
+button:hover { border-color: var(--accent); }
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  border-color: transparent; color: #fff; box-shadow: var(--shadow);
+}
+.btn-primary:hover { filter: brightness(1.08); border-color: transparent; }
+.btn-primary.block { width: 100%; padding: 11px; margin-top: 4px; }
+
+/* Bar/icon buttons carry a visible border so they read as buttons, not loose glyphs. */
+.icon-btn { padding: 8px; background: transparent; border-color: var(--line); color: var(--muted); }
+.icon-btn:hover { background: var(--panel-2); border-color: var(--accent); color: var(--text); }
+.icon-btn.danger:hover { color: var(--full); border-color: var(--full); }
+.lang { padding: 7px 8px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.lang:hover { color: var(--text); }
+
+/* Segmented control */
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 7px; }
+.seg button:hover { color: var(--text); }
+.seg button.active { background: var(--accent); color: #fff; box-shadow: var(--shadow); }
+
+input {
+  width: 100%; padding: 11px; margin: 6px 0; border-radius: var(--radius);
+  border: 1px solid var(--line); background: #10141a; color: var(--text); font-size: 14px;
+}
+input:focus { outline: none; border-color: var(--accent); }
+
+/* Login */
+.login { min-height: 100vh; display: grid; place-items: center;
+  background: radial-gradient(1200px 600px at 50% -10%, #182031, var(--bg)); }
+.card { background: var(--panel); padding: 24px; border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.login-card { width: 340px; text-align: center; }
+.login-card .logo-lg { width: 44px; height: 44px; color: var(--accent); }
+.card h1 { margin: 8px 0 2px; font-size: 20px; }
+
+/* Dashboard shell — full-height flex column so the stage fills the viewport */
+#dash { display: flex; flex-direction: column; height: 100vh; }
+
+/* Header */
+header {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), var(--bg));
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .logo { width: 26px; height: 26px; color: var(--accent); }
+.brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+.brand-text strong { font-size: 14px; }
+.brand-text span { font-size: 10px; letter-spacing: 2.5px; color: var(--muted); }
+#stage { flex: 1 1 auto; min-height: 0; padding: 12px; }
+.empty { display: grid; place-items: center; height: 100%; }
+.spacer { flex: 1; }
+.storage { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 20px;
+  border: 1px solid var(--line); background: var(--panel); }
+.storage.ok { color: var(--ok); }
+.storage.alert { color: var(--alert); border-color: var(--alert); }
+.storage.full { color: #fff; background: var(--full); border-color: var(--full); }
+
+/* Players are built once and kept mounted; the view (grid / single / recordings) is a pure
+   CSS switch on #stage, so a running stream is never torn down (no reload on view change). */
+#stage.single { display: flex; gap: 10px; }
+
+#rail { flex: 0 0 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+#stage:not(.single) #rail { display: none; }
+.rail-item {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+.rail-item:hover { border-color: var(--accent); }
+.rail-item.active { outline: 2px solid var(--accent); }
+.rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Grid: up to 4 fill the stage equally, more than 4 scrolls (rows set inline from JS). */
+#players { height: 100%; }
+#players:empty { display: none; }   /* no cameras — let the empty-state message stand alone */
+#stage.grid #players { display: grid; gap: 10px; overflow-y: auto; }
+/* Single: one large player; the others stay mounted but hidden (kept alive, not reloaded). */
+#stage.single #players { flex: 1 1 auto; min-width: 0; }
+#stage.single #players .cam { display: none; }
+#stage.single #players .cam.selected { display: flex; height: 100%; }
+#stage.recordings #players { display: none; }
+
+#recordings { height: 100%; }
+#stage:not(.recordings) #recordings { display: none; }
+
+/* Cameras view — scan + configuration (config cards for discovered cams, manage cards for
+   configured ones), separate from the live players. */
+#cameras { height: 100%; overflow-y: auto; }
+#stage:not(.cameras) #cameras { display: none; }
+#stage.cameras #players { display: none; }
+.cam-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.cam-section { margin-bottom: 22px; }
+.cam-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.cam-section-title .count { font-size: 11px; min-width: 20px; text-align: center; padding: 1px 7px;
+  border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
+/* align-items: start so a short manage card never stretches to a tall config card's height */
+.cam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px; align-content: start; align-items: start; }
+.cam-section .empty-hint { padding: 18px 0; }
+.cam-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.cam-card.available { border-color: var(--accent); }
+.cam-card-head { display: flex; align-items: center; gap: 8px; }
+.cam-card-head .name, .cam-card-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cam-card .tag { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 1px 6px;
+  border-radius: 999px; background: var(--accent); color: #fff; }
+.cam-card .ident { display: block; }
+.cam-card input { margin: 3px 0; }
+.cam-card-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+/* Camera tile */
+.cam {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column; min-height: 0; position: relative;
+}
+.cam .frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: #000; display: block; object-fit: contain;
+  transform-origin: center center; will-change: transform; }
+/* Digital zoom scales the iframe, which does not re-layout: .cam clips the overflow at the tile
+   edge, and the bar paints opaquely above it so the zoomed image never spills over the controls. */
+/* One compact row: identity, a flex spacer, then the action cluster. Small footer by design. */
+.bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  box-sizing: border-box; position: relative; z-index: 2; background: var(--panel); }
+.bar .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; }
+.bar .ip { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
+.bar-spacer { flex: 1 1 auto; }
+.rec { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+.rec.on { background: var(--full); box-shadow: 0 0 6px var(--full); }
+
+/* Action cluster + inline PTZ arrows (all one row, right-aligned). */
+.bar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.ptz-inline { display: inline-flex; align-items: center; gap: 3px; padding-right: 6px;
+  border-right: 1px solid var(--line); }
+.ptz-mini { padding: 4px 7px; font-size: 12px; line-height: 1; border: 1px solid var(--line);
+  border-radius: 6px; touch-action: none; user-select: none; -webkit-user-select: none;
+  display: inline-flex; align-items: center; justify-content: center; }
+.ptz-mini:hover { border-color: var(--accent); }
+.ptz-mini:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Digital zoom: pan surface + bar controls. The overlay is transparent to clicks at 1x so the
+   go2rtc player underneath keeps its own controls (unmute to listen); it only takes the pointer
+   once zoomed, to drag-pan and wheel-zoom. */
+.zoom-overlay { position: absolute; inset: 0; z-index: 1; pointer-events: none; touch-action: none; }
+.cam.zoomed .zoom-overlay { pointer-events: auto; cursor: grab; }
+.cam.zoomed .zoom-overlay.grabbing { cursor: grabbing; }
+.zoom-inline { display: inline-flex; align-items: center; gap: 1px; }
+.zoom-inline .icon-btn { padding: 2px 5px; font-size: 12px; line-height: 1; }
+.zoom-level { font-size: 10px; color: var(--muted); min-width: 26px; text-align: center;
+  font-variant-numeric: tabular-nums; }
+/* Per-camera quality dropdown — inline in the bar, matches the buttons. */
+.quality-select { font-size: 11px; font-weight: 600; padding: 4px 6px; line-height: 1;
+  color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px;
+  cursor: pointer; -webkit-appearance: menulist; appearance: auto; }
+.quality-select:hover { background: var(--panel-2); border-color: var(--accent); color: var(--text); }
+.quality-select option { color: var(--text); background: var(--panel); }
+
+/* Capability badges */
+.badges { display: inline-flex; gap: 4px; align-items: center; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2);
+  color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.badge.ptz { color: #7fd0ff; border-color: var(--accent); }
+.spin .icon { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Loading state (e.g. the network-scan popup) — centred spinner + message */
+.loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 30px 10px; }
+.spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line);
+  border-top-color: var(--accent); animation: spin .8s linear infinite; }
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 10; }
+.modal-card { width: min(560px, 92vw); max-height: 86vh; overflow: auto; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.row small { color: var(--muted); }
+
+/* Recordings browser — filter bar on top, a discreet clip list on the side, player beside it. */
+.rec-screen { height: 100%; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.rec-filter { flex: 0 0 auto; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.field select, .field input { margin: 0; }
+.rec-filter .retention { margin-left: auto; align-self: center; font-size: 12px; white-space: nowrap; }
+select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--line); background: #10141a; color: var(--text); font-size: 14px; }
+
+.rec-body { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.rec-side { flex: 0 0 300px; display: flex; flex-direction: column; min-height: 0; }
+.rec-list { flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.rec-pager { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding-top: 8px; }
+.rec-main { flex: 1 1 auto; min-width: 0; display: flex; }
+.rec-player { width: 100%; height: 100%; background: #000; border-radius: var(--radius);
+  border: 1px solid var(--line); object-fit: contain; }
+.rec-row { display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.rec-row:hover { background: var(--panel-2); color: var(--accent); }
+.rec-row.active { background: var(--panel-2); outline: 1px solid var(--accent); outline-offset: -1px; }
+.rec-row small { color: var(--muted); }
+
+/* ---------------------------------------------------------------------------------
+   Responsive / mobile. The dashboard is expected to be opened from phones, so below
+   ~760px the header collapses to icons, the grid goes single-column, and Single
+   stacks the camera rail on top. Touch targets grow.
+   --------------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  #dash { height: 100dvh; }                 /* dynamic vh so mobile browser chrome doesn't clip */
+  header { flex-wrap: wrap; padding: 8px 10px; gap: 8px; }
+  header .btn-primary span, .seg button span { display: none; }   /* icons only */
+  .brand-text span { display: none; }
+  .spacer { flex-basis: 100%; height: 0; }  /* force the controls onto their own wrapped row */
+  #storage { font-size: 11.5px; padding: 5px 10px; }
+  #stage { padding: 8px; }
+
+  /* Grid: one column, each camera a comfortable height, scroll the rest. */
+  #stage.grid #players { grid-template-columns: 1fr !important; grid-auto-rows: minmax(210px, 46vh) !important; }
+
+  /* Single: rail becomes a horizontal strip above the large player. */
+  #stage.single { flex-direction: column; }
+  #rail { flex: 0 0 auto; flex-direction: row; overflow-x: auto; overflow-y: hidden;
+    gap: 6px; padding: 0 0 6px; }
+  .rail-item { flex: 0 0 auto; }
+  .rail-name { max-width: 34vw; }
+
+  /* Bigger touch targets. */
+  .icon-btn { padding: 9px; }
+  .ptz-mini { padding: 7px 10px; font-size: 15px; }
+  .ptz-inline { gap: 5px; }
+
+  /* Recordings: stack the player above the clip list on narrow screens. */
+  .rec-body { flex-direction: column; }
+  .rec-side { flex: 1 1 auto; }
+  .rec-main { flex: 0 0 42vh; }
+}
+
+@media (max-width: 480px) {
+  .bar .ip { display: none; }               /* room is tight — name + actions matter more */
+  .bar { gap: 6px; padding: 7px 8px; }
+  .brand-text { display: none; }
+  .modal-card { width: 94vw; }
+}

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Lint (ruff)
+        run: ruff check backend tests
+      - name: Type-check (mypy)
+        run: mypy backend/app
+      - name: Test (pytest)
+        run: pytest
+    # Note: `black --check` is intentionally not enforced yet — adopting the formatter across the
+    # existing codebase is a deliberate, separate step (see ROADMAP M2). The config lives in
+    # pyproject so it is a one-command switch once that lands.

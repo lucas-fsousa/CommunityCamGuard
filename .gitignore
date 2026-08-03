@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+venv*/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Test coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Local working notes / feedback — may carry device credentials or raw logs, never commit
+FEEDBACK.md
+
+# Environment-specific diagnostic tooling (dumps live camera creds/logs into data/diag) — local only
+scripts/diagnose_streams.sh
+
+# Secrets & local config
+.env
+
+# Runtime data (SQLite registry + generated go2rtc.yaml hold camera credentials)
+recordings/
+data/
+*.db
+*.sqlite3
+
+# Media engine binary (downloaded via scripts/bootstrap)
+go2rtc
+go2rtc.exe
+bin/
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+
+# Harness / environment (not part of the project)
+.ai-jail
+.claude/
+
+# scratch dir for local audio/debug captures (not for the repo)
+tmp/
+
+# Reverse-engineering workspace (APKs, extracted libs, scratch)
+re/
