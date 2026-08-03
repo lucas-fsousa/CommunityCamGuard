@@ -278,6 +278,13 @@ def media_streams(request: Request) -> dict:
             "live_hwaccel": s.live_hwaccel}
 
 
+@router.get("/media/activity", dependencies=[Depends(require_auth)])
+def media_activity(request: Request) -> dict:
+    """Per-stream video-packet liveness, for the dashboard's freeze watchdog (see go2rtc)."""
+    media = getattr(request.app.state, "media", None)
+    return media.stream_activity() if media else {}
+
+
 @router.post("/media/restart", dependencies=[Depends(require_auth)])
 def media_restart(request: Request) -> dict:
     _resync(request)

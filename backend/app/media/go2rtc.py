@@ -235,6 +235,33 @@ class Go2rtc:
             self.write_config(cameras)
             self.reload_external()
 
+    def stream_activity(self) -> dict[str, dict]:
+        """Per-stream liveness for the freeze watchdog: ``{stream_id: {video_packets, consumers}}``.
+
+        go2rtc leaves a stalled WebRTC/MSE consumer attached to a **dead producer** — the player's
+        timer keeps running while the picture is frozen (visible via the camera's burnt-in
+        timestamp). ``video_packets`` is the producers' received **video** packet total; a stream
+        whose video packets stop advancing *while it still has consumers* is frozen upstream, and
+        the dashboard rebuilds that player. Best-effort: returns ``{}`` if go2rtc can't be read.
+        """
+        try:
+            with urllib.request.urlopen(f"{self.api}/api/streams", timeout=2) as r:
+                data = json.loads(r.read())
+        except (urllib.error.URLError, OSError, ValueError):
+            return {}
+        out: dict[str, dict] = {}
+        for sid, s in (data or {}).items():
+            producers = s.get("producers") or []
+            consumers = s.get("consumers") or []
+            video_packets = sum(
+                rc.get("packets", 0)
+                for p in producers
+                for rc in (p.get("receivers") or [])
+                if (rc.get("codec") or {}).get("codec_type") == "video"
+            )
+            out[sid] = {"video_packets": video_packets, "consumers": len(consumers)}
+        return out
+
     def wait_healthy(self, timeout: float = 10.0) -> bool:
         """Poll the API until it answers, so callers know go2rtc is ready."""
         deadline = time.monotonic() + timeout

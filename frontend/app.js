@@ -337,6 +337,39 @@ function refreshPlayer(mac, btn) {
   t.el.firstChild.replaceWith(camFrame(cam));
 }
 
+// Freeze watchdog. go2rtc leaves a stalled WebRTC/MSE consumer attached to a **dead producer**, so
+// the player's on-screen timer keeps advancing while the picture is frozen (visible via the camera's
+// burnt-in timestamp) — and it only recovers on a manual reload. We can't read the cross-origin
+// iframe's <video>, so we poll go2rtc's per-stream **video packet** counter (through the backend): a
+// watched stream whose video packets stop advancing for a few polls is frozen upstream, so we rebuild
+// that one player automatically — exactly what the manual reload does.
+const STALL_POLL_MS = 5000, STALL_STRIKES = 3;   // ~15s of no new video frames before we reload
+const _stall = new Map();   // mac -> { sid, packets, strikes }
+async function freezeWatchdog() {
+  if (_playersSuspended || (state.view !== "grid" && state.view !== "single")) return;
+  let activity;
+  try { activity = await api("/media/activity"); } catch { return; }
+  tiles.forEach((t, mac) => {
+    const frame = t.el.firstChild;
+    if (!frame || frame.tagName !== "IFRAME" || frame.src === "about:blank") return;
+    const a = activity[frame.dataset.src];
+    if (!a || a.consumers === 0) { _stall.delete(mac); return; }     // not currently watched
+    const prev = _stall.get(mac);
+    if (!prev || prev.sid !== frame.dataset.src || a.video_packets > prev.packets) {
+      _stall.set(mac, { sid: frame.dataset.src, packets: a.video_packets, strikes: 0 });
+      return;                                                        // fresh or still flowing
+    }
+    const strikes = prev.strikes + 1;
+    if (strikes >= STALL_STRIKES) {
+      _stall.delete(mac);
+      console.warn(`freeze watchdog: ${frame.dataset.src} stalled — reloading`);
+      refreshPlayer(mac);                                            // rebuild the frozen player
+    } else {
+      _stall.set(mac, { sid: frame.dataset.src, packets: a.video_packets, strikes });
+    }
+  });
+}
+
 // Suspend/resume the live players. The go2rtc players are cross-origin iframes, so we can't
 // script their volume — to stop their audio (e.g. when viewing Recordings, so live sound doesn't
 // overlap the recording) we unload the iframe; resuming rebuilds it to reconnect. Grid<->Single
@@ -684,6 +717,7 @@ async function boot() {
   state.gridHdMax = media.grid_hd_max_cameras ?? 0;
   await Promise.all([loadCameras(), loadStorage()]);
   setInterval(loadStorage, 15000);
+  setInterval(freezeWatchdog, STALL_POLL_MS);   // auto-reload a player whose video has frozen
 }
 
 applyI18n();     // fill static labels for the initial language (the login screen shows first)
