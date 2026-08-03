@@ -48,7 +48,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 
 | Priority | Item | Status |
 |---|---|---|
-| P1 | `docs/public/` + `docs/internal/` structure + index. **ADRs started** (0001–0010 cover the pillars + control/storage); migrating the remaining `DECISIONS.md` decisions in batches | wip |
+| P1 | `docs/public/` + `docs/internal/` structure + index. **ADRs 0001–0014** cover the load-bearing decisions (pillars, control, storage, audio, zoom, playback, i18n); `DECISIONS.md` kept as the historical journal | wip |
 | P1 | **API/endpoint docs** — `docs/public/api.md` (reference) + Swagger/ReDoc at `/api/docs`, `/api/redoc`, schema at `/api/openapi.json` | done |
 | P2 | README with a documentation index pointing to `docs/`; roadmap de-duplicated; facts updated | done |
 | P2 | `CONTRIBUTING.md`: standards (ruff/mypy/pytest), PR flow, no-secrets rule, driver plug-in guide | done |
