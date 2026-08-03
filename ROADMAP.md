@@ -1,67 +1,67 @@
 # ROADMAP — Community Cam Guard (CCG)
 
-Documento vivo. Backlog, prioridades e marcos. Detalhe técnico e justificativas ficam em
-`docs/` (ADRs); aqui fica **o quê** e **em que ordem**, não o **como**.
+Living document: backlog, priorities and milestones. Technical detail and rationale live in
+`docs/` (ADRs); this file is **what** and **in what order**, not **how**.
 
-Legenda de prioridade: **P0** crítico · **P1** alto · **P2** médio · **P3** oportunista.
+Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
 
 ---
 
-## Marco M1 — Qualidade de vídeo ao vivo (Feature 1)  ⟶ EM ANDAMENTO
+## Milestone M1 — Live video quality (Feature 1)  ⟶ IN PROGRESS
 
-Objetivo: aproximar a imagem do app oficial, com um **seletor de qualidade** cujo default é o
-máximo que a câmera + host sustentam. Referência de diagnóstico: `docs/DECISIONS.md §34`.
+Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the most
+the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 
-| Prioridade | Item | Status |
+| Priority | Item | Status |
 |---|---|---|
-| P0 | **Bitrate alvo + GOP** no transcode (`-b:v/-maxrate/-bufsize/-g`) — antes só defaults do go2rtc | done |
-| P0 | Modelo de **níveis de qualidade** (`low`/`medium`/`high`/`max`) mapeando fonte→bitrate (`media/quality.py`) | done |
-| P0 | Config `live_quality` (default `max`) + testes unitários (`test_quality.py`, wiring do `build_config`) | done |
-| P1 | **Seletor de qualidade por câmera na UI** — dropdown Auto/HD/SD (client-side/instantâneo) + endpoint expõe qualidade | done |
-| P0 | **Travamento do HD RESOLVIDO** — era MSE-sobre-internet (viewer remoto). Forçar `mode=webrtc,mse` no player resolveu; usuário confirmou HD liso nas 2 câmeras. Diagnóstico via `scripts/diagnose_streams.sh` | done |
-| P1 | **Polimento dos controles** (feedback): dropdown de qualidade, D-pad de PTZ em cruz, borda em todos os botões, barra mais alta | done |
-| P2 | Resiliência a engasgo da câmera (EOF→reconnect do transcode) — tuning de timeout/reconnect no go2rtc (fator secundário) | todo |
-| P2 | **Aceleração por hardware** (`live_hwaccel`: vaapi/cuda/v4l2m2m/...) — plumbing + testes prontos | done¹ |
-| P1 | **Validação visual** dos níveis de bitrate + hwaccel contra o go2rtc real → `FEEDBACK.md` | blocked² |
-| P2 | Perfil `high`/preset no encoder — go2rtc vem UPX-packed, template não inspecionável; validar antes | blocked² |
-| P2 | Auto-degradação sob pressão de CPU (respeita `grid_hd_max_cameras` como guarda de host) | todo |
-| P2 | UI: controle global de `live_quality` (bitrate) — precisa endpoint de settings + restart go2rtc | todo |
+| P0 | **Target bitrate + GOP** on the transcode (`-b:v/-maxrate/-bufsize/-g`) — was go2rtc defaults only | done |
+| P0 | **Quality levels** model (`low`/`medium`/`high`/`max`) mapping source→bitrate (`media/quality.py`) | done |
+| P0 | `live_quality` setting (default `max`) + unit tests (`test_quality.py`, `build_config` wiring) | done |
+| P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
+| P0 | **HD freezing FIXED** — it was MSE-over-internet (remote viewer). Forcing `mode=webrtc,mse` in the player fixed it (confirmed smooth on both cameras). Diagnosed via `scripts/diagnose_streams.sh` | done |
+| P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
+| P2 | **Hardware acceleration** (`live_hwaccel`: vaapi/cuda/v4l2m2m/…) — plumbing + tests done | done¹ |
+| P1 | **Visual validation** of the bitrate levels + hwaccel against the real go2rtc | blocked² |
+| P2 | `high` profile/preset on the encoder — go2rtc ships UPX-packed, template not inspectable; validate first | blocked² |
+| P2 | Camera-hiccup resilience (transcode EOF→reconnect) — go2rtc timeout/reconnect tuning (secondary factor) | todo |
+| P2 | Auto-degradation under CPU pressure (honours `grid_hd_max_cameras` as the host guard) | todo |
+| P2 | UI: global `live_quality` (bitrate) control — needs a settings endpoint + go2rtc restart | todo |
+| P3 | Measure and document quality vs. the vendor app (bitrate/resolution/latency side by side) | todo |
 
-¹ Gated (default `""` = software, comportamento atual). Precisa do GPU do usuário pra valer — ver `FEEDBACK.md §3`.
-² Depende do hardware/olho do usuário. Passos e o que reportar em `FEEDBACK.md`.
-| P3 | Medir e documentar qualidade vs. app oficial (bitrate/resolução/latência lado a lado) | todo |
+¹ Gated (default `""` = software, current behaviour); needs a GPU to matter.
+² Depends on hardware / a human eye on the real streams.
 
-## Marco M2 — Arquitetura & qualidade de código (Feature 2)
+## Milestone M2 — Architecture & code quality (Feature 2)
 
-| Prioridade | Item | Status |
+| Priority | Item | Status |
 |---|---|---|
-| P1 | Tooling: `ruff` (lint, ruleset focado) + `mypy` (limpo, 31 arquivos) + CI rodando lint+type+testes | done |
-| P1 | `black` configurado no pyproject — **aplicar** formatação em massa (37 arquivos) = passo deliberado à parte | todo |
-| P1 | Cobertura de testes ≥ 90% — **65% → 76%** (233 testes). Feito: `drivers/base.py` 100%, `rtsp.py` 92%, `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py`. Falta: `ws_discovery` 24%, `active_scan` 37%, `recorder.py` 66% | wip |
-| P1 | Formalizar camada de drivers (Strategy + Factory) — **já pronto**: `CameraDriver` + registry ordenado + `detect`/`for_camera`/`get` + fallback genérico | done |
-| P1 | Injeção de dependência p/ serviços (go2rtc, recorder, registry) — remover singletons/acoplamento | todo |
-| P2 | Remover condicionais por fabricante espalhadas; isolar em drivers/adapters | todo |
-| P2 | Quebrar arquivos grandes por responsabilidade única (auditar `recorder.py`, `routes.py`) | todo |
+| P1 | Tooling: `ruff` (focused ruleset) + `mypy` (clean, 31 files) + CI running lint+types+tests | done |
+| P1 | `black` configured in pyproject — **applying** a repo-wide format (37 files) is a separate deliberate step | todo |
+| P1 | Test coverage ≥ 90% — **65% → 76%** (233 tests). Done: `drivers/base.py` 100%, `rtsp.py` 92%, `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py`. Left: `ws_discovery` 24%, `active_scan` 37%, `recorder.py` 66% | wip |
+| P1 | Formalise the driver layer (Strategy + Factory) — **already done**: `CameraDriver` + ordered registry + `detect`/`for_camera`/`get` + generic fallback | done |
+| P1 | Dependency injection for services (go2rtc, recorder, registry) — remove singletons/coupling | todo |
+| P2 | Remove scattered per-vendor conditionals; isolate them in drivers/adapters | todo |
+| P2 | Split large files by single responsibility (audit `recorder.py`, `routes.py`) | todo |
 
-## Marco M3 — Documentação & multiplataforma (Feature 3)
+## Milestone M3 — Documentation & cross-platform (Feature 3)
 
-| Prioridade | Item | Status |
+| Priority | Item | Status |
 |---|---|---|
-| P1 | Estrutura `docs/public/` + `docs/internal/` + índice. **ADRs iniciados** (6 fundacionais: drivers, identidade-MAC, discovery, gravação, live-view, OOM); migração das demais decisões do `DECISIONS.md` segue em lotes | wip |
-| P1 | **Doc de API/endpoints** — `docs/public/api.md` (referência) + Swagger/ReDoc em `/api/docs`,`/api/redoc`, schema em `/api/openapi.json` | done |
-| P2 | README com índice/documentação apontando pra `docs/`; roadmap desduplicado; fatos atualizados | done |
-| P2 | `CONTRIBUTING.md`: padrões (ruff/mypy/pytest), fluxo de PR, regra de segredos, plug-in de driver | done |
-| P2 | Infra: Dockerfile/compose/.dockerignore revisados (comentário "SKELETON" desatualizado corrigido, contexto de build enxuto, framing cross-platform) | done |
-| P2 | Suporte Windows/Linux/macOS documentado (Docker roda em todos; WSL reenquadrado como opção do Windows, não requisito). Falta: testar de fato em macOS/Windows nativo | wip |
+| P1 | `docs/public/` + `docs/internal/` structure + index. **ADRs started** (0001–0010 cover the pillars + control/storage); migrating the remaining `DECISIONS.md` decisions in batches | wip |
+| P1 | **API/endpoint docs** — `docs/public/api.md` (reference) + Swagger/ReDoc at `/api/docs`, `/api/redoc`, schema at `/api/openapi.json` | done |
+| P2 | README with a documentation index pointing to `docs/`; roadmap de-duplicated; facts updated | done |
+| P2 | `CONTRIBUTING.md`: standards (ruff/mypy/pytest), PR flow, no-secrets rule, driver plug-in guide | done |
+| P2 | Infra: Dockerfile/compose/.dockerignore reviewed (stale "SKELETON" comment fixed, lean build context, cross-platform framing) | done |
+| P2 | Windows/Linux/macOS documented (Docker runs on all; WSL reframed as one Windows option, not a requirement). Left: actually test on native macOS/Windows | wip |
 
-## Fora de escopo / paralelo (RE do protocolo P2P)
+## Out of scope / parallel track
 
-A engenharia reversa do controle P2P (reboot/PTZ/two-way talk direto) segue como trilha
-separada — ver `re/notes/` e `re/notes/penetrate-commands.md` (dicionário de comandos já
-recuperado). Não bloqueia os marcos acima.
+Direct control of **reboot and two-way audio** lives in the vendor's proprietary P2P channel, not
+ONVIF (see ADR 0008) — reverse-engineering it is a separate track and does not block the milestones
+above.
 
 ---
 
-_Convenção: ao concluir um item, marque `done` e mova o detalhe técnico/justificativa para um ADR
-em `docs/internal/`._
+_Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
+under `docs/internal/`._
