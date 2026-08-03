@@ -74,9 +74,34 @@ per-model database; confirm with `ffprobe -rtsp_transport udp "rtsp://user:pass@
 Note the exact model(s)/firmware you verified in the module docstring, and add a case to
 `tests/test_drivers.py` (paths / detection / control gating).
 
+## Code standards
+
+CI (`.github/workflows/ci.yml`) runs three gates on every push/PR — run them locally first:
+
+```bash
+ruff check backend tests   # lint (config in pyproject.toml)
+mypy backend/app           # type-check
+pytest                     # tests (throwaway DB, no cameras/network)
+```
+
+- **Types:** annotate public functions; `mypy` must pass. New modules should be typed.
+- **Style:** `ruff` enforces imports, pyupgrade and bugbear rules; line length 100. (`black` is
+  configured in `pyproject.toml` but not yet enforced repo-wide — don't mass-reformat existing files.)
+- **Tests:** every bug fix gets a regression test; we're working toward **≥90% coverage**
+  (`pytest --cov=backend/app`). Tests must be fast and offline — mock the network/subprocess layer.
+- **Secrets:** never commit real camera credentials, IPs/MACs, tokens or `.env`. Use fake examples
+  (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`). The `.gitignore` already excludes `data/`, `re/`, `.env`.
+
+## PR flow
+
+1. Branch off `main`; keep the change focused.
+2. Make the three gates above green; add/adjust tests.
+3. Note the exact camera model(s)/firmware you verified (for driver PRs) in the module docstring.
+4. Open the PR with a short *why*. Match the surrounding style; keep modules cohesive.
+
 ## Guidelines
 
 - **Be gentle with cameras.** These cheap devices hang under connection pressure — discovery
   reuses one connection, throttles, and caps concurrency. Keep it that way.
 - Keep it **standard-library-first** in the discovery layer (no heavy ONVIF deps).
-- Run `pytest` before opening a PR. Match the surrounding style; keep modules cohesive.
+- Prefer the driver interface over per-vendor `if` branches scattered through the app.

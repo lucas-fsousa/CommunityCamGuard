@@ -14,6 +14,16 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 > dedicated **Cameras** setup tab, and a REST API. Two-way audio (talk) and camera reboot are the
 > remaining controls (they live in the vendor P2P channel — see `docs/DECISIONS.md`).
 
+## Documentation
+
+| | |
+|---|---|
+| **[Setup](#setup)** | Run it — Docker on Linux/macOS/Windows, or Python directly. |
+| **[API reference](docs/public/api.md)** | Every REST endpoint — build your own UI/scripts. Interactive at `/api/docs`. |
+| **[Contributing](CONTRIBUTING.md)** | Dev setup, standards (ruff/mypy/pytest), how to add a camera brand. |
+| **[Roadmap](ROADMAP.md)** | Backlog, priorities, milestones. |
+| **[Design decisions](docs/DECISIONS.md)** | The *why* behind the architecture. |
+
 ## Supported cameras & adding your own
 
 Camera-family knowledge lives in a **pluggable driver layer** (`backend/app/drivers/`). A driver
@@ -72,20 +82,22 @@ out, two-way audio (mic), digital outputs (LED / "anti-thief" siren).
   older than N days (0 = keep forever).
 - **Auth** — a secret key from `.env` gates the dashboard via a signed session cookie.
 
-## WSL networking (important)
+## Platforms & networking
 
-WSL2's default NAT networking cannot reach cameras on your LAN, and multicast discovery does
-not cross it. On **Windows 11** enable **mirrored** networking so WSL shares the host's
-network interfaces. Add to `C:\Users\<you>\.wslconfig`:
+Runs anywhere Docker does — **Linux, macOS and Windows**. The one requirement is that the host can
+reach the cameras on your LAN (discovery and RTSP are direct, on-network):
 
-```ini
-[wsl2]
-networkingMode=mirrored
-```
+- **Linux / macOS** — host networking works out of the box; nothing special to do.
+- **Windows** — run via **Docker Desktop** or **WSL2**. WSL2's default NAT can't reach LAN cameras
+  and blocks multicast discovery, so enable **mirrored** networking. Add to `C:\Users\<you>\.wslconfig`:
 
-Then `wsl --shutdown` and reopen. It is fully reversible (remove the line + `wsl --shutdown`).
-Outbound-based setups like `cloudflared` tunnels and `nginx` reached via `localhost` keep
-working; only setups that hard-code the old `172.x` WSL IP or use custom `iptables` need care.
+  ```ini
+  [wsl2]
+  networkingMode=mirrored
+  ```
+
+  then `wsl --shutdown` and reopen (fully reversible). Outbound setups like `cloudflared` tunnels and
+  `nginx` via `localhost` keep working; only setups hard-coding the old `172.x` WSL IP need care.
 
 ## Setup
 
@@ -124,13 +136,15 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 ### Tests
 
 ```bash
-pip install -e '.[dev]'   # pytest
-pytest                    # runs the suite in tests/
+pip install -e '.[dev]'
+pytest                    # the suite in tests/
+ruff check backend tests  # lint
+mypy backend/app          # type-check
 ```
-The suite (~110 tests) covers the pure logic — camera drivers, RTSP parsing/auth + credential
-verification, credential encryption, capability probe, storage policy, retention + playback cache,
-recordings pagination, go2rtc config/reload, config, session tokens — against a throwaway DB, no
-cameras or network needed.
+The suite (200+ tests) covers the logic — camera drivers, RTSP parsing/auth + credential
+verification, encryption, capability probe, PTZ/reboot control, storage policy, retention + playback
+cache, recordings pagination, the REST endpoints and go2rtc config — against a throwaway DB, no
+cameras or network needed. Lint and types are enforced in CI (`.github/workflows/ci.yml`).
 
 ## Operating note: power-cycle the cameras first
 
@@ -153,28 +167,12 @@ does not lose a camera's identity, name or credentials — it is re-matched auto
 
 ## Roadmap
 
-- [x] Project scaffold, config, ONVIF WS-Discovery
-- [x] Active-scan discovery fallback (MAC identity, curated endpoint whitelist, gentle probe)
-- [x] Camera registry (SQLite, MAC-keyed, Fernet-encrypted credentials)
-- [x] go2rtc integration (generate config from registry, manage process, WebRTC + RTSP restream)
-- [x] 24/7 segment recorder (ffmpeg -c:v copy, 60s MP4 chunks by day/hour) + SQLite index
-- [x] Storage monitor (80% alert, skip-save-when-full, auto-resume; never deletes)
-- [x] Recording retention — time-based cleanup job (`RECORDING_RETENTION_DAYS`; 0 = keep forever)
-- [x] FastAPI backend: secret-key cookie auth + REST API (cameras, discovery, storage, recordings) + service lifespan
-- [x] Web dashboard (plain HTML/JS): login, live grid/single via go2rtc, storage banner, recording playback
-- [x] Pluggable **camera drivers** (`backend/app/drivers/`) — adding a brand is one file + one line
-- [x] No-auth scan **identification** (vendor/model/firmware/RTSP paths/driver) + MAC from ONVIF
-- [x] Dedicated **Cameras** tab — scan, filter (all/available/configured), credential-validated add
-      with **automatic capability probe** so controls enable on add
-- [x] **Recordings browser** — filter by camera + date range, paginated (`limit`/`offset`, capped),
-      crash-safe fragmented-MP4 segments, HEVC→H.264 browser playback
-- [x] Capability probe (PTZ / audio / video codecs / port roles) + real RTSP stream URIs via ONVIF
-- [x] Device control: **PTZ** (ONVIF, press-and-hold) + **listen-in audio** (WebRTC)
-- [x] i18n — dashboard localised (en default + pt-BR), browser-detected + header selector; more locales are one dict block
-- [x] Playback cache eviction (LRU size cap via `PLAYBACK_CACHE_MB`) + opt-in background pre-transcode (`PLAYBACK_PRETRANSCODE`)
-- [ ] Two-way audio (talk/mic) + camera reboot — live in the vendor **Gwell P2P** channel (needs a
-      packet capture of the vendor app to reverse; ONVIF is exhausted for these units)
-- [ ] Optional S3 tiering
+Discovery, MAC-keyed registry, go2rtc live view, 24/7 recording + retention, storage policy,
+pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
+API are all **working**. Still open: **two-way audio (talk) and camera reboot** (they live in the
+vendor Gwell P2P channel — see `docs/DECISIONS.md`) and optional S3 tiering.
+
+Full backlog, priorities and milestones: **[ROADMAP.md](ROADMAP.md)**.
 
 ## License
 

@@ -1,10 +1,28 @@
-.venv/
+# Keep the build context small and free of local/dev/sensitive files.
+.git/
+.github/
+.venv*/
+venv*/
 __pycache__/
 *.py[cod]
-.git/
-recordings/
-data/
-bin/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Runtime data & secrets (never into the image/context)
 .env
+data/
+recordings/
+bin/
+FEEDBACK.md
+
+# Local tooling / workspaces not needed to build the app
+re/
+tmp/
+scripts/
+docs/
+tests/
 node_modules/
 frontend/dist/

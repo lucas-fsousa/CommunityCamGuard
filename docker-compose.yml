@@ -1,8 +1,8 @@
 # Community Cam Guard (CCG) — local stack.
-# Both services use HOST networking: go2rtc must reach the LAN cameras (RTSP + WebRTC) and,
-# under WSL mirrored, host networking keeps everything on 127.0.0.1 (reachable from the
-# Windows browser) exactly like the host run. Ports (loopback, 32xx) come from the app's
-# settings / .env and the generated data/go2rtc.yaml.
+# Both services use HOST networking so go2rtc can reach the LAN cameras (RTSP + WebRTC) directly.
+# Everything binds loopback (127.0.0.1, 32xx range). On Windows via WSL2, enable `mirrored`
+# networking (see README) so this reaches the LAN and the Windows browser exactly like a host run.
+# Ports come from the app's settings / .env and the generated data/go2rtc.yaml.
 #
 # Bring up:  docker compose up -d --build
 # The app binds 127.0.0.1:3200; go2rtc binds 127.0.0.1:3201/3202/3203.

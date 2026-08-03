@@ -1,5 +1,6 @@
-# App image (FastAPI + recorder). SKELETON — not used yet; for now run on the host with
-# `python -m backend.app.main`. go2rtc runs as its own container (see docker-compose.yml).
+# App image (FastAPI + recorder). Built and run by docker-compose.yml (the `app` service).
+# go2rtc runs as its own container (also in the compose file). To run without Docker instead,
+# use `python -m backend.app.main` on the host.
 FROM python:3.12-slim
 
 # ffmpeg is required by the recorder (segmenting the go2rtc restream).

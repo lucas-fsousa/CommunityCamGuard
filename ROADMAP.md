@@ -50,9 +50,10 @@ máximo que a câmera + host sustentam. Referência de diagnóstico: `docs/DECIS
 |---|---|---|
 | P1 | Estrutura `docs/public/` + `docs/internal/` criada + índice `docs/README.md`; **quebrar `DECISIONS.md` em ADRs** ainda pendente | wip |
 | P1 | **Doc de API/endpoints** — `docs/public/api.md` (referência) + Swagger/ReDoc em `/api/docs`,`/api/redoc`, schema em `/api/openapi.json` | done |
-| P2 | README curto com índice apontando pra `docs/` | todo |
-| P2 | `CONTRIBUTING.md`: padrões, arquitetura, convenções, testes, fluxo de PR | todo |
-| P2 | Suporte oficial Windows/Linux/macOS; WSL como opção de execução, não requisito | todo |
+| P2 | README com índice/documentação apontando pra `docs/`; roadmap desduplicado; fatos atualizados | done |
+| P2 | `CONTRIBUTING.md`: padrões (ruff/mypy/pytest), fluxo de PR, regra de segredos, plug-in de driver | done |
+| P2 | Infra: Dockerfile/compose/.dockerignore revisados (comentário "SKELETON" desatualizado corrigido, contexto de build enxuto, framing cross-platform) | done |
+| P2 | Suporte Windows/Linux/macOS documentado (Docker roda em todos; WSL reenquadrado como opção do Windows, não requisito). Falta: testar de fato em macOS/Windows nativo | wip |
 
 ## Fora de escopo / paralelo (RE do protocolo P2P)
 
