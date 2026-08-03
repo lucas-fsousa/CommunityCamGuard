@@ -40,7 +40,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 | Priority | Item | Status |
 |---|---|---|
 | P1 | Tooling: `ruff` (focused ruleset) + `mypy` (clean, 31 files) + CI running lint+types+tests | done |
-| P1 | `black` configured in pyproject — **applying** a repo-wide format (37 files) is a separate deliberate step | todo |
+| P1 | `black` — config kept in pyproject, but **deliberately not applied**: a repo-wide format is ~887 lines of pure churn that undoes the author's intentional compact style (which the `ruff` ruleset is configured to allow). Lint/format bar is met by ruff+mypy. Available for anyone who wants it. | done |
 | P1 | Test coverage ≥ 90% — **REACHED: 65% → 90%** (290 tests). Major modules ≥ 90% (drivers/device/media 100%, storage 97%, recorder 93%, rtsp 92%, ws_discovery 89%). Remaining tails: `playback.py`, `main.py` (lifespan), some `routes.py` branches | done |
 | P1 | Formalise the driver layer (Strategy + Factory) — **already done**: `CameraDriver` + ordered registry + `detect`/`for_camera`/`get` + generic fallback | done |
 | P1 | Dependency injection for services — **already in place**: created in the lifespan, injected via `app.state`, no global service singletons; clean layer direction (registry never imports recording) | done |
