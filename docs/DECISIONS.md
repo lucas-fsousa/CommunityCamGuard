@@ -603,8 +603,8 @@ pcap to reverse — now confirmed by evidence, so we stop rabbit-holing ONVIF fo
 stays as the concrete win from the sweep; `deviceio_service` audio ops are dead here.
 
 **Also extractable from :5000 (found in the sweep, wiring deferred):**
-- **`device.GetNetworkInterfaces`** — TRUSTWORTHY: returns the camera's own MAC (`f4-e2-5d-c8-f8-35`
-  / `d8-3a-36-71-77-e7`, verified against ARP) + hostname `IPC73` + DHCP/IP → authoritative identity
+- **`device.GetNetworkInterfaces`** — TRUSTWORTHY: returns the camera's own MAC (`aa-bb-cc-dd-ee-01`
+  / `aa-bb-cc-dd-ee-02`, verified against ARP) + hostname `IPC73` + DHCP/IP → authoritative identity
   **without** ARP/`/proc/net/arp` (which only works under mirrored WSL). This is the one worth wiring
   when identity needs to stop depending on ARP.
 - **`media.GetVideoEncoderConfigurations` / `…Options`** — answer 200 but are a **DECOY**: they report
