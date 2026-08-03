@@ -51,15 +51,15 @@ out, two-way audio (mic), digital outputs (LED / "anti-thief" siren).
 
 ```
                  ┌────────────────────────── FastAPI (Python) ──────────────────────────┐
-   Browser ──────┤  auth (secret-key cookie) · REST API · discovery · recording manager  │
+   Browser ──────┤  auth (secret-key cookie) · REST API · discovery · recording manager │
    (dashboard)   └───────────────┬───────────────────────────────────┬──────────────────┘
-        │  WebRTC/HLS            │ manages                            │ spawns
-        ▼                        ▼                                    ▼
+        │  WebRTC/HLS            │ manages                           │ spawns
+        ▼                        ▼                                   ▼
    ┌──────────┐          ┌──────────────┐                    ┌──────────────────┐
    │  go2rtc  │◀── RTSP ─┤   Cameras    │                    │ ffmpeg -c copy   │
    │ (media)  │   ONVIF  │  (LAN, WiFi) │                    │ segment recorder │
    └──────────┘          └──────────────┘                    └────────┬─────────┘
-                                                                       ▼
+                                                                      ▼
                                                     recordings/<cam>/<date>/<hh>/*.mp4
                                                     + SQLite index  → (optional) S3 tiering
 ```
