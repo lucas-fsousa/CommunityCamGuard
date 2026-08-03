@@ -38,7 +38,7 @@ the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`.
 |---|---|---|
 | P1 | Tooling: `ruff` (focused ruleset) + `mypy` (clean, 31 files) + CI running lint+types+tests | done |
 | P1 | `black` configured in pyproject — **applying** a repo-wide format (37 files) is a separate deliberate step | todo |
-| P1 | Test coverage ≥ 90% — **65% → 82%** (253 tests). Done: `ws_discovery.py` 89%, `active_scan.py` 61%, `drivers/base.py` 100%, `rtsp.py` 92%, `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py`. Left: `recorder.py` 66%, rest of `active_scan` (_identify/scan) | wip |
+| P1 | Test coverage ≥ 90% — **65% → 83%** (259 tests). Done: `ws_discovery.py` 89%, `active_scan.py` 80%, `drivers/base.py` 100%, `rtsp.py` 92%, `routes.py` 88%, `main.py` 76%, `ptz.py`/`device.py`. Left: `recorder.py` 66%, `playback.py`, `storage.py` tails | wip |
 | P1 | Formalise the driver layer (Strategy + Factory) — **already done**: `CameraDriver` + ordered registry + `detect`/`for_camera`/`get` + generic fallback | done |
 | P1 | Dependency injection for services (go2rtc, recorder, registry) — remove singletons/coupling | todo |
 | P2 | Remove scattered per-vendor conditionals; isolate them in drivers/adapters | todo |
