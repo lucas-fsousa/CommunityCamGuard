@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Community Cam Guard</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-05.1" />
 </head>
 <body>
   <!-- Icon sprite (referenced via <use href="#i-…">) -->
@@ -61,8 +61,12 @@
     </main>
   </section>
 
-  <script type="module" src="/player.js"></script>
-  <script src="/i18n.js"></script>
-  <script src="/app.js"></script>
+  <!-- Frontend build badge (fixed corner): app.js fills it from its own ?v= so you can SEE which
+       version the browser actually loaded. Bump ALL ?v= below on every .js/.css/.html change. -->
+  <div id="app-version" class="app-version" title="Frontend build"></div>
+
+  <script type="module" src="/player.js?v=2026-08-05.1"></script>
+  <script src="/i18n.js?v=2026-08-05.1"></script>
+  <script src="/app.js?v=2026-08-05.1"></script>
 </body>
 </html>

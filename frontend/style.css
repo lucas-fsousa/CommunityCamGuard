@@ -270,3 +270,9 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   .brand-text { display: none; }
   .modal-card { width: 94vw; }
 }
+
+/* Frontend build badge — tiny, fixed, unobtrusive; shows which asset version the browser loaded. */
+.app-version {
+  position: fixed; bottom: 4px; right: 6px; z-index: 9999; pointer-events: none;
+  font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .4;
+}

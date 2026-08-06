@@ -2,6 +2,20 @@
 // Plain-JS dashboard. Same-origin API (cookie auth is automatic); live video is embedded
 // straight from go2rtc's built-in player, so we hold no media code here.
 
+// Frontend build version — read from this script's own ?v= (set in index.html) and shown in a corner
+// badge + console, so a stale browser cache is obvious at a glance. Bump the ?v= on every asset in
+// index.html whenever any .js/.css/.html changes.
+const APP_VERSION = (() => {
+  try { return new URL(document.currentScript.src).searchParams.get("v") || "dev"; }
+  catch (e) { return "dev"; }
+})();
+console.log("[CCG] frontend build " + APP_VERSION);
+(function showVersionBadge() {
+  const set = () => { const b = document.getElementById("app-version"); if (b) b.textContent = "build " + APP_VERSION; };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", set);
+  else set();
+})();
+
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, props = {}, ...kids) => {
   const n = Object.assign(document.createElement(tag), props);
@@ -338,38 +352,62 @@ function qualityControls(cam) {
 }
 
 // Restart a single camera's player — swap its iframe for a fresh one so one stuck stream
-// recovers on its own, instead of an F5 that re-buffers every camera. The tile's first child
-// is the iframe (built in renderPlayers); replacing it forces a clean reconnect for just this cam.
+// recovers on its own, instead of an F5 that re-buffers every camera. Swapping in a fresh <cam-player>
+// gives a clean WebRTC session for just this cam.
 function refreshPlayer(mac, btn) {
   const t = tiles.get(mac);
   const cam = state.cameras.find((c) => c.mac === mac);
   if (!t || !cam) return;
   if (btn) { btn.classList.add("spin"); setTimeout(() => btn.classList.remove("spin"), 600); }
-  t.el.firstChild.replaceWith(camFrame(cam));
+  replacePlayerFrame(t.el, cam);
+}
+
+function replacePlayerFrame(tile, cam) {
+  const old = tile.firstChild;
+  // A deliberate replacement is final, unlike a transient DOM move. Dispose synchronously so
+  // the old peer cannot reconnect and consume another ffmpeg transcode behind the new tile.
+  if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
+  old.replaceWith(camFrame(cam));
 }
 
 // Freeze watchdog. The failure we actually see: a WebRTC PeerConnection wedges (lost keyframe, stuck
 // decoder) — the picture freezes while go2rtc keeps "sending" packets and the player's timer keeps
 // advancing, so no server-side counter (producer OR consumer) reflects it. The only truthful signal
 // is the real decoded-frame progress of the <video>, which we can now read because the player is
-// same-origin (player.js / <cam-player>, tracked via requestVideoFrameCallback). A watched tile whose
+// same-origin (player.js / <cam-player>, tracked via decoded-frame counters). A watched tile whose
 // presented frames stop advancing past FREEZE_MS is rebuilt — a fresh PeerConnection gets a new
 // keyframe and recovers. Purely client-side: the freeze is client-side, and recording is independent.
 const STALL_POLL_MS = 3000;       // how often we check
 const FREEZE_MS = 10000;          // no newly-presented frame for this long (while playing) = frozen
+const RECOVERY_COOLDOWN_MS = 30000; // never flap a persistently bad stream every watchdog tick
+const lastAutoRecovery = new Map();
+
+function tileIsVisible(tile) {
+  // In Single view every unselected tile has display:none. Chromium legitimately stops decoding
+  // those streams, which used to make the watchdog "freeze" and rebuild healthy cameras forever.
+  // Off-screen grid tiles can be throttled for the same reason, so only repair what the user can see.
+  if (!tile || tile.offsetParent === null) return false;
+  const r = tile.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
+    r.top < window.innerHeight && r.left < window.innerWidth;
+}
 function freezeWatchdog() {
   if (_playersSuspended || document.hidden) return;
   if (state.view !== "grid" && state.view !== "single") return;
   tiles.forEach((t, mac) => {
     const frame = t.el.firstChild;
     if (!frame || frame.tagName !== "CAM-PLAYER" || typeof frame.frozenMs !== "function") return;
-    if (frame.frozenMs() > FREEZE_MS) {
-      console.warn(`freeze watchdog: ${frame.dataset.src} frozen ${Math.round(frame.frozenMs())}ms — rebuilding`);
-      refreshPlayer(mac);   // rebuild only this player → fresh WebRTC session + keyframe
-    }
+    if (!tileIsVisible(t.el)) return;
+    const frozenMs = frame.frozenMs();
+    if (frozenMs <= FREEZE_MS) return;
+    const last = lastAutoRecovery.get(mac) || 0;
+    if (Date.now() - last < RECOVERY_COOLDOWN_MS) return;
+    lastAutoRecovery.set(mac, Date.now());
+    console.warn(`[freeze watchdog] ${frame.dataset.src} frozen for ${Math.round(frozenMs)}ms — rebuilding`);
+    refreshPlayer(mac);
   });
 }
-// When the tab returns to the foreground, rVFC was paused while hidden — reset each player's freeze
+// When the tab returns to the foreground, browser frame accounting may have been paused while hidden — reset each player's freeze
 // clock so we don't rebuild a perfectly healthy stream on the first check after unhide.
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
@@ -390,8 +428,9 @@ function setPlayersLive(live) {
     const frame = t.el.firstChild;
     if (live) {
       const cam = state.cameras.find((c) => c.mac === mac);
-      if (cam) frame.replaceWith(camFrame(cam));   // reconnect the stream
+      if (cam) replacePlayerFrame(t.el, cam);      // reconnect the stream
     } else if (frame && frame.tagName === "CAM-PLAYER") {
+      frame.dispose?.();
       frame.replaceWith(suspendedFrame());         // tear down the stream + its audio
     }
   });
@@ -427,7 +466,7 @@ function renderPlayers() {
       // kept mounted so an ordinary re-render never reloads a stream.
       const frame = t.el.firstChild;
       if (!_playersSuspended && frame.dataset.src && frame.dataset.src !== streamFor(cam)) {
-        frame.replaceWith(camFrame(cam));
+        replacePlayerFrame(t.el, cam);
       }
     }
   });
