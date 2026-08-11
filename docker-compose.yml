@@ -32,6 +32,11 @@ services:
     image: community-cam-guard-app:latest
     container_name: ccg-app
     network_mode: host          # serves 127.0.0.1:3200; reaches go2rtc at 127.0.0.1:3201/3203
+    # Factory onboarding performs a read-only Wi-Fi scan now and will temporarily associate to a
+    # camera SoftAP once that transport is complete. Scope the network capability to this service;
+    # go2rtc never needs it. Hosts without an exposed Wi-Fi radio simply report no networks.
+    cap_add:
+      - NET_ADMIN
     env_file: .env
     environment:
       MANAGE_GO2RTC: "false"    # go2rtc is the container above — don't spawn the binary here

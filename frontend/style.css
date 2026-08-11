@@ -27,6 +27,7 @@ button {
 button:hover { border-color: var(--accent); }
 button:active { transform: translateY(1px); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
 .btn-primary {
   background: linear-gradient(180deg, var(--accent), var(--accent-2));
@@ -140,6 +141,10 @@ header {
 .cam-card .ident { display: block; }
 .cam-card input { margin: 3px 0; }
 .cam-card-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.provision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.provision-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.provision-result { min-height: 1.2em; color: var(--ok); }
+.label-photo { padding: 8px; margin: 3px 0; }
 
 /* Camera tile */
 .cam {
@@ -204,6 +209,15 @@ header {
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 10; }
 .modal-card { width: min(560px, 92vw); max-height: 86vh; overflow: auto; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h2 { margin: 0; font-size: 18px; }
+.provisioning-modal { width: min(640px, 94vw); display: flex; flex-direction: column; gap: 8px; }
+.provisioning-modal .compact { margin: 0 0 2px; }
+.provisioning-modal hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.provisioning-modal details { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; }
+.provisioning-modal summary { color: var(--muted); cursor: pointer; font-weight: 600; }
+.provision-inline, .provision-network-row { display: flex; align-items: center; gap: 8px; }
+.provision-inline .label-photo { flex: 1 1 auto; min-width: 0; }
+.provision-network-row select { flex: 1 1 auto; min-width: 0; }
 .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .row small { color: var(--muted); }
 
@@ -269,6 +283,7 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   .bar { gap: 6px; padding: 7px 8px; }
   .brand-text { display: none; }
   .modal-card { width: 94vw; }
+  .provision-grid { grid-template-columns: 1fr; }
 }
 
 /* Frontend build badge — tiny, fixed, unobtrusive; shows which asset version the browser loaded. */

@@ -91,6 +91,7 @@ app = FastAPI(
         {"name": "auth", "description": "Log in/out and check the current session."},
         {"name": "cameras", "description": "List, add, remove, probe and control cameras."},
         {"name": "discovery", "description": "Scan the network for cameras."},
+        {"name": "provisioning", "description": "Factory-new setup; localhost only."},
         {"name": "media", "description": "Live-stream info and media-engine control."},
         {"name": "storage", "description": "Recording storage status."},
         {"name": "recordings", "description": "Browse and fetch recorded segments."},

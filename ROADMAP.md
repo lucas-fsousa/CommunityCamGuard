@@ -61,6 +61,7 @@ or wait on hardware/a human eye.
 | P2 | `CONTRIBUTING.md`: standards (ruff/mypy/pytest), PR flow, no-secrets rule, driver plug-in guide | done |
 | P2 | Infra: Dockerfile/compose/.dockerignore reviewed (stale "SKELETON" comment fixed, lean build context, cross-platform framing) | done |
 | P2 | Windows/Linux/macOS documented (Docker runs on all; WSL reframed as one Windows option, not a requirement). Left: actually test on native macOS/Windows | wip |
+| P2 | Split the oversized `frontend/app.js` into semantic ES modules (`api/auth`, navigation/state, live cameras, camera management/provisioning, recordings), leaving the main file responsible only for boot/orchestration | todo |
 
 ## Out of scope / parallel track
 
@@ -77,7 +78,7 @@ above.
 | P1 | Complete browser microphone → AMR-NB mode 7/8 kHz → camera speaker two-way audio; legacy P2P transport and codec now reproduce the native app, physical intelligibility confirmation pending | wip |
 | P1 | Integrate the proven P2P controls into a reusable backend/Docker driver | todo |
 | P0 | Keep provisioned cameras operational and controllable without WAN (LAN-only) | todo |
-| P1 | Provision a new/reset camera without the vendor Android app or account | todo |
+| P1 | Provision a new/reset camera without the vendor Android app or account — localhost-only API/UI and label parser done; recovered QR/SoftAP transport still pending | wip |
 
 ---
 

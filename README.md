@@ -122,6 +122,13 @@ Adding cameras is done in the dashboard's **Cameras** tab: hit **Scan network**,
 username/password to each discovered camera and **Add** — the credentials are verified and the
 device's capabilities probed on the spot, so the controls light up immediately.
 
+The same tab has a **Set up new camera** button that opens a compact factory-onboarding dialog. The
+server scans visible Wi-Fi networks; the user selects one and provides only its password.
+For security, this surface is available only when the dashboard is opened through
+`http://localhost:3200`; the backend rejects remote, proxied and cross-site provisioning requests
+even when they carry a valid dashboard session. Label validation is working; actual QR/SoftAP
+synchronization remains disabled until the recovered vendor transport is complete.
+
 Ports are loopback-only in the **32xx** prototype range: app **3200**,
 go2rtc API **3201**, WebRTC **3202**, RTSP restream **3203**.
 

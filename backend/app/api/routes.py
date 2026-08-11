@@ -20,7 +20,7 @@ from pathlib import Path
 import websockets
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from starlette.websockets import WebSocketState
 
 from .. import drivers
@@ -37,7 +37,15 @@ from ..config import get_settings
 from ..db import registry
 from ..discovery import active_scan, rtsp
 from ..media import go2rtc, quality
+from ..provisioning import (
+    LabelError,
+    WifiSelectionError,
+    inspect_label,
+    scan_wifi_networks,
+    selected_ssid,
+)
 from ..recording import playback, recorder
+from .local_only import require_local_request
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
@@ -59,6 +67,24 @@ class CameraIn(BaseModel):
     rtsp_port: int | None = None
     last_ip: str | None = None
     vendor: str | None = None
+
+
+class ProvisioningLabelIn(BaseModel):
+    """Identity visible on a factory-new camera; none of these fields are credentials."""
+
+    label: str = Field(default="", max_length=512)
+    device_id: str = Field(default="", max_length=20)
+    capability_code: str = Field(default="", max_length=10)
+    firmware_version: str = Field(default="", max_length=64)
+    mac: str = Field(default="", max_length=32)
+
+
+class ProvisioningStartIn(ProvisioningLabelIn):
+    """Ephemeral setup request. ``wifi_password`` must never be persisted or logged."""
+
+    wifi_network_id: str = Field(min_length=1, max_length=1024)
+    wifi_password: SecretStr = Field(default=SecretStr(""), max_length=128)
+    name: str = Field(default="", max_length=100)
 
 
 class PtzIn(BaseModel):
@@ -285,6 +311,80 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
             for c in candidates
         ],
     }
+
+
+# --- factory-new provisioning (strictly localhost-only) -----------------------------
+
+_LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
+
+
+def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
+    try:
+        return inspect_label(
+            label=body.label,
+            device_id=body.device_id,
+            capability_code=body.capability_code,
+            firmware_version=body.firmware_version,
+            mac=body.mac,
+        )
+    except LabelError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/provisioning/status", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+def provisioning_status() -> dict:
+    """Describe the local onboarding surface without probing or changing any camera."""
+    return {
+        "local_only": True,
+        "label_inspection": True,
+        "transport_ready": False,
+        "transports": {
+            "qr": "protocol-recovery",
+            "softap": "protocol-recovery",
+            "bluetooth": "planned",
+            "wired": "planned",
+        },
+    }
+
+
+@router.post("/provisioning/inspect", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+def provisioning_inspect(body: ProvisioningLabelIn) -> dict:
+    """Validate and decode a scanned/typed factory label without contacting the camera."""
+    return _inspect_provisioning_label(body)
+
+
+@router.get("/provisioning/networks", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+def provisioning_networks(response: Response) -> dict:
+    """Read-only scan from the server's Wi-Fi radio; SSIDs carry short-lived signed IDs."""
+    networks, scanner, error = scan_wifi_networks()
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "networks": [network.public() for network in networks],
+        "scanner": scanner,
+        "error": error or None,
+    }
+
+
+@router.post("/provisioning/start", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+def provisioning_start(body: ProvisioningStartIn) -> dict:
+    """Begin onboarding once a transport is available; credentials remain request-local.
+
+    This endpoint intentionally fails closed until the recovered ``AP_NET_CONFIG`` transport is
+    implemented.  Keeping the route and schema in place lets the UI/security boundary land without
+    ever claiming that a camera was configured when no packet was sent.
+    """
+    identity = _inspect_provisioning_label(body)
+    try:
+        selected_ssid(body.wifi_network_id)
+    except WifiSelectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Touch the SecretStr only inside this request. Do not log, return or persist its value.
+    body.wifi_password.get_secret_value()
+    modes = ", ".join(identity["setup_modes"])
+    raise HTTPException(
+        status_code=501,
+        detail=f"camera label accepted ({modes}); provisioning transport is not ready yet",
+    )
 
 
 # --- media / storage ----------------------------------------------------------------

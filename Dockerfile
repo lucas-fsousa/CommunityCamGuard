@@ -5,7 +5,7 @@ FROM python:3.12-slim
 
 # ffmpeg is required by the recorder (segmenting the go2rtc restream).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg iw \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

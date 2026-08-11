@@ -109,6 +109,27 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 |---|---|---|---|
 | POST | `/api/discovery/scan` | `username`, `password` (query, optional) | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Gentle by design — cheap cameras hang under aggressive probing. |
 
+### Factory provisioning (localhost only)
+
+These endpoints are intentionally distinct from adding a camera that is already on the LAN. They
+require authentication **and** a request made through `localhost`/loopback. A domain, LAN address,
+internet client, cross-site origin or forwarded remote IP receives **403**, even with a valid
+dashboard session.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/api/provisioning/status` | — | Reports available onboarding stages/transports. |
+| POST | `/api/provisioning/inspect` | `ProvisioningLabelIn` | Validates the scanned label or manual identity without contacting the camera. |
+| GET | `/api/provisioning/networks` | — | Read-only Wi-Fi scan. Returns display names and short-lived signed selection IDs. |
+| POST | `/api/provisioning/start` | `ProvisioningStartIn` | Reserved for actual synchronization; currently fails closed with `501` until the recovered transport is complete. |
+
+`ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
+`capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
+code by itself. `ProvisioningStartIn` adds the selected `wifi_network_id` returned by the scan,
+`wifi_password` and optional `name`. Arbitrary SSID text is not accepted. The signed network choice
+expires after five minutes. The Wi-Fi password is request-local and is never persisted, logged or
+returned.
+
 ### Media (live streams)
 
 | Method | Path | Notes |
@@ -191,6 +212,7 @@ Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 | Code | Meaning |
 |---|---|
 | 401 | Not authenticated (log in first). |
+| 403 | Operation is restricted to a genuine localhost request (factory provisioning). |
 | 422 | Validation error — including a **wrong camera password** on add (deliberately not 401, so a UI doesn't bounce to login). |
 | 404 | Camera not found. |
 | 501 | Camera/driver doesn't support the requested action (e.g. PTZ/reboot). |
