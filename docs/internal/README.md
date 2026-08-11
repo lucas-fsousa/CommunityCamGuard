@@ -25,6 +25,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0012](0012-digital-zoom.md) | Digital zoom (no optical zoom to drive) |
 | [0013](0013-browser-playable-recordings-transcode-cache.md) | Browser-playable recordings via a bounded HEVC→H.264 cache |
 | [0014](0014-dashboard-i18n-no-build-step.md) | Dashboard i18n with no build step |
+| [0015](0015-content-addressed-build-id.md) | Content-addressed build identity and automatic cache busting |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,

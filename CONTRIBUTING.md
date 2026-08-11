@@ -106,3 +106,10 @@ pytest                     # tests (throwaway DB, no cameras/network)
   reuses one connection, throttles, and caps concurrency. Keep it that way.
 - Keep it **standard-library-first** in the discovery layer (no heavy ONVIF deps).
 - Prefer the driver interface over per-vendor `if` branches scattered through the app.
+
+### Dashboard build identity
+
+Do not add or increment manual `?v=` asset versions. The server hashes the executable source and
+`frontend/boot.js` applies that content ID automatically. A frontend edit is visible after reload in
+the compose bind-mount workflow; rebuild the app image only when backend code changes. CI tests fail
+if date-based asset versions are reintroduced.

@@ -179,6 +179,7 @@ curl -b jar.txt "http://127.0.0.1:3200/api/recordings?mac=aa:bb:cc:dd:ee:ff&limi
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | GET | `/health` | none | `{"status":"ok"}` — liveness probe, no `/api` prefix, no auth. |
+| GET | `/api/build` | none | Content-derived application build ID used for automatic dashboard cache busting. |
 
 ---
 

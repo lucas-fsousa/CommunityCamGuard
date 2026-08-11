@@ -2,11 +2,10 @@
 // Plain-JS dashboard. Same-origin API (cookie auth is automatic); live video is embedded
 // straight from go2rtc's built-in player, so we hold no media code here.
 
-// Frontend build version — read from this script's own ?v= (set in index.html) and shown in a corner
-// badge + console, so a stale browser cache is obvious at a glance. Bump the ?v= on every asset in
-// index.html whenever any .js/.css/.html changes.
+// Content-derived build version installed by boot.js. There is no manual counter to bump and no
+// generated tracked file for contributors to conflict over.
 const APP_VERSION = (() => {
-  try { return new URL(document.currentScript.src).searchParams.get("v") || "dev"; }
+  try { return window.__CCG_BUILD__ || new URL(document.currentScript.src).searchParams.get("v") || "dev"; }
   catch (e) { return "dev"; }
 })();
 console.log("[CCG] frontend build " + APP_VERSION);

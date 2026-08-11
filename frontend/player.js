@@ -1,7 +1,8 @@
 // Same-origin live player. Extends go2rtc's VideoRTC (vendored video-rtc.js), which owns the WebRTC/MSE
 // negotiation, and connects over go2rtc's WebSocket API. The <video> it builds lives in OUR DOM, so the
 // dashboard can read the decoder's real progress and recover a wedged stream (app.js freezeWatchdog).
-import { VideoRTC } from "./video-rtc.js?v=2026-08-11.1";
+const buildVersion = window.__CCG_BUILD__ || "dev";
+const { VideoRTC } = await import(`./video-rtc.js?v=${encodeURIComponent(buildVersion)}`);
 
 // A fresh RTSP/UDP session may legitimately wait almost one camera GOP for its first complete
 // VPS/SPS/PPS + IDR set (measured just under 10 s on these units), before WebRTC negotiation time.

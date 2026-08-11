@@ -11,13 +11,16 @@ Run with: ``uvicorn backend.app.main:app`` (host/port from ``.env``).
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.routes import router
 from .config import get_settings
 from .db import registry
+from .frontend_build import build_version
 from .media.go2rtc import Go2rtc
 from .recording.playback import Warmer
 from .recording.recorder import Recorder
@@ -96,12 +99,29 @@ app = FastAPI(
 app.include_router(router)
 
 
+@app.middleware("http")
+async def dashboard_cache_policy(request, call_next):
+    """Always revalidate the shell/bootstrap; hashed assets may remain cached safely."""
+    response = await call_next(request)
+    if request.url.path in {"/", "/index.html", "/boot.js", "/api/build"}:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@app.get("/api/build", include_in_schema=False)
+def frontend_build_info() -> JSONResponse:
+    settings = get_settings()
+    project_root = Path(__file__).resolve().parents[2]
+    version = build_version(project_root, settings.frontend_dir)
+    return JSONResponse({"version": version}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
 
 
-# Static dashboard (plain HTML/JS, no build). Mounted last so /api and /health win.
+# Static dashboard (plain HTML/JS, no bundler). Mounted last so /api and /health win.
 _frontend = get_settings().frontend_dir
 if _frontend.is_dir():
     app.mount("/", StaticFiles(directory=_frontend, html=True), name="frontend")
