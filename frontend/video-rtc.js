@@ -117,6 +117,11 @@ export class VideoRTC extends HTMLElement {
          */
         this.mseCodecs = '';
 
+        /** [diagnostic] Bytes waiting outside SourceBuffer plus latest live-edge gap. */
+        this.mseQueueBytes = 0;
+        this.mseQueueLimit = 0;
+        this.mseBufferedGap = 0;
+
         /**
          * [internal] Disconnect TimeoutID.
          * @type {number}
@@ -340,6 +345,8 @@ export class VideoRTC extends HTMLElement {
 
         this.video.src = '';
         this.video.srcObject = null;
+        this.mseQueueBytes = 0;
+        this.mseBufferedGap = 0;
     }
 
     /**
@@ -458,6 +465,7 @@ export class VideoRTC extends HTMLElement {
             // Keep a bounded queue instead; overflow or an append failure is unrecoverable without
             // a fresh init segment, so close this signalling/media socket and let VideoRTC reconnect.
             const MAX_QUEUE_BYTES = 16 * 1024 * 1024;
+            this.mseQueueLimit = MAX_QUEUE_BYTES;
             const queue = [];
             let queueBytes = 0;
             let failed = false;
@@ -465,9 +473,17 @@ export class VideoRTC extends HTMLElement {
             const fail = error => {
                 if (failed || this.pcState === WebSocket.OPEN) return;
                 failed = true;
+                const failedQueueBytes = queueBytes;
                 queue.length = 0;
                 queueBytes = 0;
+                this.mseQueueBytes = 0;
                 console.warn('VideoRTC MSE stalled; reconnecting', error);
+                this.dispatchEvent(new CustomEvent('media-diagnostic', {detail: {
+                    event: 'mse_failure',
+                    error: String(error && (error.message || error)).slice(0, 240),
+                    mseQueueBytes: failedQueueBytes,
+                    mseQueueLimit: this.mseQueueLimit,
+                }}));
                 // MSE and WebRTC negotiate in parallel. If MSE fails before WebRTC wins, discard
                 // the half-negotiated PC too; otherwise VideoRTC.onconnect() refuses to start a
                 // replacement socket because `this.pc` is still non-null.
@@ -483,6 +499,7 @@ export class VideoRTC extends HTMLElement {
                 if (failed || sb.updating || !queue.length) return;
                 const data = queue.shift();
                 queueBytes -= data.byteLength;
+                this.mseQueueBytes = queueBytes;
                 try {
                     sb.appendBuffer(data);
                 } catch (error) {
@@ -510,9 +527,21 @@ export class VideoRTC extends HTMLElement {
                     }
                     if (this.video.currentTime < start) this.video.currentTime = start;
                     const gap = end - this.video.currentTime;
+                    this.mseBufferedGap = gap;
                     // Never slow a live stream to 0.1x. Play normally near the edge and use a
                     // modest bounded catch-up rate when latency grows.
-                    this.video.playbackRate = gap > 1 ? Math.min(1.25, gap) : 1;
+                    const wasCatchingUp = this.video.playbackRate > 1;
+                    const nextRate = gap > 1 ? Math.min(1.25, gap) : 1;
+                    this.video.playbackRate = nextRate;
+                    const isCatchingUp = nextRate > 1;
+                    if (wasCatchingUp !== isCatchingUp) {
+                        this.dispatchEvent(new CustomEvent('media-diagnostic', {detail: {
+                            event: isCatchingUp ? 'catchup_start' : 'catchup_end',
+                            bufferedGap: gap,
+                            playbackRate: nextRate,
+                            mseQueueBytes: this.mseQueueBytes,
+                        }}));
+                    }
                 }
                 appendNext();
             });
@@ -527,6 +556,7 @@ export class VideoRTC extends HTMLElement {
                     }
                     queue.push(data);
                     queueBytes += bytes;
+                    this.mseQueueBytes = queueBytes;
                     return;
                 }
                 try {

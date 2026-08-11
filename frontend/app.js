@@ -235,9 +235,27 @@ function camFrame(cam) {
   const sid = streamFor(cam);
   const frame = el("cam-player", { className: "frame" });
   frame.dataset.src = sid;   // so a view switch can tell if it must reconnect
+  frame.addEventListener("media-diagnostic", (e) => reportMediaEvent(cam, frame, e.detail || {}));
   frame.src = wsFor(sid);    // VideoRTC .src setter kicks off the WebSocket/WebRTC connect
   applyZoom(cam.mac, frame);   // a rebuilt frame (restart / resume) keeps its zoom
   return frame;
+}
+
+function reportMediaEvent(cam, frame, detail) {
+  if (!cam || !detail.event || document.hidden) return;
+  const d = typeof frame.diagnostics === "function" ? frame.diagnostics() : {};
+  // The API schema deliberately accepts only scalars. Flatten the player/RTC snapshot and omit
+  // undefined/NaN values, which keeps every event compact enough to inspect as one log line.
+  const metrics = {};
+  for (const [key, value] of Object.entries({ ...d, ...detail })) {
+    if (key === "event" || value === undefined || value === null) continue;
+    if (["boolean", "string"].includes(typeof value) ||
+        (typeof value === "number" && Number.isFinite(value))) metrics[key] = value;
+  }
+  void api("/media/client-event", {
+    method: "POST",
+    body: JSON.stringify({ event: detail.event, mac: cam.mac, stream: frame.dataset.src, metrics }),
+  }).catch((err) => console.debug("media diagnostics unavailable", err));
 }
 
 // A black stand-in that holds the tile's firstChild slot while the live player is torn down (under
@@ -462,6 +480,13 @@ async function freezeWatchdog() {
         producerFrozen,
         server,
         player: typeof frame.diagnostics === "function" ? frame.diagnostics() : null,
+      });
+      reportMediaEvent(state.cameras.find((c) => c.mac === mac), frame, {
+        event: "watchdog_recovery",
+        clientFrozenMs: Math.round(frozenMs),
+        producerFrozen,
+        serverVideoPackets: server && server.video_packets,
+        serverConsumers: server && server.consumers,
       });
       // A client-only stall needs only a fresh PeerConnection. A server packet stall cycles the
       // local H.264 producer after disposing this browser, without reconnecting the base camera.

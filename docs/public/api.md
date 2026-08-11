@@ -115,6 +115,8 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 |---|---|---|
 | GET | `/api/media/streams` | Media-engine status + live-view settings (below). |
 | GET | `/api/media/activity` | Per-stream `{video_packets, consumers}` — liveness for a client freeze watchdog (a watched stream whose video packets stop advancing is frozen upstream). |
+| POST | `/api/media/client-event` | Bounded live-player transition snapshot for diagnostics (details below). |
+| GET | `/api/media/client-events` | Last 200 browser transition snapshots from this server process. |
 | POST | `/api/media/recover/{mac}` | Cycle one camera's local preloaded H.264 producer after a confirmed stall. The shared camera RTSP/recording producer is not restarted. |
 | POST | `/api/media/restart` | Regenerate go2rtc config and restart it (after registry changes). |
 
@@ -133,7 +135,27 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 
 To play a stream, point a WebRTC/MSE player at go2rtc using the camera's stream IDs, e.g.
 `{go2rtc_api}/stream.html?src={web_stream_id}&mode=webrtc,mse`. `web_stream_id` is the cheap
-substream feed; `hd_stream_id` is the full-resolution main feed (see `docs/DECISIONS.md §34`).
+local 640px derivative; `hd_stream_id` is the shared full-resolution local transcode. Both fan out
+from one camera RTSP producer (see `docs/DECISIONS.md §34`).
+
+#### Live-view diagnostics
+
+`POST /api/media/client-event` accepts the dashboard's bounded live-player transition snapshots. It
+is authenticated and intended for the bundled player, not as a periodic metrics endpoint. Body:
+
+```json
+{
+  "event": "catchup_start",
+  "mac": "aa:bb:cc:dd:ee:ff",
+  "stream": "cam_aabbccddeeff_hd",
+  "metrics": {"transport": "mse", "bufferedGap": 2.4, "playbackRate": 1.25}
+}
+```
+
+Allowed events are `waiting`, `stalled`, `playing`, `catchup_start`, `catchup_end`, `mse_failure`,
+and `watchdog_recovery`. `GET /api/media/client-events` returns the last 200 events from the current
+server process, oldest first. Each event includes a UTC timestamp and, when available, a snapshot of
+the matching go2rtc stream packet/consumer counters.
 
 ### Storage
 

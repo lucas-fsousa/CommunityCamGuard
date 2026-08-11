@@ -1,7 +1,7 @@
 // Same-origin live player. Extends go2rtc's VideoRTC (vendored video-rtc.js), which owns the WebRTC/MSE
 // negotiation, and connects over go2rtc's WebSocket API. The <video> it builds lives in OUR DOM, so the
 // dashboard can read the decoder's real progress and recover a wedged stream (app.js freezeWatchdog).
-import { VideoRTC } from "./video-rtc.js?v=2026-08-10.3";
+import { VideoRTC } from "./video-rtc.js?v=2026-08-11.1";
 
 // A fresh RTSP/UDP session may legitimately wait almost one camera GOP for its first complete
 // VPS/SPS/PPS + IDR set (measured just under 10 s on these units), before WebRTC negotiation time.
@@ -28,7 +28,9 @@ class CamPlayer extends VideoRTC {
     this._hasRVFC = false;
     this._probeBusy = false;
     this._statsPC = null;
+    this._rtcStats = {};
     this._lastStallEvent = null;
+    this._lastDiagnosticAt = new Map();
     this._everPlayed = false;
     this._disposed = false;        // a replaced tile must never reconnect in the background
   }
@@ -48,9 +50,20 @@ class CamPlayer extends VideoRTC {
     this.style.display = "block";
     this._mountedAt = this._framesAt = this._presentedAt = this._mediaAt = performance.now();
     for (const name of ["waiting", "stalled"]) {
-      v.addEventListener(name, () => { this._lastStallEvent = { name, at: performance.now() }; });
+      v.addEventListener(name, () => {
+        this._lastStallEvent = { name, at: performance.now() };
+        this._emitDiagnostic(name);
+      });
     }
-    v.addEventListener("playing", () => { this._everPlayed = true; });
+    v.addEventListener("playing", () => {
+      this._everPlayed = true;
+      if (this._lastStallEvent) {
+        this._emitDiagnostic("playing", {
+          stallDurationMs: Math.round(performance.now() - this._lastStallEvent.at),
+        });
+        this._lastStallEvent = null;
+      }
+    });
     this._startMonitors();
   }
 
@@ -58,6 +71,16 @@ class CamPlayer extends VideoRTC {
     if (this._disposed || !this.video) return;
     if (!this._probeTID) this._probeTID = setInterval(() => this._probe(), 2000);
     if (!this._rvfcID) this._trackPresentedFrames();
+  }
+
+  _emitDiagnostic(event, detail = {}) {
+    const now = performance.now();
+    const last = this._lastDiagnosticAt.get(event);
+    // Browsers may emit waiting/stalled in bursts for one incident. One snapshot per five seconds
+    // contains the useful state without turning telemetry itself into load.
+    if (last !== undefined && now - last < 5000) return;
+    this._lastDiagnosticAt.set(event, now);
+    this.dispatchEvent(new CustomEvent("media-diagnostic", { detail: { event, ...detail } }));
   }
 
   // Track compositor submissions for diagnostics, but use mediaTime (not presentedFrames) as the
@@ -110,6 +133,18 @@ class CamPlayer extends VideoRTC {
         (await pc.getStats()).forEach((r) => {
           if (r.type === "inbound-rtp" && r.kind === "video" && Number.isFinite(r.framesDecoded)) {
             n = r.framesDecoded;
+            this._rtcStats = {
+              rtcPacketsReceived: r.packetsReceived,
+              rtcPacketsLost: r.packetsLost,
+              rtcJitter: r.jitter,
+              rtcFramesReceived: r.framesReceived,
+              rtcFramesDropped: r.framesDropped,
+              rtcKeyFramesDecoded: r.keyFramesDecoded,
+              rtcFreezeCount: r.freezeCount,
+              rtcTotalFreezesDuration: r.totalFreezesDuration,
+              rtcJitterBufferDelay: r.jitterBufferDelay,
+              rtcJitterBufferEmittedCount: r.jitterBufferEmittedCount,
+            };
           }
         });
       }
@@ -154,17 +189,33 @@ class CamPlayer extends VideoRTC {
 
   diagnostics() {
     const q = this.video && this.video.getVideoPlaybackQuality && this.video.getVideoPlaybackQuality();
+    const v = this.video;
+    let bufferedStart = null, bufferedEnd = null;
+    if (v && v.buffered && v.buffered.length) {
+      bufferedStart = v.buffered.start(0);
+      bufferedEnd = v.buffered.end(v.buffered.length - 1);
+    }
     return {
+      transport: this.pcState === WebSocket.OPEN ? "webrtc" :
+        (this.wsState === WebSocket.OPEN && this.mseCodecs ? "mse" : "connecting"),
       connectionState: this.pc && this.pc.connectionState,
       iceConnectionState: this.pc && this.pc.iceConnectionState,
-      readyState: this.video && this.video.readyState,
-      currentTime: this.video && this.video.currentTime,
+      readyState: v && v.readyState,
+      networkState: v && v.networkState,
+      paused: v && v.paused,
+      currentTime: v && v.currentTime,
+      playbackRate: v && v.playbackRate,
+      bufferedStart,
+      bufferedEnd,
+      bufferedGap: bufferedEnd == null || !v ? null : bufferedEnd - v.currentTime,
+      mseQueueBytes: this.mseQueueBytes,
+      mseQueueLimit: this.mseQueueLimit,
       framesDecoded: this._frames,
       totalVideoFrames: q && q.totalVideoFrames,
       droppedVideoFrames: q && q.droppedVideoFrames,
       mediaTime: this._mediaTime,
       presentedFrames: this._presented,
-      lastStallEvent: this._lastStallEvent,
+      ...this._rtcStats,
     };
   }
 

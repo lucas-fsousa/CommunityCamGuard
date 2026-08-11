@@ -10,14 +10,17 @@ config and the recorder is re-synced to the new camera list.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import urllib.parse
+from collections import deque
+from datetime import UTC, datetime
 from pathlib import Path
 
 import websockets
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
 from .. import drivers
@@ -38,6 +41,7 @@ from ..recording import playback, recorder
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
+_client_media_events: deque[dict] = deque(maxlen=200)
 
 
 # --- schemas -----------------------------------------------------------------------
@@ -60,6 +64,15 @@ class CameraIn(BaseModel):
 class PtzIn(BaseModel):
     direction: str | None = None       # up | down | left | right (not needed for stop)
     action: str = "step"               # "start" (hold) | "stop" (release) | "step" (one nudge)
+
+
+class MediaClientEventIn(BaseModel):
+    """Small, bounded browser snapshot emitted only on live-view state transitions."""
+
+    event: str = Field(min_length=1, max_length=40)
+    mac: str = Field(min_length=1, max_length=64)
+    stream: str = Field(min_length=1, max_length=128)
+    metrics: dict[str, bool | int | float | str | None] = Field(default_factory=dict)
 
 
 def _camera_out(cam: registry.Camera) -> dict:
@@ -298,6 +311,47 @@ def media_activity(request: Request) -> dict:
     """Per-stream video-packet liveness, for the dashboard's freeze watchdog (see go2rtc)."""
     media = getattr(request.app.state, "media", None)
     return media.stream_activity() if media else {}
+
+
+_MEDIA_CLIENT_EVENTS = {
+    "waiting", "stalled", "playing", "catchup_start", "catchup_end",
+    "mse_failure", "watchdog_recovery",
+}
+
+
+@router.post("/media/client-event", dependencies=[Depends(require_auth)])
+def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
+    """Correlate a browser stall/catch-up with the server's stream counters at that instant.
+
+    This deliberately accepts only scalar metrics and a short allow-list of transition names. It
+    never receives camera credentials, media data or arbitrary browser logs. Events are rare (not a
+    periodic beacon), kept in a 200-entry in-memory ring and also emitted as one structured log line.
+    """
+    if body.event not in _MEDIA_CLIENT_EVENTS:
+        raise HTTPException(status_code=422, detail="unknown media client event")
+    if len(body.metrics) > 40:
+        raise HTTPException(status_code=413, detail="too many media metrics")
+    event = body.model_dump()
+    event["at"] = datetime.now(UTC).isoformat(timespec="milliseconds")
+    media = getattr(request.app.state, "media", None)
+    try:
+        activity = media.stream_activity().get(body.stream) if media else None
+    except Exception:  # diagnostics must never interfere with live playback
+        activity = None
+    if activity is not None:
+        event["server"] = activity
+    encoded = json.dumps(event, separators=(",", ":"), sort_keys=True)
+    if len(encoded) > 8192:
+        raise HTTPException(status_code=413, detail="media event too large")
+    _client_media_events.append(event)
+    log.warning("live_view_event %s", encoded)
+    return {"ok": True}
+
+
+@router.get("/media/client-events", dependencies=[Depends(require_auth)])
+def media_client_events() -> list[dict]:
+    """Recent browser transition snapshots, oldest first (process-local, bounded to 200)."""
+    return list(_client_media_events)
 
 
 @router.post("/media/recover/{mac}", dependencies=[Depends(require_auth)])

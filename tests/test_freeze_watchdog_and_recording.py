@@ -64,6 +64,23 @@ def test_media_activity_route_empty_without_media():
     assert routes.media_activity(req) == {}
 
 
+def test_media_client_event_captures_server_counter_snapshot():
+    routes._client_media_events.clear()
+    media = SimpleNamespace(stream_activity=lambda: {
+        "cam_x_hd": {"video_packets": 321, "consumers": 1},
+    })
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))
+    body = routes.MediaClientEventIn(
+        event="catchup_start", mac="aa:bb:cc:dd:ee:01", stream="cam_x_hd",
+        metrics={"bufferedGap": 2.4, "playbackRate": 1.25, "transport": "mse"},
+    )
+    assert routes.media_client_event(body, req) == {"ok": True}
+    event = routes.media_client_events()[-1]
+    assert event["server"] == {"video_packets": 321, "consumers": 1}
+    assert event["metrics"]["transport"] == "mse"
+    assert event["at"].endswith("+00:00")
+
+
 def test_restart_preload_cycles_only_requested_local_stream(monkeypatch):
     calls = []
 
