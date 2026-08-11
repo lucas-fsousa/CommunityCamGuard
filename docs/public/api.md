@@ -145,17 +145,18 @@ is authenticated and intended for the bundled player, not as a periodic metrics 
 
 ```json
 {
-  "event": "catchup_start",
+  "event": "live_edge_jump",
   "mac": "aa:bb:cc:dd:ee:ff",
   "stream": "cam_aabbccddeeff_hd",
-  "metrics": {"transport": "mse", "bufferedGap": 2.4, "playbackRate": 1.25}
+  "metrics": {"transport": "mse", "bufferedGap": 2.4, "discardedSeconds": 2.15}
 }
 ```
 
-Allowed events are `waiting`, `stalled`, `playing`, `catchup_start`, `catchup_end`, `mse_failure`,
-and `watchdog_recovery`. `GET /api/media/client-events` returns the last 200 events from the current
-server process, oldest first. Each event includes a UTC timestamp and, when available, a snapshot of
-the matching go2rtc stream packet/consumer counters.
+Allowed events are `waiting`, `stalled`, `playing`, `live_edge_jump`, `catchup_start`, `catchup_end`,
+`mse_failure`, and `watchdog_recovery`. The catch-up pair remains accepted for older cached clients;
+current clients discard stale live media instead of accelerating it. `GET /api/media/client-events`
+returns the last 200 events from the current server process, oldest first. Each event includes a UTC
+timestamp and, when available, a snapshot of the matching go2rtc stream packet/consumer counters.
 
 ### Storage
 
@@ -167,7 +168,7 @@ the matching go2rtc stream packet/consumer counters.
 
 | Method | Path | Params | Notes |
 |---|---|---|---|
-| GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Includes `total` and `retention_days`. |
+| GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Includes `total` and `retention_days`. |
 | GET | `/api/recordings/file` | `path` (required) | Stream a recorded `.mp4` segment (HEVC transcoded to H.264 on demand for the browser). |
 
 ```bash

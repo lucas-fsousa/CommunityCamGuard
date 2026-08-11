@@ -60,7 +60,7 @@ out, two-way audio (mic), digital outputs (LED / "anti-thief" siren).
    │ (media)  │   ONVIF  │  (LAN, WiFi) │                    │ segment recorder │
    └──────────┘          └──────────────┘                    └────────┬─────────┘
                                                                       ▼
-                                                    recordings/<cam>/<date>/<hh>/*.mp4
+                                                    recordings/<cam>/<UTC-date>/<UTC-hour>/*.mp4
                                                     + SQLite index  → (optional) S3 tiering
 ```
 
@@ -72,7 +72,7 @@ out, two-way audio (mic), digital outputs (LED / "anti-thief" siren).
   Runs as its own container (compose) or a single static binary; the app generates its config from
   the registry and reloads it on changes.
 - **Recording** — `ffmpeg` segment muxer in `-c:v copy` (remux, no re-encode → near-zero CPU),
-  configurable chunk length (`SEGMENT_SECONDS`, default 300) laid out by date/hour and indexed in
+  configurable chunk length (`SEGMENT_SECONDS`, default 300) laid out by UTC date/hour and indexed in
   SQLite. Each segment is a **crash-safe fragmented MP4** (playable up to its last flushed fragment
   after a hard kill). Streams are HEVC; the recordings player transcodes HEVC→H.264 on demand into a
   size-capped LRU cache so clips play (and seek) natively in the browser.

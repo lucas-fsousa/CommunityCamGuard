@@ -2,7 +2,7 @@
 command build, segment indexing, and the start/pause/resume/stop lifecycle. subprocess is faked,
 so no real ffmpeg runs.
 """
-from datetime import datetime
+from datetime import UTC, datetime
 
 from backend.app.db.registry import Camera
 from backend.app.recording import recorder
@@ -38,6 +38,7 @@ def test_spawn_builds_a_fragmented_mp4_segment_command(monkeypatch):
 
     def fake_popen(cmd, **kw):
         captured["cmd"] = cmd
+        captured["env"] = kw["env"]
         return FakeProc()
 
     monkeypatch.setattr(recorder.subprocess, "Popen", fake_popen)
@@ -53,6 +54,23 @@ def test_spawn_builds_a_fragmented_mp4_segment_command(monkeypatch):
     # crash-safe fragmented MP4 (ADR 0004)
     assert "movflags=+frag_keyframe+empty_moov+default_base_moof" in cmd
     assert cmd[-1].endswith("%Y%m%d_%H%M%S.mp4")                           # strftime output template
+    assert captured["env"]["TZ"] == "UTC0"                               # filenames are always UTC
+
+
+def test_ensure_dirs_uses_utc_across_hour_and_day_rollover(monkeypatch):
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is UTC
+            return cls(2026, 8, 31, 23, 30, tzinfo=UTC)
+
+    monkeypatch.setattr(recorder, "datetime", FixedDateTime)
+    rec = Recorder(segment_seconds=300)
+    mac = "aa:bb:cc:dd:ee:01"
+    rec._ensure_dirs([mac])
+    root = rec.root / recorder._safe_mac(mac)
+    assert (root / "2026-08-31" / "23").is_dir()
+    assert (root / "2026-09-01" / "00").is_dir()
 
 
 # --- _index: pick up finalized segments ---------------------------------------------
@@ -74,6 +92,9 @@ def test_index_records_finalized_segments():
     assert added == 1
     res = recorder.query_segments()
     assert res["total"] == 1 and res["items"][0]["path"] == str(seg)
+    assert res["items"][0]["started_at"] == "2026-08-01T12:00:00+00:00"
+    assert res["items"][0]["day"] == "2026-08-01"
+    assert res["items"][0]["hour"] == 12
 
 
 def test_index_skips_unparseable_filenames():

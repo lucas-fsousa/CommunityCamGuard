@@ -449,7 +449,11 @@ export class VideoRTC extends HTMLElement {
             this.video.srcObject = null;
         }
 
-        this.play();
+        // MSE fragments from go2rtc are emitted around keyframes (roughly every two seconds for
+        // our H.264 transcodes). Starting playback on the first few hundred milliseconds makes the
+        // player consume the fragment before the next one exists, guaranteeing a waiting/playing
+        // loop. Keep the element paused until updateend has accumulated a small live cushion.
+        this.video.pause();
 
         this.mseCodecs = '';
 
@@ -465,6 +469,28 @@ export class VideoRTC extends HTMLElement {
             // Keep a bounded queue instead; overflow or an append failure is unrecoverable without
             // a fresh init segment, so close this signalling/media socket and let VideoRTC reconnect.
             const MAX_QUEUE_BYTES = 16 * 1024 * 1024;
+            // This is a monitoring view, not VOD: old pictures have no value once the player falls
+            // behind. Retain a small seekable history for MSE stability, but keep playback close to
+            // the live edge. The old code used the five-second retention boundary as the playback
+            // target and then accelerated to 1.25x; that made a stall visibly replay itself after
+            // F5 instead of discarding it.
+            const RETAIN_SECONDS = 8;
+            const PRUNE_AFTER_SECONDS = 12;
+            const START_BUFFER_SECONDS = 3;
+            const LIVE_TARGET_SECONDS = 3;
+            const MAX_LIVE_GAP_SECONDS = 8;
+            // These cameras deliver frames in bursts: a measured 9.9 seconds of encoded media
+            // took 11 wall-clock seconds even though the track itself is a precise 10 fps. If we
+            // consume that bursty timeline rigidly at 1x, the startup cushion drains and Chrome
+            // alternates waiting/playing forever. A small adaptive slowdown is much less visible
+            // than a spinner and keeps the displayed capture close to the live edge.
+            const LOW_BUFFER_SECONDS = 2;
+            const CRITICAL_BUFFER_SECONDS = 0.75;
+            const CRITICAL_PLAYBACK_RATE = 0.85;
+            const LOW_PLAYBACK_RATE = 0.92;
+            const HIGH_BUFFER_SECONDS = 4;
+            const CATCHUP_PLAYBACK_RATE = 1.05;
+            let liveStarted = false;
             this.mseQueueLimit = MAX_QUEUE_BYTES;
             const queue = [];
             let queueBytes = 0;
@@ -514,31 +540,72 @@ export class VideoRTC extends HTMLElement {
 
                 if (sb.buffered && sb.buffered.length) {
                     const end = sb.buffered.end(sb.buffered.length - 1);
-                    const start = Math.max(0, end - 5);
                     const start0 = sb.buffered.start(0);
-                    if (start > start0) {
+                    // Pruning on every fragment doubles SourceBuffer work and can itself make HD
+                    // append fall behind. Use hysteresis: compact only after the history grows past
+                    // twelve seconds, then retain eight.
+                    if (end - start0 > PRUNE_AFTER_SECONDS) {
+                        const retainFrom = Math.max(0, end - RETAIN_SECONDS);
                         try {
-                            sb.remove(start0, start);
-                            ms.setLiveSeekableRange(start, end);
+                            sb.remove(start0, retainFrom);
+                            ms.setLiveSeekableRange(retainFrom, end);
                         } catch (error) {
                             fail(error);
                         }
                         return; // remove() is asynchronous; its updateend will resume the queue
                     }
-                    if (this.video.currentTime < start) this.video.currentTime = start;
                     const gap = end - this.video.currentTime;
                     this.mseBufferedGap = gap;
-                    // Never slow a live stream to 0.1x. Play normally near the edge and use a
-                    // modest bounded catch-up rate when latency grows.
-                    const wasCatchingUp = this.video.playbackRate > 1;
-                    const nextRate = gap > 1 ? Math.min(1.25, gap) : 1;
-                    this.video.playbackRate = nextRate;
-                    const isCatchingUp = nextRate > 1;
-                    if (wasCatchingUp !== isCatchingUp) {
+                    if (!liveStarted) {
+                        const available = end - sb.buffered.start(sb.buffered.length - 1);
+                        if (available >= START_BUFFER_SECONDS) {
+                            const liveTarget = Math.max(
+                                sb.buffered.start(sb.buffered.length - 1),
+                                end - LIVE_TARGET_SECONDS,
+                            );
+                            this.video.currentTime = liveTarget;
+                            liveStarted = true;
+                            this.play();
+                        }
+                        appendNext();
+                        return;
+                    }
+                    // Recover an actual underrun immediately. currentTime can sit just beyond
+                    // bufferedEnd after a camera burst; merely appending another short fragment
+                    // leaves the element in `waiting`. Seek into the newest complete range and
+                    // rebuild a small cushion instead of replaying a long stale backlog.
+                    if (Number.isFinite(gap) && gap <= 0) {
+                        const lastRangeStart = sb.buffered.start(sb.buffered.length - 1);
+                        this.video.currentTime = Math.max(
+                            lastRangeStart,
+                            end - CRITICAL_BUFFER_SECONDS,
+                        );
+                        this.video.playbackRate = CRITICAL_PLAYBACK_RATE;
+                        this.play();
+                    } else if (Number.isFinite(gap) && gap < CRITICAL_BUFFER_SECONDS) {
+                        this.video.playbackRate = CRITICAL_PLAYBACK_RATE;
+                    } else if (Number.isFinite(gap) && gap < LOW_BUFFER_SECONDS) {
+                        this.video.playbackRate = LOW_PLAYBACK_RATE;
+                    } else if (Number.isFinite(gap) && gap > HIGH_BUFFER_SECONDS &&
+                               gap <= MAX_LIVE_GAP_SECONDS) {
+                        this.video.playbackRate = CATCHUP_PLAYBACK_RATE;
+                    } else if (this.video.playbackRate !== 1) {
+                        this.video.playbackRate = 1;
+                    }
+                    // Drop stale buffered media in one seek. Gradual catch-up is actively harmful
+                    // for surveillance: it keeps showing the past and spends extra decoder CPU.
+                    if (Number.isFinite(gap) && gap > MAX_LIVE_GAP_SECONDS) {
+                        const lastRangeStart = sb.buffered.start(sb.buffered.length - 1);
+                        const liveTarget = Math.max(lastRangeStart, end - LIVE_TARGET_SECONDS);
+                        const discardedSeconds = Math.max(0, liveTarget - this.video.currentTime);
+                        this.video.currentTime = liveTarget;
+                        this.video.playbackRate = 1;
+                        this.play();
                         this.dispatchEvent(new CustomEvent('media-diagnostic', {detail: {
-                            event: isCatchingUp ? 'catchup_start' : 'catchup_end',
+                            event: 'live_edge_jump',
                             bufferedGap: gap,
-                            playbackRate: nextRate,
+                            discardedSeconds,
+                            playbackRate: 1,
                             mseQueueBytes: this.mseQueueBytes,
                         }}));
                     }

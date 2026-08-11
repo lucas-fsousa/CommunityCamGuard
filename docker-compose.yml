@@ -35,6 +35,7 @@ services:
     env_file: .env
     environment:
       MANAGE_GO2RTC: "false"    # go2rtc is the container above — don't spawn the binary here
+      TZ: "UTC"                 # persistence clock; recorder also pins each ffmpeg child to UTC0
     volumes:
       - ./recordings:/app/recordings
       - ./data:/app/data

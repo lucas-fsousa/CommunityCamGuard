@@ -1,7 +1,7 @@
 """Time-based recording retention — the sporadic cleanup job."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from backend.app import config
 from backend.app.db import connect
@@ -31,8 +31,8 @@ def _count_rows() -> int:
 
 
 def test_purge_deletes_expired_keeps_recent(tmp_path):
-    recent = _seed_segment(tmp_path, started=datetime.now() - timedelta(days=2))
-    old = _seed_segment(tmp_path, started=datetime.now() - timedelta(days=10))
+    recent = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=2))
+    old = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=10))
     cleaner = retention.RetentionCleaner(retention_days=7)
     cleaner.root = tmp_path
     removed = cleaner.purge()
@@ -42,7 +42,7 @@ def test_purge_deletes_expired_keeps_recent(tmp_path):
 
 
 def test_purge_prunes_empty_dirs(tmp_path):
-    old = _seed_segment(tmp_path, started=datetime.now() - timedelta(days=30))
+    old = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=30))
     day_dir = old.parent.parent
     cleaner = retention.RetentionCleaner(retention_days=7)
     cleaner.root = tmp_path
@@ -52,7 +52,7 @@ def test_purge_prunes_empty_dirs(tmp_path):
 
 def test_purge_also_drops_playback_cache(tmp_path, monkeypatch):
     from backend.app.recording import playback
-    old = _seed_segment(tmp_path, started=datetime.now() - timedelta(days=10))
+    old = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=10))
     cache = playback.cache_path(old)
     cache.write_bytes(b"transcoded")                        # pretend it was viewed & cached
     cleaner = retention.RetentionCleaner(retention_days=7)
@@ -62,7 +62,7 @@ def test_purge_also_drops_playback_cache(tmp_path, monkeypatch):
 
 
 def test_retention_zero_keeps_forever(tmp_path):
-    old = _seed_segment(tmp_path, started=datetime.now() - timedelta(days=999))
+    old = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=999))
     cleaner = retention.RetentionCleaner(retention_days=0)  # disabled
     cleaner.root = tmp_path
     assert cleaner.purge() == 0
@@ -82,3 +82,10 @@ def test_start_noop_when_disabled(tmp_path):
     cleaner = retention.RetentionCleaner(retention_days=0)
     cleaner.start()
     assert cleaner._thread is None                          # no thread spun for a disabled job
+
+
+def test_retention_cutoff_is_explicit_utc():
+    cleaner = retention.RetentionCleaner(retention_days=7)
+    cutoff = cleaner._cutoff_iso()
+    assert cutoff.endswith("+00:00")
+    assert datetime.fromisoformat(cutoff).tzinfo is UTC

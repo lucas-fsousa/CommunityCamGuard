@@ -6,6 +6,9 @@ in SQLite:
 
     recordings/<mac>/<YYYY-MM-DD>/<HH>/<YYYYMMDD_HHMMSS>.mp4
 
+Every date/time component in that layout is **UTC**.  This is deliberately independent of the
+camera timezone, the host timezone and the container's ``TZ`` setting.
+
 Video is remuxed (``-c:v copy`` → near-zero CPU, the whole point). The cameras' PCM A-law
 audio is transcoded to AAC (negligible at 16 kHz mono) because MP4 cannot carry A-law.
 Small independent segments mean a copy is trivial and a corrupt file costs one minute, not
@@ -124,11 +127,15 @@ class Recorder:
         return Path(get_settings().db_path).parent / f"rec_{_safe_mac(mac)}.log"
 
     def _output_template(self, mac: str) -> str:
-        # strftime placeholders expanded by ffmpeg's segment muxer per segment.
+        # strftime placeholders are expanded by ffmpeg's segment muxer.  _spawn gives that child
+        # a fixed UTC timezone so this path cannot drift when the host/container/camera timezone
+        # changes.  Camera packet timestamps are separately replaced with server wall-clock time.
         return str(self._cam_dir(mac) / "%Y-%m-%d" / "%H" / "%Y%m%d_%H%M%S.mp4")
 
     def _ensure_dirs(self, macs: list[str]) -> None:
-        now = datetime.now()
+        # Must use the same clock basis as ffmpeg's UTC strftime expansion below.  Using naive
+        # local time here can pre-create the wrong hour and make ffmpeg fail at a rollover.
+        now = datetime.now(UTC)
         for when in (now, now + timedelta(hours=1)):  # cover hour/day rollover
             sub = Path(when.strftime("%Y-%m-%d")) / when.strftime("%H")
             for mac in macs:
@@ -289,7 +296,14 @@ class Recorder:
             "movflags=+frag_keyframe+empty_moov+default_base_moof",
             self._output_template(mac),
         ]
-        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=logfile)
+        # FFmpeg's segment muxer has no per-output "strftime in UTC" flag; strftime follows the
+        # process timezone.  Pin only the child to POSIX UTC0, which works both in and outside
+        # Docker and does not depend on the image having a zoneinfo database installed.
+        ffmpeg_env = os.environ.copy()
+        ffmpeg_env["TZ"] = "UTC0"
+        return subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=logfile, env=ffmpeg_env
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -347,7 +361,11 @@ class Recorder:
                 if not list_all and (now - st.st_mtime) < _FINALIZE_GRACE:
                     continue  # still being written
                 try:
-                    started = datetime.strptime(path.stem, "%Y%m%d_%H%M%S")
+                    # Filenames produced by this recorder are UTC.  Keep the timezone marker in
+                    # the index as well so downstream consumers never reinterpret the value as
+                    # local time.  Legacy index rows remain untouched; historical filenames may
+                    # have been produced before the UTC invariant and cannot be safely guessed.
+                    started = datetime.strptime(path.stem, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
                 except ValueError:
                     continue
                 rows.append((mac, str(path), started.isoformat(timespec="seconds"),

@@ -39,6 +39,25 @@ def test_bootstrap_has_no_manually_incremented_asset_versions():
     assert "__CCG_BUILD__" in boot
 
 
+def test_live_restart_cycles_producer_and_mse_discards_stale_video():
+    """The operator's restart and the MSE fallback must both mean "back to live"."""
+    frontend = Path(__file__).parents[1] / "frontend"
+    app = (frontend / "app.js").read_text()
+    player = (frontend / "player.js").read_text()
+    video_rtc = (frontend / "video-rtc.js").read_text()
+
+    assert "refreshPlayer(cam.mac, reload, true)" in app
+    assert 'this.mode = "mse"' in player
+    assert "const START_BUFFER_SECONDS = 3" in video_rtc
+    assert "const CRITICAL_PLAYBACK_RATE = 0.85" in video_rtc
+    assert "const LOW_PLAYBACK_RATE = 0.92" in video_rtc
+    assert "const CATCHUP_PLAYBACK_RATE = 1.05" in video_rtc
+    assert "void refreshPlayer(mac, null, true)" in app
+    assert "event: 'live_edge_jump'" in video_rtc
+    assert "this.video.currentTime = liveTarget" in video_rtc
+    assert "Math.min(1.25, gap)" not in video_rtc
+
+
 def test_build_endpoint_is_public_no_store_and_returns_content_id():
     response = main.frontend_build_info()
     body = json.loads(response.body)

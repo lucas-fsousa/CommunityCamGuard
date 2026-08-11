@@ -151,6 +151,18 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         # Override the built-in software preset so frame pacing/GOP are the *last* video options.
         # Hardware presets remain go2rtc's own when LIVE_HWACCEL is explicitly selected.
         "ffmpeg": {
+            # go2rtc's default RTSP input forces ``-fflags nobuffer -flags low_delay``. That is a
+            # poor fit for these cameras' HEVC restream: a local FFmpeg consumer normally joins in
+            # the middle of a long GOP and needs to retain packets until the next complete
+            # VPS/SPS/PPS + IDR set. With the low-latency flags it repeatedly lost references
+            # (PPS/POC/RPS decoder errors) and could remain alive/consume packets while producing
+            # no H.264 pictures. Keep the wall-clock repair supplied by ``#async``, but use the
+            # normal demuxer buffer. This is still a loopback RTSP hop; the few seconds of MSE
+            # startup buffer dominate latency and reliability matters more than shaving packets.
+            "rtsp": (
+                "-timeout {timeout} -user_agent go2rtc/ffmpeg "
+                "-rtsp_flags prefer_tcp -i {input}"
+            ),
             "h264": quality.h264_encoder_template(s.live_fps),
             "h264_sd": quality.h264_encoder_template(s.live_fps, width=640),
             # ffmpeg sources are redirected to go2rtc's exec producer. Keep its startup window
@@ -266,13 +278,17 @@ class Go2rtc:
             out[sid] = {"video_packets": video_packets, "consumers": len(consumers)}
         return out
 
-    def restart_preload(self, sid: str, *, disconnect_grace: float = 0.5) -> bool:
+    def restart_preload(self, sid: str, *, disconnect_grace: float = 2.0) -> bool:
         """Restart one preloaded *local* producer without touching the base camera/recording feed.
 
-        The caller first disposes the browser player. A short grace lets the WebSocket relay detach
+        The caller first disposes the browser player. A grace period lets the WebSocket relay detach
         its consumer; removing the preload then leaves the H.264 producer with no consumers, so
         go2rtc terminates that FFmpeg process. Re-adding it creates a clean decoder/encoder chain
         while the camera's shared base RTSP producer and recorder remain uninterrupted.
+
+        Do not shorten this to the old 0.5 s: with the MSE media relay still unwinding, DELETE only
+        removed the preload consumer and PUT immediately pinned the same wedged FFmpeg process
+        again. Two seconds is bounded and comfortably covers the observed proxy close latency.
 
         go2rtc 1.9.x can return HTTP 500 after successfully adding a preload. Verify the resulting
         registry instead of treating that response alone as failure.

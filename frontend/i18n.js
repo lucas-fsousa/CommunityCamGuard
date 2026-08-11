@@ -50,7 +50,7 @@ const STRINGS = {
     "cam.removeConfirm": "Remove {name}?",
     "cam.probe": "probe capabilities",
     "cam.probeFailed": "Probe failed: {msg}",
-    "cam.restart": "restart this player",
+    "cam.restart": "restart stream and return to live",
     "cam.unnamed": "(unnamed)",
 
     "cap.videoCodec": "video codec",
@@ -141,7 +141,7 @@ const STRINGS = {
     "cam.removeConfirm": "Remover {name}?",
     "cam.probe": "detectar recursos",
     "cam.probeFailed": "Falha na detecção: {msg}",
-    "cam.restart": "reiniciar este player",
+    "cam.restart": "reiniciar stream e voltar ao vivo",
     "cam.unnamed": "(sem nome)",
 
     "cap.videoCodec": "codec de vídeo",

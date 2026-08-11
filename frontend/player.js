@@ -11,7 +11,12 @@ const STARTUP_GRACE_MS = 45000;
 class CamPlayer extends VideoRTC {
   constructor() {
     super();
-    this.mode = "webrtc,mse";     // negotiate both; VideoRTC's codec weights prefer WebRTC here
+    // Chromium's WebRTC receiver can remain ICE/DTLS "connected" and keep receiving RTP while
+    // decoding no new frames. VideoRTC then permanently wins its fixed WebRTC-vs-MSE priority
+    // comparison and discards the healthy MSE path. Use MSE as the sole dashboard transport: the
+    // same local H.264 producer remains shared, but a wedged PeerConnection can no longer pin the
+    // visible picture to an old frame. The bounded MSE queue below jumps directly to the live edge.
+    this.mode = "mse";
     this.background = false;       // tear down WS/PC when removed from the DOM
     // Do NOT let go2rtc tear down + reconnect the stream when the tab is hidden. Its default
     // visibilityCheck disconnects on hide and reconnects on show — so switching to another tab and back

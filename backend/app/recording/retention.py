@@ -15,7 +15,7 @@ so it is never in scope. A file that can't be removed keeps its row, so the next
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ..config import get_settings
@@ -46,9 +46,13 @@ class RetentionCleaner:
         self._thread: threading.Thread | None = None
 
     def _cutoff_iso(self) -> str:
-        # Segment start times are stored as naive local-time ISO (from the strftime filename),
-        # so the cutoff is naive local too; ISO strings compare chronologically.
-        return (datetime.now() - timedelta(days=self.retention_days)).isoformat(timespec="seconds")
+        # New segment names and started_at values are UTC.  Use the same basis for retention so
+        # host/camera timezone changes cannot make footage expire early or late.  Legacy naive
+        # rows still compare in chronological YYYY-MM-DDTHH:MM:SS order; there is no safe way to
+        # infer which historical timezone produced them.
+        return (datetime.now(UTC) - timedelta(days=self.retention_days)).isoformat(
+            timespec="seconds"
+        )
 
     def purge(self) -> int:
         """Delete every segment older than the retention window. Returns how many were removed."""

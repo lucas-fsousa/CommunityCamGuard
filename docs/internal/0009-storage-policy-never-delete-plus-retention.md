@@ -30,5 +30,6 @@ and self-healing (a file that can't be unlinked keeps its row and is retried nex
   `autostart_services`, and `start()` is a no-op when disabled (no idle thread).
 - The Recordings page surfaces the active window (`retention_days`, `0` = unlimited) so users
   understand why old clips disappear.
-- Segment times are naive **local** ISO (from the strftime filename), so the age cutoff is naive-local
-  too and ISO strings compare chronologically.
+- New segment paths and indexed start times are explicit **UTC** (ADR 0016), so the age cutoff is
+  UTC-aware too. Legacy naive rows remain comparable by their ISO calendar components; they are not
+  rewritten because their original timezone cannot be inferred safely.

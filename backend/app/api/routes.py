@@ -315,7 +315,7 @@ def media_activity(request: Request) -> dict:
 
 _MEDIA_CLIENT_EVENTS = {
     "waiting", "stalled", "playing", "catchup_start", "catchup_end",
-    "mse_failure", "watchdog_recovery",
+    "live_edge_jump", "mse_failure", "watchdog_recovery",
 }
 
 

@@ -177,7 +177,13 @@ function camBar(cam) {
   const del = removeBtn(cam);
   const probe = probeBtn(cam);
   const reload = el("button", { className: "icon-btn", title: t("cam.restart"), innerHTML: svgIcon("i-refresh") });
-  reload.addEventListener("click", (e) => { e.stopPropagation(); refreshPlayer(cam.mac, reload); });
+  reload.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // A browser-only replacement reconnects to the same hot FFmpeg producer and therefore keeps
+    // any delay already accumulated there. The explicit user action means "back to live": detach
+    // this consumer, cycle only this camera's local H.264 producer, then create a clean player.
+    void refreshPlayer(cam.mac, reload, true);
+  });
   const caps = cam.capabilities || {};
 
   // A single compact row: identity on the left, controls on the right. Keeping it one line is what
@@ -383,28 +389,32 @@ function qualityControls(cam) {
   return sel;
 }
 
-// Restart a single camera's player — swap its iframe for a fresh one so one stuck stream
-// recovers on its own, instead of an F5 that re-buffers every camera. Swapping in a fresh <cam-player>
-// gives a clean WebRTC session for just this cam.
+// Restart a single camera's player. A lightweight replacement is enough for view/quality changes;
+// an explicit recovery also cycles the server's local H.264 producer so an upstream backlog cannot
+// survive this action the way it survives F5. Neither path reconnects the base camera/recorder feed.
 async function refreshPlayer(mac, btn, restartProducer = false) {
   const t = tiles.get(mac);
   const cam = state.cameras.find((c) => c.mac === mac);
   if (!t || !cam) return;
-  if (btn) { btn.classList.add("spin"); setTimeout(() => btn.classList.remove("spin"), 600); }
-  if (restartProducer) {
-    const old = t.el.firstChild;
-    // Detach the browser before asking the server to cycle its preload; otherwise this consumer
-    // would keep the old FFmpeg producer alive and the recovery would be a no-op.
-    if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
-    const placeholder = suspendedFrame();
-    if (old) old.replaceWith(placeholder); else t.el.prepend(placeholder);
-    producerProgress.delete(cam.mac);
-    try { await api(`/media/recover/${encodeURIComponent(mac)}`, { method: "POST" }); }
-    catch (err) { console.warn("[freeze watchdog] local producer recovery failed", mac, err); }
-    if (placeholder.isConnected) placeholder.replaceWith(camFrame(cam));
-    return;
+  if (btn) { btn.disabled = true; btn.classList.add("spin"); }
+  try {
+    if (restartProducer) {
+      const old = t.el.firstChild;
+      // Detach the browser before asking the server to cycle its preload; otherwise this consumer
+      // would keep the old FFmpeg producer alive and the recovery would be a no-op.
+      if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
+      const placeholder = suspendedFrame();
+      if (old) old.replaceWith(placeholder); else t.el.prepend(placeholder);
+      producerProgress.delete(cam.mac);
+      try { await api(`/media/recover/${encodeURIComponent(mac)}`, { method: "POST" }); }
+      catch (err) { console.warn("[stream recovery] local producer recovery failed", mac, err); }
+      if (placeholder.isConnected) placeholder.replaceWith(camFrame(cam));
+      return;
+    }
+    replacePlayerFrame(t.el, cam);
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove("spin"); }
   }
-  replacePlayerFrame(t.el, cam);
 }
 
 function replacePlayerFrame(tile, cam) {
@@ -487,9 +497,11 @@ async function freezeWatchdog() {
         serverVideoPackets: server && server.video_packets,
         serverConsumers: server && server.consumers,
       });
-      // A client-only stall needs only a fresh PeerConnection. A server packet stall cycles the
-      // local H.264 producer after disposing this browser, without reconnecting the base camera.
-      void refreshPlayer(mac, null, producerFrozen);
+      // Packet counters can advance while an H.264 producer emits an undecodable stream (observed:
+      // the browser and an independent FFmpeg both got no frame although video_packets increased).
+      // Therefore a confirmed visible freeze must recycle the local HD transcode as well as the
+      // consumer. The base RTSP producer and recorder remain shared and untouched.
+      void refreshPlayer(mac, null, true);
     });
   } finally {
     _watchdogBusy = false;

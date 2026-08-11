@@ -352,6 +352,9 @@ def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(mon
     assert "cam_aabbcc000007_live" not in streams
     assert "ffmpeg:cam_aabbcc000007#async#video=h264" in streams["cam_aabbcc000007_hd"]
     assert cfg["preload"]["cam_aabbcc000007_hd"] == "video&audio"
+    assert "nobuffer" not in cfg["ffmpeg"]["rtsp"]
+    assert "low_delay" not in cfg["ffmpeg"]["rtsp"]
+    assert cfg["ffmpeg"]["rtsp"].endswith("-rtsp_flags prefer_tcp -i {input}")
     assert "-vf fps=12,scale=640:-2" in cfg["ffmpeg"]["h264_sd"]
     assert cfg["ffmpeg"]["output"].endswith("{output}#starttimeout=45")
     # The recording feed is never re-encoded, so it must stay a bare RTSP URL.

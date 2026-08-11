@@ -683,14 +683,16 @@ which also self-heals rows written before the fix.
 
 ## 20. Live-player UX: per-camera restart + audio-off in Recordings (2026-07-28)
 
-The go2rtc live players are **cross-origin iframes**, so we can't script their volume from the
-dashboard (see §11). Two UX fixes built around that:
+The original go2rtc live players were **cross-origin iframes**. They have since become same-origin
+`<cam-player>` elements for diagnostics and precise recovery (see §34), while retaining the two UX
+behaviours introduced here:
 
-- **Per-camera "restart player"** — a refresh button on each tile swaps that camera's iframe for a
-  fresh one, so one stuck stream recovers on its own instead of an F5 that re-buffers every camera.
+- **Per-camera "restart stream"** — a refresh button on each tile now disposes that consumer and
+  cycles only the camera's local browser transcode before reconnecting. It does not restart the
+  camera, its shared RTSP producer, or recording.
 - **Audio off in Recordings** — switching to Recordings only hid the live `#players` via CSS, but a
-  hidden iframe keeps streaming, so both cameras' audio played over the recording. `setPlayersLive()`
-  now **unloads** the iframes (`src="about:blank"`) when entering Recordings (tears down stream +
+  hidden player keeps streaming, so both cameras' audio played over the recording. `setPlayersLive()`
+  now **unloads** the players when entering Recordings (tears down stream +
   audio) and rebuilds them on the way back to Grid/Single. Grid↔Single stay live (no-op, no
   re-buffer); tiles created while in Recordings start unloaded. Returning to live re-connects the
   streams (a small, expected re-buffer, since you'd left the live view).
@@ -744,8 +746,8 @@ setting a window.
   recordings page can list; a not-yet-indexed segment is by definition recent and never in scope.
   A file that can't be unlinked keeps its row, so the next pass retries it (self-healing).
 - Started in the lifespan after the storage monitor (gated by `autostart_services`; `start()` is a
-  no-op when disabled, so no idle thread). Segment start times are naive **local** ISO (from the
-  strftime filename), so the cutoff is naive-local too and ISO strings compare chronologically.
+  no-op when disabled, so no idle thread). This originally used naive local timestamps; §35 and
+  ADR 0016 supersede that detail with explicit UTC paths, index values and cutoff.
 
 6 tests added (expiry vs. recent, empty-dir prune, cache drop, 0=keep-forever, floor, disabled
 no-op) → 82 pass. `.env.example` documents the knob; set to 7 days for this deployment.
@@ -1306,3 +1308,33 @@ exec producer and the dashboard each get 45 seconds to start so neither recycles
 launch before frame one.
 The template must begin with `-c:v`: go2rtc's AAC+Opus multimode mapper recognizes video codecs by
 that prefix and prepends `-map 0:v:0?`; placing `-vf` first silently created an audio-only producer.
+
+### §34 addendum 5 — live means discard backlog, not replay it faster (2026-08-11)
+
+A garage-camera incident looked frozen at one burnt-in timestamp, survived both F5 and the tile's
+restart button, and then appeared to run faster until current time. The correlated client events
+made the failure domain unambiguous: transport was the MSE fallback, the server video-packet counter
+advanced continuously, `bufferedGap` reached exactly five seconds, and the player repeatedly entered
+`waiting` at `playbackRate=1.25`. That speed was explicitly set by our MSE catch-up controller.
+
+The five-second retention window had accidentally become the playback target. It also pruned a small
+slice on nearly every fragment, adding avoidable `SourceBuffer` work. MSE now keeps playback at 1×
+and, when more than 1.5 seconds behind, seeks directly to 250 ms from the live edge. History pruning
+uses hysteresis (prune after 12 seconds, retain eight). A `live_edge_jump` diagnostic records how much
+stale media was discarded.
+
+The restart button had only replaced the browser element, so F5 and the button both reattached to the
+same preloaded FFmpeg producer and could inherit its backlog. It now means “return to live”: dispose
+the browser consumer, cycle only that camera's local `_hd` preload/FFmpeg, and reconnect. The shared
+base RTSP producer and recording remain uninterrupted; view and quality changes still use the cheap
+browser-only replacement.
+
+## 35. Recording namespace is UTC, independent of camera/host timezone (2026-08-11)
+
+The segment muxer expands its `%Y/%H` output template in the FFmpeg process timezone. The container
+currently happened to be UTC, but this was not an invariant for host execution or a deployment that
+sets `TZ`; camera time synchronization is also not a trustworthy persistence clock. Recorder FFmpeg
+children now run with `TZ=UTC0`, directory pre-creation uses `datetime.now(UTC)`, indexed timestamps
+carry `+00:00`, and retention uses a UTC cutoff. Compose declares `TZ=UTC` too, but the child-level
+pin is the actual guarantee. Historical paths are left untouched because their source timezone
+cannot be inferred safely. See ADR `docs/internal/0016-utc-recording-layout.md`.
