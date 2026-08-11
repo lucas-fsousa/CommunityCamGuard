@@ -24,8 +24,9 @@ _STREAMS = {
 
 
 class _Resp:
-    def __init__(self, body):
+    def __init__(self, body=b"", status=200):
         self._body = body
+        self.status = status
 
     def read(self):
         return self._body
@@ -61,6 +62,36 @@ def test_media_activity_route_proxies_the_monitor():
 def test_media_activity_route_empty_without_media():
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
     assert routes.media_activity(req) == {}
+
+
+def test_restart_preload_cycles_only_requested_local_stream(monkeypatch):
+    calls = []
+
+    def open_(request, timeout=None):
+        method = request.get_method() if hasattr(request, "get_method") else "GET"
+        url = request.full_url if hasattr(request, "full_url") else request
+        calls.append((method, url))
+        if method == "PUT":
+            raise go2rtc.urllib.error.HTTPError(url, 500, "go2rtc quirk", {}, None)
+        if method == "GET":
+            return _Resp(json.dumps({"cam_x_hd": {"query": "video&audio"}}).encode())
+        return _Resp()
+
+    monkeypatch.setattr(go2rtc.urllib.request, "urlopen", open_)
+    monkeypatch.setattr(go2rtc.time, "sleep", lambda _seconds: None)
+    assert go2rtc.Go2rtc(manage=False).restart_preload("cam_x_hd") is True
+    assert [method for method, _ in calls] == ["DELETE", "PUT", "GET"]
+    assert all("cam_x_hd" in url for _, url in calls[:2])
+
+
+def test_media_recover_targets_hd_preload_not_camera_source(monkeypatch):
+    cam = Camera(mac="aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1")
+    restarted = []
+    media = SimpleNamespace(restart_preload=lambda sid: restarted.append(sid) or True)
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))
+    monkeypatch.setattr(routes.registry, "get_camera", lambda _mac: cam)
+    assert routes.media_recover(cam.mac, req) == {"ok": True}
+    assert restarted == [go2rtc.hd_stream_id(cam.mac)]
 
 
 # --- rule: recording always uses the base (main) feed, at full quality --------------

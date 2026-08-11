@@ -453,49 +453,86 @@ export class VideoRTC extends HTMLElement {
 
             const sb = ms.addSourceBuffer(msg.value);
             sb.mode = 'segments'; // segments or sequence
-            sb.addEventListener('updateend', () => {
-                if (!sb.updating && bufLen > 0) {
-                    try {
-                        const data = buf.slice(0, bufLen);
-                        sb.appendBuffer(data);
-                        bufLen = 0;
-                    } catch (e) {
-                        // console.debug(e);
-                    }
-                }
+            // SourceBuffer can remain busy during decoder/GC pressure. The original fixed 2 MiB
+            // Uint8Array overflowed after a few seconds of HD and silently lost media forever.
+            // Keep a bounded queue instead; overflow or an append failure is unrecoverable without
+            // a fresh init segment, so close this signalling/media socket and let VideoRTC reconnect.
+            const MAX_QUEUE_BYTES = 16 * 1024 * 1024;
+            const queue = [];
+            let queueBytes = 0;
+            let failed = false;
 
-                if (!sb.updating && sb.buffered && sb.buffered.length) {
+            const fail = error => {
+                if (failed || this.pcState === WebSocket.OPEN) return;
+                failed = true;
+                queue.length = 0;
+                queueBytes = 0;
+                console.warn('VideoRTC MSE stalled; reconnecting', error);
+                // MSE and WebRTC negotiate in parallel. If MSE fails before WebRTC wins, discard
+                // the half-negotiated PC too; otherwise VideoRTC.onconnect() refuses to start a
+                // replacement socket because `this.pc` is still non-null.
+                if (this.pc) {
+                    this.pc.close();
+                    this.pc = null;
+                    this.pcState = WebSocket.CLOSED;
+                }
+                if (this.ws) this.ws.close();
+            };
+
+            const appendNext = () => {
+                if (failed || sb.updating || !queue.length) return;
+                const data = queue.shift();
+                queueBytes -= data.byteLength;
+                try {
+                    sb.appendBuffer(data);
+                } catch (error) {
+                    fail(error);
+                }
+            };
+
+            sb.addEventListener('error', fail);
+            sb.addEventListener('abort', fail);
+            sb.addEventListener('updateend', () => {
+                if (failed || sb.updating) return;
+
+                if (sb.buffered && sb.buffered.length) {
                     const end = sb.buffered.end(sb.buffered.length - 1);
-                    const start = end - 5;
+                    const start = Math.max(0, end - 5);
                     const start0 = sb.buffered.start(0);
                     if (start > start0) {
-                        sb.remove(start0, start);
-                        ms.setLiveSeekableRange(start, end);
+                        try {
+                            sb.remove(start0, start);
+                            ms.setLiveSeekableRange(start, end);
+                        } catch (error) {
+                            fail(error);
+                        }
+                        return; // remove() is asynchronous; its updateend will resume the queue
                     }
-                    if (this.video.currentTime < start) {
-                        this.video.currentTime = start;
-                    }
+                    if (this.video.currentTime < start) this.video.currentTime = start;
                     const gap = end - this.video.currentTime;
-                    this.video.playbackRate = gap > 0.1 ? gap : 0.1;
-                    // console.debug('VideoRTC.buffered', gap, this.video.playbackRate, this.video.readyState);
+                    // Never slow a live stream to 0.1x. Play normally near the edge and use a
+                    // modest bounded catch-up rate when latency grows.
+                    this.video.playbackRate = gap > 1 ? Math.min(1.25, gap) : 1;
                 }
+                appendNext();
             });
 
-            const buf = new Uint8Array(2 * 1024 * 1024);
-            let bufLen = 0;
-
             this.ondata = data => {
-                if (sb.updating || bufLen > 0) {
-                    const b = new Uint8Array(data);
-                    buf.set(b, bufLen);
-                    bufLen += b.byteLength;
-                    // console.debug('VideoRTC.buffer', b.byteLength, bufLen);
-                } else {
-                    try {
-                        sb.appendBuffer(data);
-                    } catch (e) {
-                        // console.debug(e);
+                if (failed) return;
+                const bytes = data.byteLength || 0;
+                if (sb.updating || queue.length) {
+                    if (queueBytes + bytes > MAX_QUEUE_BYTES) {
+                        fail(new Error(`MSE queue exceeded ${MAX_QUEUE_BYTES} bytes`));
+                        return;
                     }
+                    queue.push(data);
+                    queueBytes += bytes;
+                    return;
+                }
+                try {
+                    sb.appendBuffer(data);
+                } catch (error) {
+                    fail(error);
                 }
             };
         };

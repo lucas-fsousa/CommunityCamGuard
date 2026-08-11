@@ -28,6 +28,8 @@ const state = {
   rec: { mac: "", from: "", to: "", page: 0, pageSize: 50 },
   candidates: [], camFilter: "all",   // Cameras view: discovered (unconfigured) cams + which cards to show
 };
+let _storageTimer = 0;
+let _watchdogTimer = 0;
 
 async function api(path, opts = {}) {
   const res = await fetch("/api" + path, {
@@ -39,7 +41,18 @@ async function api(path, opts = {}) {
 }
 
 // --- auth --------------------------------------------------------------------------
-function showLogin() { $("#login").classList.remove("hidden"); $("#dash").classList.add("hidden"); }
+function stopDashboardSession() {
+  if (_storageTimer) { clearInterval(_storageTimer); _storageTimer = 0; }
+  if (_watchdogTimer) { clearInterval(_watchdogTimer); _watchdogTimer = 0; }
+  // A hidden authenticated dashboard must not leave media consumers/transcodes running after
+  // logout or session expiry. Login rebuilds them through applyView().
+  if (typeof setPlayersLive === "function") setPlayersLive(false);
+}
+function showLogin() {
+  stopDashboardSession();
+  $("#login").classList.remove("hidden");
+  $("#dash").classList.add("hidden");
+}
 function showDash() { $("#login").classList.add("hidden"); $("#dash").classList.remove("hidden"); }
 
 $("#login-form").addEventListener("submit", async (e) => {
@@ -66,12 +79,12 @@ async function loadStorage() {
 }
 
 // --- camera tiles ------------------------------------------------------------------
-// No forced mode: every stream the player is pointed at is H.264 + AAC/Opus, so go2rtc's
-// mode=webrtc,mse pins the *priority*: try WebRTC first, fall back to MSE only if it truly fails.
+// Every stream the player is pointed at is H.264 + AAC/Opus. VideoRTC negotiates WebRTC and MSE
+// together, then its codec weights prefer WebRTC for these tracks; MSE remains the transport fallback.
 // This matters for remote viewers — MSE is WebSocket/TCP, so a 1080p feed over the internet stalls
 // to rebuffer on any jitter/loss ("travando toda hora"); WebRTC's UDP + jitter buffer rides over it.
-// Diagnostics showed the HD tile landing on MSE while the substream got WebRTC, so we stop leaving
-// it to chance. MSE stays as the fallback so a WebRTC-hostile network still gets a picture.
+// Diagnostics previously showed the HD tile landing on MSE while the substream got WebRTC; keeping
+// H.264+Opus available makes WebRTC win that selection on normal browsers.
 // The <cam-player> element (player.js) sets mode="webrtc,mse"; here we only hand it the signalling
 // WebSocket. We point it at the app's OWN origin (/api/go2rtc/ws), which proxies to go2rtc: this
 // keeps the player same-origin (so the freeze watchdog can read the real <video>) without opening
@@ -172,7 +185,7 @@ function camBar(cam) {
   // keeps the footer small (the go2rtc player already adds its own control strip above us).
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz) actions.append(ptzControls(cam));
-  if (cam.has_substream) actions.append(qualityControls(cam));
+  if (cam.has_quality_variants) actions.append(qualityControls(cam));
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
     rec,
@@ -186,32 +199,35 @@ function camBar(cam) {
 
 // Which go2rtc stream a tile should pull, weighing picture against CPU.
 //
-// Both variants are re-encoded to H.264 (the browser cannot take the cameras' HEVC); they
-// differ in source. `_hd` is the main 1080p feed at ~30% of a core per viewer, `_web` the
-// substream at ~8%. Single view is always one camera, so it takes `_hd`. The grid takes it
-// too while it is small enough (`grid_hd_max_cameras`) — on these units the substream is a
-// 640x360 / 37 kbps feed, so the CPU buys a visible improvement — and falls back to `_web`
-// once there are enough tiles that the full-resolution cost would starve the host.
+// Both variants are served by the local media hub (the browser cannot take the cameras' HEVC).
+// `_hd` is one shared, preheated 1080p transcode per camera; `_web` is a local 640px derivative.
+// Neither browser choice opens another RTSP connection to the camera. Single view takes `_hd`.
+// The grid takes it
+// too by default: maximum resolution is the product policy. A user on a weaker host can select
+// Auto (respect `grid_hd_max_cameras`) or SD (always `_web`) per camera.
 // Per-camera quality preference, chosen by the user and kept client-side (no server round-trip,
 // no go2rtc restart — the variants already exist as separate streams, so switching is instant).
-// "auto" = the sharpest the host can sustain (the default, matching the "max quality" intent);
-// "sharp" = force the main 1080p feed; "smooth" = force the cheap substream.
+// "sharp" = force the main 1080p feed (default); "auto" = respect the host budget;
+// "smooth" = force the cheap substream.
 const QUALITY_PREFS = ["auto", "sharp", "smooth"];
 function qualityPref(mac) {
-  try { return localStorage.getItem("ccg.quality." + mac) || "auto"; } catch { return "auto"; }
+  // Max resolution is the product default. Auto and SD are explicit user choices for hosts that
+  // cannot sustain one full-resolution transcode per visible camera.
+  try { return localStorage.getItem("ccg.quality." + mac) || "sharp"; } catch { return "sharp"; }
 }
 function setQualityPref(mac, val) {
   try { localStorage.setItem("ccg.quality." + mac, val); } catch { /* private mode: session-only */ }
 }
 
 function streamFor(cam) {
-  if (!cam.has_substream) return cam.web_stream_id;   // only one source; nothing to choose
   const pref = qualityPref(cam.mac);
   if (pref === "sharp") return cam.hd_stream_id;
   if (pref === "smooth") return cam.web_stream_id;
-  // auto: single view is always sharp; the grid is sharp only while small enough not to starve
-  // the host (grid_hd_max_cameras), else the substream. See docs/DECISIONS.md §34.
-  const hd = state.view === "single" || state.cameras.length <= state.gridHdMax;
+  // auto: only the selected single-view camera is HD; the grid follows the configured host budget.
+  // This policy is opt-in. The default above remains HD for every camera.
+  const hd = state.view === "single"
+    ? cam.mac === state.selected
+    : state.cameras.length <= state.gridHdMax;
   return hd ? cam.hd_stream_id : cam.web_stream_id;
 }
 
@@ -332,9 +348,8 @@ function zoomControls(cam) {
 }
 
 // Per-camera quality selector for the bar: a dropdown so the user picks the mode directly
-// (Auto / HD / SD) instead of cycling blindly. Only meaningful when the camera has a substream
-// (two sources to choose between); for a single-source camera streamFor has no choice, so the
-// caller omits it. Changing it reconnects just this one player.
+// (Auto / HD / SD) instead of cycling blindly. Both choices are local server streams; changing it
+// reconnects just this player and never creates another connection to the camera.
 function qualityControls(cam) {
   const sel = el("select", { className: "quality-select", title: t("quality.label") });
   for (const val of QUALITY_PREFS) {
@@ -354,11 +369,24 @@ function qualityControls(cam) {
 // Restart a single camera's player — swap its iframe for a fresh one so one stuck stream
 // recovers on its own, instead of an F5 that re-buffers every camera. Swapping in a fresh <cam-player>
 // gives a clean WebRTC session for just this cam.
-function refreshPlayer(mac, btn) {
+async function refreshPlayer(mac, btn, restartProducer = false) {
   const t = tiles.get(mac);
   const cam = state.cameras.find((c) => c.mac === mac);
   if (!t || !cam) return;
   if (btn) { btn.classList.add("spin"); setTimeout(() => btn.classList.remove("spin"), 600); }
+  if (restartProducer) {
+    const old = t.el.firstChild;
+    // Detach the browser before asking the server to cycle its preload; otherwise this consumer
+    // would keep the old FFmpeg producer alive and the recovery would be a no-op.
+    if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
+    const placeholder = suspendedFrame();
+    if (old) old.replaceWith(placeholder); else t.el.prepend(placeholder);
+    producerProgress.delete(cam.mac);
+    try { await api(`/media/recover/${encodeURIComponent(mac)}`, { method: "POST" }); }
+    catch (err) { console.warn("[freeze watchdog] local producer recovery failed", mac, err); }
+    if (placeholder.isConnected) placeholder.replaceWith(camFrame(cam));
+    return;
+  }
   replacePlayerFrame(t.el, cam);
 }
 
@@ -367,6 +395,7 @@ function replacePlayerFrame(tile, cam) {
   // A deliberate replacement is final, unlike a transient DOM move. Dispose synchronously so
   // the old peer cannot reconnect and consume another ffmpeg transcode behind the new tile.
   if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
+  producerProgress.delete(cam.mac);
   old.replaceWith(camFrame(cam));
 }
 
@@ -380,7 +409,11 @@ function replacePlayerFrame(tile, cam) {
 const STALL_POLL_MS = 3000;       // how often we check
 const FREEZE_MS = 10000;          // no newly-presented frame for this long (while playing) = frozen
 const RECOVERY_COOLDOWN_MS = 30000; // never flap a persistently bad stream every watchdog tick
+const PRODUCER_STALL_STRIKES = 3;    // three unchanged server samples (~9s) confirms a dead transcode
+const PRODUCER_STARTUP_GRACE_MS = 45000; // match go2rtc's slow-source window; steady state stays strict
 const lastAutoRecovery = new Map();
+const producerProgress = new Map();
+let _watchdogBusy = false;
 
 function tileIsVisible(tile) {
   // In Single view every unselected tile has display:none. Chromium legitimately stops decoding
@@ -391,21 +424,52 @@ function tileIsVisible(tile) {
   return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
     r.top < window.innerHeight && r.left < window.innerWidth;
 }
-function freezeWatchdog() {
-  if (_playersSuspended || document.hidden) return;
+async function freezeWatchdog() {
+  if (_watchdogBusy || _playersSuspended || document.hidden) return;
   if (state.view !== "grid" && state.view !== "single") return;
-  tiles.forEach((t, mac) => {
-    const frame = t.el.firstChild;
-    if (!frame || frame.tagName !== "CAM-PLAYER" || typeof frame.frozenMs !== "function") return;
-    if (!tileIsVisible(t.el)) return;
-    const frozenMs = frame.frozenMs();
-    if (frozenMs <= FREEZE_MS) return;
-    const last = lastAutoRecovery.get(mac) || 0;
-    if (Date.now() - last < RECOVERY_COOLDOWN_MS) return;
-    lastAutoRecovery.set(mac, Date.now());
-    console.warn(`[freeze watchdog] ${frame.dataset.src} frozen for ${Math.round(frozenMs)}ms — rebuilding`);
-    refreshPlayer(mac);
-  });
+  _watchdogBusy = true;
+  try {
+    let activity = null;
+    try { activity = await api("/media/activity"); } catch { /* client counters still work */ }
+    tiles.forEach((t, mac) => {
+      const frame = t.el.firstChild;
+      if (!frame || frame.tagName !== "CAM-PLAYER" || typeof frame.frozenMs !== "function") return;
+      if (!tileIsVisible(t.el)) return;
+      const sid = frame.dataset.src;
+      const server = activity && activity[sid];
+      let producerFrozen = false;
+      if (server && server.consumers > 0) {
+        const prev = producerProgress.get(mac);
+        const reset = !prev || prev.sid !== sid;
+        const progressed = reset || server.video_packets !== prev.packets;
+        const strikes = progressed ? 0 : prev.strikes + 1;
+        const firstSeen = reset ? Date.now() : prev.firstSeen;
+        producerProgress.set(mac, { sid, packets: server.video_packets, strikes, firstSeen });
+        producerFrozen = Date.now() - firstSeen >= PRODUCER_STARTUP_GRACE_MS &&
+          strikes >= PRODUCER_STALL_STRIKES;
+      } else {
+        producerProgress.delete(mac);
+      }
+
+      const frozenMs = frame.frozenMs();
+      if (!producerFrozen && frozenMs <= FREEZE_MS) return;
+      const last = lastAutoRecovery.get(mac) || 0;
+      if (Date.now() - last < RECOVERY_COOLDOWN_MS) return;
+      lastAutoRecovery.set(mac, Date.now());
+      console.warn("[freeze watchdog] rebuilding stalled stream", {
+        stream: sid,
+        clientFrozenMs: Math.round(frozenMs),
+        producerFrozen,
+        server,
+        player: typeof frame.diagnostics === "function" ? frame.diagnostics() : null,
+      });
+      // A client-only stall needs only a fresh PeerConnection. A server packet stall cycles the
+      // local H.264 producer after disposing this browser, without reconnecting the base camera.
+      void refreshPlayer(mac, null, producerFrozen);
+    });
+  } finally {
+    _watchdogBusy = false;
+  }
 }
 // When the tab returns to the foreground, browser frame accounting may have been paused while hidden — reset each player's freeze
 // clock so we don't rebuild a perfectly healthy stream on the first check after unhide.
@@ -440,6 +504,23 @@ function setPlayersLive(live) {
 // Camera tiles (iframe + bar) are built once and kept mounted; switching grid<->single
 // only toggles CSS, so a running stream is never torn down and re-created (no reload).
 const tiles = new Map();   // mac -> { el }
+
+function ensureSelected() {
+  if (state.cameras.length && !state.cameras.some((c) => c.mac === state.selected)) {
+    state.selected = state.cameras[0].mac;
+  }
+}
+
+function reconcilePlayerSources() {
+  if (_playersSuspended) return;
+  state.cameras.forEach((cam) => {
+    const t = tiles.get(cam.mac);
+    const frame = t && t.el.firstChild;
+    if (frame && frame.tagName === "CAM-PLAYER" && frame.dataset.src !== streamFor(cam)) {
+      replacePlayerFrame(t.el, cam);
+    }
+  });
+}
 
 // Reconcile #players with the camera list without recreating existing tiles. New cameras
 // get a tile appended; removed ones are dropped; existing tiles keep their live frame and
@@ -480,7 +561,11 @@ function buildRail() {
       el("span", { className: "rec" + (c.recording ? " on" : "") }),
       el("span", { className: "rail-name", textContent: c.name || c.mac }),
     );
-    item.addEventListener("click", () => { state.selected = c.mac; applyView(); });
+    item.addEventListener("click", () => {
+      state.selected = c.mac;
+      reconcilePlayerSources();
+      applyView();
+    });
     rail.append(item);
   });
 }
@@ -517,12 +602,15 @@ function applyView() {
 }
 
 function render() {
+  ensureSelected();
   renderPlayers();
   applyView();
 }
 
 function setView(view) {
   state.view = view;
+  ensureSelected();
+  reconcilePlayerSources();
   document.querySelectorAll(".views button").forEach((b) =>
     b.classList.toggle("active", b.dataset.view === view));
   applyView();   // layout-only: keep the players mounted so streams don't reload
@@ -763,8 +851,8 @@ async function boot() {
   state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
   state.gridHdMax = media.grid_hd_max_cameras ?? 0;
   await Promise.all([loadCameras(), loadStorage()]);
-  setInterval(loadStorage, 15000);
-  setInterval(freezeWatchdog, STALL_POLL_MS);   // auto-reload a player whose video has frozen
+  if (!_storageTimer) _storageTimer = setInterval(loadStorage, 15000);
+  if (!_watchdogTimer) _watchdogTimer = setInterval(freezeWatchdog, STALL_POLL_MS);
 }
 
 applyI18n();     // fill static labels for the initial language (the login screen shows first)

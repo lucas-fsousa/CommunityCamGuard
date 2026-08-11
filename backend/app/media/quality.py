@@ -61,14 +61,14 @@ def normalize_hwaccel(hwaccel: str | None) -> str:
     return v if v in HWACCELS and v else ""
 
 
-def video_h264_directive(hwaccel: str | None = "") -> str:
+def video_h264_directive(hwaccel: str | None = "", *, codec: str = "h264") -> str:
     """The go2rtc video-codec directive for a transcode: ``#video=h264`` plus optional hardware.
 
     With a hardware value it becomes e.g. ``#video=h264#hardware=vaapi``, telling go2rtc to encode
     with ``h264_vaapi`` instead of libx264. Unknown/empty falls back to plain software H.264.
     """
     hw = normalize_hwaccel(hwaccel)
-    return f"#video=h264#hardware={hw}" if hw else "#video=h264"
+    return f"#video={codec}#hardware={hw}" if hw else f"#video={codec}"
 
 
 def target_kbps(level: str | None, *, hd: bool) -> int:
@@ -77,17 +77,51 @@ def target_kbps(level: str | None, *, hd: bool) -> int:
     return table[normalize_level(level)]
 
 
-def encode_raw_args(level: str | None, fps: int, *, hd: bool) -> str:
-    """Build the go2rtc ``#raw=`` chunk for a transcode: fixed frame rate + quality bitrate/GOP.
+def h264_encoder_template(fps: int, *, width: int | None = None) -> str:
+    """Return the software H.264 template installed over go2rtc's built-in preset.
 
-    ``#raw=`` appends raw ffmpeg **output** args to go2rtc's ``#video=h264`` template. We set:
+    go2rtc expands ``#raw`` *before* its codec template.  Putting ``-g`` in ``#raw`` therefore
+    did not do what it appeared to do: the built-in H.264 preset appended ``-g 50`` afterwards
+    and silently won.  Keep timing/GOP options in the final codec template so the configured
+    two-second recovery interval is the effective one.
 
-    * ``-r {fps}`` — the fixed rate the browser needs (these cameras send no PTS; see ``live_fps``).
-    * ``-b:v/-maxrate/-bufsize`` — an explicit capped bitrate: the quality lever this module adds.
-    * ``-g`` — a ~2 s keyframe interval derived from the frame rate.
-
-    Returned as a single ``#raw=`` segment (go2rtc takes one raw block, space-separated args).
+    The ``fps`` filter is intentional rather than output ``-r``.  Both regularise these cameras'
+    missing/jittery timestamps, but output ``-r`` can keep manufacturing copies of the last good
+    frame while the HEVC decoder is no longer producing pictures.  Those fake frames kept every
+    liveness counter moving while the dashboard was visibly frozen.  The filter only advances
+    when decoded input frames reach it, allowing the existing watchdog to observe a dead producer.
     """
+    rate = max(1, min(int(fps), 60))
+    gop = max(1, round(rate * GOP_SECONDS))
+    filters = f"fps={rate}"
+    if width is not None:
+        # Keep scaling in the same filter graph as pacing. Supplying go2rtc's ``#width`` would
+        # append a second ``-vf`` and replace the fps filter, bringing synthetic frozen frames
+        # and unreliable liveness detection back.
+        safe_width = max(160, min(int(width), 7680))
+        filters += f",scale={safe_width}:-2"
+    return (
+        # In go2rtc multimode (AAC + Opus), codec strings must start with ``-c:v`` so its Args
+        # builder prepends ``-map 0:v:0?``. A leading filter silently produced audio-only output.
+        f"-c:v libx264 -vf {filters} -g:v {gop} -keyint_min:v {gop} "
+        "-sc_threshold:v 0 -bf:v 0 -profile:v high -level:v 4.1 "
+        "-preset:v superfast -tune:v zerolatency -pix_fmt:v yuv420p "
+        "-fps_mode passthrough"
+    )
+
+
+def encode_raw_args(level: str | None, fps: int, *, hd: bool) -> str:
+    """Build the go2rtc ``#raw=`` chunk carrying per-stream bitrate limits.
+
+    ``#raw=`` is expanded before go2rtc's video-codec template.  It therefore contains only
+    options that the template does not replace:
+
+    * ``-b:v/-maxrate/-bufsize`` — an explicit capped bitrate: the quality lever this module adds.
+
+    Frame pacing and the GOP live in :func:`h264_encoder_template`, where they are guaranteed to
+    come after ``#raw`` and cannot be overwritten by go2rtc's built-in ``-g 50``.  ``fps`` remains
+    in this signature so callers keep one quality-policy API and for backward compatibility.
+    """
+    del fps
     kbps = target_kbps(level, hd=hd)
-    gop = max(1, round(fps * GOP_SECONDS))
-    return f"#raw=-r {fps} -b:v {kbps}k -maxrate {kbps}k -bufsize {kbps * 2}k -g {gop}"
+    return f"#raw=-b:v {kbps}k -maxrate {kbps}k -bufsize {kbps * 2}k"

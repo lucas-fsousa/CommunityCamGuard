@@ -17,7 +17,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from ..config import get_settings
 from ..db import registry
@@ -31,15 +31,11 @@ def stream_id(mac: str) -> str:
 
 
 def web_stream_id(mac: str) -> str:
-    """The cheap live variant: the camera's **substream**, re-encoded to H.264 + AAC/Opus.
+    """Locally downscaled live variant, derived from :func:`hd_stream_id`.
 
-    The re-encode is unavoidable (the browser cannot take these cameras' HEVC — see
-    ``build_config``), so it is done on the small feed: ~8% of a CPU core per viewer instead of
-    ~30% at full resolution. This is what lets a wall of cameras share one host.
-
-    The catch is the source: on these units the substream is **640x360 at ~37 kbps** — measured,
-    and genuinely poor. No encoder setting recovers detail the camera never sent, so
-    ``grid_hd_max_cameras`` exists to prefer :func:`hd_stream_id` on a small wall instead.
+    It deliberately does **not** open the camera's secondary RTSP feed. Every browser/consumer
+    reads from the server-side hub, keeping the camera at one RTSP session regardless of how many
+    clients are open.
     """
     return stream_id(mac) + "_web"
 
@@ -59,12 +55,8 @@ def hd_stream_id(mac: str) -> str:
     """The full-resolution live variant: the **main** 1080p feed re-encoded to H.264.
 
     The counterpart to :func:`web_stream_id` — same treatment, bigger source, so ~30% of a CPU
-    core per viewer against ~8%. Worth it where the picture matters: single-camera view always,
-    and the grid too while it holds at most ``grid_hd_max_cameras`` tiles (the substream is a
-    37 kbps feed, so on a small wall the CPU buys a real improvement).
-
-    go2rtc keeps an ``ffmpeg:`` source idle until something consumes it, so the variants that
-    are not on screen cost nothing. See ``build_config`` and docs/DECISIONS.md §34.
+    core per camera. It is preloaded once on the server and shared by all browser consumers, so a
+    reload never starts another camera session or another HD transcode.
     """
     return stream_id(mac) + "_hd"
 
@@ -96,13 +88,13 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
     if cameras is None:
         cameras = registry.list_cameras()
     streams: dict[str, str | list[str]] = {}
+    preload: dict[str, str] = {}
     for cam in cameras:
         url = cam.rtsp_url
         if not url:
             continue
         sid = stream_id(cam.mac)
         streams[sid] = url
-
         # --- browser-facing variants ----------------------------------------------------
         # **Video has to become H.264 for the browser.** This is the same conclusion every
         # working NVR reaches (Frigate's camera-setup docs open by telling you to configure the
@@ -117,47 +109,59 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         # stalls: that is the freezing. Re-encoding fixes both at once — correct header, and a
         # flat 0.0667 s per sample (verified).
         #
-        # So: re-encode, but from the **substream**, which is what makes it affordable —
-        # ~5% of a core per viewer at 640x360 vs ~26% at 1080p. Frigate's guidance is the same
-        # ("use the substream for live viewing, keep the main stream for recording").
+        # So: re-encode the main stream once on the server and share that H.264 producer. This is
+        # intentionally not sourced from the camera substream: opening main + sub made each camera
+        # serve two RTSP sessions before a single browser was counted. SD is downscaled locally.
         # Both audio codecs: AAC is what MP4/MSE can carry, Opus is what WebRTC needs. Encoding
         # both costs nothing at 16 kHz mono and lets the player negotiate **WebRTC** — lowest
         # latency, and universally supported now that the video is H.264, so the dashboard no
         # longer depends on the browser having an HEVC decoder.
         audio_part = "#audio=aac#audio=opus" if cam.capabilities.get("has_audio") else ""
-        # Encoder params come from the quality policy (media/quality.py): a fixed frame rate
-        # (the cameras send no PTS, so preserving their timing hands the browser jittering
-        # sample durations and it stalls — see `live_fps`) plus a level-driven target bitrate,
-        # the lever that actually buys picture quality. `hd=` tracks the *source* resolution:
-        # the substream needs few bits, the 1080p main feed benefits from more.
+        # Per-stream bitrate comes from the quality policy. Frame pacing and the effective GOP
+        # are in the generated H.264 codec template below; go2rtc expands #raw *before* its
+        # built-in template, whose later `-g 50` used to override our requested `-g 20`.
         sub_raw = quality.encode_raw_args(s.live_quality, s.live_fps, hd=False)
         main_raw = quality.encode_raw_args(s.live_quality, s.live_fps, hd=True)
         # The video codec directive, optionally hardware-accelerated (see live_hwaccel). Empty
         # hwaccel -> plain `#video=h264` (software), which is the default and current behaviour.
         vid = quality.video_h264_directive(s.live_hwaccel)
-        sub = cam.substream_url
-        if sub:
-            sub_id = sub_stream_id(cam.mac)
-            streams[sub_id] = sub
-            # Audio lives only on the main feed, so it is merged in as a second source.
-            video = f"ffmpeg:{sub_id}{vid}{sub_raw}"
-            streams[web_stream_id(cam.mac)] = (
-                [video, f"ffmpeg:{sid}{audio_part}"] if audio_part else video)
-        else:
-            # No substream advertised: the web variant re-encodes the main feed, so it earns the
-            # main-feed bitrate (it is this camera's only live source).
-            streams[web_stream_id(cam.mac)] = f"ffmpeg:{sid}{vid}{audio_part}{main_raw}"
+        hd_sid = hd_stream_id(cam.mac)
+        # `#async` makes go2rtc prepend FFmpeg's wall-clock timestamp input options. These cameras
+        # have no trustworthy PTS; one unit was empirically running its declared 10 fps timeline at
+        # ~3x wall speed (13.1 Mbps and >100% CPU despite a 4.5 Mbps cap). Server wall time makes
+        # frame pacing and VBV rate control mean what they say.
+        streams[hd_sid] = f"ffmpeg:{sid}#async{vid}{audio_part}{main_raw}"
 
-        # Full-resolution variant for single-camera view: the main feed re-encoded. Only ever
-        # consumed by one tile at a time, and go2rtc keeps an `ffmpeg:` source idle until
-        # something consumes it, so grid view pays nothing for it.
-        if sub:
-            streams[hd_stream_id(cam.mac)] = f"ffmpeg:{sid}{vid}{audio_part}{main_raw}"
+        # Hold one local H.264 producer open. New WebRTC consumers attach to an already-running
+        # encoder with current codec parameters/keyframes instead of repeatedly constructing the
+        # camera -> HEVC decoder -> H.264 encoder chain. `video&audio` is go2rtc's native preload
+        # query; for silent cameras the absent audio match is optional.
+        preload[hd_sid] = "video&audio" if audio_part else "video"
+
+        # SD/Auto is a *local* derivative of the hot HD stream. This spends server CPU only when
+        # requested, but never opens the camera's `/onvif2` feed and therefore never adds a second
+        # RTSP session to constrained camera hardware.
+        sd_vid = quality.video_h264_directive(s.live_hwaccel, codec="h264_sd")
+        streams[web_stream_id(cam.mac)] = (
+            f"ffmpeg:{hd_sid}{sd_vid}{audio_part}{sub_raw}")
     return {
         "api": {"listen": _api_listen()},
         "rtsp": {"listen": f"{s.go2rtc_host}:{s.go2rtc_rtsp_port}"},
         "webrtc": {"listen": f"{s.go2rtc_host}:{s.go2rtc_webrtc_port}"},
+        # Override the built-in software preset so frame pacing/GOP are the *last* video options.
+        # Hardware presets remain go2rtc's own when LIVE_HWACCEL is explicitly selected.
+        "ffmpeg": {
+            "h264": quality.h264_encoder_template(s.live_fps),
+            "h264_sd": quality.h264_encoder_template(s.live_fps, width=640),
+            # ffmpeg sources are redirected to go2rtc's exec producer. Keep its startup window
+            # above the measured first-IDR delay; the fragment is consumed by exec, not FFmpeg.
+            "output": (
+                "-user_agent ffmpeg/go2rtc -rtsp_transport tcp -f rtsp "
+                "{output}#starttimeout=45"
+            ),
+        },
         "streams": streams,
+        "preload": preload,
     }
 
 
@@ -261,6 +265,43 @@ class Go2rtc:
             )
             out[sid] = {"video_packets": video_packets, "consumers": len(consumers)}
         return out
+
+    def restart_preload(self, sid: str, *, disconnect_grace: float = 0.5) -> bool:
+        """Restart one preloaded *local* producer without touching the base camera/recording feed.
+
+        The caller first disposes the browser player. A short grace lets the WebSocket relay detach
+        its consumer; removing the preload then leaves the H.264 producer with no consumers, so
+        go2rtc terminates that FFmpeg process. Re-adding it creates a clean decoder/encoder chain
+        while the camera's shared base RTSP producer and recorder remain uninterrupted.
+
+        go2rtc 1.9.x can return HTTP 500 after successfully adding a preload. Verify the resulting
+        registry instead of treating that response alone as failure.
+        """
+        if disconnect_grace > 0:
+            time.sleep(min(disconnect_grace, 2.0))
+        query = urlencode({"src": sid})
+        endpoint = f"{self.api}/api/preload?{query}"
+        try:
+            with urllib.request.urlopen(
+                    urllib.request.Request(endpoint, method="DELETE"), timeout=3):
+                pass
+        except (urllib.error.URLError, OSError):
+            # Absence is fine: PUT below is also the repair for a preload that disappeared.
+            pass
+        time.sleep(0.25)
+        try:
+            with urllib.request.urlopen(
+                    urllib.request.Request(endpoint, data=b"", method="PUT"), timeout=5) as r:
+                if r.status in (200, 201, 204):
+                    return True
+        except (urllib.error.URLError, OSError):
+            pass
+        try:
+            with urllib.request.urlopen(f"{self.api}/api/preload", timeout=2) as r:
+                current = json.loads(r.read())
+            return sid in (current or {})
+        except (urllib.error.URLError, OSError, ValueError):
+            return False
 
     def wait_healthy(self, timeout: float = 10.0) -> bool:
         """Poll the API until it answers, so callers know go2rtc is ready."""

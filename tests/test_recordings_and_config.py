@@ -217,35 +217,35 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     streams = go2rtc.build_config(cameras=[silent, audible])["streams"]
     # The live variant is about **video**, not audio: the browser cannot play these cameras'
     # HEVC, so even a silent camera needs an H.264 one. Audio only adds the AAC track.
-    # (Neither camera advertises a substream here, so both re-encode the main feed -> `main_raw`.)
+    # HD is transcoded once from the base stream and preloaded; SD is a local derivative of HD.
     main_raw = _raw(hd=True)
+    sub_raw = _raw(hd=False)
     assert streams["cam_aabbcc000001"] == "rtsp://admin@10.0.0.1:554/onvif1"      # recording
-    assert streams["cam_aabbcc000001_web"] == f"ffmpeg:cam_aabbcc000001#video=h264{main_raw}"
+    assert streams["cam_aabbcc000001_hd"] == (
+        f"ffmpeg:cam_aabbcc000001#async#video=h264{main_raw}")
+    assert streams["cam_aabbcc000001_web"] == (
+        f"ffmpeg:cam_aabbcc000001_hd#video=h264_sd{sub_raw}")
+    assert streams["cam_aabbcc000002_hd"] == (
+        f"ffmpeg:cam_aabbcc000002#async#video=h264#audio=aac#audio=opus{main_raw}")
     assert (streams["cam_aabbcc000002_web"]
-            == f"ffmpeg:cam_aabbcc000002#video=h264#audio=aac#audio=opus{main_raw}")
+            == f"ffmpeg:cam_aabbcc000002_hd"
+               f"#video=h264_sd#audio=aac#audio=opus{sub_raw}")
 
 
-def test_go2rtc_live_variant_prefers_the_substream():
-    """Live view re-encodes the **substream** to H.264; the main feed is left for recording.
-
-    The browser needs H.264 (handing it the cameras' HEVC yields a wrong fMP4 track header and
-    jittering sample durations — the freezing). Re-encoding is therefore unavoidable here, so it
-    is done on the cheap 640x360 feed (~5% of a core) instead of 1080p (~26%). The substream is
-    pulled as its own go2rtc stream because the cameras reject ffmpeg's interleaved-TCP RTSP,
-    and audio is merged from the main feed since the substream carries none.
-    """
+def test_go2rtc_variants_never_open_the_camera_substream():
+    """Recording/live/SD share one camera RTSP producer even when `/onvif2` is advertised."""
     from backend.app.db.registry import Camera
     cam = Camera(mac="aa:bb:cc:00:00:03", stream_path="/onvif1", last_ip="10.0.0.3",
                  username="admin", password="pw",
                  capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
     streams = go2rtc.build_config(cameras=[cam])["streams"]
     assert streams["cam_aabbcc000003"] == "rtsp://admin:pw@10.0.0.3:554/onvif1"   # recording
-    assert streams["cam_aabbcc000003_sub"] == "rtsp://admin:pw@10.0.0.3:554/onvif2"
-    assert streams["cam_aabbcc000003_web"] == [
-        # cheap re-encode off the substream -> substream bitrate (`hd=False`)
-        f"ffmpeg:cam_aabbcc000003_sub#video=h264{_raw(hd=False)}",
-        "ffmpeg:cam_aabbcc000003#audio=aac#audio=opus",  # audio only, off the main feed
-    ]
+    assert "cam_aabbcc000003_sub" not in streams
+    assert "onvif2" not in repr(streams)
+    assert streams["cam_aabbcc000003_hd"].startswith(
+        "ffmpeg:cam_aabbcc000003#async#video=h264")
+    assert streams["cam_aabbcc000003_web"].startswith(
+        "ffmpeg:cam_aabbcc000003_hd#video=h264_sd")
 
 
 def test_substream_url_none_when_camera_has_one_path():
@@ -310,42 +310,50 @@ def test_rekey_segments_same_mac_is_a_noop():
     assert recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "AA:BB:CC:DD:EE:FF") == 0
 
 
-def test_go2rtc_hd_variant_reencodes_only_when_a_substream_exists():
-    """The `_hd` variant is the deliberate exception: it *does* re-encode the video.
-
-    Grid view runs on the cheap substream passthrough (`_web`); single view swaps to this one,
-    which repairs the camera's malformed 1080p bitstream at ~27% of a core. go2rtc leaves the
-    ffmpeg idle until a viewer actually consumes it, so grid view pays nothing for it. A camera
-    with no substream has nothing to swap between and gets no `_hd`.
-    """
+def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():
+    """A single shared H.264 producer is hot before browsers connect, for all cameras."""
     from backend.app.db.registry import Camera
     dual = Camera(mac="aa:bb:cc:00:00:05", stream_path="/onvif1", last_ip="10.0.0.5",
                   capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
     single = Camera(mac="aa:bb:cc:00:00:06", stream_path="/onvif1", last_ip="10.0.0.6",
                     capabilities={"has_audio": True, "stream_paths": ["/onvif1"]})
-    streams = go2rtc.build_config(cameras=[dual, single])["streams"]
+    cfg = go2rtc.build_config(cameras=[dual, single])
+    streams = cfg["streams"]
     assert (streams["cam_aabbcc000005_hd"]
-            == f"ffmpeg:cam_aabbcc000005#video=h264#audio=aac#audio=opus{_raw(hd=True)}")
-    assert "cam_aabbcc000006_hd" not in streams
+            == f"ffmpeg:cam_aabbcc000005#async"
+               f"#video=h264#audio=aac#audio=opus{_raw(hd=True)}")
+    assert "cam_aabbcc000006_hd" in streams
+    assert cfg["preload"] == {
+        "cam_aabbcc000005_hd": "video&audio",
+        "cam_aabbcc000006_hd": "video&audio",
+    }
 
 
-def test_live_transcodes_are_pinned_to_a_fixed_frame_rate(monkeypatch):
-    """Every browser-facing transcode carries `-r <live_fps>`.
+def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(monkeypatch):
+    """The final H.264 template owns pacing/GOP, after per-stream raw bitrate arguments.
 
-    Not cosmetic: the cameras send no PTS, so without a fixed rate ffmpeg reproduces their
-    67/133 ms jitter and the player stalls (docs/DECISIONS.md §34). It also stops the encoder
-    paying for duplicated frames — 20 -> 10 fps halved CPU for two 1080p streams at an
-    identical bitrate.
+    This ordering matters: go2rtc used to append its built-in ``-g 50`` after our raw ``-g 24``,
+    silently changing recovery from two to more than four seconds. The fps filter also stops
+    output when decoding stops instead of manufacturing fresh timestamps for a frozen picture.
     """
     from backend.app.db.registry import Camera
     monkeypatch.setenv("LIVE_FPS", "12")
     config.get_settings.cache_clear()
     cam = Camera(mac="aa:bb:cc:00:00:07", stream_path="/onvif1", last_ip="10.0.0.7",
                  capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
-    streams = go2rtc.build_config(cameras=[cam])["streams"]
-    # The fixed rate lives inside the #raw= block (which now also carries quality bitrate args).
-    assert "#raw=-r 12 " in streams["cam_aabbcc000007_web"][0]
-    assert "#raw=-r 12 " in streams["cam_aabbcc000007_hd"]
+    cfg = go2rtc.build_config(cameras=[cam])
+    streams = cfg["streams"]
+    template = cfg["ffmpeg"]["h264"]
+    assert "-vf fps=12" in template
+    assert "-g:v 24" in template
+    assert "-g 50" not in template
+    assert "-r 12" not in streams["cam_aabbcc000007_web"]
+    assert "-r 12" not in streams["cam_aabbcc000007_hd"]
+    assert "cam_aabbcc000007_live" not in streams
+    assert "ffmpeg:cam_aabbcc000007#async#video=h264" in streams["cam_aabbcc000007_hd"]
+    assert cfg["preload"]["cam_aabbcc000007_hd"] == "video&audio"
+    assert "-vf fps=12,scale=640:-2" in cfg["ffmpeg"]["h264_sd"]
+    assert cfg["ffmpeg"]["output"].endswith("{output}#starttimeout=45")
     # The recording feed is never re-encoded, so it must stay a bare RTSP URL.
     assert streams["cam_aabbcc000007"] == "rtsp://admin@10.0.0.7:554/onvif1"
     config.get_settings.cache_clear()

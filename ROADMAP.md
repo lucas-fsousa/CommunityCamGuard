@@ -10,8 +10,9 @@ Status: `todo` · `wip` · `done` · `blocked`.
 
 ## Milestone M1 — Live video quality (Feature 1)  ⟶ CORE DONE
 
-Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the most
-the camera + host can sustain. Diagnostic reference: `docs/DECISIONS.md §34`. Core delivered
+Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the
+camera's maximum resolution; Auto/SD are explicit user choices for weaker hosts. Diagnostic
+reference: `docs/DECISIONS.md §34`. Core delivered
 (quality levels, per-camera selector, both freezing bugs fixed); the remaining rows are P2/P3 polish
 or wait on hardware/a human eye.
 
@@ -21,14 +22,15 @@ or wait on hardware/a human eye.
 | P0 | **Quality levels** model (`low`/`medium`/`high`/`max`) mapping source→bitrate (`media/quality.py`) | done |
 | P0 | `live_quality` setting (default `max`) + unit tests (`test_quality.py`, `build_config` wiring) | done |
 | P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
-| P0 | **HD freezing FIXED** — it was MSE-over-internet (remote viewer). Forcing `mode=webrtc,mse` in the player fixed it (confirmed smooth on both cameras). Diagnosed via `scripts/diagnose_streams.sh` | done |
+| P0 | **HD transport hardening** — prefer WebRTC; bounded/recoverable MSE queue; no 0.1× live playback fallback | done |
 | P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
-| P0 | **Frozen-player auto-recovery** (feedback): go2rtc keeps a stalled consumer on a dead producer (timer runs, picture frozen). Watchdog polls `/api/media/activity` (per-stream video packets); reloads a player stalled ~15s | done³ |
+| P0 | **Single camera connection + local fan-out**: recording and preloaded H.264 share one RTSP producer; SD is downscaled locally; runtime verified one port-554 session/camera | done |
+| P0 | **Frozen-player auto-recovery**: hybrid watchdog distinguishes client stall from local producer stall; only the latter cycles that camera's local preload | done³ |
 | — | **Invariant:** recording always uses the base (main) feed at full quality (`-c:v copy`), decoupled from the live quality selector — guard tests lock it | done |
 | P2 | **Hardware acceleration** (`live_hwaccel`: vaapi/cuda/v4l2m2m/…) — plumbing + tests done | done¹ |
 | P1 | **Visual validation** of the bitrate levels + hwaccel against the real go2rtc | blocked² |
 | P2 | `high` profile/preset on the encoder — go2rtc ships UPX-packed, template not inspectable; validate first | blocked² |
-| P2 | Camera-hiccup resilience (transcode EOF→reconnect) — go2rtc timeout/reconnect tuning (secondary factor) | todo |
+| P1 | Camera-hiccup resilience (transcode EOF→reconnect) — visible dead producers are detected and recreated by the hybrid watchdog; server-only retry tuning remains | partial |
 | P2 | Auto-degradation under CPU pressure (honours `grid_hd_max_cameras` as the host guard) | todo |
 | P2 | UI: global `live_quality` (bitrate) control — needs a settings endpoint + go2rtc restart | todo |
 | P3 | Measure and document quality vs. the vendor app (bitrate/resolution/latency side by side) | todo |
@@ -65,6 +67,17 @@ or wait on hardware/a human eye.
 Direct control of **reboot and two-way audio** lives in the vendor's proprietary P2P channel, not
 ONVIF (see ADR 0008) — reverse-engineering it is a separate track and does not block the milestones
 above.
+
+### Proprietary-camera capability backlog
+
+| Priority | Item | Status |
+|---|---|---|
+| P1 | Siren/deterrent ON/OFF over P2P, with bounded activation and guaranteed OFF | done |
+| P1 | Map and expose the camera's **selectable siren sound/effect**; the garage unit currently plays a dog-bark effect, proving this is separate from siren ON/OFF | todo |
+| P1 | Complete browser microphone → AMR-NB mode 7/8 kHz → camera speaker two-way audio; legacy P2P transport and codec now reproduce the native app, physical intelligibility confirmation pending | wip |
+| P1 | Integrate the proven P2P controls into a reusable backend/Docker driver | todo |
+| P0 | Keep provisioned cameras operational and controllable without WAN (LAN-only) | todo |
+| P1 | Provision a new/reset camera without the vendor Android app or account | todo |
 
 ---
 

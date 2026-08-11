@@ -47,6 +47,7 @@ frontend/dist/
 
 # scratch dir for local audio/debug captures (not for the repo)
 tmp/
+temp/
 
 # Reverse-engineering workspace (APKs, extracted libs, scratch)
 re/

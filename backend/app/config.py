@@ -98,11 +98,13 @@ class Settings(BaseSettings):
         from .media.quality import normalize_hwaccel
         return normalize_hwaccel(v)
 
-    # How many cameras may share the grid before it drops from the full-resolution stream to the
-    # cheap substream. Raising it buys picture quality with CPU — the substream on these cameras
-    # is a 640x360 / 37 kbps feed, which is genuinely poor.
+    # In the UI's opt-in Auto quality mode, how many cameras may share the grid before it drops
+    # from the full-resolution stream to the cheap substream. Raising it buys picture quality with
+    # CPU — the substream on these cameras is a 640x360 / 37 kbps feed, which is genuinely poor.
     #
-    # **Defaults to 0 (always substream) because on a 2-vCPU host it is not safe.** Measured with
+    # **Auto defaults to 0 (always substream) because on a 2-vCPU host HD is not safe.** The normal
+    # per-camera default remains explicit HD; selecting Auto/SD is the user's performance choice.
+    # Measured with
     # the recorder and both audio tracks running, two cameras on the full-resolution feed put the
     # go2rtc cgroup at `cpu.pressure full avg10 = 29.7` — the same starvation that made players
     # freeze (docs/DECISIONS.md §34); on the substream the same load sits at ~2. The knob is here

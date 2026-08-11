@@ -80,6 +80,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   "web_stream_id": "cam_aabbccddeeff_web",
   "hd_stream_id": "cam_aabbccddeeff_hd",
   "has_substream": true,
+  "has_quality_variants": true,
   "webrtc_url": "http://127.0.0.1:3201/webrtc.html?src=cam_aabbccddeeff",
   "recording": true
 }
@@ -114,6 +115,7 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 |---|---|---|
 | GET | `/api/media/streams` | Media-engine status + live-view settings (below). |
 | GET | `/api/media/activity` | Per-stream `{video_packets, consumers}` — liveness for a client freeze watchdog (a watched stream whose video packets stop advancing is frozen upstream). |
+| POST | `/api/media/recover/{mac}` | Cycle one camera's local preloaded H.264 producer after a confirmed stall. The shared camera RTSP/recording producer is not restarted. |
 | POST | `/api/media/restart` | Regenerate go2rtc config and restart it (after registry changes). |
 
 `GET /api/media/streams` returns:

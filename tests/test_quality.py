@@ -43,21 +43,34 @@ def test_max_is_the_sharpest_level():
 def test_encode_raw_args_shape_and_content():
     args = quality.encode_raw_args("max", 10, hd=True)
     assert args.startswith("#raw=")
-    # fixed frame rate is always present (cameras send no PTS)
-    assert "-r 10" in args
     # the quality lever: an explicit, capped bitrate
     kbps = quality.target_kbps("max", hd=True)
     assert f"-b:v {kbps}k" in args
     assert f"-maxrate {kbps}k" in args
     assert f"-bufsize {kbps * 2}k" in args
-    # ~2 s GOP at 10 fps -> 20 frames
-    assert "-g 20" in args
+    # Timing/GOP must not be here: go2rtc expands raw args before its codec preset and would
+    # silently override them. They live in the final H.264 template instead.
+    assert "-r " not in args
+    assert "-g " not in args
 
 
-def test_encode_raw_args_gop_tracks_frame_rate():
-    assert "-g 30" in quality.encode_raw_args("high", 15, hd=False)
+def test_h264_template_owns_frame_pacing_and_gop():
+    template = quality.h264_encoder_template(15)
+    # Required by go2rtc's multimode mapper when AAC and Opus are emitted together.
+    assert template.startswith("-c:v ")
+    assert "-vf fps=15" in template
+    assert "-g:v 30" in template
+    assert "-keyint_min:v 30" in template
+    assert "-sc_threshold:v 0" in template
+    assert "-fps_mode passthrough" in template
     # never zero, even at 1 fps
-    assert "-g 2" in quality.encode_raw_args("low", 1, hd=False)
+    assert "-g:v 2" in quality.h264_encoder_template(1)
+
+
+def test_sd_h264_template_combines_pacing_and_scaling_in_one_filter_graph():
+    template = quality.h264_encoder_template(10, width=640)
+    assert "-vf fps=10,scale=640:-2" in template
+    assert template.count("-vf ") == 1
 
 
 def test_encode_raw_args_is_a_single_raw_block():
@@ -70,6 +83,7 @@ def test_encode_raw_args_is_a_single_raw_block():
 def test_video_directive_is_software_h264_by_default():
     assert quality.video_h264_directive("") == "#video=h264"
     assert quality.video_h264_directive(None) == "#video=h264"
+    assert quality.video_h264_directive(None, codec="h264_sd") == "#video=h264_sd"
 
 
 @pytest.mark.parametrize("hw", ["vaapi", "cuda", "v4l2m2m", "rkmpp"])
@@ -93,4 +107,4 @@ def test_invalid_level_uses_default_bitrate():
     default = quality.target_kbps(quality.DEFAULT_LEVEL, hd=True)
     assert quality.target_kbps("nonsense", hd=True) == default
     # and produces valid args rather than crashing
-    assert re.match(r"#raw=-r \d+ -b:v \d+k", quality.encode_raw_args("nonsense", 10, hd=True))
+    assert re.match(r"#raw=-b:v \d+k", quality.encode_raw_args("nonsense", 10, hd=True))

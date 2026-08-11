@@ -1238,11 +1238,12 @@ Live view is stable now, but the grid looks poor. Measured why, so the trade is 
   the camera never sent**; the grid's picture ceiling is the camera's substream, not our pipeline.
   The main feed re-encodes to ~3000 kbps, which is the visible difference.
 - **Fixed frame rate is mandatory, and it is also free money.** The transcodes were producing
-  20 fps from a source that delivers ~10 real fps — pure duplicated-frame encoding. Pinning
-  `-r 10` (new `live_fps`) halved CPU for two 1080p streams, **121% -> 60%**, at an identical
-  bitrate. `-fps_mode passthrough` is cheaper still (53%) but **reintroduces the 67/133 ms jitter**
-  and with it the freezing, so it is not an option: these cameras send no PTS, so the rate has to
-  be imposed. Set `live_fps` to what a camera actually delivers, not what it advertises.
+  20 fps from a source that delivers ~10 real fps — pure duplicated-frame encoding. Pinning the
+  stream to 10 fps halved CPU for two 1080p streams, **121% -> 60%**, at an identical bitrate.
+  This is now imposed with an `fps=10` filter, not output `-r 10`: the filter preserves regular
+  timestamps without continuously manufacturing new output timestamps after decoded input stops.
+  Raw `-fps_mode passthrough` is cheaper still (53%) but **reintroduces the 67/133 ms jitter** and
+  with it the freezing. Set `live_fps` to what a camera actually delivers, not what it advertises.
 - **Full-resolution grid does not fit this host.** With the recorder and both audio tracks live,
   two cameras on `_hd` put the go2rtc cgroup at `cpu.pressure full avg10 = 29.7` — the freezing
   regime (29.6). On the substream the same load sits at ~2. So `grid_hd_max_cameras` ships at
@@ -1255,3 +1256,53 @@ contributes nothing. What remains is firmware: the camera's ~0.4 s fixed, uninte
 that also ignores Stop (§13), so panning is discontinuous by construction. Only the Gwell P2P
 path — what the vendor app uses, and what feels faster — can change that. (Note `ptz.move()`, the
 one-shot `step` action, does block 0.5 s on `PULSE_SECONDS`; the D-pad never calls it.)
+
+### §34 addendum 4 — permanent frozen-frame loop and ephemeral decoder recovery (2026-08-10)
+
+Both HD tiles eventually froze while their recording segments continued changing normally. At the
+same moment each browser-facing FFmpeg rose from its usual 14–20% CPU to 56–87%. A new decoder on
+the shared HEVC restream reproduced the cause on both cameras:
+
+- `PPS id out of range: 0`;
+- `Could not find ref with POC ...` / `Error constructing the frame RPS`;
+- no usable decoded picture, while output `-r 10` kept recoding the last good one.
+
+That last behaviour defeated all three watchdog signals: H.264 packets, browser
+`framesDecoded`, and media time continued advancing even though the image content did not. There
+was also an independent option-order bug: `#raw=-g 20` is expanded before go2rtc's built-in H.264
+template, which then appended `-g 50`. `ffprobe` confirmed the effective keyframe interval was five
+seconds, not two.
+
+**First fix, superseded.** A dedicated lazy `_live` source made recovery fresh, but meant every
+camera served two simultaneous RTSP sessions (recording plus live) and every browser rebuild paid
+the slow source/IDR startup again. That explains the recurring loading state and unnecessarily
+loads the camera's small hardware.
+
+**Current fix.** Each camera now has exactly one native base producer. Recording copies it and one
+preloaded `_hd` FFmpeg consumer converts it to H.264 once on the server. Every WebRTC/MSE consumer
+fans out from that hot local producer; the `_web` 640×360 choice is downscaled locally from `_hd`
+rather than opening `/onvif2`. After deployment, `ss` showed exactly two established connections
+to port 554 for two cameras, while HD packet counters advanced continuously and both recordings
+continued to grow. An explicit SD `ffprobe` returned H.264 640×360 + AAC without adding a third
+camera connection.
+
+The two cameras also proved that an `fps=10` filter alone is insufficient when the input timeline
+itself runs fast: the quintal stream declared 10 fps but emitted **13.1 Mbps in wall time** against
+a 4.5 Mbps VBV cap and pushed FFmpeg above 100% CPU; the garage stream respected 4.5 Mbps. The HD
+source now uses go2rtc's `#async` input mode, which prepends FFmpeg wall-clock timestamps and audio
+sync. Frame pacing, bitrate control and stall timing are therefore based on server time rather than
+the camera's broken RTP clock.
+
+Recovery now distinguishes failure domains. A stalled browser decoder gets a fresh PeerConnection
+only. If the server H.264 packet counter also stalls, the client disposes its consumer and calls
+`POST /api/media/recover/{mac}`; the server cycles only that stream's preload/FFmpeg process. The
+base camera producer and recorder remain connected throughout.
+
+The generated software H.264 template is now the final owner of `fps`, GOP, fixed keyint and
+scene-cut settings; per-stream `#raw` contains only bitrate limits. The first complete IDR was
+measured just under 10 seconds, but it is now paid once during server startup rather than after
+every browser reload. Steady-state stalls still recover on the normal threshold, while go2rtc's
+exec producer and the dashboard each get 45 seconds to start so neither recycles a valid slow
+launch before frame one.
+The template must begin with `-c:v`: go2rtc's AAC+Opus multimode mapper recognizes video codecs by
+that prefix and prepends `-map 0:v:0?`; placing `-vf` first silently created an audio-only producer.

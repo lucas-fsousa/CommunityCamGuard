@@ -79,6 +79,9 @@ def _camera_out(cam: registry.Camera) -> dict:
         "web_stream_id": go2rtc.web_stream_id(cam.mac),
         "hd_stream_id": go2rtc.hd_stream_id(cam.mac),
         "has_substream": cam.substream_url is not None,
+        # HD and SD are now server-local variants for every camera. This is separate from the
+        # vendor camera advertising `/onvif2`, which we intentionally do not open concurrently.
+        "has_quality_variants": True,
         "webrtc_url": go2rtc.webrtc_page_url(cam.mac),
         "recording": False,  # live flag filled in by list_cameras()
     }
@@ -279,12 +282,12 @@ def media_streams(request: Request) -> dict:
     healthy = bool(media and media.wait_healthy(timeout=1))
     s = get_settings()
     return {"go2rtc_api": s.go2rtc_api, "healthy": healthy,
-            # Grid tiles pick their stream from this: at or below it they get the full-resolution
-            # feed, above it the cheap substream (see go2rtc.web_stream_id).
+            # Grid tiles in opt-in Auto mode pick their local stream from this: at or below it they
+            # get full resolution, above it the locally downscaled variant.
             "grid_hd_max_cameras": s.grid_hd_max_cameras,
             # Encoder bitrate level for the transcodes (media/quality.py). Global, config-driven;
-            # exposed so the UI can show/inform the current quality. Source selection (substream
-            # vs main) is per-camera and driven client-side off has_substream + the stream ids.
+            # exposed so the UI can show/inform the current quality. Variant selection is
+            # per-camera and client-side; both stream IDs are served from the local media hub.
             "live_quality": s.live_quality,
             "quality_levels": list(quality.LEVELS),
             "live_hwaccel": s.live_hwaccel}
@@ -295,6 +298,24 @@ def media_activity(request: Request) -> dict:
     """Per-stream video-packet liveness, for the dashboard's freeze watchdog (see go2rtc)."""
     media = getattr(request.app.state, "media", None)
     return media.stream_activity() if media else {}
+
+
+@router.post("/media/recover/{mac}", dependencies=[Depends(require_auth)])
+def media_recover(mac: str, request: Request) -> dict:
+    """Restart one camera's local H.264 producer, never its RTSP/recording producer."""
+    try:
+        cam = registry.get_camera(mac)
+    except (KeyError, ValueError):
+        cam = None
+    if cam is None:
+        raise HTTPException(status_code=404, detail="camera not found")
+    media = getattr(request.app.state, "media", None)
+    if media is None:
+        raise HTTPException(status_code=503, detail="media engine not running")
+    ok = media.restart_preload(go2rtc.hd_stream_id(cam.mac))
+    if not ok:
+        raise HTTPException(status_code=502, detail="local stream recovery failed")
+    return {"ok": True}
 
 
 @router.websocket("/go2rtc/ws")
@@ -344,6 +365,11 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
             _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
+            # Consume both the completed direction and the cancellation. Without this, normal
+            # browser disconnects leave "Task exception was never retrieved" warnings and can
+            # keep relay resources alive until garbage collection (especially harmful for MSE,
+            # where this socket carries the media itself rather than signalling only).
+            await asyncio.gather(*tasks, return_exceptions=True)
     except Exception as exc:   # upstream connect/relay failure — just close the browser socket
         log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
     finally:
