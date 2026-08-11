@@ -1329,6 +1329,28 @@ the browser consumer, cycle only that camera's local `_hd` preload/FFmpeg, and r
 base RTSP producer and recording remain uninterrupted; view and quality changes still use the cheap
 browser-only replacement.
 
+### §34 addendum 6 — intercom can corrupt the RTSP audio clock and delay video (2026-08-11)
+
+A bounded host-only two-way-audio test on the garage camera left the recordings and native HEVC
+restream current, but the shared browser-facing `_hd` transcode fell almost one minute behind. A
+frame captured from the base stream showed `16:53:13`; the same camera's HD producer was still at
+`16:51:59`. The yard HD producer remained current. This isolated the queue to the local garage
+FFmpeg rather than the camera, LAN, browser or recorder.
+
+Reproducing the complete video + AAC + Opus pipeline exposed the trigger immediately after the
+intercom session: FFmpeg repeatedly reported `Queue input is backward in time` and non-monotonic
+audio DTS. RTSP output interleaves all tracks, so a regressing camera-audio clock held back valid
+video packets even though video decode/encode itself ran faster than real time. Packet counters and
+browser frame counters could not detect this class of failure because delayed pictures continued
+to advance.
+
+Every audio-capable live transcode now includes
+`-af aresample=async=1:first_pts=0` in its single go2rtc `#raw` block, before AAC and Opus encoding.
+The same clock repair was already proven in the recorder. In a controlled reproduction it removed
+all backward-time/DTS errors and sustained `1.16x` processing speed. After deployment, garage HD
+converged from nine seconds of cold-start lag to the current wall clock and stayed there while the
+base recordings continued. Silent cameras do not receive an unnecessary audio filter.
+
 ## 35. Recording namespace is UTC, independent of camera/host timezone (2026-08-11)
 
 The segment muxer expands its `%Y/%H` output template in the FFmpeg process timezone. The container

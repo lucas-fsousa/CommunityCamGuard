@@ -80,6 +80,12 @@ def test_encode_raw_args_is_a_single_raw_block():
     assert "#" not in args[len("#raw=") :]  # no stray directive markers after the block
 
 
+def test_encode_raw_args_can_repair_a_regressing_live_audio_clock():
+    args = quality.encode_raw_args("max", 10, hd=True, repair_audio_clock=True)
+    assert "-af aresample=async=1:first_pts=0" in args
+    assert args.count("#raw=") == 1
+
+
 def test_video_directive_is_software_h264_by_default():
     assert quality.video_h264_directive("") == "#video=h264"
     assert quality.video_h264_directive(None) == "#video=h264"

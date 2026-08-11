@@ -110,13 +110,23 @@ def h264_encoder_template(fps: int, *, width: int | None = None) -> str:
     )
 
 
-def encode_raw_args(level: str | None, fps: int, *, hd: bool) -> str:
+def encode_raw_args(
+    level: str | None,
+    fps: int,
+    *,
+    hd: bool,
+    repair_audio_clock: bool = False,
+) -> str:
     """Build the go2rtc ``#raw=`` chunk carrying per-stream bitrate limits.
 
     ``#raw=`` is expanded before go2rtc's video-codec template.  It therefore contains only
     options that the template does not replace:
 
     * ``-b:v/-maxrate/-bufsize`` — an explicit capped bitrate: the quality lever this module adds.
+    * ``aresample=async=1:first_pts=0`` — when requested, rebuild the live audio clock before
+      AAC/Opus are muxed with video. Some cameras regress their audio RTP timestamps after a
+      two-way-audio session; without this repair the RTSP muxer waits for the late audio track and
+      the otherwise-current video accumulates tens of seconds of server-side backlog.
 
     Frame pacing and the GOP live in :func:`h264_encoder_template`, where they are guaranteed to
     come after ``#raw`` and cannot be overwritten by go2rtc's built-in ``-g 50``.  ``fps`` remains
@@ -124,4 +134,7 @@ def encode_raw_args(level: str | None, fps: int, *, hd: bool) -> str:
     """
     del fps
     kbps = target_kbps(level, hd=hd)
-    return f"#raw=-b:v {kbps}k -maxrate {kbps}k -bufsize {kbps * 2}k"
+    args = f"-b:v {kbps}k -maxrate {kbps}k -bufsize {kbps * 2}k"
+    if repair_audio_clock:
+        args += " -af aresample=async=1:first_pts=0"
+    return f"#raw={args}"

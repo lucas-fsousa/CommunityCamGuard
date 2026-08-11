@@ -7,11 +7,13 @@ from backend.app.media import go2rtc, quality
 from backend.app.recording import recorder
 
 
-def _raw(*, hd: bool) -> str:
+def _raw(*, hd: bool, has_audio: bool = True) -> str:
     """The expected go2rtc ``#raw=`` chunk under the current settings — computed, not hardcoded,
     so these wiring tests stay correct if the quality bitrates are ever retuned."""
     s = config.get_settings()
-    return quality.encode_raw_args(s.live_quality, s.live_fps, hd=hd)
+    return quality.encode_raw_args(
+        s.live_quality, s.live_fps, hd=hd, repair_audio_clock=has_audio,
+    )
 
 
 def _seed(n, mac="aabbccddeeff", day="2026-07-27"):
@@ -218,13 +220,15 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     # The live variant is about **video**, not audio: the browser cannot play these cameras'
     # HEVC, so even a silent camera needs an H.264 one. Audio only adds the AAC track.
     # HD is transcoded once from the base stream and preloaded; SD is a local derivative of HD.
+    silent_main_raw = _raw(hd=True, has_audio=False)
+    silent_sub_raw = _raw(hd=False, has_audio=False)
     main_raw = _raw(hd=True)
     sub_raw = _raw(hd=False)
     assert streams["cam_aabbcc000001"] == "rtsp://admin@10.0.0.1:554/onvif1"      # recording
     assert streams["cam_aabbcc000001_hd"] == (
-        f"ffmpeg:cam_aabbcc000001#async#video=h264{main_raw}")
+        f"ffmpeg:cam_aabbcc000001#async#video=h264{silent_main_raw}")
     assert streams["cam_aabbcc000001_web"] == (
-        f"ffmpeg:cam_aabbcc000001_hd#video=h264_sd{sub_raw}")
+        f"ffmpeg:cam_aabbcc000001_hd#video=h264_sd{silent_sub_raw}")
     assert streams["cam_aabbcc000002_hd"] == (
         f"ffmpeg:cam_aabbcc000002#async#video=h264#audio=aac#audio=opus{main_raw}")
     assert (streams["cam_aabbcc000002_web"]
@@ -351,6 +355,7 @@ def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(mon
     assert "-r 12" not in streams["cam_aabbcc000007_hd"]
     assert "cam_aabbcc000007_live" not in streams
     assert "ffmpeg:cam_aabbcc000007#async#video=h264" in streams["cam_aabbcc000007_hd"]
+    assert "-af aresample=async=1:first_pts=0" in streams["cam_aabbcc000007_hd"]
     assert cfg["preload"]["cam_aabbcc000007_hd"] == "video&audio"
     assert "nobuffer" not in cfg["ffmpeg"]["rtsp"]
     assert "low_delay" not in cfg["ffmpeg"]["rtsp"]

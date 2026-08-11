@@ -120,8 +120,20 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         # Per-stream bitrate comes from the quality policy. Frame pacing and the effective GOP
         # are in the generated H.264 codec template below; go2rtc expands #raw *before* its
         # built-in template, whose later `-g 50` used to override our requested `-g 20`.
-        sub_raw = quality.encode_raw_args(s.live_quality, s.live_fps, hd=False)
-        main_raw = quality.encode_raw_args(s.live_quality, s.live_fps, hd=True)
+        # A proprietary talk session can leave this firmware's RTSP audio clock jumping
+        # backwards. RTSP output interleaves tracks, so that bad audio timeline used to hold back
+        # perfectly current video: the base/recorder stayed live while `_hd` fell almost a minute
+        # behind. Normalize audio before both AAC and Opus encoders. The recorder already applies
+        # the same repair independently; this keeps live view equally resilient.
+        repair_audio_clock = bool(audio_part)
+        sub_raw = quality.encode_raw_args(
+            s.live_quality, s.live_fps, hd=False,
+            repair_audio_clock=repair_audio_clock,
+        )
+        main_raw = quality.encode_raw_args(
+            s.live_quality, s.live_fps, hd=True,
+            repair_audio_clock=repair_audio_clock,
+        )
         # The video codec directive, optionally hardware-accelerated (see live_hwaccel). Empty
         # hwaccel -> plain `#video=h264` (software), which is the default and current behaviour.
         vid = quality.video_h264_directive(s.live_hwaccel)
