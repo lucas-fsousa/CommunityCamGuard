@@ -798,9 +798,9 @@ HTML/JS app.
 - **`frontend/i18n.js`** — a `STRINGS` dict (`en`, `pt-BR`), a `t(key, params)` that fills
   `{token}`s and **falls back** en→key so a missing translation never blanks the UI, and
   `applyI18n()` that fills static markup via `data-i18n` (textContent), `data-i18n-ph`
-  (placeholder) and `data-i18n-title` (title). Loaded before `app.js`; exposes `t`/`applyI18n`/
-  `setLang`/`getLang` on `window` (no module system here).
-- **Static strings** carry `data-i18n*` attributes in `index.html`; **dynamic strings** in `app.js`
+  (placeholder) and `data-i18n-title` (title). This originally exposed globals on `window`; ADR 0018
+  later replaced that integration with native ES Module exports while retaining zero build tooling.
+- **Static strings** carry `data-i18n*` attributes in `index.html`; **dynamic strings** in the frontend
   (camera bars, scan modal, recordings, PTZ/hover titles, storage banner) go through `t()`. The
   product name (*Community Cam Guard* / *CCG*) is intentionally **not** translated.
 - **Language pick** — `localStorage` (`ccg_lang`) wins, else the **browser** language (`pt*` →

@@ -28,6 +28,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0015](0015-content-addressed-build-id.md) | Content-addressed build identity and automatic cache busting |
 | [0016](0016-utc-recording-layout.md) | Recording paths and index timestamps are always UTC |
 | [0017](0017-localhost-only-factory-provisioning.md) | Factory provisioning is a localhost-only security boundary |
+| [0018](0018-semantic-frontend-modules.md) | Semantic native ES modules with a thin orchestration entrypoint |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,

@@ -292,5 +292,6 @@ function setLang(lang) {
   localStorage.setItem("ccg_lang", lang);
 }
 
-// Expose on window for app.js (no module system in this plain-JS app).
-Object.assign(window, { t, applyI18n, setLang, getLang: () => currentLang, I18N_LANGS: LANGS });
+const getLang = () => currentLang;
+
+export { applyI18n, getLang, LANGS as I18N_LANGS, setLang, t };

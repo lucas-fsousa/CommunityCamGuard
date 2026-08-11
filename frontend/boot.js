@@ -13,18 +13,24 @@
   style.href = `/style.css?v=${encodeURIComponent(version)}`;
   document.head.append(style);
 
-  const classic = (src) => new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${src}?v=${encodeURIComponent(version)}`;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error(`failed to load ${src}`));
-    document.body.append(script);
-  });
+  // Every semantic module receives the same content-derived cache key. An import map keeps those
+  // versioned URLs out of source imports and guarantees a contributor cannot serve a stale child
+  // module after changing only one frontend file.
+  const moduleUrl = (path) => `${path}?v=${encodeURIComponent(version)}`;
+  const importMap = document.createElement("script");
+  importMap.type = "importmap";
+  importMap.textContent = JSON.stringify({ imports: {
+    "ccg/core": moduleUrl("/modules/core.js"),
+    "ccg/i18n": moduleUrl("/i18n.js"),
+    "ccg/live": moduleUrl("/modules/live-cameras.js"),
+    "ccg/cameras": moduleUrl("/modules/camera-management.js"),
+    "ccg/recordings": moduleUrl("/modules/recordings.js"),
+  } });
+  document.head.append(importMap);
 
-  // Register <cam-player> before app.js creates tiles. i18n then installs the globals app.js uses.
+  // Register <cam-player> before app.js creates tiles, then start the orchestration module.
   await import(`/player.js?v=${encodeURIComponent(version)}`);
-  await classic("/i18n.js");
-  await classic("/app.js");
+  await import(`/app.js?v=${encodeURIComponent(version)}`);
 })().catch((error) => {
   console.error("[CCG] dashboard bootstrap failed", error);
   const badge = document.getElementById("app-version");

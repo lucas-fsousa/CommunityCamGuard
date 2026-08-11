@@ -37,25 +37,39 @@ def test_bootstrap_has_no_manually_incremented_asset_versions():
     assert "2026-" not in player
     assert 'fetch("/api/build"' in boot
     assert "__CCG_BUILD__" in boot
+    assert 'importMap.type = "importmap"' in boot
+    assert '"ccg/core": moduleUrl("/modules/core.js")' in boot
+    assert "await import(`/app.js?v=" in boot
 
 
 def test_live_restart_cycles_producer_and_mse_discards_stale_video():
     """The operator's restart and the MSE fallback must both mean "back to live"."""
     frontend = Path(__file__).parents[1] / "frontend"
-    app = (frontend / "app.js").read_text()
+    live = (frontend / "modules" / "live-cameras.js").read_text()
     player = (frontend / "player.js").read_text()
     video_rtc = (frontend / "video-rtc.js").read_text()
 
-    assert "refreshPlayer(cam.mac, reload, true)" in app
+    assert "refreshPlayer(cam.mac, reload, true)" in live
     assert 'this.mode = "mse"' in player
     assert "const START_BUFFER_SECONDS = 3" in video_rtc
     assert "const CRITICAL_PLAYBACK_RATE = 0.85" in video_rtc
     assert "const LOW_PLAYBACK_RATE = 0.92" in video_rtc
     assert "const CATCHUP_PLAYBACK_RATE = 1.05" in video_rtc
-    assert "void refreshPlayer(mac, null, true)" in app
+    assert "void refreshPlayer(mac, null, true)" in live
     assert "event: 'live_edge_jump'" in video_rtc
     assert "this.video.currentTime = liveTarget" in video_rtc
     assert "Math.min(1.25, gap)" not in video_rtc
+
+
+def test_frontend_entrypoint_only_orchestrates_semantic_modules():
+    frontend = Path(__file__).parents[1] / "frontend"
+    app = (frontend / "app.js").read_text()
+
+    for specifier in ("ccg/core", "ccg/i18n", "ccg/live", "ccg/cameras", "ccg/recordings"):
+        assert f'from "{specifier}"' in app
+    assert len(app.splitlines()) < 200
+    assert "function openProvisioningModal" not in app
+    assert "function freezeWatchdog" not in app
 
 
 def test_build_endpoint_is_public_no_store_and_returns_content_id():

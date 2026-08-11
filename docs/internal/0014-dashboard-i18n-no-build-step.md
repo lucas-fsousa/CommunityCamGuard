@@ -15,8 +15,8 @@ A tiny localisation layer, `frontend/i18n.js`:
 - A `STRINGS` dict (`en`, `pt-BR`) and `t(key, params)` that fills `{token}`s and **falls back**
   en→key, so a missing translation never blanks the UI.
 - `applyI18n()` fills static markup via `data-i18n` (textContent), `data-i18n-ph` (placeholder) and
-  `data-i18n-title` (title). Dynamic strings in `app.js` go through `t()`. Loaded before `app.js`;
-  exposes `t`/`applyI18n`/`setLang`/`getLang` on `window` (no module system).
+  `data-i18n-title` (title). Dynamic strings go through `t()`. The functions are native ES Module
+  exports consumed by the semantic frontend modules; no globals or bundler are required (ADR 0018).
 - **Language pick:** `localStorage` (`ccg_lang`) wins, else the browser language (`pt*` → `pt-BR`),
   else `en`. A header `<select>` switches live (re-fills static labels and rebuilds dynamic strings —
   no reload).

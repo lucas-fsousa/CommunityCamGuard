@@ -13,8 +13,9 @@ A generated version file committed to Git would move rather than remove that con
 
 `GET /api/build` hashes the runtime Python sources, frontend HTML/CSS/JS and `pyproject.toml`, returning
 a short `b-<sha256>` identity. The stable, non-cached `boot.js` requests that identity and loads every
-frontend asset with the value as its query-string cache key. `player.js` uses the same value for its
-dynamic `video-rtc.js` import. The badge displays that content identity.
+frontend asset with the value as its query-string cache key. A runtime import map gives every
+semantic ES Module the same key; `player.js` also uses it for its dynamic `video-rtc.js` import. The
+badge displays that content identity.
 
 The fingerprint is computed from contents, not Git metadata or a mutable counter. This works in a
 release image (where `.git` is intentionally absent) and with the compose frontend bind mount: local
