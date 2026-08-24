@@ -23,11 +23,63 @@ export function renderRecordings(stage) {
   const search = el("button", { className: "btn-primary", innerHTML: svgIcon("i-scan") + `<span>${t("rec.search")}</span>` });
   const retention = el("span", { className: "muted retention", title: t("rec.retentionHint") });
 
-  const player = el("video", { className: "rec-player", controls: true });
+  const player = el("video", { className: "rec-player", controls: true, preload: "auto" });
+  const playbackState = el("small", { className: "muted rec-playback-state" });
   const info = el("span", { className: "muted" });
   const prev = el("button", { textContent: t("rec.prev") });
   const next = el("button", { textContent: t("rec.next") });
   const list = el("div", { className: "rec-list" });
+  let playbackSelection = 0;
+
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  async function waitForSeekable(path, fileUrl, selection) {
+    let idleChecks = 0;
+    while (selection === playbackSelection) {
+      await wait(1000);
+      if (selection !== playbackSelection) return;
+      let status;
+      try {
+        status = await api("/recordings/playback-status?path=" + encodeURIComponent(path));
+      } catch (_) {
+        return;
+      }
+      if (selection !== playbackSelection) return;
+      if (status.cached) {
+        const resumeAt = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+        const shouldResume = !player.paused;
+        playbackState.textContent = t("rec.seekableReady");
+        player.addEventListener("loadedmetadata", () => {
+          if (selection !== playbackSelection) return;
+          if (resumeAt > 0 && Number.isFinite(player.duration)) {
+            player.currentTime = Math.min(resumeAt, Math.max(0, player.duration - 0.1));
+          }
+          if (shouldResume) player.play().catch(() => {});
+          playbackState.textContent = "";
+        }, { once: true });
+        // Same endpoint, cache-busted so the browser cannot reuse the earlier chunked response.
+        player.src = fileUrl + "&ready=" + Date.now();
+        player.load();
+        return;
+      }
+      if (status.ready) {
+        playbackState.textContent = "";       // source codec was browser-native
+        return;
+      }
+      if (status.transcoding) {
+        idleChecks = 0;
+        playbackState.textContent = t("rec.preparingSeekable");
+        continue;
+      }
+      // The video request and its FFmpeg job start independently from this status poll. Allow a
+      // short race window, but don't poll forever after a failed encoder.
+      idleChecks += 1;
+      if (idleChecks >= 5) {
+        playbackState.textContent = t("rec.playbackFailed");
+        return;
+      }
+    }
+  }
 
   async function load() {
     r.mac = camSel.value; r.from = fromI.value; r.to = toI.value;
@@ -51,15 +103,29 @@ export function renderRecordings(stage) {
       return;
     }
     res.items.forEach((s) => {
+      const download = el("a", {
+        className: "rec-download",
+        href: "/api/recordings/download?path=" + encodeURIComponent(s.path),
+        title: t("rec.download"),
+        ariaLabel: t("rec.downloadRecording", { camera: nameOf[s.mac] || s.mac }),
+        innerHTML: svgIcon("i-download"),
+      });
+      download.addEventListener("click", (event) => event.stopPropagation());
       const row = el("div", { className: "rec-row" },
-        el("span", { textContent: `${s.day} ${s.started_at.slice(11, 19)}` }),
-        el("small", { textContent: `${nameOf[s.mac] || s.mac} · ${(s.size_bytes / 1e6).toFixed(1)} MB` }),
+        el("div", { className: "rec-row-copy" },
+          el("span", { textContent: `${s.day} ${s.started_at.slice(11, 19)}` }),
+          el("small", { textContent: `${nameOf[s.mac] || s.mac} · ${(s.size_bytes / 1e6).toFixed(1)} MB` })),
+        download,
       );
       row.addEventListener("click", () => {
         list.querySelectorAll(".rec-row.active").forEach((n) => n.classList.remove("active"));
         row.classList.add("active");
-        player.src = "/api/recordings/file?path=" + encodeURIComponent(s.path);
-        player.play().catch(() => {});   // seekable now; user drives the scrubber
+        const selection = ++playbackSelection;
+        const fileUrl = "/api/recordings/file?path=" + encodeURIComponent(s.path);
+        playbackState.textContent = t("rec.startingPlayback");
+        player.src = fileUrl;
+        player.play().catch(() => {});   // first HEVC view starts progressively while cache warms
+        waitForSeekable(s.path, fileUrl, selection);
       });
       list.append(row);
     });
@@ -73,7 +139,7 @@ export function renderRecordings(stage) {
     el("div", { className: "rec-filter" }, field(t("rec.camera"), camSel), field(t("rec.from"), fromI), field(t("rec.to"), toI), search, retention),
     el("div", { className: "rec-body" },
       el("div", { className: "rec-side" }, list, el("div", { className: "rec-pager" }, prev, info, next)),
-      el("div", { className: "rec-main" }, player),
+      el("div", { className: "rec-main" }, player, playbackState),
     ),
   ));
   load();

@@ -72,6 +72,92 @@ def test_frontend_entrypoint_only_orchestrates_semantic_modules():
     assert "function freezeWatchdog" not in app
 
 
+def test_provisioning_modal_is_explicit_and_validates_identity_in_background():
+    cameras = (Path(__file__).parents[1] / "frontend" / "modules" / "camera-management.js").read_text()
+
+    assert 'close.addEventListener("click", dismiss)' in cameras
+    assert 'overlay.addEventListener("click"' not in cameras
+    assert 'document.addEventListener("keydown"' not in cameras
+    assert 'label.addEventListener("input"' in cameras
+    assert "scheduleIdentityInspection" in cameras
+    assert "field.readOnly = locked" in cameras
+    assert 'textContent: t("provision.inspect")' not in cameras
+    assert 'password.addEventListener("input"' in cameras
+    assert 'readiness.textContent = reason || t("provision.ready")' in cameras
+    assert "response.manual_entry_allowed" in cameras
+    assert 'api("/provisioning/networks/manual"' in cameras
+    assert "browserCanProvision()" in cameras
+    assert "state.provisioning?.remote_ble_enabled" in cameras
+    assert "Boolean(state.provisioning?.transport_ready)" in cameras
+    assert 'from "ccg/provisioning-ble"' in cameras
+    assert "connectProvisioningCamera(deviceId.value, onBleNotification)" in cameras
+    assert 'api("/provisioning/privileged/online-status"' in cameras
+    assert "takeQueuedBleStage(prepared.expected_responses.wifi_connection)" in cameras
+    assert "provision.bluetoothFinalResponseMissing" in cameras
+    assert "connectionReply?.wifi_connection?.connected" in cameras
+    assert 'api("/provisioning/privileged/bind"' in cameras
+    assert 'textContent: t("provision.finishWifiOnly")' in cameras
+    assert 'textContent: t("provision.bindPrivileged")' in cameras
+
+
+def test_ble_provisioning_transport_uses_recovered_gatt_contract():
+    frontend = Path(__file__).parents[1] / "frontend"
+    ble = (frontend / "modules" / "camera-provisioning-ble.js").read_text()
+    boot = (frontend / "boot.js").read_text()
+
+    assert '"8922a5c3-1e44-403e-a587-bcf972e398b4"' in ble
+    assert 'writeWithoutResponse: "0000fed7-0000-1000-8000-00805f9b34fb"' in ble
+    assert "(count << 4) | index" in ble
+    assert "navigator.bluetooth.requestDevice" in ble
+    assert "navigator.bluetooth.getDevices" in ble
+    assert "candidate.name === expectedName" in ble
+    assert 'filters: [{ name: expectedName }]' in ble
+    assert "export function createBleMessageAssembler()" in ble
+    assert "export async function writeBleFrames(session, frames)" in ble
+    assert "[notify, writeWithoutResponse, indicate]" in ble
+    assert "firmware revisions return packets over FED7" in ble
+    assert "response channel rejected" in ble
+    assert "writeValueWithResponse" in ble
+    assert "setTimeout(resolve, 35)" in ble
+    assert 'api("/provisioning/ble/prepare"' in (frontend / "modules" / "camera-management.js").read_text()
+    assert "prepared.frames.challenge, prepared.expected_responses.challenge" in (
+        frontend / "modules" / "camera-management.js"
+    ).read_text()
+    cameras = (frontend / "modules" / "camera-management.js").read_text()
+    # Factory onboarding stops at Wi-Fi. LAN discovery and privileged/RTSP onboarding have
+    # separate user-visible stages instead of being hidden inside the BLE transaction.
+    assert "waitForProvisionedCamera" not in cameras
+    assert cameras.count('api("/discovery/scan"') == 1  # the main Scan Network action only
+    assert "writeFrames(encodedFrames(finishFrames))" not in cameras
+    assert 'api("/provisioning/ble/decode-response"' in cameras
+    assert "if (challengeReply.valid !== true)" in cameras
+    assert 'if (!wifiReply.json)' in cameras
+    assert "configReply.binding" not in cameras
+    assert "connectionReply?.wifi_connection?.connected" in cameras
+    assert "bleFinishFrames = prepared.frames.finish || []" in cameras
+    assert '"ccg/provisioning-ble": moduleUrl("/modules/camera-provisioning-ble.js")' in boot
+
+
+def test_recording_rows_offer_download_without_triggering_playback_selection():
+    frontend = Path(__file__).parents[1] / "frontend"
+    recordings = (frontend / "modules" / "recordings.js").read_text()
+    index = (frontend / "index.html").read_text()
+
+    assert 'href: "/api/recordings/download?path="' in recordings
+    assert 'event.stopPropagation()' in recordings
+    assert 'svgIcon("i-download")' in recordings
+    assert 'id="i-download"' in index
+
+
+def test_recording_first_view_polls_until_seekable_cache_is_ready():
+    recordings = (Path(__file__).parents[1] / "frontend" / "modules" / "recordings.js").read_text()
+    assert "/recordings/playback-status?path=" in recordings
+    assert "status.transcoding" in recordings
+    assert "status.cached" in recordings
+    assert "const resumeAt =" in recordings
+    assert 'player.src = fileUrl + "&ready=" + Date.now()' in recordings
+
+
 def test_build_endpoint_is_public_no_store_and_returns_content_id():
     response = main.frontend_build_info()
     body = json.loads(response.body)

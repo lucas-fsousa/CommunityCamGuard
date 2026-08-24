@@ -19,6 +19,7 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 | | |
 |---|---|
 | **[Setup](#setup)** | Run it — Docker on Linux/macOS/Windows, or Python directly. |
+| **[Bluetooth onboarding](docs/public/bluetooth-onboarding.md)** | Put a factory-new camera on Wi-Fi without the vendor UI. |
 | **[API reference](docs/public/api.md)** | Every REST endpoint — build your own UI/scripts. Interactive at `/api/docs`. |
 | **[Contributing](CONTRIBUTING.md)** | Dev setup, standards (ruff/mypy/pytest), how to add a camera brand. |
 | **[Roadmap](ROADMAP.md)** | Backlog, priorities, milestones. |
@@ -106,7 +107,8 @@ cp .env.example .env          # set DASHBOARD_SECRET_KEY at minimum
 
 # Recommended: the whole stack (app + go2rtc) via Docker Compose, host networking:
 docker compose up -d --build
-# then open http://localhost:3200 and unlock with DASHBOARD_SECRET_KEY.
+# then open http://<server-lan-ip>:3200 (or localhost on the server) and unlock with
+# DASHBOARD_SECRET_KEY.
 # The frontend is bind-mounted (live edits); rebuild the app image after backend changes.
 ```
 
@@ -122,15 +124,17 @@ Adding cameras is done in the dashboard's **Cameras** tab: hit **Scan network**,
 username/password to each discovered camera and **Add** — the credentials are verified and the
 device's capabilities probed on the spot, so the controls light up immediately.
 
-The same tab has a **Set up new camera** button that opens a compact factory-onboarding dialog. The
-server scans visible Wi-Fi networks; the user selects one and provides only its password.
-For security, this surface is available only when the dashboard is opened through
-`http://localhost:3200`; the backend rejects remote, proxied and cross-site provisioning requests
-even when they carry a valid dashboard session. Label validation is working; actual QR/SoftAP
-synchronization remains disabled until the recovered vendor transport is complete.
+The same tab has a **Set up new camera** button for factory onboarding. The authenticated dashboard
+is reachable from the local network, but provisioning additionally rejects public, cross-site and
+publicly forwarded requests. Bluetooth onboarding is physically validated on the current Yoosee
+firmware; see the [step-by-step guide](docs/public/bluetooth-onboarding.md). The browser device must
+have Bluetooth and network access to the dashboard. Web Bluetooth also requires a secure browser
+context: use `localhost` on a Bluetooth-capable server, trusted local HTTPS, or a temporary HTTPS
+tunnel. Plain `http://192.168.x.x:3200` is suitable for normal dashboard use but not Web Bluetooth.
 
-Ports are loopback-only in the **32xx** prototype range: app **3200**,
-go2rtc API **3201**, WebRTC **3202**, RTSP restream **3203**.
+The authenticated app listens on the LAN at **3200**. Internal go2rtc services remain loopback-only:
+API **3201**, WebRTC **3202**, RTSP restream **3203**. Only port 3200 should be opened in the host
+firewall.
 
 > **Set `DASHBOARD_SECRET_KEY` before adding cameras and don't change it afterwards.** Camera
 > passwords are encrypted at rest with a key derived from that secret, so changing it makes

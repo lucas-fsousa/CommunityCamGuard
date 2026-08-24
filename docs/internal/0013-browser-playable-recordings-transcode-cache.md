@@ -34,3 +34,22 @@ The cache is a **size-capped LRU** (`PLAYBACK_CACHE_MB`, default 2048; `0` = unb
   is the opposite choice from *recording*, where fragmented MP4 is right for crash-safety — ADR 0004.)
 - Deferred: background **pre-transcode** of new segments so the first view doesn't pay the latency
   (`PLAYBACK_PRETRANSCODE`, opt-in).
+
+## Amendment — progressive first view (2026-08-17)
+
+Real recordings are five-minute, 1080p HEVC segments. On the prototype host, converting only
+216 seconds took **41.46 seconds**, during which the old endpoint returned no response body. That
+made downloading the original feel dramatically faster and made FFmpeg compete with live view
+while the browser displayed only a spinner.
+
+The earlier rejection of fragmented playback still applies to the *final* review artifact: a
+reviewer needs reliable duration and seeking. It no longer justifies withholding every byte until
+the final artifact exists. The first uncached request now tails a growing fragmented H.264 MP4 from
+one shared FFmpeg job. When encoding completes, the same output is remuxed with `-c copy` into the
+faststart cache; no second video encode occurs. `/recordings/playback-status` lets the frontend
+detect that transition and replace the progressive source while preserving `currentTime` and play/
+pause state. Thus startup is progressive, while the steady-state player remains seekable.
+
+Concurrent viewers of the same segment share one job. A browser disconnect does not cancel it: the
+job completes the reusable cache. Temporary fragments disappear after the last reader closes, and
+the existing bounded LRU policy remains authoritative for completed derived files.

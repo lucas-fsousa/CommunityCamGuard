@@ -1,11 +1,11 @@
 # Community Cam Guard (CCG) — local stack.
 # Both services use HOST networking so go2rtc can reach the LAN cameras (RTSP + WebRTC) directly.
-# Everything binds loopback (127.0.0.1, 32xx range). On Windows via WSL2, enable `mirrored`
-# networking (see README) so this reaches the LAN and the Windows browser exactly like a host run.
+# The authenticated dashboard binds the LAN (0.0.0.0:3200); internal go2rtc services stay on
+# loopback. On Windows via WSL2, enable `mirrored` networking (see README).
 # Ports come from the app's settings / .env and the generated data/go2rtc.yaml.
 #
 # Bring up:  docker compose up -d --build
-# The app binds 127.0.0.1:3200; go2rtc binds 127.0.0.1:3201/3202/3203.
+# The app binds 0.0.0.0:3200; go2rtc binds 127.0.0.1:3201/3202/3203.
 
 name: ccg
 
@@ -31,7 +31,7 @@ services:
     build: .
     image: community-cam-guard-app:latest
     container_name: ccg-app
-    network_mode: host          # serves 127.0.0.1:3200; reaches go2rtc at 127.0.0.1:3201/3203
+    network_mode: host          # serves LAN :3200; reaches go2rtc at 127.0.0.1:3201/3203
     # Factory onboarding performs a read-only Wi-Fi scan now and will temporarily associate to a
     # camera SoftAP once that transport is complete. Scope the network capability to this service;
     # go2rtc never needs it. Hosts without an exposed Wi-Fi radio simply report no networks.
@@ -41,10 +41,13 @@ services:
     environment:
       MANAGE_GO2RTC: "false"    # go2rtc is the container above — don't spawn the binary here
       TZ: "UTC"                 # persistence clock; recorder also pins each ffmpeg child to UTC0
+      PROVISIONING_BLE_MATERIAL_FILE: "/app/temp/ble-provision-material.json"
+      PROVISIONING_REMOTE_BLE_ENABLED: "${PROVISIONING_REMOTE_BLE_ENABLED:-false}"
     volumes:
       - ./recordings:/app/recordings
       - ./data:/app/data
       - ./frontend:/app/frontend      # live-editable dashboard (no rebuild for UI tweaks)
+      - ./temp:/app/temp:ro           # ignored, owner-only, short-lived BLE research material
     depends_on:
       - go2rtc
     restart: unless-stopped

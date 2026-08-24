@@ -32,7 +32,7 @@ class WifiNetwork:
 
     def public(self) -> dict:
         return {
-            "id": sign_network(self.ssid),
+            "id": sign_network(self.ssid, self.security),
             "ssid": self.ssid,
             "signal": max(0, min(int(self.signal), 100)),
             "security": self.security,
@@ -43,11 +43,24 @@ def _serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(get_settings().effective_signing_key, salt=_TOKEN_SALT)
 
 
-def sign_network(ssid: str) -> str:
-    return _serializer().dumps({"ssid": ssid})
+def sign_network(ssid: str, security: str = "") -> str:
+    return _serializer().dumps({"ssid": ssid, "security": security})
 
 
-def selected_ssid(token: str) -> str:
+def manual_network(ssid: str, security: str) -> WifiNetwork:
+    """Validate a localhost-only fallback selection before signing it like a scan result."""
+    normalized_ssid = ssid.strip()
+    if not normalized_ssid or len(normalized_ssid.encode("utf-8")) > 32:
+        raise WifiSelectionError("SSID must contain 1 to 32 UTF-8 bytes")
+    security_labels = {"wpa": "WPA/WPA2", "wep": "WEP", "open": "open"}
+    try:
+        normalized_security = security_labels[security.strip().lower()]
+    except KeyError as exc:
+        raise WifiSelectionError("unsupported Wi-Fi security") from exc
+    return WifiNetwork(ssid=normalized_ssid, security=normalized_security)
+
+
+def selected_network(token: str) -> WifiNetwork:
     try:
         payload = _serializer().loads(token, max_age=TOKEN_MAX_AGE)
     except SignatureExpired as exc:
@@ -55,9 +68,17 @@ def selected_ssid(token: str) -> str:
     except BadData as exc:
         raise WifiSelectionError("invalid Wi-Fi selection") from exc
     ssid = payload.get("ssid") if isinstance(payload, dict) else None
+    security = payload.get("security", "") if isinstance(payload, dict) else ""
     if not isinstance(ssid, str) or not ssid or len(ssid.encode("utf-8")) > 32:
         raise WifiSelectionError("invalid Wi-Fi selection")
-    return ssid
+    if not isinstance(security, str) or len(security) > 128:
+        raise WifiSelectionError("invalid Wi-Fi selection")
+    return WifiNetwork(ssid=ssid, security=security)
+
+
+def selected_ssid(token: str) -> str:
+    """Compatibility helper for callers that only need the network name."""
+    return selected_network(token).ssid
 
 
 def _split_nmcli(line: str) -> list[str]:

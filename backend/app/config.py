@@ -18,8 +18,9 @@ class Settings(BaseSettings):
     dashboard_secret_key: str = "change-me"
     session_signing_key: str = ""
 
-    # Server — bind loopback only (never 0.0.0.0). Prototype port range 32xx per ports_doc.
-    host: str = "127.0.0.1"
+    # Dashboard/API — exposed to the LAN and always protected by DASHBOARD_SECRET_KEY. Internal
+    # go2rtc API/RTSP ports remain loopback-only behind the authenticated app proxy.
+    host: str = "0.0.0.0"
     port: int = 3200
     # Auto-start go2rtc + recorder + storage monitor with the API (disable for API-only /
     # hardware-less runs and tests).
@@ -34,6 +35,17 @@ class Settings(BaseSettings):
 
     # Persistence (camera registry + recording index)
     db_path: Path = Path("./data/ccg.db")
+
+    # Optional, short-lived reverse-engineering bridge for the recovered BLE handshake. The file
+    # lives in git-ignored temp storage, must be owner-only and is never returned to the browser.
+    provisioning_ble_material_file: Path | None = None
+    # TanKey/randNumber are a single short-lived handshake pair. The cloud issues a different
+    # pair on every request and the camera silently falls back to an unusable session when an old
+    # pair is presented, so reject material before that can look like a successful provisioning.
+    provisioning_ble_material_max_age_seconds: int = 300
+    # Explicit, temporary escape hatch for Web Bluetooth on a phone reached through an HTTPS
+    # reverse tunnel. Authentication remains mandatory and only the BLE subset is opened.
+    provisioning_remote_ble_enabled: bool = False
 
     # Recording
     recordings_dir: Path = Path("./recordings")

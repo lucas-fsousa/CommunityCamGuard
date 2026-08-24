@@ -45,6 +45,16 @@ def test_ffmpeg_cmd_transcodes_video_copies_audio_faststart():
     assert "+faststart" in " ".join(cmd)                            # seekable, real duration up front
 
 
+def test_progressive_encode_then_remux_uses_only_one_video_encode():
+    stream = playback._stream_ffmpeg_cmd(Path("/in.mp4"), Path("/stream.mp4"))
+    remux = playback._faststart_remux_cmd(Path("/stream.mp4"), Path("/cache.mp4"))
+    assert "libx264" in stream
+    assert "frag_keyframe+empty_moov+default_base_moof" in " ".join(stream)
+    assert "+faststart" in remux
+    copy_at = remux.index("-c")
+    assert remux[copy_at + 1] == "copy"                              # no second encode
+
+
 def _fake_run(monkeypatch, *, rc=0, write=b"H264-MP4"):
     def run(cmd, **kw):
         if rc == 0:
@@ -82,6 +92,30 @@ def test_transcoded_path_none_and_no_cache_on_failure(monkeypatch, tmp_path):
     seg = tmp_path / "seg.mp4"; seg.write_bytes(b"hevc")
     assert playback.transcoded_path(seg) is None
     assert not playback.cache_path(seg).is_file() and not list(playback.cache_path(seg).parent.glob("*.part"))
+
+
+def test_streaming_transcode_builds_faststart_cache(monkeypatch, tmp_path):
+    seg = tmp_path / "seg.mp4"
+    seg.write_bytes(b"hevc")
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        output = Path(cmd[-1])
+        output.write_bytes(b"fragmented" if "libx264" in cmd else b"faststart")
+
+        class Result:
+            returncode = 0
+        return Result()
+
+    monkeypatch.setattr(playback.subprocess, "run", run)
+    data = b"".join(playback.streaming_transcode(seg))
+
+    cache = playback.cache_path(seg)
+    assert data in {b"fragmented", b"faststart"}  # thread may finish before reader opens
+    assert cache.read_bytes() == b"faststart"
+    assert len(calls) == 2 and "libx264" in calls[0] and "copy" in calls[1]
+    assert playback.transcode_in_progress(seg) is False
 
 
 def _set_cap(monkeypatch, mb):

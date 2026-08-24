@@ -27,8 +27,10 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0014](0014-dashboard-i18n-no-build-step.md) | Dashboard i18n with no build step |
 | [0015](0015-content-addressed-build-id.md) | Content-addressed build identity and automatic cache busting |
 | [0016](0016-utc-recording-layout.md) | Recording paths and index timestamps are always UTC |
-| [0017](0017-localhost-only-factory-provisioning.md) | Factory provisioning is a localhost-only security boundary |
+| [0017](0017-localhost-only-factory-provisioning.md) | Superseded: factory provisioning as a localhost-only boundary |
 | [0018](0018-semantic-frontend-modules.md) | Semantic native ES modules with a thin orchestration entrypoint |
+| [0019](0019-progressive-first-recording-playback.md) | Progressive first playback while the full recording transcode is cached |
+| [0020](0020-lan-dashboard-and-bluetooth-onboarding.md) | LAN dashboard with trusted-LAN provisioning and homologated BLE onboarding |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,

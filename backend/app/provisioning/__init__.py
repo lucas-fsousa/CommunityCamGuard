@@ -1,12 +1,63 @@
 """Factory-new camera onboarding primitives."""
 
+from .ble import (
+    BleCodecError,
+    BleFrame,
+    BleMessage,
+    BleMessageAssembler,
+    BleProvisioningAttempt,
+    BleProvisioningMaterial,
+    begin_ble_provisioning_attempt,
+    ble_provisioning_attempt,
+    build_ble_provisioning_frames,
+    decrypt_ble_payload,
+    encrypt_ble_payload,
+    fragment_ble_message,
+    load_ble_provisioning_material,
+    parse_ble_frame,
+)
 from .labels import LabelError, inspect_label
-from .wifi import WifiSelectionError, scan_wifi_networks, selected_ssid
+from .privileged import (
+    PrivilegedEnrollmentError,
+    bind_vendor_device,
+    mark_privileged_enrollment_bound,
+    pending_privileged_enrollment,
+    privileged_enrollment_status,
+    query_vendor_device_online,
+    remember_privileged_handoff,
+)
+from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
+from .wifi import WifiSelectionError, manual_network, scan_wifi_networks, selected_network
 
 __all__ = [
+    "BleCodecError",
+    "BleFrame",
+    "BleMessage",
+    "BleMessageAssembler",
+    "BleProvisioningAttempt",
+    "BleProvisioningMaterial",
     "LabelError",
+    "PrivilegedEnrollmentError",
     "WifiSelectionError",
+    "begin_ble_provisioning_attempt",
+    "bind_vendor_device",
+    "ble_provisioning_attempt",
+    "build_ble_provisioning_frames",
+    "build_wifi_payload",
+    "decrypt_ble_payload",
+    "encrypt_ble_payload",
+    "encryption_from_scan",
+    "fragment_ble_message",
     "inspect_label",
+    "load_ble_provisioning_material",
+    "manual_network",
+    "mark_privileged_enrollment_bound",
+    "parse_ble_frame",
+    "pending_privileged_enrollment",
+    "privileged_enrollment_status",
+    "query_vendor_device_online",
+    "remember_privileged_handoff",
+    "render_svg_base64",
     "scan_wifi_networks",
-    "selected_ssid",
+    "selected_network",
 ]

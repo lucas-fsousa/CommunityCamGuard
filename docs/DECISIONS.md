@@ -1360,3 +1360,16 @@ children now run with `TZ=UTC0`, directory pre-creation uses `datetime.now(UTC)`
 carry `+00:00`, and retention uses a UTC cutoff. Compose declares `TZ=UTC` too, but the child-level
 pin is the actual guarantee. Historical paths are left untouched because their source timezone
 cannot be inferred safely. See ADR `docs/internal/0016-utc-recording-layout.md`.
+
+## 36. First recording playback streams while its seekable cache is built (2026-08-17)
+
+The download endpoint exposed the real latency source: original HEVC delivery was immediate, while
+the web player waited for a complete HEVC→H.264 faststart transcode before receiving one byte. A
+216-second 1080p sample took 41.46 seconds; normal configured segments are five minutes.
+
+An uncached `/recordings/file` request now tails a fragmented H.264 output while one shared FFmpeg
+job is still encoding. Completion triggers a cheap stream-copy remux into the existing faststart
+LRU cache. The frontend polls `/recordings/playback-status`, then swaps to that seekable file at the
+same playback position. Concurrent viewers share the job, disconnects do not waste the cache work,
+and the HEVC archive/download remains unchanged. See ADR
+`docs/internal/0019-progressive-first-recording-playback.md`.

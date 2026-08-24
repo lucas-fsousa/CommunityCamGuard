@@ -91,7 +91,7 @@ app = FastAPI(
         {"name": "auth", "description": "Log in/out and check the current session."},
         {"name": "cameras", "description": "List, add, remove, probe and control cameras."},
         {"name": "discovery", "description": "Scan the network for cameras."},
-        {"name": "provisioning", "description": "Factory-new setup; localhost only."},
+        {"name": "provisioning", "description": "Factory-new setup; authenticated trusted LAN only."},
         {"name": "media", "description": "Live-stream info and media-engine control."},
         {"name": "storage", "description": "Recording storage status."},
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
@@ -132,5 +132,5 @@ if __name__ == "__main__":
     import uvicorn
 
     s = get_settings()
-    # Binds to settings.host (127.0.0.1 by default) — never 0.0.0.0.
+    # Binds to settings.host (0.0.0.0 by default); dashboard authentication remains mandatory.
     uvicorn.run(app, host=s.host, port=s.port)

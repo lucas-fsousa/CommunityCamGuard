@@ -10,8 +10,12 @@ config and the recorder is re-synced to the new camera list.
 from __future__ import annotations
 
 import asyncio
+import base64
+import hmac
 import json
 import logging
+import re
+import time
 import urllib.parse
 from collections import deque
 from datetime import UTC, datetime
@@ -19,7 +23,7 @@ from pathlib import Path
 
 import websockets
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, SecretStr
 from starlette.websockets import WebSocketState
 
@@ -38,14 +42,31 @@ from ..db import registry
 from ..discovery import active_scan, rtsp
 from ..media import go2rtc, quality
 from ..provisioning import (
+    BleCodecError,
     LabelError,
+    PrivilegedEnrollmentError,
     WifiSelectionError,
+    begin_ble_provisioning_attempt,
+    bind_vendor_device,
+    ble_provisioning_attempt,
+    build_ble_provisioning_frames,
+    build_wifi_payload,
+    decrypt_ble_payload,
+    encryption_from_scan,
     inspect_label,
+    load_ble_provisioning_material,
+    manual_network,
+    mark_privileged_enrollment_bound,
+    pending_privileged_enrollment,
+    privileged_enrollment_status,
+    query_vendor_device_online,
+    remember_privileged_handoff,
+    render_svg_base64,
     scan_wifi_networks,
-    selected_ssid,
+    selected_network,
 )
 from ..recording import playback, recorder
-from .local_only import require_local_request
+from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
@@ -84,7 +105,37 @@ class ProvisioningStartIn(ProvisioningLabelIn):
 
     wifi_network_id: str = Field(min_length=1, max_length=1024)
     wifi_password: SecretStr = Field(default=SecretStr(""), max_length=128)
-    name: str = Field(default="", max_length=100)
+
+
+class ProvisioningManualNetworkIn(BaseModel):
+    """Explicit fallback used only when this server has no usable Wi-Fi scanner."""
+
+    ssid: str = Field(min_length=1, max_length=64)
+    security: str = Field(default="wpa", max_length=16)
+
+
+class ProvisioningBleResponseIn(ProvisioningLabelIn):
+    """One camera response returned by Web Bluetooth for ephemeral server-side decoding."""
+
+    attempt_id: str = Field(min_length=20, max_length=128)
+    command: int = Field(ge=0, le=255)
+    encrypted: bool = False
+    data_base64: str = Field(default="", max_length=16384)
+    time_area: str = Field(default="UTC", min_length=1, max_length=128)
+    time_zone: int = Field(default=0, ge=-50_400, le=50_400)
+
+
+class ProvisioningPrivilegedBindIn(ProvisioningLabelIn):
+    """Explicit second onboarding stage, after Wi-Fi has already been configured."""
+
+    time_area: str = Field(default="UTC", min_length=1, max_length=128)
+    time_zone: int = Field(default=0, ge=-50_400, le=50_400)
+
+
+class ProvisioningOnlineStatusIn(ProvisioningLabelIn):
+    """Read-only APK-compatible lookup for the configToken pinned to one BLE attempt."""
+
+    attempt_id: str = Field(min_length=20, max_length=128)
 
 
 class PtzIn(BaseModel):
@@ -316,6 +367,7 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
 # --- factory-new provisioning (strictly localhost-only) -----------------------------
 
 _LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
+_BLE_PROVISIONING = [Depends(require_auth), Depends(require_local_or_remote_ble_request)]
 
 
 def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
@@ -331,29 +383,33 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/provisioning/status", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+@router.get("/provisioning/status", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
+    material_path = get_settings().provisioning_ble_material_file
+    ble_status = "handshake-ready" if material_path and material_path.is_file() else "discovery-ready"
     return {
-        "local_only": True,
+        "local_only": False,
+        "lan_only": True,
+        "remote_ble_enabled": get_settings().provisioning_remote_ble_enabled,
         "label_inspection": True,
-        "transport_ready": False,
+        "transport_ready": True,
         "transports": {
-            "qr": "protocol-recovery",
+            "qr": "experimental-ready",
             "softap": "protocol-recovery",
-            "bluetooth": "planned",
+            "bluetooth": ble_status,
             "wired": "planned",
         },
     }
 
 
-@router.post("/provisioning/inspect", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+@router.post("/provisioning/inspect", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
 def provisioning_inspect(body: ProvisioningLabelIn) -> dict:
     """Validate and decode a scanned/typed factory label without contacting the camera."""
     return _inspect_provisioning_label(body)
 
 
-@router.get("/provisioning/networks", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+@router.get("/provisioning/networks", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
 def provisioning_networks(response: Response) -> dict:
     """Read-only scan from the server's Wi-Fi radio; SSIDs carry short-lived signed IDs."""
     networks, scanner, error = scan_wifi_networks()
@@ -362,29 +418,307 @@ def provisioning_networks(response: Response) -> dict:
         "networks": [network.public() for network in networks],
         "scanner": scanner,
         "error": error or None,
+        "manual_entry_allowed": not scanner,
     }
 
 
-@router.post("/provisioning/start", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
-def provisioning_start(body: ProvisioningStartIn) -> dict:
-    """Begin onboarding once a transport is available; credentials remain request-local.
-
-    This endpoint intentionally fails closed until the recovered ``AP_NET_CONFIG`` transport is
-    implemented.  Keeping the route and schema in place lets the UI/security boundary land without
-    ever claiming that a camera was configured when no packet was sent.
-    """
-    identity = _inspect_provisioning_label(body)
+@router.post("/provisioning/networks/manual", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+def provisioning_manual_network(body: ProvisioningManualNetworkIn, response: Response) -> dict:
+    """Sign an explicit SSID only when automatic Wi-Fi discovery is unavailable."""
+    _networks, scanner, _error = scan_wifi_networks()
+    if scanner:
+        raise HTTPException(
+            status_code=409,
+            detail="manual Wi-Fi entry is disabled while automatic scanning is available",
+        )
     try:
-        selected_ssid(body.wifi_network_id)
+        network = manual_network(body.ssid, body.security)
     except WifiSelectionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    # Touch the SecretStr only inside this request. Do not log, return or persist its value.
-    body.wifi_password.get_secret_value()
-    modes = ", ".join(identity["setup_modes"])
-    raise HTTPException(
-        status_code=501,
-        detail=f"camera label accepted ({modes}); provisioning transport is not ready yet",
+    response.headers["Cache-Control"] = "no-store"
+    return {"network": network.public()}
+
+
+@router.post("/provisioning/start", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
+    """Create the recovered vendor Wi-Fi QR without persisting its embedded credentials.
+
+    Rendering the artifact is not proof that the camera read or accepted it, so this deliberately
+    returns an ``awaiting_camera_scan`` state rather than claiming successful provisioning.
+    """
+    identity = _inspect_provisioning_label(body)
+    if "qr" not in identity["setup_modes"]:
+        raise HTTPException(
+            status_code=501,
+            detail="camera label does not advertise QR provisioning; SoftAP is not ready yet",
+        )
+    try:
+        network = selected_network(body.wifi_network_id)
+    except WifiSelectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # The secret exists only for this synchronous render. Do not log, return or persist either the
+    # plain password or the textual QR payload (which contains it by construction).
+    password = body.wifi_password.get_secret_value()
+    try:
+        payload = build_wifi_payload(
+            ssid=network.ssid,
+            password=password,
+            encryption=encryption_from_scan(network.security, password),
+        )
+        qr_data = render_svg_base64(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "status": "awaiting_camera_scan",
+        "transport": "qr",
+        "experimental": True,
+        "cloud_token_used": False,
+        "device_id": identity["device_id"],
+        "qr": {"mime_type": "image/svg+xml", "data_base64": qr_data},
+    }
+
+
+@router.post("/provisioning/ble/prepare", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> dict:
+    """Prepare encrypted GATT writes while keeping cloud material and Wi-Fi plaintext server-side."""
+    identity = _inspect_provisioning_label(body)
+    if "bluetooth" not in identity["setup_modes"]:
+        raise HTTPException(status_code=422, detail="camera label does not advertise Bluetooth setup")
+    try:
+        network = selected_network(body.wifi_network_id)
+    except WifiSelectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    settings = get_settings()
+    if settings.provisioning_ble_material_file is None:
+        raise HTTPException(status_code=503, detail="BLE handshake material is unavailable")
+    try:
+        material = load_ble_provisioning_material(
+            settings.provisioning_ble_material_file,
+            expected_device_id=identity["device_id"],
+            max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
+        )
+        password = body.wifi_password.get_secret_value()
+        wifi_payload = build_wifi_payload(
+            ssid=network.ssid,
+            password=password,
+            encryption=encryption_from_scan(network.security, password),
+            user_id=material.server_user_id,
+            config_token=material.config_token,
+        )
+        # The vendor Android client explicitly negotiates MTU 256 before initializing its native
+        # packet session. At MTU 23 this firmware treats each fragment as a separate command and
+        # echoed only the final 13 bytes of the 32-byte challenge, so TanKey was never installed.
+        stages = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=256)
+        attempt = begin_ble_provisioning_attempt(material)
+    except (BleCodecError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "status": "ready_for_explicit_browser_send",
+        "transport": "bluetooth",
+        "experimental": True,
+        "device_id": identity["device_id"],
+        "attempt_id": attempt.attempt_id,
+        "attempt_expires_in": max(0, int(attempt.expires_at - time.time())),
+        "frames": {
+            stage: [base64.b64encode(frame).decode("ascii") for frame in frames]
+            for stage, frames in stages.items()
+        },
+        "expected_responses": {
+            "challenge": 0x71,
+            "wifi_list": 0x81,
+            "wifi_config_ack": 0x83,
+            "wifi_connection": 0x85,
+        },
+    }
+
+
+@router.post("/provisioning/ble/decode-response", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: Response) -> dict:
+    """Decode a transient camera reply without exposing TanKey or persisting its contents."""
+    identity = _inspect_provisioning_label(body)
+    if body.command not in {0x71, 0x73, 0x81, 0x83, 0x85}:
+        raise HTTPException(status_code=422, detail="unsupported BLE provisioning response")
+    try:
+        raw = base64.b64decode(body.data_base64, validate=True) if body.data_base64 else b""
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="invalid BLE response encoding") from exc
+    try:
+        attempt = ble_provisioning_attempt(
+            body.attempt_id,
+            expected_device_id=identity["device_id"],
+        )
+        material = attempt.material
+        decoded = decrypt_ble_payload(raw, material.tan_key) if body.encrypted else raw
+    except (BleCodecError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    text = ""
+    payload = None
+    try:
+        text = decoded.rstrip(b"\x00").decode("utf-8")
+        payload = json.loads(text) if text else None
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    challenge_valid = None
+    if body.command == 0x71:
+        # Firmware 40.1.x acknowledges the random challenge with only its trailing bytes (13 on
+        # the observed device), while other revisions return a JSON DevBleInfo object. The vendor
+        # app tolerates both. Verify the short echo server-side without exposing randNumber.
+        challenge_valid = bool(decoded) and len(decoded) <= len(material.random_number) and hmac.compare_digest(
+            decoded, material.random_number.encode("utf-8")[-len(decoded):]
+        )
+    wifi_connection = None
+    configuration_acknowledged = body.command == 0x83
+    public_payload = payload
+    if body.command == 0x85 and isinstance(payload, dict):
+        # DevBleConnWiFiRes.CONNECTED == 0.  This endpoint belongs to the Wi-Fi transport only:
+        # account/P2P binding and RTSP activation are separate onboarding stages.  Keep the
+        # one-time proof out of the browser response and, importantly, do not consume it here by
+        # silently calling the vendor cloud.
+        confirm_key = payload.get("confirmKey")
+        connect_status = payload.get("connectStatus")
+        public_payload = {key: value for key, value in payload.items() if key != "confirmKey"}
+        text = json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
+        handoff_ready = False
+        if connect_status == 0 and isinstance(confirm_key, str) and confirm_key:
+            try:
+                remember_privileged_handoff(material, confirm_key=confirm_key)
+                handoff_ready = True
+            except PrivilegedEnrollmentError:
+                # Wi-Fi success remains valid even if its optional, short-lived continuation can no
+                # longer be retained. The explicit next stage will report that it must be repeated.
+                log.warning("BLE privileged handoff expired before retention device=%s", identity["device_id"])
+        wifi_connection = {
+            "connected": connect_status == 0,
+            "status": connect_status,
+            "privileged_handoff_advertised": isinstance(confirm_key, str) and bool(confirm_key),
+            "privileged_handoff_ready": handoff_ready,
+        }
+    # 0x71 contains handshake material and 0x83 echoes the complete plaintext provisioning
+    # payload after server-side decryption, including the Wi-Fi password. Neither may cross back
+    # into the browser or remain in an HTTP inspector. The command itself is sufficient as ACK.
+    if body.command in {0x71, 0x83}:
+        text = ""
+        public_payload = None
+    if body.command == 0x85:
+        text = json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False) \
+            if public_payload is not None else ""
+    log.warning(
+        "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d json_keys=%s "
+        "connect_status=%s privileged_handoff=%d",
+        identity["device_id"],
+        body.command,
+        len(decoded),
+        int(body.encrypted),
+        int(bool(text)),
+        sorted(str(key) for key in payload) if isinstance(payload, dict) else [],
+        payload.get("connectStatus", "-") if isinstance(payload, dict) else "-",
+        int(bool(payload.get("confirmKey"))) if isinstance(payload, dict) else 0,
     )
+    return {
+        "command": body.command,
+        "encrypted": body.encrypted,
+        "length": len(decoded),
+        "valid": challenge_valid,
+        "text": text[:4096],
+        "json": public_payload,
+        "hex": "" if body.command in {0x71, 0x83, 0x85} else decoded[:128].hex() if not text else "",
+        "configuration_acknowledged": configuration_acknowledged,
+        "wifi_connection": wifi_connection,
+    }
+
+
+@router.post(
+    "/provisioning/privileged/status",
+    dependencies=_BLE_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response) -> dict:
+    """Report whether an unconsumed post-Wi-Fi handoff exists; never return its secrets."""
+    identity = _inspect_provisioning_label(body)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return privileged_enrollment_status(identity["device_id"])
+
+
+@router.post(
+    "/provisioning/privileged/online-status",
+    dependencies=_BLE_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_online_status(body: ProvisioningOnlineStatusIn, response: Response) -> dict:
+    """Perform the read-only configToken status lookup used by the vendor APK."""
+    identity = _inspect_provisioning_label(body)
+    try:
+        attempt = ble_provisioning_attempt(
+            body.attempt_id,
+            expected_device_id=identity["device_id"],
+        )
+        result = query_vendor_device_online(attempt.material)
+    except (BleCodecError, PrivilegedEnrollmentError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result.device_id is not None and result.device_id != identity["device_id"]:
+        raise HTTPException(status_code=409, detail="vendor online result belongs to a different camera")
+    handoff_ready = False
+    if result.online:
+        remember_privileged_handoff(attempt.material, confirm_key=None)
+        handoff_ready = True
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "device_id": identity["device_id"],
+        "query_succeeded": result.success,
+        "online": result.online,
+        "terminal_failure": result.terminal_failure,
+        "code": result.code,
+        "privileged_handoff_ready": handoff_ready,
+    }
+
+
+@router.post(
+    "/provisioning/privileged/bind",
+    dependencies=_BLE_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: Response) -> dict:
+    """Explicitly enroll one Wi-Fi-connected camera in the vendor IoTVideo/P2P device list."""
+    identity = _inspect_provisioning_label(body)
+    try:
+        pending = pending_privileged_enrollment(identity["device_id"])
+        result = bind_vendor_device(
+            pending,
+            time_area=body.time_area,
+            time_zone=body.time_zone,
+        )
+    except PrivilegedEnrollmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not result.success:
+        detail = result.message or (str(result.code) if result.code is not None else "unknown error")
+        raise HTTPException(status_code=409, detail=f"camera P2P enrollment failed: {detail}")
+    if not result.dev_token:
+        raise HTTPException(status_code=502, detail="camera P2P enrollment returned no subscription material")
+    try:
+        mark_privileged_enrollment_bound(pending, result.dev_token)
+    except PrivilegedEnrollmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    log.info("Privileged P2P enrollment accepted device=%s", identity["device_id"])
+    return {
+        "device_id": identity["device_id"],
+        "p2p_binding": "bound",
+        "subscription_material_ready": True,
+        "p2p_session": "pending",
+        "rtsp": "pending",
+    }
 
 
 # --- media / storage ----------------------------------------------------------------
@@ -553,6 +887,14 @@ def storage_status(request: Request) -> dict:
 
 # --- recordings ---------------------------------------------------------------------
 
+def _recording_target(path: str) -> tuple[Path, Path]:
+    """Resolve a recording path and keep every recording endpoint inside its configured root."""
+    root = Path(get_settings().recordings_dir).resolve()
+    target = Path(path).resolve()
+    if root not in target.parents or not target.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return root, target
+
 @router.get("/recordings", dependencies=[Depends(require_auth)])
 def recordings(mac: str | None = None, day_from: str | None = None,
                day_to: str | None = None, limit: int = 50, offset: int = 0) -> dict:
@@ -576,10 +918,62 @@ def recording_file(path: str):
     stream that also warms the cache (see :mod:`..recording.playback`). H.264 segments are served
     directly.
     """
-    root = Path(get_settings().recordings_dir).resolve()
-    target = Path(path).resolve()
-    if root not in target.parents or not target.is_file():
-        raise HTTPException(status_code=404, detail="not found")
-    # HEVC -> serve a cached H.264 transcode (seekable, correct duration); H.264 -> serve as-is.
-    playable = playback.transcoded_path(target)
-    return FileResponse(playable or target, media_type="video/mp4")
+    _root, target = _recording_target(path)
+    # Cache hit -> seekable immediately. Browser-native codec -> original immediately. The first
+    # HEVC view tails one shared fragmented encode, which becomes the seekable cache when complete.
+    playable = playback.cached_path(target)
+    if playable is not None:
+        return FileResponse(playable, media_type="video/mp4")
+    if not playback.needs_transcode(target):
+        return FileResponse(target, media_type="video/mp4")
+    return StreamingResponse(
+        playback.streaming_transcode(target),
+        media_type="video/mp4",
+        headers={
+            "Cache-Control": "private, no-store",
+            "Accept-Ranges": "none",
+            "X-Playback-Mode": "progressive",
+        },
+    )
+
+
+@router.get("/recordings/playback-status", dependencies=[Depends(require_auth)])
+def recording_playback_status(path: str) -> dict:
+    """Tell the player when the progressive first view has become seekable."""
+    _root, target = _recording_target(path)
+    if playback.cached_path(target) is not None:
+        return {"ready": True, "cached": True, "transcoding": False}
+    if playback.transcode_in_progress(target):
+        return {"ready": False, "cached": False, "transcoding": True}
+    browser_playable = not playback.needs_transcode(target)
+    return {"ready": browser_playable, "cached": False, "transcoding": False}
+
+
+def _recording_download_name(target: Path, root: Path) -> str:
+    """Build ``Camera_Name_<original UTC timestamp>.mp4`` without trusting client text."""
+    relative = target.relative_to(root)
+    recording_mac = relative.parts[0] if relative.parts else ""
+    camera = next(
+        (
+            item
+            for item in registry.list_cameras()
+            if item.mac.replace(":", "").lower() == recording_mac.lower()
+        ),
+        None,
+    )
+    label = (camera.name if camera and camera.name.strip() else recording_mac) or "camera"
+    safe_label = re.sub(r"[^\w.-]+", "_", label, flags=re.UNICODE).strip("._")[:80] or "camera"
+    return f"{safe_label}_{target.name}"
+
+
+@router.get("/recordings/download", dependencies=[Depends(require_auth)])
+def recording_download(path: str):
+    """Download one original segment with a camera-prefixed, UTC timestamp filename."""
+    root, target = _recording_target(path)
+    return FileResponse(
+        target,
+        media_type="video/mp4",
+        filename=_recording_download_name(target, root),
+        content_disposition_type="attachment",
+        headers={"Cache-Control": "private, no-store"},
+    )

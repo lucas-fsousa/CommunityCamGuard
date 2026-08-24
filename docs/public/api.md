@@ -3,7 +3,7 @@
 REST API for discovering, streaming, recording and controlling ONVIF/RTSP cameras. Build your own
 UI (or scripts) against these endpoints — the bundled dashboard is just one consumer of this API.
 
-- **Base URL:** `http://<host>:3200` (loopback by default; see `HOST`/`PORT` in `.env`).
+- **Base URL:** `http://<host>:3200` (LAN by default; see `HOST`/`PORT` in `.env`).
 - **Interactive docs:** Swagger at [`/api/docs`](/api/docs), ReDoc at [`/api/redoc`](/api/redoc),
   raw schema at [`/api/openapi.json`](/api/openapi.json).
 - **Content type:** JSON request/response unless noted.
@@ -109,26 +109,65 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz 
 |---|---|---|---|
 | POST | `/api/discovery/scan` | `username`, `password` (query, optional) | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Gentle by design — cheap cameras hang under aggressive probing. |
 
-### Factory provisioning (localhost only)
+### Factory provisioning (authenticated trusted LAN only)
 
 These endpoints are intentionally distinct from adding a camera that is already on the LAN. They
-require authentication **and** a request made through `localhost`/loopback. A domain, LAN address,
-internet client, cross-site origin or forwarded remote IP receives **403**, even with a valid
-dashboard session.
+require authentication and a direct trusted-LAN request using a literal loopback, RFC1918 or IPv6
+ULA/link-local address. The Origin/Referer must match Host; public clients, DNS rebinding names,
+cross-site requests and any public forwarded hop receive **403** even with a valid session. The BLE
+subset may additionally use an explicitly enabled, same-origin HTTPS tunnel.
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/provisioning/status` | — | Reports available onboarding stages/transports. |
 | POST | `/api/provisioning/inspect` | `ProvisioningLabelIn` | Validates the scanned label or manual identity without contacting the camera. |
-| GET | `/api/provisioning/networks` | — | Read-only Wi-Fi scan. Returns display names and short-lived signed selection IDs. |
-| POST | `/api/provisioning/start` | `ProvisioningStartIn` | Reserved for actual synchronization; currently fails closed with `501` until the recovered transport is complete. |
+| GET | `/api/provisioning/networks` | — | Read-only Wi-Fi scan. Returns display names, short-lived signed selection IDs and whether manual fallback is allowed. |
+| POST | `/api/provisioning/networks/manual` | `{ssid, security}` | Creates a signed selection for an explicit SSID, but only when the server has no usable Wi-Fi scanner. |
+| POST | `/api/provisioning/start` | `ProvisioningStartIn` | Generates the recovered vendor Wi-Fi QR in memory for labels that advertise QR setup. SoftAP-only devices still fail closed with `501`. |
+| POST | `/api/provisioning/ble/prepare` | `ProvisioningStartIn` | Prepares the encrypted BLE Wi-Fi stages; secrets remain server-side. |
+| POST | `/api/provisioning/ble/decode-response` | `ProvisioningBleResponseIn` | Decodes one GATT response. Discards the credential-bearing `0x83` echo and retains a valid `0x85` handoff only in bounded process memory. Never binds automatically. |
+| POST | `/api/provisioning/privileged/online-status` | `ProvisioningOnlineStatusIn` | Read-only APK-compatible lookup of the current `configToken`. A successful `status == 1` creates the alternative no-`confirmKey` handoff. |
+| POST | `/api/provisioning/privileged/status` | `ProvisioningLabelIn` | Reports whether a fresh post-Wi-Fi P2P handoff is pending; returns no proof/token. |
+| POST | `/api/provisioning/privileged/bind` | `ProvisioningPrivilegedBindIn` | Explicit stage 2: bind the camera to the captured IoTVideo account. It still does not enable RTSP. |
 
 `ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
 `capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
 code by itself. `ProvisioningStartIn` adds the selected `wifi_network_id` returned by the scan,
 `wifi_password` and optional `name`. Arbitrary SSID text is not accepted. The signed network choice
 expires after five minutes. The Wi-Fi password is request-local and is never persisted, logged or
-returned.
+returned as plain text. The QR response is marked `Cache-Control: no-store`; its SVG necessarily
+encodes the selected SSID and password and the browser revokes its temporary object URL when the
+dialog closes.
+
+The start response is intentionally `status: "awaiting_camera_scan"`, `experimental: true` and
+`cloud_token_used: false`. It means only that an artifact matching the APK's recovered modern QR
+format was produced. The user must put the camera in QR pairing mode and wait for its physical
+acknowledgement; the API does not claim that the camera read, accepted or joined the network.
+The renderer matches the current APK's high (`H`) QR error-correction level. The vendor flow also
+obtains a per-setup `configToken`; the LAN-only experimental response currently identifies
+`cloud_token_used: false`, so firmware acceptance is not yet guaranteed even when the code is
+optically decoded.
+
+For labels that advertise Bluetooth, the modal selects only the exact `GW_BLE_<deviceId>` device,
+negotiates the recovered secure session, reads the camera's Wi-Fi scan, sends the selected network
+and waits for the camera to confirm its Wi-Fi association. This is physically validated; see
+[Bluetooth onboarding](bluetooth-onboarding.md). The browser device needs Bluetooth and access to
+the dashboard, and Web Bluetooth requires a secure context (`localhost` or trusted HTTPS).
+
+After Wi-Fi confirmation the modal exposes two explicit choices. **Finish Wi-Fi only** sends the
+Bluetooth finish command without binding anything. **Link P2P access** consumes the short-lived
+handoff through `/provisioning/privileged/bind`; receiving `0x83` alone never contacts the vendor
+binding service. The handoff and returned subscription token stay in memory, expire with the setup
+session and are never returned. A successful bind reports RTSP as `pending`: the separately
+homologated post-bind sequence still has to initialize P2P, enable `onvifEn`, install the camera's
+HA1 password value, verify real RTSP media and insert the encrypted clear credential in the
+registry. See
+[Bluetooth onboarding](bluetooth-onboarding.md#post-wi-fi-p2p-and-rtsp-stage) for the exact contract.
+
+When the server has no Wi-Fi radio/scanner, `GET /provisioning/networks` returns
+`manual_entry_allowed: true`. The localhost UI then accepts an explicit 1–32-byte SSID and
+`wpa`, `wep` or `open` security. The manual endpoint refuses requests with `409` while automatic
+scanning is available, so this remains a capability-based fallback rather than the normal path.
 
 ### Media (live streams)
 
@@ -190,7 +229,9 @@ timestamp and, when available, a snapshot of the matching go2rtc stream packet/c
 | Method | Path | Params | Notes |
 |---|---|---|---|
 | GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Includes `total` and `retention_days`. |
-| GET | `/api/recordings/file` | `path` (required) | Stream a recorded `.mp4` segment (HEVC transcoded to H.264 on demand for the browser). |
+| GET | `/api/recordings/file` | `path` (required) | Play a recorded `.mp4`. A first HEVC view is transcoded progressively while a seekable H.264 cache is built; cache hits and browser-native codecs are served directly. |
+| GET | `/api/recordings/playback-status` | `path` (required) | Reports `{ready, cached, transcoding}` so a first progressive view can switch to the completed seekable cache. |
+| GET | `/api/recordings/download` | `path` (required) | Download the original `.mp4` with `attachment` disposition and a server-generated `Camera_UTC-timestamp.mp4` filename. |
 
 ```bash
 curl -b jar.txt "http://127.0.0.1:3200/api/recordings?mac=aa:bb:cc:dd:ee:ff&limit=50"
@@ -212,7 +253,7 @@ Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 | Code | Meaning |
 |---|---|
 | 401 | Not authenticated (log in first). |
-| 403 | Operation is restricted to a genuine localhost request (factory provisioning). |
+| 403 | Factory provisioning did not originate from the authenticated trusted local network. |
 | 422 | Validation error — including a **wrong camera password** on add (deliberately not 401, so a UI doesn't bounce to login). |
 | 404 | Camera not found. |
 | 501 | Camera/driver doesn't support the requested action (e.g. PTZ/reboot). |

@@ -78,7 +78,9 @@ above.
 | P1 | Complete browser microphone → AMR-NB mode 7/8 kHz → camera speaker two-way audio; legacy P2P transport and codec now reproduce the native app, physical intelligibility confirmation pending | wip |
 | P1 | Integrate the proven P2P controls into a reusable backend/Docker driver | todo |
 | P0 | Keep provisioned cameras operational and controllable without WAN (LAN-only) | todo |
-| P1 | Provision a new/reset camera without the vendor Android app or account — localhost-only API/UI and label parser done; recovered QR/SoftAP transport still pending | wip |
+| P1 | Provision a new/reset camera without using the vendor UI — **BLE Wi-Fi flow physically homologated end-to-end** on camera 3 (MTU 256, secure challenge, camera-side Wi-Fi scan/config and `devresult` confirmation); current prototype still obtains short-lived handshake material from a vendor-authenticated session, so removing that dependency remains pending; SoftAP remains fallback | wip |
+| P0 | Explicit post-Wi-Fi stage matched to the APK and physically homologated: `0x83` is ACK only; race `0x85/confirmKey` with read-only `cloud/netcfg/devresult`, bind only after a separate user action, then start a fresh P2P session. Camera 3 was bound, appeared online in the three-device inventory and answered 37/40 model reads. Remaining: move the bounded transport from the ignored RE tooling into the production backend | wip |
+| P1 | RTSP post-bind contract physically homologated: enable `onvifEn`, send the HA1 expected by command `type=3`, require real Digest-authenticated media, then store the clear credential encrypted. Camera 3 is now in the registry with one shared producer, H.264 dashboard output and recording verified. Remaining: expose this sequence transactionally in the onboarding modal | wip |
 
 ---
 

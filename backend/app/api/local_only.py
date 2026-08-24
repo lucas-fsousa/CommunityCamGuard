@@ -1,10 +1,10 @@
-"""Server-side guard for operations that must never be exposed off-host.
+"""Server-side guard for operations that must never be exposed outside the trusted LAN.
 
 Provisioning receives Wi-Fi credentials and can reconfigure nearby hardware.  Authentication is
 not enough for that surface: an authenticated dashboard may deliberately be published through a
-reverse proxy.  The checks here require a real loopback connection *and* a loopback HTTP origin.
-Forwarding headers are treated as evidence, never as authority: any non-loopback hop rejects the
-request.
+reverse proxy. Forwarding headers are treated as evidence, never as authority: any public hop
+rejects the request. Direct clients must use a literal loopback/RFC1918/ULA address and same-origin
+browser requests.
 """
 from __future__ import annotations
 
@@ -12,6 +12,14 @@ import ipaddress
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
+
+from ..config import get_settings
+
+_TRUSTED_V4 = tuple(
+    ipaddress.ip_network(value) for value in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+)
+_TRUSTED_V6 = tuple(ipaddress.ip_network(value) for value in ("::1/128", "fc00::/7", "fe80::/10"))
+_LAN_ONLY_DETAIL = "provisioning is available only from the authenticated local network"
 
 
 def _loopback_ip(value: str) -> bool:
@@ -24,10 +32,21 @@ def _loopback_ip(value: str) -> bool:
     return address.is_loopback
 
 
+def _trusted_ip(value: str) -> bool:
+    try:
+        address = ipaddress.ip_address(value.strip().strip("[]"))
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    networks = _TRUSTED_V4 if isinstance(address, ipaddress.IPv4Address) else _TRUSTED_V6
+    return any(address in network for network in networks)
+
+
 def _local_hostname(value: str) -> bool:
-    """Accept only literal loopback addresses or the exact DNS name ``localhost``."""
+    """Accept localhost or a literal trusted-LAN address; reject DNS rebinding names."""
     value = value.rstrip(".").lower()
-    return value == "localhost" or _loopback_ip(value)
+    return value == "localhost" or _trusted_ip(value)
 
 
 def _header_hostname(value: str) -> str:
@@ -55,24 +74,57 @@ def _forwarded_addresses(request: Request) -> list[str]:
 
 
 def require_local_request(request: Request) -> None:
-    """FastAPI dependency that rejects every request not provably made via localhost.
+    """Reject provisioning requests not provably made from the authenticated local network.
 
     The generic 403 deliberately does not disclose which check failed.  This guard must remain on
     every provisioning route even when the normal dashboard session dependency is also present.
     """
     client = request.client
     host = _header_hostname(request.headers.get("host", ""))
-    if client is None or not _loopback_ip(client.host) or not _local_hostname(host):
-        raise HTTPException(status_code=403, detail="provisioning is available only on localhost")
+    if client is None or not _trusted_ip(client.host) or not _local_hostname(host):
+        raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
+    # A remote LAN peer claiming Host: localhost is not a localhost request. A loopback peer may
+    # legitimately be an on-host HTTPS proxy addressing the app through its private LAN IP.
+    if not _loopback_ip(client.host) and (host == "localhost" or _loopback_ip(host)):
+        raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
 
     for name in ("origin", "referer"):
         value = request.headers.get(name)
-        if value and not _local_hostname(_header_hostname(value)):
-            raise HTTPException(status_code=403, detail="provisioning is available only on localhost")
+        if value:
+            source_host = _header_hostname(value)
+            if not _local_hostname(source_host) or source_host.rstrip(".").lower() != host.rstrip(".").lower():
+                raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
 
     if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
-        raise HTTPException(status_code=403, detail="provisioning is available only on localhost")
+        raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
 
     for value in _forwarded_addresses(request):
-        if not _loopback_ip(_header_hostname(value)):
-            raise HTTPException(status_code=403, detail="provisioning is available only on localhost")
+        if not _trusted_ip(_header_hostname(value)):
+            raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
+
+
+def require_local_or_remote_ble_request(request: Request) -> None:
+    """Allow trusted-LAN provisioning or the BLE subset through an opted-in HTTPS tunnel."""
+    try:
+        require_local_request(request)
+        return
+    except HTTPException as local_error:
+        if not get_settings().provisioning_remote_ble_enabled:
+            raise local_error
+
+    host = _header_hostname(request.headers.get("host", ""))
+    source = request.headers.get("origin") or request.headers.get("referer") or ""
+    parsed_source = urlsplit(source)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    fetch_site = request.headers.get("sec-fetch-site", "").lower()
+    if (
+        not host
+        or parsed_source.scheme.lower() != "https"
+        or (parsed_source.hostname or "").lower() != host.lower()
+        or forwarded_proto != "https"
+        or fetch_site not in {"", "same-origin", "none"}
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="remote BLE provisioning requires a same-origin HTTPS tunnel",
+        )

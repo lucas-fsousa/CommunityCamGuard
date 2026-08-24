@@ -215,9 +215,29 @@ header {
 .provisioning-modal hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .provisioning-modal details { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; }
 .provisioning-modal summary { color: var(--muted); cursor: pointer; font-weight: 600; }
+.provisioning-modal details > small { display: block; margin: 7px 0 2px; }
 .provision-inline, .provision-network-row { display: flex; align-items: center; gap: 8px; }
 .provision-inline .label-photo { flex: 1 1 auto; min-width: 0; }
 .provision-network-row select { flex: 1 1 auto; min-width: 0; }
+.provision-manual-network { display: flex; flex-direction: column; gap: 7px; padding: 11px;
+  border: 1px solid var(--accent); border-radius: var(--radius); background: rgba(61,139,253,.06); }
+.provision-manual-network.hidden { display: none; }
+.provision-network-manual-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr); gap: 10px; }
+.provision-network-manual-grid label { display: flex; flex-direction: column; gap: 4px; }
+.provision-network-manual-grid label > span { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.provision-network-manual-grid input, .provision-network-manual-grid select { margin: 0; width: 100%; }
+.provision-locked { color: var(--muted); background: var(--panel-2); cursor: not-allowed; }
+.provision-readiness { display: block; min-height: 18px; }
+.provision-readiness.ready { color: var(--ok); }
+.provision-privileged { display: flex; flex-direction: column; gap: 7px; padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.provision-privileged.hidden { display: none; }
+.provision-qr-box { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); text-align: center; }
+.provision-qr-box.hidden { display: none; }
+.provision-qr { display: block; width: min(320px, 78vw); height: auto; padding: 8px;
+  border-radius: 8px; background: #fff; image-rendering: pixelated; }
 .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .row small { color: var(--muted); }
 
@@ -234,14 +254,21 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
 .rec-side { flex: 0 0 300px; display: flex; flex-direction: column; min-height: 0; }
 .rec-list { flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
 .rec-pager { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding-top: 8px; }
-.rec-main { flex: 1 1 auto; min-width: 0; display: flex; }
-.rec-player { width: 100%; height: 100%; background: #000; border-radius: var(--radius);
+.rec-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rec-player { width: 100%; min-height: 0; flex: 1 1 auto; background: #000; border-radius: var(--radius);
   border: 1px solid var(--line); object-fit: contain; }
-.rec-row { display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.rec-playback-state { min-height: 16px; flex: 0 0 auto; text-align: center; }
+.rec-row { display: flex; align-items: center; gap: 8px;
+  padding: 7px 7px 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.rec-row-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .rec-row:hover { background: var(--panel-2); color: var(--accent); }
 .rec-row.active { background: var(--panel-2); outline: 1px solid var(--accent); outline-offset: -1px; }
 .rec-row small { color: var(--muted); }
+.rec-download { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px;
+  color: var(--muted); text-decoration: none; border: 1px solid transparent; border-radius: 7px; opacity: .55; }
+.rec-download .icon { width: 16px; height: 16px; }
+.rec-row:hover .rec-download, .rec-row.active .rec-download, .rec-download:focus-visible { opacity: 1; }
+.rec-download:hover, .rec-download:focus-visible { color: var(--accent); border-color: var(--accent); background: var(--panel); }
 
 /* ---------------------------------------------------------------------------------
    Responsive / mobile. The dashboard is expected to be opened from phones, so below
@@ -284,6 +311,7 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   .brand-text { display: none; }
   .modal-card { width: 94vw; }
   .provision-grid { grid-template-columns: 1fr; }
+  .provision-network-manual-grid { grid-template-columns: 1fr; }
 }
 
 /* Frontend build badge — tiny, fixed, unobtrusive; shows which asset version the browser loaded. */

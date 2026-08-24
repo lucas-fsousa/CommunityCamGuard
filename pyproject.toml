@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "python-multipart>=0.0.9",
     "itsdangerous>=2.1",
+    "qrcode>=8.0",
     "cryptography>=42",
     "websockets>=12",   # WS client for the go2rtc signalling proxy (routes.go2rtc_ws)
 ]

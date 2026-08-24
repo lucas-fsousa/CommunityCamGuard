@@ -1,6 +1,7 @@
 import { t } from "ccg/i18n";
 import { api, el, state, svgIcon } from "ccg/core";
 import { capBadges, probeBtn, removeBtn } from "ccg/live";
+import { connectProvisioningCamera, supportsWebBluetooth } from "ccg/provisioning-ble";
 
 let loadCameras = async () => {};
 let setView = () => {};
@@ -16,12 +17,12 @@ function browserIsLoopback() {
 }
 
 export async function loadProvisioningStatus() {
-  if (!browserIsLoopback()) {
-    state.provisioning = { local_only: true, blocked: true };
-    return;
-  }
   try { state.provisioning = await api("/provisioning/status"); }
   catch (err) { state.provisioning = { local_only: true, blocked: true, error: err.message }; }
+}
+
+function browserCanProvision() {
+  return Boolean(state.provisioning?.transport_ready) && !state.provisioning?.blocked;
 }
 
 // --- Cameras view: scan + configuration --------------------------------------------
@@ -111,52 +112,166 @@ function configuredCard(cam) {
 // Factory-new onboarding lives in a compact on-demand modal. A label photo is decoded in this
 // browser and never uploaded. Wi-Fi names are read-only options returned by the local server.
 function openProvisioningModal() {
-  if (!browserIsLoopback() || (state.provisioning && state.provisioning.blocked)) return;
+  if (!browserCanProvision() || (state.provisioning && state.provisioning.blocked)) return;
 
   const label = el("input", { placeholder: t("provision.label"), autocomplete: "off" });
   const deviceId = el("input", { placeholder: t("provision.deviceId"), inputMode: "numeric", autocomplete: "off" });
   const capability = el("input", { placeholder: t("provision.capability"), autocomplete: "off" });
   const firmware = el("input", { placeholder: t("provision.firmware"), autocomplete: "off" });
   const mac = el("input", { placeholder: t("provision.mac"), autocomplete: "off" });
-  const name = el("input", { placeholder: t("add.namePlaceholder"), autocomplete: "off" });
   const network = el("select", { disabled: true });
+  const manualSsid = el("input", { placeholder: t("provision.manualSsid"), autocomplete: "off" });
+  const manualSecurity = el("select", {},
+    el("option", { value: "wpa", textContent: "WPA/WPA2" }),
+    el("option", { value: "open", textContent: t("provision.openNetwork") }),
+    el("option", { value: "wep", textContent: "WEP" }));
   const password = el("input", { placeholder: t("provision.wifiPassword"), type: "password",
-    autocomplete: "new-password", disabled: true });
-  const photo = el("input", { type: "file", accept: "image/*", capture: "environment", className: "label-photo" });
+    autocomplete: "new-password" });
+  const photo = el("input", { type: "file", accept: "image/*", capture: "environment",
+    className: "label-photo", title: t("provision.photo"), ariaLabel: t("provision.photo") });
   const result = el("p", { className: "provision-result muted" });
   const error = el("p", { className: "error" });
   const networkError = el("small", { className: "muted" });
-  const inspect = el("button", { textContent: t("provision.inspect") });
+  const manualHint = el("small", { className: "muted" });
+  const readiness = el("small", { className: "provision-readiness muted" });
+  const qrBox = el("div", { className: "provision-qr-box hidden" });
   const refreshNetworks = el("button", { textContent: t("provision.refreshNetworks") });
   const transportReady = Boolean(state.provisioning && state.provisioning.transport_ready);
+  const bleHandshakeReady = state.provisioning?.transports?.bluetooth === "handshake-ready";
+  const remoteBle = !browserIsLoopback() && Boolean(state.provisioning?.remote_ble_enabled);
   const start = el("button", { className: "btn-primary", textContent: t("provision.start"), disabled: true });
+  const findBluetooth = el("button", { textContent: t("provision.findBluetooth"), disabled: true });
+  const manualFields = [deviceId, capability, firmware, mac];
+  const manualNetworkPanel = el("section", { className: "provision-manual-network hidden" },
+    el("strong", { textContent: t("provision.manualWifiTitle") }),
+    el("small", { className: "muted", textContent: t("provision.manualWifiDescription") }),
+    el("div", { className: "provision-network-manual-grid" },
+      el("label", {}, el("span", { textContent: t("provision.manualSsidLabel") }), manualSsid),
+      el("label", {}, el("span", { textContent: t("provision.securityLabel") }), manualSecurity)),
+    el("small", { className: "muted", textContent: t("provision.twoGhzHint") }));
+  let qrUrl = "";
+  let manualNetworkMode = false;
+  let identityValid = false;
+  let validatingIdentity = false;
+  let validationTimer = 0;
+  let validationVersion = 0;
+  let bleConnecting = false;
+  let bleSession = null;
+  let bleWaiter = null;
+  const bleInbox = new Map();
+  let bleProvisioningPending = false;
+  let bleAttemptId = "";
+  let bleStage = "";
+  let bleFinishFrames = [];
+  let wifiConfigured = false;
+
+  const clearQr = () => {
+    if (qrUrl) URL.revokeObjectURL(qrUrl);
+    qrUrl = "";
+    qrBox.replaceChildren();
+    qrBox.classList.add("hidden");
+  };
+
+  const privilegedStatus = el("small", { className: "muted" });
+  const finishWifiOnly = el("button", { textContent: t("provision.finishWifiOnly"), disabled: true });
+  const bindPrivileged = el("button", {
+    className: "btn-primary", textContent: t("provision.bindPrivileged"), disabled: true,
+  });
+  privilegedStatus.textContent = t("provision.privilegedPending");
+  const privilegedPanel = el("section", { className: "provision-privileged" },
+    el("strong", { textContent: t("provision.privilegedTitle") }),
+    el("small", { className: "muted", textContent: t("provision.privilegedDescription") }),
+    privilegedStatus,
+    el("div", { className: "provision-actions" }, finishWifiOnly, bindPrivileged));
+
+  const finishBluetooth = async () => {
+    if (bleSession && bleFinishFrames.length) {
+      await bleSession.writeFrames(encodedFrames(bleFinishFrames));
+    }
+    bleSession?.disconnect();
+    bleSession = null;
+    bleFinishFrames = [];
+    privilegedPanel.classList.add("hidden");
+  };
 
   const identityPayload = () => ({
     label: label.value.trim(), device_id: deviceId.value.trim(),
     capability_code: capability.value.trim(), firmware_version: firmware.value.trim(), mac: mac.value.trim(),
   });
+  const identityHasEnoughInput = () => Boolean(
+    label.value.trim() || (deviceId.value.trim().length >= 6 && capability.value.trim()),
+  );
+  const selectedNetworkNeedsPassword = () => {
+    if (manualNetworkMode) return manualSecurity.value !== "open";
+    const security = (network.selectedOptions[0]?.dataset.security || "").trim().toLowerCase();
+    return !["--", "open", "none"].includes(security);
+  };
+  const updateManualState = () => {
+    const locked = Boolean(label.value.trim() || (photo.files && photo.files.length));
+    manualFields.forEach((field) => {
+      field.readOnly = locked;
+      field.classList.toggle("provision-locked", locked);
+    });
+    manualHint.textContent = t(locked ? "provision.manualLocked" : "provision.manualAvailable");
+  };
   const updateStart = () => {
-    const networkReady = Boolean(network.value);
-    password.disabled = !networkReady;
-    start.disabled = !transportReady || !networkReady;
-    start.title = transportReady ? "" : t("provision.transportPending");
+    start.textContent = bleSession && bleHandshakeReady
+      ? t("provision.startBluetooth") : t("provision.start");
+    findBluetooth.disabled = !supportsWebBluetooth() || validatingIdentity || !identityValid || bleConnecting;
+    findBluetooth.title = supportsWebBluetooth() ? "" : t("provision.bluetoothUnavailable");
+    if (wifiConfigured) {
+      start.disabled = true;
+      start.title = "";
+      readiness.textContent = t("provision.wifiStageComplete");
+      readiness.classList.add("ready");
+      return;
+    }
+    if (qrUrl) {
+      start.disabled = true;
+      start.title = "";
+      readiness.textContent = t("provision.qrReady");
+      readiness.classList.add("ready");
+      return;
+    }
+    const networkReady = manualNetworkMode ? Boolean(manualSsid.value.trim()) : Boolean(network.value);
+    let reason = "";
+    if (!transportReady) reason = t("provision.transportPending");
+    else if (bleProvisioningPending) reason = t("provision.bluetoothWaitingLan");
+    else if (remoteBle && !bleSession) reason = t("provision.connectBluetoothFirst");
+    else if (validatingIdentity) reason = t("provision.inspecting");
+    else if (!identityValid) reason = t("provision.needIdentity");
+    else if (!networkReady) reason = t("provision.needNetwork");
+    else if (selectedNetworkNeedsPassword() && !password.value) reason = t("provision.needPassword");
+    start.disabled = Boolean(reason);
+    start.title = reason;
+    readiness.textContent = reason || t("provision.ready");
+    readiness.classList.toggle("ready", !reason);
   };
 
   async function scanNetworks() {
-    refreshNetworks.disabled = true; network.disabled = true; networkError.textContent = "";
+    clearQr(); refreshNetworks.disabled = true; network.disabled = true; networkError.textContent = "";
+    manualNetworkMode = false; manualNetworkPanel.classList.add("hidden"); network.hidden = false;
     network.replaceChildren(el("option", { value: "", textContent: t("provision.scanningNetworks") }));
     try {
       const response = await api("/provisioning/networks");
       network.replaceChildren();
       if (!response.networks.length) {
         network.append(el("option", { value: "", textContent: t("provision.noNetworks") }));
-        networkError.textContent = t("provision.noWifiRadio");
+        manualNetworkMode = Boolean(response.manual_entry_allowed);
+        manualNetworkPanel.classList.toggle("hidden", !manualNetworkMode);
+        network.hidden = manualNetworkMode;
+        networkError.textContent = t(manualNetworkMode ? "provision.manualWifiEnabled" : "provision.noWifiRadio");
       } else {
         network.append(el("option", { value: "", textContent: t("provision.chooseNetwork") }));
-        response.networks.forEach((item) => network.append(el("option", {
-          value: item.id,
-          textContent: `${item.ssid} · ${item.signal}%${item.security ? ` · ${item.security}` : ""}`,
-        })));
+        response.networks.forEach((item) => {
+          const option = el("option", {
+            value: item.id,
+            textContent: `${item.ssid} · ${item.signal}%${item.security ? ` · ${item.security}` : ""}`,
+          });
+          option.dataset.security = item.security || "";
+          option.dataset.ssid = item.ssid || "";
+          network.append(option);
+        });
         network.disabled = false;
       }
     } catch (err) {
@@ -165,22 +280,48 @@ function openProvisioningModal() {
     } finally { refreshNetworks.disabled = false; updateStart(); }
   }
 
-  async function inspectIdentity() {
-    error.textContent = ""; result.textContent = t("provision.inspecting"); inspect.disabled = true;
+  async function inspectIdentity(version) {
+    validatingIdentity = true; error.textContent = ""; result.textContent = t("provision.inspecting"); updateStart();
     try {
       const info = await api("/provisioning/inspect", { method: "POST", body: JSON.stringify(identityPayload()) });
+      if (version !== validationVersion) return null;
       deviceId.value = info.device_id; capability.value = info.capability_code;
       if (info.firmware_version) firmware.value = info.firmware_version;
       if (info.mac) mac.value = info.mac;
+      identityValid = true;
       result.textContent = t("provision.valid", { id: info.device_id, modes: info.setup_modes.join(", ") });
       return info;
-    } catch (err) { result.textContent = ""; error.textContent = err.message; return null; }
-    finally { inspect.disabled = false; }
+    } catch (err) {
+      if (version === validationVersion) {
+        identityValid = false; result.textContent = ""; error.textContent = err.message;
+      }
+      return null;
+    } finally {
+      if (version === validationVersion) { validatingIdentity = false; updateStart(); }
+    }
+  }
+
+  function scheduleIdentityInspection(immediate = false) {
+    window.clearTimeout(validationTimer);
+    const version = ++validationVersion;
+    identityValid = false;
+    validatingIdentity = false;
+    error.textContent = "";
+    clearQr();
+    if (!identityHasEnoughInput()) {
+      result.textContent = "";
+      updateStart();
+      return;
+    }
+    validationTimer = window.setTimeout(() => void inspectIdentity(version), immediate ? 0 : 450);
+    updateStart();
   }
 
   photo.addEventListener("change", async () => {
     const file = photo.files && photo.files[0];
     if (!file) return;
+    window.clearTimeout(validationTimer); ++validationVersion;
+    updateManualState(); identityValid = false; clearQr(); updateStart();
     error.textContent = ""; result.textContent = t("provision.decoding");
     try {
       if (!("BarcodeDetector" in window)) throw new Error(t("provision.noDecoder"));
@@ -189,45 +330,343 @@ function openProvisioningModal() {
       bitmap.close?.();
       const qr = codes.find((code) => code.rawValue)?.rawValue;
       if (!qr) throw new Error(t("provision.noQr"));
-      label.value = qr; await inspectIdentity();
+      label.value = qr; updateManualState(); scheduleIdentityInspection(true);
     } catch (err) { result.textContent = ""; error.textContent = err.message; }
-    finally { photo.value = ""; }
+    finally { photo.value = ""; updateManualState(); }
   });
-  inspect.addEventListener("click", inspectIdentity);
+  label.addEventListener("input", () => { updateManualState(); scheduleIdentityInspection(); });
+  manualFields.forEach((field) => field.addEventListener("input", () => scheduleIdentityInspection()));
   refreshNetworks.addEventListener("click", scanNetworks);
-  network.addEventListener("change", updateStart);
-  start.addEventListener("click", async () => {
-    error.textContent = ""; result.textContent = ""; start.disabled = true;
+  network.addEventListener("change", () => { clearQr(); updateStart(); });
+  manualSsid.addEventListener("input", () => { clearQr(); updateStart(); });
+  manualSecurity.addEventListener("change", () => { clearQr(); updateStart(); });
+  password.addEventListener("input", () => { clearQr(); updateStart(); });
+
+  const encodedFrames = (frames) => (frames || []).map((encoded) => {
+    const raw = atob(encoded);
+    return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+  });
+  const encodeBytes = (bytes) => {
+    let binary = "";
+    for (const byte of bytes || []) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  };
+  const decodeBleResponse = (message) => api("/provisioning/ble/decode-response", {
+    method: "POST",
+    body: JSON.stringify({
+      ...identityPayload(), attempt_id: bleAttemptId,
+      command: message.command, encrypted: message.encrypted,
+      time_area: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      time_zone: -new Date().getTimezoneOffset() * 60,
+      data_base64: encodeBytes(message.data),
+    }),
+  });
+  const collectSsids = (value, found = []) => {
+    if (Array.isArray(value)) value.forEach((item) => collectSsids(item, found));
+    else if (value && typeof value === "object") {
+      Object.entries(value).forEach(([key, item]) => {
+        if (key.toLowerCase() === "ssid" && typeof item === "string") found.push(item);
+        else collectSsids(item, found);
+      });
+    }
+    return found;
+  };
+  const onBleNotification = (_frame, message, notificationError) => {
+    if (notificationError) {
+      if (!bleWaiter) return;
+      const waiter = bleWaiter; bleWaiter = null; window.clearTimeout(waiter.timer);
+      waiter.reject(notificationError); return;
+    }
+    if (!message) return;
+    if (bleWaiter && message.command === bleWaiter.command) {
+      const waiter = bleWaiter; bleWaiter = null; window.clearTimeout(waiter.timer);
+      waiter.resolve(message);
+      return;
+    }
+    const queued = bleInbox.get(message.command) || [];
+    queued.push(message);
+    bleInbox.set(message.command, queued.slice(-4));
+  };
+  const waitForBleStage = (expectedCommand, timeout = 12000) => new Promise((resolve, reject) => {
+    const queued = bleInbox.get(expectedCommand) || [];
+    if (queued.length) {
+      const message = queued.shift();
+      if (queued.length) bleInbox.set(expectedCommand, queued);
+      else bleInbox.delete(expectedCommand);
+      resolve(message);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (bleWaiter?.command !== expectedCommand) return;
+      bleWaiter = null;
+      reject(new Error(t("provision.bluetoothTimeout")));
+    }, timeout);
+    bleWaiter = { command: expectedCommand, resolve, reject, timer };
+  });
+  const takeQueuedBleStage = (expectedCommand) => {
+    const queued = bleInbox.get(expectedCommand) || [];
+    if (!queued.length) return null;
+    const message = queued.shift();
+    if (queued.length) bleInbox.set(expectedCommand, queued);
+    else bleInbox.delete(expectedCommand);
+    return message;
+  };
+  const exchangeBleStage = (frames, expectedCommand) => new Promise((resolve, reject) => {
+    if (!bleSession) { reject(new Error(t("provision.bluetoothDisconnected"))); return; }
+    const timer = window.setTimeout(() => {
+      if (bleWaiter?.command !== expectedCommand) return;
+      bleWaiter = null;
+      reject(new Error(t("provision.bluetoothTimeout")));
+    }, 12000);
+    bleWaiter = { command: expectedCommand, resolve, reject, timer };
+    bleSession.writeFrames(encodedFrames(frames)).catch((writeError) => {
+      if (bleWaiter?.command === expectedCommand) bleWaiter = null;
+      window.clearTimeout(timer); reject(writeError);
+    });
+  });
+
+  findBluetooth.addEventListener("click", async () => {
+    clearQr(); bleConnecting = true; error.textContent = "";
+    result.textContent = t("provision.bluetoothSearching"); updateStart();
     try {
-      await api("/provisioning/start", { method: "POST", body: JSON.stringify({
-        ...identityPayload(), wifi_network_id: network.value, wifi_password: password.value, name: name.value,
+      if (!supportsWebBluetooth()) throw new Error(t("provision.bluetoothUnavailable"));
+      bleSession?.disconnect();
+      bleSession = null;
+      bleSession = await connectProvisioningCamera(deviceId.value, onBleNotification);
+      result.textContent = t("provision.bluetoothConnected", { name: bleSession.device.name || deviceId.value });
+      privilegedPanel.classList.remove("hidden");
+      privilegedStatus.textContent = t("provision.privilegedPending");
+    } catch (err) {
+      result.textContent = "";
+      if (err.name !== "NotFoundError") error.textContent = err.message;
+    } finally { bleConnecting = false; updateStart(); }
+  });
+  finishWifiOnly.addEventListener("click", async () => {
+    finishWifiOnly.disabled = true; bindPrivileged.disabled = true; error.textContent = "";
+    try {
+      await finishBluetooth();
+      result.textContent = t("provision.bluetoothConfigured");
+    } catch (err) {
+      error.textContent = err.message;
+      finishWifiOnly.disabled = false; bindPrivileged.disabled = false;
+    }
+  });
+  bindPrivileged.addEventListener("click", async () => {
+    finishWifiOnly.disabled = true; bindPrivileged.disabled = true; error.textContent = "";
+    privilegedStatus.textContent = t("provision.bindingPrivileged");
+    try {
+      const response = await api("/provisioning/privileged/bind", {
+        method: "POST",
+        body: JSON.stringify({
+          ...identityPayload(),
+          time_area: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          time_zone: -new Date().getTimezoneOffset() * 60,
+        }),
+      });
+      if (response.p2p_binding !== "bound") throw new Error(t("provision.privilegedBindInvalid"));
+      try {
+        await finishBluetooth();
+        result.textContent = t("provision.privilegedBound");
+      } catch (finishError) {
+        // The account link has already succeeded. A failed optional 0x88 write must not invite a
+        // duplicate bind; disconnect the browser transport and continue with P2P confirmation.
+        bleSession?.disconnect(); bleSession = null; bleFinishFrames = [];
+        privilegedPanel.classList.add("hidden");
+        result.textContent = t("provision.privilegedBoundFinishFailed", {
+          message: finishError.message,
+        });
+      }
+    } catch (err) {
+      privilegedStatus.textContent = "";
+      error.textContent = err.message;
+      finishWifiOnly.disabled = false; bindPrivileged.disabled = false;
+    }
+  });
+  start.addEventListener("click", async () => {
+    error.textContent = ""; result.textContent = ""; start.disabled = true; clearQr(); bleStage = "";
+    try {
+      let networkId = network.value;
+      if (manualNetworkMode) {
+        const signed = await api("/provisioning/networks/manual", { method: "POST", body: JSON.stringify({
+          ssid: manualSsid.value, security: manualSecurity.value,
+        }) });
+        networkId = signed.network.id;
+      }
+      if (bleSession && bleHandshakeReady) {
+        bleProvisioningPending = true;
+        bleInbox.clear();
+        result.textContent = t("provision.bluetoothSending");
+        const prepared = await api("/provisioning/ble/prepare", { method: "POST", body: JSON.stringify({
+          ...identityPayload(), wifi_network_id: networkId, wifi_password: password.value,
+        }) });
+        if (!prepared.attempt_id) throw new Error(t("provision.bluetoothAttemptMissing"));
+        bleAttemptId = prepared.attempt_id;
+        bleStage = t("provision.bluetoothStageChallenge");
+        result.textContent = bleStage;
+        const challengeMessage = await exchangeBleStage(
+          prepared.frames.challenge, prepared.expected_responses.challenge,
+        );
+        const challengeReply = await decodeBleResponse(challengeMessage);
+        if (challengeReply.valid !== true) {
+          throw new Error(t("provision.bluetoothHandshakeInvalid"));
+        }
+        // The vendor client changes activities after 0x71. Besides UI navigation, that gives the
+        // low-power firmware time to install the newly negotiated TanKey before encrypted 0x80.
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+        bleStage = t("provision.bluetoothStageLinkType");
+        result.textContent = bleStage;
+        // ChooseLinkTypeActivity sends this command and navigates immediately; its write callback
+        // reports only queue success and never waits for 0x73. Some firmware does not emit 0x73
+        // here at all. Blocking on it prevents the later SSID/password command from ever running.
+        await bleSession.writeFrames(encodedFrames(prepared.frames.link_type));
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        bleStage = t("provision.bluetoothStageWifiScan");
+        result.textContent = bleStage;
+        const wifiMessage = await exchangeBleStage(
+          prepared.frames.wifi_list, prepared.expected_responses.wifi_list,
+        );
+        const wifiReply = await decodeBleResponse(wifiMessage);
+        if (!wifiReply.json) {
+          throw new Error(t("provision.bluetoothWifiListInvalid"));
+        }
+        const visibleSsids = [...new Set(collectSsids(wifiReply.json))];
+        const requestedSsid = manualNetworkMode
+          ? manualSsid.value.trim() : network.selectedOptions[0]?.dataset.ssid || "";
+        if (requestedSsid && !visibleSsids.includes(requestedSsid)) {
+          throw new Error(t("provision.bluetoothSsidNotVisible", { ssid: requestedSsid }));
+        }
+        bleStage = t("provision.bluetoothStageWifiConfig");
+        result.textContent = bleStage;
+        const configMessage = await exchangeBleStage(
+          prepared.frames.wifi_config, prepared.expected_responses.wifi_config_ack,
+        );
+        const configReply = await decodeBleResponse(configMessage);
+        if (configReply.configuration_acknowledged !== true) {
+          throw new Error(t("provision.bluetoothConfigNotAcknowledged"));
+        }
+        // This mirrors WaitDeviceOnlineActivity exactly. 0x83 is only an ACK/echo. The APK then
+        // races asynchronous 0x85 against a read-only devresult lookup of the same configToken.
+        // Firmware is allowed to complete through either path; account binding remains explicit.
+        let connectionReply = null;
+        for (let attempt = 1; !connectionReply && attempt <= 36; attempt += 1) {
+          bleStage = t("provision.bluetoothStageWifiConfirmation");
+          result.textContent = t("provision.bluetoothWaitingWifi", { attempt, total: 36 });
+          const bleResult = takeQueuedBleStage(prepared.expected_responses.wifi_connection);
+          if (bleResult) {
+            const decoded = await decodeBleResponse(bleResult);
+            if (decoded.wifi_connection?.connected) connectionReply = decoded;
+            else if (decoded.wifi_connection) {
+              throw new Error(t("provision.bluetoothWifiRejected", {
+                status: decoded.wifi_connection.status,
+              }));
+            }
+          }
+          if (!connectionReply) {
+            let online = null;
+            try {
+              online = await api("/provisioning/privileged/online-status", {
+                method: "POST",
+                body: JSON.stringify({ ...identityPayload(), attempt_id: bleAttemptId }),
+              });
+            } catch (statusError) {
+              // ConfigNetOnlineStatusProxy ignores transient HTTP failures and asks again on its
+              // next five-second tick. Preserve that behavior while the BLE 0x85 path stays live.
+              console.warn("[CCG BLE] post-Wi-Fi status query failed", statusError);
+            }
+            if (online?.online && online.privileged_handoff_ready) {
+              connectionReply = { wifi_connection: {
+                connected: true,
+                status: 0,
+                privileged_handoff_ready: true,
+              } };
+            } else if (online?.terminal_failure) {
+              throw new Error(t("provision.bluetoothWifiRejected", { status: 0 }));
+            }
+          }
+          if (!connectionReply && attempt < 36) {
+            await new Promise((resolve) => window.setTimeout(resolve, 5000));
+          }
+        }
+        if (!connectionReply?.wifi_connection?.connected) {
+          throw new Error(t("provision.bluetoothFinalResponseMissing"));
+        }
+        password.value = "";
+        wifiConfigured = true;
+        bleFinishFrames = prepared.frames.finish || [];
+        finishWifiOnly.disabled = false;
+        start.hidden = true;
+        findBluetooth.hidden = true;
+        privilegedPanel.classList.remove("hidden");
+        const handoffReady = connectionReply.wifi_connection.privileged_handoff_ready === true;
+        bindPrivileged.disabled = !handoffReady;
+        privilegedStatus.textContent = t(handoffReady
+          ? "provision.privilegedReady" : "provision.privilegedUnavailable");
+        result.textContent = t("provision.wifiConnected");
+        updateStart();
+        return;
+      }
+      const response = await api("/provisioning/start", { method: "POST", body: JSON.stringify({
+        ...identityPayload(), wifi_network_id: networkId, wifi_password: password.value,
       }) });
-      password.value = ""; result.textContent = t("provision.started");
-    } catch (err) { error.textContent = err.message; }
-    finally { updateStart(); }
+      const encoded = response.qr && response.qr.data_base64;
+      if (!encoded) throw new Error(t("provision.qrMissing"));
+      const raw = atob(encoded);
+      const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
+      qrUrl = URL.createObjectURL(new Blob([bytes], { type: response.qr.mime_type || "image/svg+xml" }));
+      qrBox.replaceChildren(
+        el("img", { className: "provision-qr", src: qrUrl, alt: t("provision.qrAlt") }),
+        el("strong", { textContent: t("provision.qrInstruction") }),
+        el("small", { className: "muted", textContent: t("provision.experimental") }),
+      );
+      qrBox.classList.remove("hidden");
+      password.value = ""; result.textContent = "";
+    } catch (err) {
+      error.textContent = bleStage
+        ? t("provision.bluetoothStageFailed", { stage: bleStage, message: err.message })
+        : err.message;
+      if (bleProvisioningPending) {
+        bleSession?.disconnect(); bleSession = null; bleAttemptId = ""; bleInbox.clear();
+        finishWifiOnly.disabled = true; bindPrivileged.disabled = true;
+        privilegedPanel.classList.remove("hidden");
+        privilegedStatus.textContent = t("provision.privilegedPending");
+      }
+    }
+    finally { bleProvisioningPending = false; updateStart(); }
   });
 
   const close = el("button", { className: "icon-btn", textContent: "×", title: t("scan.close") });
   const card = el("div", { className: "card modal-card provisioning-modal" },
     el("div", { className: "modal-head" }, el("h2", { textContent: t("provision.title") }), close),
     el("p", { className: "muted compact", textContent: t("provision.description") }),
+    remoteBle ? el("small", { className: "provision-remote-warning", textContent: t("provision.remoteBle") }) : "",
     label,
-    el("div", { className: "provision-inline" }, photo, inspect),
+    el("div", { className: "provision-inline" }, photo),
     el("details", {}, el("summary", { textContent: t("provision.manualDetails") }),
-      el("div", { className: "provision-grid" }, deviceId, capability, firmware, mac)),
+      manualHint, el("div", { className: "provision-grid" }, deviceId, capability, firmware, mac)),
     el("hr"),
     el("div", { className: "provision-network-row" }, network, refreshNetworks), networkError,
-    name, password,
+    manualNetworkPanel,
+    password,
     el("small", { className: "muted", textContent: t("provision.wifiHint") }),
     !transportReady ? el("small", { className: "muted", textContent: t("provision.transportPending") }) : "",
-    el("div", { className: "provision-actions" }, start), result, error);
+    el("small", { className: "muted", textContent: t("provision.bluetoothPurpose") }),
+    readiness, el("div", { className: "provision-actions" }, findBluetooth, start),
+    privilegedPanel, qrBox, result, error);
   const overlay = el("div", { className: "modal" }, card);
-  const dismiss = () => { password.value = ""; overlay.remove(); document.removeEventListener("keydown", onKey); };
-  const onKey = (event) => { if (event.key === "Escape") dismiss(); };
+  const dismiss = () => {
+    password.value = ""; clearQr(); window.clearTimeout(validationTimer);
+    if (bleWaiter) {
+      window.clearTimeout(bleWaiter.timer);
+      bleWaiter.reject(new Error(t("provision.bluetoothDisconnected")));
+      bleWaiter = null;
+    }
+    bleSession?.disconnect(); overlay.remove();
+    bleInbox.clear();
+  };
   close.addEventListener("click", dismiss);
-  overlay.addEventListener("click", (event) => { if (event.target === overlay) dismiss(); });
-  document.addEventListener("keydown", onKey);
   document.body.append(overlay);
+  updateManualState();
+  updateStart();
   void scanNetworks();
 }
 
@@ -243,8 +682,8 @@ export function renderCameras(stage) {
     disabled: _scanning, innerHTML: svgIcon("i-scan") + `<span>${t("nav.scan")}</span>` });
   scan.addEventListener("click", runScan);
   const setup = el("button", {
-    disabled: !browserIsLoopback() || Boolean(state.provisioning && state.provisioning.blocked),
-    title: browserIsLoopback() ? t("provision.open") : t("provision.localOnly"),
+    disabled: !browserCanProvision() || Boolean(state.provisioning && state.provisioning.blocked),
+    title: browserCanProvision() ? t("provision.open") : t("provision.localOnly"),
     innerHTML: svgIcon("i-cam") + `<span>${t("provision.open")}</span>`,
   });
   setup.addEventListener("click", openProvisioningModal);
