@@ -11,6 +11,7 @@ laboratory.  Secrets are accepted as decoded values and never logged or included
 
 from __future__ import annotations
 
+import json
 import secrets
 import socket
 import struct
@@ -32,6 +33,53 @@ from .crypto import (
 
 LIST_HOST = "list.iotvideo.tencentcs.com"
 LIST_PORT = 51701
+
+# Every entry is queried with the read-only B7 family. Action roots describe capabilities here;
+# they are never invoked with the AC action family in this module.
+MODEL_READ_PATHS = frozenset(
+    {
+        "ProConst._productInfo",
+        "ProConst._versionInfo",
+        "ProConst.devFuncCfg",
+        "ProConst.devFunCode",
+        "ProReadonly._online",
+        "ProReadonly.sysVer",
+        "ProReadonly.connectInfo",
+        "ProReadonly.power",
+        "ProReadonly.simCard",
+        "ProReadonly.devInfo",
+        "ProReadonly.tfInfo",
+        "ProReadonly.aiModeDownL",
+        "ProWritable._almEvtSetting",
+        "ProWritable._otaMode",
+        "ProWritable.timeZone",
+        "ProWritable.onvifEn",
+        "ProWritable.recordParm",
+        "ProWritable.guardParm",
+        "ProWritable.videoParm",
+        "ProWritable.csVideoRes",
+        "ProWritable.nightViewModeV2",
+        "ProWritable.motionZone",
+        "ProWritable.workMode",
+        "ProWritable.pressKeyCall",
+        "ProWritable.screenSwitch",
+        "ProWritable.antiFlickerSwitch",
+        "ProWritable.volume",
+        "ProWritable.indicatorLight",
+        "ProWritable.audioMode",
+        "ProWritable.whiteLightPlan",
+        "ProWritable.autoWhiteLight",
+        "ProWritable.autoWorkMode",
+        "ProWritable.resFile",
+        "ProWritable.whiteLightCtrl",
+        "ProWritable.zoomFocusW",
+        "Action.whiteLightCtrl",
+        "Action.expelCtrl",
+        "Action.laserCtrl",
+        "Action.ptzCheck",
+        "Action.zoomFocusA",
+    }
+)
 
 
 class P2PProbeError(RuntimeError):
@@ -95,6 +143,7 @@ class CallingResult:
     direct_handshake: bool
     error_code: int | None
     peer_endpoint: tuple[str, int] | None
+    next_sequence: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +158,24 @@ class P2PRouteProbe:
     direct_handshake: bool
     camera_contacted: bool
     broker_error_code: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class ModelReadResult:
+    transport_acknowledged: bool
+    error_code: int | None
+    value: object | None
+
+
+@dataclass(frozen=True, slots=True)
+class P2PPropertyRead:
+    device_id: str
+    property_path: str
+    authenticated: bool
+    direct_handshake: bool
+    transport_acknowledged: bool
+    error_code: int | None
+    value: object | None
 
 
 def hash_string(data: bytes) -> int:
@@ -337,6 +404,80 @@ def parse_term_dns(wire: bytes, node: CertifiedNode, expected_term: str) -> tupl
     if domain != expected_term:
         raise ValueError("TermDNS response does not match the requested term")
     return frame[0x1C:0x20], struct.unpack_from("<I", frame, 0x20)[0]
+
+
+def build_model_read(
+    node: CertifiedNode,
+    device_id: int,
+    path: str,
+    sequence: int,
+    message_id: int,
+) -> bytes:
+    """Build one allowlisted, read-only GDM B7 property request."""
+    if path not in MODEL_READ_PATHS:
+        raise ValueError("thing-model path is not in the read-only allowlist")
+    encoded_path = path.encode("utf-8")
+    frame = _new_header(
+        0xB7,
+        0x26 + len(encoded_path) + 1,
+        node.session_id,
+        sequence,
+        _randomized_flags(mode=2, proc=3),
+    )
+    frame[0] = 0x7E
+    struct.pack_into("<Q", frame, 0x18, device_id)
+    struct.pack_into("<I", frame, 0x20, message_id & 0x7FFFFFFF)
+    struct.pack_into("<H", frame, 0x24, len(encoded_path))
+    frame[0x26 : 0x26 + len(encoded_path)] = encoded_path
+    return _finish_mode2(frame, node.session_key)
+
+
+def parse_model_read_response(frame: bytes, device_id: int) -> tuple[int, object | None] | None:
+    """Parse direct B8 or access-node cached AA GDM responses."""
+    if len(frame) < 0x26 or frame[1] not in (0xAA, 0xB8):
+        return None
+    if struct.unpack_from("<Q", frame, 0x18)[0] != device_id:
+        return None
+    error_code = struct.unpack_from("<H", frame, 0x24)[0]
+    if not (frame[0x20] & 1):
+        return error_code, None
+    if len(frame) < 0x28:
+        return None
+    json_length = struct.unpack_from("<H", frame, 0x26)[0]
+    if 0x28 + json_length > len(frame):
+        return None
+    try:
+        value = json.loads(frame[0x28 : 0x28 + json_length].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return error_code, value
+
+
+def parse_model_report(frame: bytes) -> tuple[int | None, str, object] | None:
+    """Parse a brokered AA property report without accepting an action response."""
+    if len(frame) < 0x22 or frame[1] != 0xAA:
+        return None
+    options = struct.unpack_from("<H", frame, 0x1C)[0]
+    path_length = frame[0x1F] + 1
+    json_length = struct.unpack_from("<H", frame, 0x20)[0] + 1
+    cursor = 0x22
+    destination = None
+    if options & 1:
+        if cursor + 8 > len(frame):
+            return None
+        destination = struct.unpack_from("<Q", frame, cursor)[0]
+        cursor += 8
+    if cursor + path_length + json_length > len(frame):
+        return None
+    encoded_path = frame[cursor : cursor + path_length].rstrip(b"\x00")
+    cursor += path_length
+    encoded_json = frame[cursor : cursor + json_length].rstrip(b"\x00")
+    try:
+        path = encoded_path.decode("utf-8")
+        value = json.loads(encoded_json.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return (destination, path, value) if path else None
 
 
 def build_mode2_response_ack(node: CertifiedNode, response: bytes) -> bytes:
@@ -682,6 +823,7 @@ def call_device(
     direct_handshake = False
     error_code = None
     peer_endpoint = None
+    next_sequence = node.next_sequence
     nat_online = build_nat_online(access_id, device.device_id, attempt.link_id)
     nat_ack = build_nat_online_ack(access_id, attempt.link_id)
 
@@ -689,6 +831,7 @@ def call_device(
         if deadline is not None and time.monotonic() >= deadline:
             break
         sequence = (node.next_sequence + retry) & 0xFFFFFFFF
+        next_sequence = (sequence + 1) & 0xFFFFFFFF
         sock.sendto(
             build_calling_request(
                 node,
@@ -745,6 +888,138 @@ def call_device(
         direct_handshake=direct_handshake,
         error_code=error_code,
         peer_endpoint=peer_endpoint,
+        next_sequence=next_sequence,
+    )
+
+
+def exchange_model_read(
+    sock: socket.socket,
+    node: CertifiedNode,
+    device: OnlineDevice,
+    path: str,
+    sequence: int,
+    timeout: float,
+    *,
+    retries: int = 3,
+    deadline: float | None = None,
+) -> ModelReadResult:
+    """Read one allowlisted property; this function cannot construct writes or actions."""
+    if retries < 1:
+        raise ValueError("model-read retries must be positive")
+    request = build_model_read(node, device.device_id, path, sequence, secrets.randbits(31))
+    transport_acknowledged = False
+    error_code = None
+    value = None
+    for _retry in range(retries):
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        sock.sendto(request, node.address)
+        receive_until = time.monotonic() + timeout
+        if deadline is not None:
+            receive_until = min(receive_until, deadline)
+        for wire, peer in _receive(sock, receive_until):
+            if peer != node.address:
+                continue
+            plain = _decrypt_node_frame(wire, node)
+            if plain is None:
+                continue
+            flags = struct.unpack_from("<I", plain, 0x14)[0]
+            if flags & (1 << 20):
+                if plain[1] == 0xB7:
+                    transport_acknowledged = True
+                continue
+            report = parse_model_report(plain)
+            if report is not None:
+                destination, report_path, report_value = report
+                acknowledge_reliable_node_frame(sock, node, plain)
+                if destination is not None and destination != device.device_id:
+                    continue
+                if (
+                    report_path == path
+                    or report_path.startswith(path + ".")
+                    or path.startswith(report_path + ".")
+                ):
+                    error_code, value = 0, report_value
+                    break
+                continue
+            parsed = parse_model_read_response(plain, device.device_id)
+            acknowledge_reliable_node_frame(sock, node, plain)
+            if parsed is not None:
+                error_code, value = parsed
+                break
+        if error_code is not None:
+            break
+    return ModelReadResult(transport_acknowledged, error_code, value)
+
+
+def read_camera_property(
+    enrollment: P2PEnrollment,
+    property_path: str,
+    *,
+    timeout: float = 1.5,
+    total_timeout: float = 25.0,
+) -> P2PPropertyRead:
+    """Open only the selected target route and perform one allowlisted B7 read."""
+    if property_path not in MODEL_READ_PATHS:
+        raise P2PProbeError("thing-model path is not in the read-only allowlist")
+    bounded_timeout = max(0.5, min(float(timeout), 5.0))
+    deadline = time.monotonic() + max(8.0, min(float(total_timeout), 35.0))
+    material = LoginMaterial(enrollment.access_id, enrollment.access_token)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("", 0))
+    try:
+        endpoints = obtain_list(sock, material.access_id, bounded_timeout)
+        endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
+        node, devices, _skipped = establish_initialized_node(
+            sock,
+            material,
+            endpoints[:8],
+            bounded_timeout,
+            deadline=deadline,
+        )
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise P2PProbeError("P2P property read exhausted its time budget")
+        node = heartbeat_node(sock, node, min(bounded_timeout, remaining))
+        target = next(
+            (device for device in devices if str(device.device_id) == enrollment.device_id),
+            None,
+        )
+        if target is None or not target.status:
+            raise P2PProbeError("selected P2P camera is not online")
+        calling = call_device(
+            sock,
+            node,
+            material.access_id,
+            target,
+            bounded_timeout,
+            deadline=deadline,
+        )
+        if not calling.direct_handshake:
+            raise P2PProbeError("selected P2P camera did not complete the direct handshake")
+        model = exchange_model_read(
+            sock,
+            node,
+            target,
+            property_path,
+            calling.next_sequence,
+            min(5.0, max(0.5, deadline - time.monotonic())),
+            deadline=deadline,
+        )
+    except P2PProbeError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise P2PProbeError("P2P property read failed") from exc
+    finally:
+        sock.close()
+    return P2PPropertyRead(
+        device_id=enrollment.device_id,
+        property_path=property_path,
+        authenticated=True,
+        direct_handshake=True,
+        transport_acknowledged=model.transport_acknowledged,
+        error_code=model.error_code,
+        value=model.value,
     )
 
 

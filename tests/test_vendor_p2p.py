@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import socket
 import struct
+
+import pytest
 
 from backend.app.db.p2p import P2PEnrollment
 from backend.app.vendor_p2p import client
@@ -114,6 +117,52 @@ def test_parse_mtp_peer_endpoint_rejects_another_link():
     assert client.parse_mtp_peer_endpoint(bytes(frame), 124) is None
 
 
+def test_model_read_builder_is_allowlisted_and_contains_no_write_value():
+    node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    wire = client.build_model_read(node, 7000000002, "ProWritable.videoParm", 18, 19)
+    plain = gute_mode2_decrypt(wire, node.session_key)
+
+    assert plain[:2] == b"\x7e\xb7"
+    assert struct.unpack_from("<Q", plain, 0x18)[0] == 7000000002
+    assert plain[0x26:].rstrip(b"\x00") == b"ProWritable.videoParm"
+    with pytest.raises(ValueError, match="allowlist"):
+        client.build_model_read(node, 7000000002, "ProWritable.unknown", 18, 19)
+
+
+def test_model_read_response_requires_the_selected_device():
+    value = {"setVal": {"multiFlip": 1}, "t": 1787545850}
+    encoded = json.dumps(value, separators=(",", ":")).encode()
+    response = bytearray(0x28 + len(encoded))
+    response[:2] = b"\x7e\xb8"
+    struct.pack_into("<Q", response, 0x18, 7000000002)
+    response[0x20] = 1
+    struct.pack_into("<H", response, 0x24, 0)
+    struct.pack_into("<H", response, 0x26, len(encoded))
+    response[0x28:] = encoded
+
+    assert client.parse_model_read_response(bytes(response), 7000000002) == (0, value)
+    assert client.parse_model_read_response(bytes(response), 7000000001) is None
+
+
+def test_model_report_preserves_optional_device_destination():
+    path = b"ProWritable.videoParm\x00"
+    value = b'{"setVal":{"multiFlip":1}}\x00'
+    report = bytearray(0x22 + 8 + len(path) + len(value))
+    report[:2] = b"\x7e\xaa"
+    struct.pack_into("<H", report, 0x1C, 1)
+    report[0x1F] = len(path) - 1
+    struct.pack_into("<H", report, 0x20, len(value) - 1)
+    struct.pack_into("<Q", report, 0x22, 7000000002)
+    report[0x2A : 0x2A + len(path)] = path
+    report[0x2A + len(path) :] = value
+
+    assert client.parse_model_report(bytes(report)) == (
+        7000000002,
+        "ProWritable.videoParm",
+        {"setVal": {"multiFlip": 1}},
+    )
+
+
 def test_inventory_probe_is_read_only_and_sanitized(monkeypatch):
     enrollment = P2PEnrollment(
         device_id="7000000002",
@@ -215,3 +264,55 @@ def test_route_probe_selects_only_bound_camera_and_sanitizes_peer(monkeypatch):
     assert result.direct_handshake is True
     assert result.camera_contacted is True
     assert not hasattr(result, "peer_endpoint")
+
+
+def test_property_read_selects_only_bound_online_camera(monkeypatch):
+    enrollment = P2PEnrollment(
+        device_id="7000000002",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=None,
+        created_at="now",
+        updated_at="now",
+    )
+    node = client.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
+    devices = (
+        client.OnlineDevice(7000000001, 1, False, 1, bytes(16)),
+        client.OnlineDevice(7000000002, 1, False, 1, bytes(16)),
+    )
+    selected = []
+
+    class FakeSocket:
+        def bind(self, _address):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(client, "obtain_list", lambda *_args: [("192.0.2.10", 19800)])
+    monkeypatch.setattr(
+        client,
+        "establish_initialized_node",
+        lambda *_args, **_kwargs: (node, devices, 0),
+    )
+    monkeypatch.setattr(client, "heartbeat_node", lambda *_args: node)
+
+    def fake_call(_sock, _node, _access_id, device, _timeout, **_kwargs):
+        selected.append(("call", device.device_id))
+        return client.CallingResult(True, True, 3, True, None, None, 11)
+
+    def fake_read(_sock, _node, device, path, sequence, _timeout, **_kwargs):
+        selected.append(("read", device.device_id, path, sequence))
+        return client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}})
+
+    monkeypatch.setattr(client, "call_device", fake_call)
+    monkeypatch.setattr(client, "exchange_model_read", fake_read)
+
+    result = client.read_camera_property(enrollment, "ProWritable.videoParm")
+
+    assert selected == [
+        ("call", 7000000002),
+        ("read", 7000000002, "ProWritable.videoParm", 11),
+    ]
+    assert result.value == {"setVal": {"multiFlip": 1}}

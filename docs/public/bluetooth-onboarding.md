@@ -14,8 +14,9 @@ Cam Guard discovery.
   the Bluetooth radio.
 - A 2.4 GHz Wi-Fi network supported by the camera and its password.
 - The camera powered in Bluetooth pairing/reset mode, advertising `GW_BLE_<deviceId>`.
-- For the current prototype, fresh vendor handshake material. This is the remaining cloud
-  dependency and is not the desired final LAN-only architecture.
+- A vendor account configured once through Community Cam Guard. The backend logs in, renews its
+  session and fetches fresh handshake material with its own implementation. The vendor cloud is
+  still required and is not the desired final LAN-only architecture.
 
 Web Bluetooth requires a secure context. These are valid:
 
@@ -26,23 +27,27 @@ Web Bluetooth requires a secure context. These are valid:
 Plain `http://192.168.x.x:3200` works for monitoring and administration but browsers do not expose
 Web Bluetooth there. Close a temporary tunnel and restore the flag to `false` after onboarding.
 
-## Refresh the temporary material
+## Configure the temporary cloud dependency
 
-The current research bridge derives an owner-only, ignored file from a recent authenticated capture:
+The onboarding modal shows a compact **Vendor account for Bluetooth setup** section until the
+account has been configured. Submit it once from a direct trusted-LAN client. The endpoint is
+intentionally unavailable through the temporary public tunnel. The equivalent API call is:
 
 ```bash
-python3 re/ble_cloud_readonly.py \
-  --capture re/frida/<recent-capture>.log \
-  --device-id <device-id-from-label> \
-  --output temp/ble-provision-material.json
+curl -b jar.txt -X POST http://127.0.0.1:3200/api/provisioning/vendor-account/login \
+  -H 'Content-Type: application/json' \
+  -d '{"account_type":"email","account":"<account>","password":"<password>"}'
 ```
 
-The file is mode `0600`, is mounted read-only into the app container and expires after five minutes.
-When the user starts the Bluetooth step, the backend pins that exact key/token pair to an opaque,
-three-minute in-memory attempt. Refreshing the file cannot silently replace the TanKey halfway
-through an active exchange.
-It contains secrets: never print it, commit it or attach it to an issue. This step will disappear
-when the vendor-session dependency is replaced by a native LAN-only handshake.
+The password is converted to the vendor's password-equivalent digest and stored with the renewable
+session in one encrypted SQLite payload. Neither the identity, digest nor session token is returned.
+At BLE prepare time the backend renews the session, obtains a new TanKey/random/bind token and pins
+that exact material to an opaque three-minute in-memory attempt. Android, the vendor application,
+an emulator, Frida and capture files are not runtime dependencies.
+
+This still contacts the vendor service. It will disappear only when the cloud bootstrap itself is
+replaced by a native LAN-only handshake. Changing the vendor password requires enrolling the
+account again.
 
 ## Dashboard procedure
 

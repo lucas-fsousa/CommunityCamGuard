@@ -18,6 +18,7 @@ from backend.app.main import app
 from backend.app.provisioning import (
     BleCodecError,
     BleMessageAssembler,
+    BleProvisioningMaterial,
     LabelError,
     begin_ble_provisioning_attempt,
     build_ble_provisioning_frames,
@@ -55,7 +56,12 @@ from backend.app.provisioning.wifi import (
     selected_ssid,
     sign_network,
 )
-from backend.app.vendor_p2p import P2PInventory, P2PRouteProbe
+from backend.app.vendor_p2p import (
+    AccountSession,
+    P2PInventory,
+    P2PPropertyRead,
+    P2PRouteProbe,
+)
 
 SUBSCRIPTION_TOKEN = "ab" * 64
 
@@ -440,6 +446,71 @@ def test_ble_prepare_returns_only_encrypted_wire_frames(monkeypatch, tmp_path):
     assert response.headers["cache-control"] == "no-store"
 
 
+def test_ble_prepare_prefers_native_account_over_research_file(monkeypatch):
+    token = bytes(range(64))
+    session = AccountSession(
+        access_id="-12345",
+        access_token=token,
+        common={"accessId": "-12345", "accessToken": token[:48].hex()},
+        headers={"x-iotvideo-accessid": "-12345"},
+        expire_time=123,
+        terminal_id="-98765",
+        user_id="19088743",
+    )
+    material = BleProvisioningMaterial(
+        device_id="7443576841",
+        tan_key="00112233445566778899aabbccddeeff",
+        random_number="0123456789abcdef0123456789abcdef",
+        config_token="native-bind-token",
+        server_user_id=0x81234567,
+        captured_at=int(time.time()),
+        cloud_access_token=token,
+        cloud_common=dict(session.common),
+        cloud_headers=dict(session.headers),
+    )
+    calls = []
+    monkeypatch.setattr(
+        routes.vendor_account,
+        "get_account",
+        lambda: SimpleNamespace(session=session),
+    )
+    monkeypatch.setattr(
+        routes.vendor_account,
+        "update_session",
+        lambda refreshed: calls.append(("stored", refreshed)),
+    )
+    monkeypatch.setattr(routes, "refresh_account_session", lambda current: current)
+    monkeypatch.setattr(
+        routes,
+        "fetch_native_ble_material",
+        lambda current, *, device_id: calls.append(("material", current, device_id)) or material,
+    )
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=None,
+            provisioning_ble_material_max_age_seconds=300,
+        ),
+    )
+
+    result = routes.provisioning_ble_prepare(
+        routes.ProvisioningStartIn(
+            label="http://yoosee.co/?D=0-7443576841-8034",
+            wifi_network_id=sign_network("Home Wi-Fi", "WPA2"),
+            wifi_password="not-returned",
+        ),
+        Response(),
+    )
+
+    assert result["status"] == "ready_for_explicit_browser_send"
+    assert calls == [
+        ("stored", session),
+        ("material", session, "7443576841"),
+    ]
+    assert "native-bind-token" not in json.dumps(result)
+
+
 def test_ble_attempt_pins_one_key_and_expires_independently_of_the_material_file(tmp_path):
     material_path = tmp_path / "ble.json"
     material_path.write_text(
@@ -801,6 +872,72 @@ def test_privileged_p2p_route_probe_returns_no_peer_or_session_secrets(monkeypat
     assert "peer" not in serialized
 
 
+def test_privileged_property_read_returns_only_allowlisted_read_result(monkeypatch):
+    p2p.upsert_enrollment(
+        "7443576841",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=SUBSCRIPTION_TOKEN,
+    )
+    monkeypatch.setattr(
+        routes,
+        "read_camera_property",
+        lambda _enrollment, path: P2PPropertyRead(
+            device_id="7443576841",
+            property_path=path,
+            authenticated=True,
+            direct_handshake=True,
+            transport_acknowledged=True,
+            error_code=0,
+            value={"setVal": {"multiFlip": 1}},
+        ),
+    )
+
+    result = routes.provisioning_privileged_p2p_property_read(
+        routes.ProvisioningP2PPropertyReadIn(
+            label="http://yoosee.co/?D=0-7443576841-8034",
+            property_path="ProWritable.videoParm",
+        ),
+        Response(),
+    )
+
+    assert result["value"] == {"setVal": {"multiFlip": 1}}
+    assert result["write_capable"] is False
+    assert result["action_capable"] is False
+
+
+def test_privileged_property_read_rejects_unknown_path_before_transport(monkeypatch):
+    called = False
+
+    def unexpected_read(*_args, **_kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(routes, "read_camera_property", unexpected_read)
+    with pytest.raises(HTTPException) as caught:
+        routes.provisioning_privileged_p2p_property_read(
+            routes.ProvisioningP2PPropertyReadIn(
+                label="http://yoosee.co/?D=0-7443576841-8034",
+                property_path="ProWritable.notRecoveredFromApk",
+            ),
+            Response(),
+        )
+    assert caught.value.status_code == 422
+    assert called is False
+
+
+def test_privileged_property_read_does_not_inherit_remote_ble_tunnel_exception():
+    route = next(
+        candidate
+        for candidate in routes.router.routes
+        if candidate.path == "/api/provisioning/privileged/p2p-property-read"
+    )
+    dependencies = {dependency.call for dependency in route.dependant.dependencies}
+
+    assert routes.require_local_request in dependencies
+    assert routes.require_local_or_remote_ble_request not in dependencies
+
+
 def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
     material_path.write_text(
@@ -1047,6 +1184,58 @@ def test_provisioning_api_accepts_authenticated_private_lan_client():
         )
         assert status.status_code == 200
         assert status.json()["lan_only"] is True
+
+
+def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):
+    token = bytes(range(64))
+    session = AccountSession(
+        access_id="-12345",
+        access_token=token,
+        common={"accessId": "-12345", "accessToken": token[:48].hex()},
+        headers={"x-iotvideo-accessid": "-12345"},
+        expire_time=123,
+        terminal_id="-98765",
+        user_id="19088743",
+    )
+    monkeypatch.setattr(routes, "login_account", lambda _credentials: session)
+    response = Response()
+    result = routes.provisioning_vendor_account_login(
+        routes.ProvisioningVendorAccountLoginIn(
+            account_type="email",
+            account="person@example.invalid",
+            password="account-password",
+        ),
+        response,
+    )
+
+    serialized = json.dumps(result)
+    assert result == {
+        "provider": "yoosee-gwell",
+        "configured": True,
+        "renewable_session": True,
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert "person@example.invalid" not in serialized
+    assert "account-password" not in serialized
+    assert token.hex() not in serialized
+    assert routes.vendor_account.get_account() is not None
+
+
+def test_vendor_account_routes_reject_public_client_before_login_call(monkeypatch):
+    called = []
+    monkeypatch.setattr(routes, "login_account", lambda credentials: called.append(credentials))
+    with TestClient(app, base_url="http://localhost", client=("192.0.2.40", 50000)) as client:
+        assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
+        response = client.post(
+            "/api/provisioning/vendor-account/login",
+            json={
+                "account_type": "email",
+                "account": "person@example.invalid",
+                "password": "account-password",
+            },
+        )
+    assert response.status_code == 403
+    assert called == []
 
 
 def test_provisioning_api_rejects_authenticated_public_client():

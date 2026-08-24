@@ -96,6 +96,8 @@ def test_provisioning_modal_is_explicit_and_validates_identity_in_background():
     assert "provision.bluetoothFinalResponseMissing" in cameras
     assert "connectionReply?.wifi_connection?.connected" in cameras
     assert 'api("/provisioning/privileged/bind"' in cameras
+    assert 'api("/provisioning/vendor-account/login"' in cameras
+    assert "state.provisioning.vendor_account_configured = true" in cameras
     assert 'textContent: t("provision.finishWifiOnly")' in cameras
     assert 'textContent: t("provision.bindPrivileged")' in cameras
 

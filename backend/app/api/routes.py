@@ -39,13 +39,14 @@ from ..auth import (
     verify_token,
 )
 from ..config import get_settings
-from ..db import registry
+from ..db import registry, vendor_account
 from ..discovery import active_scan, rtsp
 from ..media import go2rtc, quality
 from ..provisioning import (
     BleCodecError,
     LabelError,
     PrivilegedEnrollmentError,
+    VendorProvisioningCloudError,
     WifiSelectionError,
     begin_ble_provisioning_attempt,
     bind_vendor_device,
@@ -55,6 +56,7 @@ from ..provisioning import (
     build_wifi_payload,
     decrypt_ble_payload,
     encryption_from_scan,
+    fetch_native_ble_material,
     inspect_label,
     load_ble_provisioning_material,
     manual_network,
@@ -68,7 +70,17 @@ from ..provisioning import (
     selected_network,
 )
 from ..recording import playback, recorder
-from ..vendor_p2p import P2PProbeError, probe_account_inventory, probe_camera_route
+from ..vendor_p2p import (
+    MODEL_READ_PATHS,
+    AccountCredentials,
+    P2PProbeError,
+    VendorAccountError,
+    login_account,
+    probe_account_inventory,
+    probe_camera_route,
+    read_camera_property,
+    refresh_account_session,
+)
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")
@@ -140,6 +152,24 @@ class ProvisioningOnlineStatusIn(ProvisioningLabelIn):
     """Read-only APK-compatible lookup for the configToken pinned to one BLE attempt."""
 
     attempt_id: str = Field(min_length=20, max_length=128)
+
+
+class ProvisioningP2PPropertyReadIn(ProvisioningLabelIn):
+    """One allowlisted thing-model read for the explicitly identified camera."""
+
+    property_path: str = Field(min_length=1, max_length=128)
+
+
+class ProvisioningVendorAccountLoginIn(BaseModel):
+    """Vendor credentials accepted only by the authenticated local-network route."""
+
+    account_type: str = Field(pattern="^(email|mobile|userId)$")
+    account: str = Field(min_length=1, max_length=320)
+    password: SecretStr = Field(min_length=1, max_length=256)
+    mobile_area: str = Field(default="0", max_length=16)
+    language: str = Field(default="en", max_length=16)
+    region: str = Field(default="US", max_length=16)
+    area: str = Field(default="us", max_length=16)
 
 
 class PtzIn(BaseModel):
@@ -418,8 +448,11 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
+    native_account = vendor_account.get_account() is not None
     ble_status = (
-        "handshake-ready" if material_path and material_path.is_file() else "discovery-ready"
+        "handshake-ready"
+        if native_account or (material_path and material_path.is_file())
+        else "discovery-ready"
     )
     return {
         "local_only": False,
@@ -427,12 +460,100 @@ def provisioning_status() -> dict:
         "remote_ble_enabled": get_settings().provisioning_remote_ble_enabled,
         "label_inspection": True,
         "transport_ready": True,
+        "vendor_cloud_required": True,
+        "vendor_account_configured": native_account,
+        "ble_material_source": (
+            "native-account"
+            if native_account
+            else "research-file"
+            if material_path and material_path.is_file()
+            else "none"
+        ),
         "transports": {
             "qr": "experimental-ready",
             "softap": "protocol-recovery",
             "bluetooth": ble_status,
             "wired": "planned",
         },
+    }
+
+
+@router.get(
+    "/provisioning/vendor-account/status",
+    dependencies=_LOCAL_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_vendor_account_status(response: Response) -> dict:
+    """Report enrollment state without disclosing an account identity or token."""
+
+    configured = vendor_account.get_account() is not None
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "provider": vendor_account.PROVIDER,
+        "configured": configured,
+        "renewable_session": configured,
+        "vendor_cloud_required": True,
+    }
+
+
+@router.post(
+    "/provisioning/vendor-account/login",
+    dependencies=_LOCAL_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_vendor_account_login(
+    body: ProvisioningVendorAccountLoginIn,
+    response: Response,
+) -> dict:
+    """Establish and encrypt a renewable native session; Android/Frida are not involved."""
+
+    try:
+        credentials = AccountCredentials.from_password(
+            account_type=body.account_type,
+            account=body.account.strip(),
+            password=body.password.get_secret_value(),
+            mobile_area=body.mobile_area,
+            language=body.language,
+            region=body.region,
+            area=body.area,
+        )
+        session = login_account(credentials)
+        vendor_account.save_account(credentials, session)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except VendorAccountError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "provider": vendor_account.PROVIDER,
+        "configured": True,
+        "renewable_session": True,
+    }
+
+
+@router.post(
+    "/provisioning/vendor-account/refresh",
+    dependencies=_LOCAL_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_vendor_account_refresh(response: Response) -> dict:
+    """Renew the encrypted native session without returning any credential material."""
+
+    stored = vendor_account.get_account()
+    if stored is None:
+        raise HTTPException(status_code=409, detail="vendor account is not configured")
+    try:
+        refreshed = refresh_account_session(stored.session)
+        vendor_account.update_session(refreshed)
+    except VendorAccountError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "provider": vendor_account.PROVIDER,
+        "configured": True,
+        "renewable_session": True,
+        "refreshed": True,
     }
 
 
@@ -527,14 +648,28 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     settings = get_settings()
-    if settings.provisioning_ble_material_file is None:
-        raise HTTPException(status_code=503, detail="BLE handshake material is unavailable")
     try:
-        material = load_ble_provisioning_material(
-            settings.provisioning_ble_material_file,
-            expected_device_id=identity["device_id"],
-            max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
-        )
+        stored = vendor_account.get_account()
+        if stored is not None:
+            refreshed = refresh_account_session(stored.session)
+            vendor_account.update_session(refreshed)
+            material = fetch_native_ble_material(
+                refreshed,
+                device_id=identity["device_id"],
+            )
+        elif settings.provisioning_ble_material_file is not None:
+            # Temporary research bridge retained for existing installations. A configured native
+            # account always wins and removes all runtime dependence on Frida/capture files.
+            material = load_ble_provisioning_material(
+                settings.provisioning_ble_material_file,
+                expected_device_id=identity["device_id"],
+                max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
+            )
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail="BLE handshake material is unavailable; configure the vendor account",
+            )
         password = body.wifi_password.get_secret_value()
         wifi_payload = build_wifi_payload(
             ssid=network.ssid,
@@ -548,6 +683,10 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
         # echoed only the final 13 bytes of the 32-byte challenge, so TanKey was never installed.
         stages = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=256)
         attempt = begin_ble_provisioning_attempt(material)
+    except HTTPException:
+        raise
+    except (VendorAccountError, VendorProvisioningCloudError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except (BleCodecError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -840,6 +979,40 @@ def provisioning_privileged_p2p_route_probe(body: ProvisioningLabelIn, response:
         "broker_error_code": route.broker_error_code,
         "media_opened": False,
         "command_sent": False,
+    }
+
+
+@router.post(
+    "/provisioning/privileged/p2p-property-read",
+    dependencies=_LOCAL_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_p2p_property_read(
+    body: ProvisioningP2PPropertyReadIn, response: Response
+) -> dict:
+    """Read one allowlisted thing-model property from exactly the requested camera."""
+    identity = _inspect_provisioning_label(body)
+    if body.property_path not in MODEL_READ_PATHS:
+        raise HTTPException(status_code=422, detail="thing-model path is not read-only allowlisted")
+    try:
+        enrollment = bound_privileged_enrollment(identity["device_id"])
+        result = read_camera_property(enrollment, body.property_path)
+    except PrivilegedEnrollmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except P2PProbeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "device_id": identity["device_id"],
+        "property_path": result.property_path,
+        "authenticated": result.authenticated,
+        "direct_handshake": result.direct_handshake,
+        "transport_acknowledged": result.transport_acknowledged,
+        "error_code": result.error_code,
+        "value": result.value,
+        "write_capable": False,
+        "action_capable": False,
     }
 
 

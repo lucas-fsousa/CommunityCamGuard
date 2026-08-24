@@ -28,6 +28,7 @@ from .privileged import (
     remember_privileged_handoff,
 )
 from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
+from .vendor_cloud import VendorProvisioningCloudError, fetch_native_ble_material
 from .wifi import WifiSelectionError, manual_network, scan_wifi_networks, selected_network
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "BleProvisioningMaterial",
     "LabelError",
     "PrivilegedEnrollmentError",
+    "VendorProvisioningCloudError",
     "WifiSelectionError",
     "begin_ble_provisioning_attempt",
     "bind_vendor_device",
@@ -49,6 +51,7 @@ __all__ = [
     "decrypt_ble_payload",
     "encrypt_ble_payload",
     "encryption_from_scan",
+    "fetch_native_ble_material",
     "fragment_ble_message",
     "inspect_label",
     "load_ble_provisioning_material",

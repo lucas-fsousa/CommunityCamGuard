@@ -216,6 +216,11 @@ header {
 .provisioning-modal details { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; }
 .provisioning-modal summary { color: var(--muted); cursor: pointer; font-weight: 600; }
 .provisioning-modal details > small { display: block; margin: 7px 0 2px; }
+.provision-vendor-account-grid { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(0, 1.5fr);
+  gap: 8px; margin-top: 8px; }
+.provision-vendor-account-grid input, .provision-vendor-account-grid select,
+.provision-vendor-account-grid button { width: 100%; margin: 0; }
+.provision-vendor-account > small:last-child { min-height: 1.2em; }
 .provision-inline, .provision-network-row { display: flex; align-items: center; gap: 8px; }
 .provision-inline .label-photo { flex: 1 1 auto; min-width: 0; }
 .provision-network-row select { flex: 1 1 auto; min-width: 0; }
@@ -311,6 +316,7 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   .brand-text { display: none; }
   .modal-card { width: 94vw; }
   .provision-grid { grid-template-columns: 1fr; }
+  .provision-vendor-account-grid { grid-template-columns: 1fr; }
   .provision-network-manual-grid { grid-template-columns: 1fr; }
 }
 

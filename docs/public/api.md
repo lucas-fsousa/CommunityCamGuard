@@ -120,17 +120,21 @@ subset may additionally use an explicitly enabled, same-origin HTTPS tunnel.
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/provisioning/status` | — | Reports available onboarding stages/transports. |
+| GET | `/api/provisioning/vendor-account/status` | — | Trusted-LAN only. Reports whether the encrypted renewable vendor session is configured; never returns the account identity or tokens. |
+| POST | `/api/provisioning/vendor-account/login` | `{account_type, account, password, mobile_area?, language?, region?, area?}` | Trusted-LAN only. Performs native account login and stores credentials/session encrypted. Android, Frida and capture files are not involved. |
+| POST | `/api/provisioning/vendor-account/refresh` | — | Trusted-LAN only. Renews the encrypted native session without returning credentials or token material. |
 | POST | `/api/provisioning/inspect` | `ProvisioningLabelIn` | Validates the scanned label or manual identity without contacting the camera. |
 | GET | `/api/provisioning/networks` | — | Read-only Wi-Fi scan. Returns display names, short-lived signed selection IDs and whether manual fallback is allowed. |
 | POST | `/api/provisioning/networks/manual` | `{ssid, security}` | Creates a signed selection for an explicit SSID, but only when the server has no usable Wi-Fi scanner. |
 | POST | `/api/provisioning/start` | `ProvisioningStartIn` | Generates the recovered vendor Wi-Fi QR in memory for labels that advertise QR setup. SoftAP-only devices still fail closed with `501`. |
-| POST | `/api/provisioning/ble/prepare` | `ProvisioningStartIn` | Prepares the encrypted BLE Wi-Fi stages; secrets remain server-side. |
+| POST | `/api/provisioning/ble/prepare` | `ProvisioningStartIn` | Renews the native account session, obtains fresh TanKey/bind-token material and prepares encrypted BLE Wi-Fi stages; secrets remain server-side. An owner-only research file is retained only as a compatibility fallback. |
 | POST | `/api/provisioning/ble/decode-response` | `ProvisioningBleResponseIn` | Decodes one GATT response. Discards the credential-bearing `0x83` echo and retains a valid `0x85` handoff only in bounded process memory. Never binds automatically. |
 | POST | `/api/provisioning/privileged/online-status` | `ProvisioningOnlineStatusIn` | Read-only APK-compatible lookup of the current `configToken`. A successful `status == 1` creates the alternative no-`confirmKey` handoff. |
 | POST | `/api/provisioning/privileged/status` | `ProvisioningLabelIn` | Reports whether a fresh post-Wi-Fi P2P handoff is pending; returns no proof/token. |
 | POST | `/api/provisioning/privileged/bind` | `ProvisioningPrivilegedBindIn` | Explicit stage 2: bind the camera to the captured IoTVideo account. It still does not enable RTSP. |
 | POST | `/api/provisioning/privileged/p2p-probe` | `ProvisioningLabelIn` | Uses encrypted post-bind material to authenticate to the P2P access node, inspect aggregate account/target visibility, heartbeat and resolve the selected target's TermDNS route. It does not CALL or send any command to the camera. |
 | POST | `/api/provisioning/privileged/p2p-route-probe` | `ProvisioningLabelIn` | Performs a bounded brokered CALLING and direct CA/CB NAT handshake for the selected camera. It exposes no peer address/session secret and opens neither media nor a control channel. |
+| POST | `/api/provisioning/privileged/p2p-property-read` | `ProvisioningP2PPropertyReadIn` | Trusted-LAN only. Opens the selected camera route and sends one allowlisted B7 thing-model read. Unknown paths are rejected before network I/O; the backend contains no write/action builder in this production slice. |
 
 `ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
 `capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
@@ -140,6 +144,14 @@ expires after five minutes. The Wi-Fi password is request-local and is never per
 returned as plain text. The QR response is marked `Cache-Control: no-store`; its SVG necessarily
 encodes the selected SSID and password and the browser revokes its temporary object URL when the
 dialog closes.
+
+The account endpoints remove the Android application, emulator, Frida and captured-session files
+from the production onboarding path. They do **not** make provisioning LAN-only: login, TanKey and
+bind-token requests still use the vendor cloud. Account identity, uppercase password-equivalent
+digest, renewable token and provisioning IDs are stored together inside a Fernet-encrypted SQLite
+payload. Only safe booleans cross back to the browser. Configure the account from a direct trusted
+LAN client before starting Web Bluetooth through a temporary HTTPS tunnel; the tunnel exception
+does not apply to account enrollment.
 
 The start response is intentionally `status: "awaiting_camera_scan"`, `experimental: true` and
 `cloud_token_used: false`. It means only that an artifact matching the APK's recovered modern QR
@@ -172,6 +184,12 @@ after a restart while deliberately stopping before direct camera contact. The ex
 `p2p-route-probe` continues through A4/A3 rendezvous and CA/CB to prove that the selected camera is
 reachable. It returns only booleans/counts: the broker/camera address, link ID, call ID, cookie,
 session key and credentials never cross the API boundary.
+
+`p2p-property-read` accepts the same camera identity plus `property_path`. The path must be one of
+the capability roots recovered from the APK and compiled into the backend allowlist. Even
+`Action.*` roots are queried with B7 and are never executed with AC. The response contains the
+camera-owned JSON value, transport acknowledgement and device error code. Unlike the temporary
+Web-Bluetooth subset, this route never accepts the remote HTTPS-tunnel exception.
 
 When the server has no Wi-Fi radio/scanner, `GET /provisioning/networks` returns
 `manual_entry_allowed: true`. The localhost UI then accepts an explicit 1–32-byte SSID and

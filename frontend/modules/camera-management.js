@@ -137,7 +137,7 @@ function openProvisioningModal() {
   const qrBox = el("div", { className: "provision-qr-box hidden" });
   const refreshNetworks = el("button", { textContent: t("provision.refreshNetworks") });
   const transportReady = Boolean(state.provisioning && state.provisioning.transport_ready);
-  const bleHandshakeReady = state.provisioning?.transports?.bluetooth === "handshake-ready";
+  let bleHandshakeReady = state.provisioning?.transports?.bluetooth === "handshake-ready";
   const remoteBle = !browserIsLoopback() && Boolean(state.provisioning?.remote_ble_enabled);
   const start = el("button", { className: "btn-primary", textContent: t("provision.start"), disabled: true });
   const findBluetooth = el("button", { textContent: t("provision.findBluetooth"), disabled: true });
@@ -149,6 +149,34 @@ function openProvisioningModal() {
       el("label", {}, el("span", { textContent: t("provision.manualSsidLabel") }), manualSsid),
       el("label", {}, el("span", { textContent: t("provision.securityLabel") }), manualSecurity)),
     el("small", { className: "muted", textContent: t("provision.twoGhzHint") }));
+  const vendorAccountType = el("select", {},
+    el("option", { value: "email", textContent: t("provision.vendorAccountEmail") }),
+    el("option", { value: "mobile", textContent: t("provision.vendorAccountMobile") }),
+    el("option", { value: "userId", textContent: t("provision.vendorAccountId") }));
+  const vendorAccount = el("input", {
+    placeholder: t("provision.vendorAccountIdentity"), autocomplete: "username",
+  });
+  const vendorMobileArea = el("input", {
+    placeholder: t("provision.vendorMobileArea"), inputMode: "numeric", autocomplete: "tel-country-code",
+    hidden: true,
+  });
+  const vendorPassword = el("input", {
+    placeholder: t("provision.vendorAccountPassword"), type: "password", autocomplete: "current-password",
+  });
+  const saveVendorAccount = el("button", {
+    className: "btn-primary", textContent: t("provision.vendorAccountSave"),
+  });
+  const vendorAccountStatus = el("small", { className: "muted" });
+  const vendorAccountPanel = el("details", {
+    className: "provision-vendor-account",
+    open: !state.provisioning?.vendor_account_configured,
+    hidden: Boolean(state.provisioning?.vendor_account_configured),
+  },
+  el("summary", { textContent: t("provision.vendorAccountTitle") }),
+  el("small", { className: "muted", textContent: t("provision.vendorAccountDescription") }),
+  el("div", { className: "provision-vendor-account-grid" },
+    vendorAccountType, vendorAccount, vendorMobileArea, vendorPassword, saveVendorAccount),
+  vendorAccountStatus);
   let qrUrl = "";
   let manualNetworkMode = false;
   let identityValid = false;
@@ -217,8 +245,11 @@ function openProvisioningModal() {
   const updateStart = () => {
     start.textContent = bleSession && bleHandshakeReady
       ? t("provision.startBluetooth") : t("provision.start");
-    findBluetooth.disabled = !supportsWebBluetooth() || validatingIdentity || !identityValid || bleConnecting;
-    findBluetooth.title = supportsWebBluetooth() ? "" : t("provision.bluetoothUnavailable");
+    findBluetooth.disabled = !supportsWebBluetooth() || !bleHandshakeReady
+      || validatingIdentity || !identityValid || bleConnecting;
+    findBluetooth.title = !supportsWebBluetooth()
+      ? t("provision.bluetoothUnavailable")
+      : !bleHandshakeReady ? t("provision.vendorAccountRequired") : "";
     if (wifiConfigured) {
       start.disabled = true;
       start.title = "";
@@ -247,6 +278,43 @@ function openProvisioningModal() {
     readiness.textContent = reason || t("provision.ready");
     readiness.classList.toggle("ready", !reason);
   };
+
+  saveVendorAccount.addEventListener("click", async () => {
+    const identity = vendorAccount.value.trim();
+    const secret = vendorPassword.value;
+    const mobileArea = vendorMobileArea.value.trim();
+    if (!identity || !secret || (vendorAccountType.value === "mobile" && !mobileArea)) {
+      vendorAccountStatus.textContent = t("provision.vendorAccountMissing");
+      return;
+    }
+    saveVendorAccount.disabled = true;
+    vendorAccountStatus.textContent = t("provision.vendorAccountSaving");
+    try {
+      await api("/provisioning/vendor-account/login", {
+        method: "POST",
+        body: JSON.stringify({
+          account_type: vendorAccountType.value, account: identity, password: secret,
+          mobile_area: vendorAccountType.value === "mobile" ? mobileArea : "0",
+        }),
+      });
+      vendorPassword.value = "";
+      vendorAccount.value = "";
+      bleHandshakeReady = true;
+      state.provisioning.vendor_account_configured = true;
+      state.provisioning.ble_material_source = "native-account";
+      state.provisioning.transports.bluetooth = "handshake-ready";
+      vendorAccountStatus.textContent = "";
+      vendorAccountPanel.hidden = true;
+    } catch (err) {
+      vendorAccountStatus.textContent = err.message;
+    } finally {
+      saveVendorAccount.disabled = false;
+      updateStart();
+    }
+  });
+  vendorAccountType.addEventListener("change", () => {
+    vendorMobileArea.hidden = vendorAccountType.value !== "mobile";
+  });
 
   async function scanNetworks() {
     clearQr(); refreshNetworks.disabled = true; network.disabled = true; networkError.textContent = "";
@@ -666,6 +734,7 @@ function openProvisioningModal() {
     el("div", { className: "modal-head" }, el("h2", { textContent: t("provision.title") }), close),
     el("p", { className: "muted compact", textContent: t("provision.description") }),
     remoteBle ? el("small", { className: "provision-remote-warning", textContent: t("provision.remoteBle") }) : "",
+    vendorAccountPanel,
     label,
     el("div", { className: "provision-inline" }, photo),
     el("details", {}, el("summary", { textContent: t("provision.manualDetails") }),
@@ -681,7 +750,7 @@ function openProvisioningModal() {
     privilegedPanel, qrBox, result, error);
   const overlay = el("div", { className: "modal" }, card);
   const dismiss = () => {
-    password.value = ""; clearQr(); window.clearTimeout(validationTimer);
+    password.value = ""; vendorPassword.value = ""; clearQr(); window.clearTimeout(validationTimer);
     if (bleWaiter) {
       window.clearTimeout(bleWaiter.timer);
       bleWaiter.reject(new Error(t("provision.bluetoothDisconnected")));

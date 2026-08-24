@@ -38,8 +38,9 @@ browser device supplies Bluetooth; the server does not need host Bluetooth acces
 - BLE from another LAN device still needs trusted HTTPS. `localhost` on a Bluetooth-capable server
   or a temporary HTTPS tunnel are the current practical alternatives.
 - Dashboard authentication is mandatory and the deployment must replace the example secret.
-- The camera can join Wi-Fi without using the vendor setup UI, but fresh handshake material
-  still comes from a vendor-authenticated session. Removing that dependency remains P0/P1 work.
+- The camera can join Wi-Fi without using the vendor setup UI. The backend now creates and renews
+  its own vendor-authenticated session and fetches fresh handshake material without Android,
+  Frida or capture files. Removing the vendor WAN/account dependency itself remains P0/P1 work.
 - LAN discovery, privileged P2P enrollment, RTSP activation/credentials and application-registry
   insertion are separate stages; Wi-Fi success must not imply any of them.
 
@@ -87,6 +88,40 @@ without touching camera state:
   2026-08-24 validation authenticated three devices and completed the selected camera's direct
   handshake with no broker error.
 
+The next read-only slice adds `/provisioning/privileged/p2p-property-read`. It accepts only the
+fixed B7 allowlist recovered from the APK, selects the durable enrollment's exact device ID and
+requires a direct handshake before issuing one property read. There is intentionally no D2 writer
+or AC action constructor in the production package yet. Live validation against the designated
+test camera returned `ProWritable.videoParm` with transport ACK/error zero and did not contact the
+two monitoring cameras. This endpoint uses the strict trusted-LAN guard, not the opt-in remote HTTPS
+exception reserved for the Web-Bluetooth onboarding subset.
+
 An enrollment completed by an older running container remains memory-only; it must be bound once
 through the new version before restart durability can be claimed. No process-memory extraction or
 secret-returning compatibility endpoint is introduced.
+
+### Native account/bootstrap addendum
+
+Static APK analysis identified the exact login response identities used by provisioning:
+`terminalId` is sent as the bind-token `termId`, while the signed Java `userId` is converted to
+the unsigned server user ID by setting its high bit. The production backend now implements:
+
+1. anonymous signed account login and renewable authenticated sessions;
+2. encrypted-at-rest storage of the account digest, 64-byte token and provisioning identities;
+3. signed `getTanKey` and `genbindtoken` requests for the selected camera; and
+4. direct in-memory construction of `BleProvisioningMaterial` consumed by the existing Web
+   Bluetooth codec.
+
+The complete `login -> refresh -> TanKey -> bind token -> backend material` chain was validated
+against the live vendor service using a fresh native session and a new output context. It used no
+Android process, emulator, Frida capture or previous BLE material. Production prefers this native
+account source; the owner-only research file remains only as a compatibility fallback.
+
+This milestone removes the APK from runtime, not the vendor cloud. The matrix is deliberately
+explicit:
+
+| Layer | Current role | Runtime requirement |
+|---|---|---|
+| APK/Frida | Research oracle for recovering still-unknown contracts | No |
+| Native backend + vendor cloud | Account login/refresh, TanKey, bind token and P2P bootstrap | Yes, currently |
+| LAN-only backend | Target architecture when cloud bootstrap has been replaced | Not complete |
