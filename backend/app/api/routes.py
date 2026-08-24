@@ -7,6 +7,7 @@ timeline. Everything but login requires the session cookie (see :mod:`..auth`).
 Mutating the camera set (add/delete) reconfigures the live services: go2rtc gets a fresh
 config and the recorder is re-synced to the new camera list.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -49,6 +50,7 @@ from ..provisioning import (
     begin_ble_provisioning_attempt,
     bind_vendor_device,
     ble_provisioning_attempt,
+    bound_privileged_enrollment,
     build_ble_provisioning_frames,
     build_wifi_payload,
     decrypt_ble_payload,
@@ -66,6 +68,7 @@ from ..provisioning import (
     selected_network,
 )
 from ..recording import playback, recorder
+from ..vendor_p2p import P2PProbeError, probe_account_inventory, probe_camera_route
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")
@@ -74,6 +77,7 @@ _client_media_events: deque[dict] = deque(maxlen=200)
 
 
 # --- schemas -----------------------------------------------------------------------
+
 
 class LoginIn(BaseModel):
     key: str
@@ -139,8 +143,8 @@ class ProvisioningOnlineStatusIn(ProvisioningLabelIn):
 
 
 class PtzIn(BaseModel):
-    direction: str | None = None       # up | down | left | right (not needed for stop)
-    action: str = "step"               # "start" (hold) | "stop" (release) | "step" (one nudge)
+    direction: str | None = None  # up | down | left | right (not needed for stop)
+    action: str = "step"  # "start" (hold) | "stop" (release) | "step" (one nudge)
 
 
 class MediaClientEventIn(BaseModel):
@@ -192,18 +196,18 @@ def _resync(request: Request) -> None:
             media.wait_healthy(timeout=6)
         if rec is not None:
             rec.start()
-    except Exception as exc:                       # keep the CRUD op successful regardless
+    except Exception as exc:  # keep the CRUD op successful regardless
         log.warning("service resync after registry change failed: %s", exc)
 
 
 # --- auth ---------------------------------------------------------------------------
 
+
 @router.post("/login")
 def login(body: LoginIn, response: Response) -> dict:
     if not check_key(body.key):
         raise HTTPException(status_code=401, detail="Invalid key")
-    response.set_cookie(COOKIE_NAME, issue_token(), httponly=True, samesite="lax",
-                        max_age=MAX_AGE)
+    response.set_cookie(COOKIE_NAME, issue_token(), httponly=True, samesite="lax", max_age=MAX_AGE)
     return {"ok": True}
 
 
@@ -219,6 +223,7 @@ def me(request: Request) -> dict:
 
 
 # --- cameras ------------------------------------------------------------------------
+
 
 @router.get("/cameras", dependencies=[Depends(require_auth)])
 def list_cameras(request: Request) -> list[dict]:
@@ -245,16 +250,27 @@ def upsert_camera(body: CameraIn, request: Request) -> dict:
     # rejection blocks the add — an offline/unreachable camera stays addable and retries later.
     if body.last_ip:
         result = rtsp.check_credentials(
-            body.last_ip, body.rtsp_port or registry.DEFAULT_RTSP_PORT,
-            body.stream_path or "/onvif1", body.username or "", body.password or "")
+            body.last_ip,
+            body.rtsp_port or registry.DEFAULT_RTSP_PORT,
+            body.stream_path or "/onvif1",
+            body.username or "",
+            body.password or "",
+        )
         if result == "auth":
             # 422, NOT 401: 401 is reserved for *dashboard session* auth (the frontend redirects to
             # login on any 401). This is a bad *camera* password — a validation error on the body.
-            raise HTTPException(status_code=422,
-                                detail="camera rejected these credentials (wrong username or password)")
+            raise HTTPException(
+                status_code=422,
+                detail="camera rejected these credentials (wrong username or password)",
+            )
     cam = registry.upsert_camera(
-        body.mac, name=body.name, username=body.username, password=body.password,
-        stream_path=body.stream_path, rtsp_port=body.rtsp_port, last_ip=body.last_ip,
+        body.mac,
+        name=body.name,
+        username=body.username,
+        password=body.password,
+        stream_path=body.stream_path,
+        rtsp_port=body.rtsp_port,
+        last_ip=body.last_ip,
         vendor=body.vendor,
     )
     # Probe capabilities as part of configuring the camera, so device controls (PTZ, audio, ...)
@@ -277,6 +293,7 @@ def delete_camera(mac: str, request: Request) -> dict:
 
 
 # --- device control / capability probe (routed through the camera's driver) --------
+
 
 @router.post("/cameras/{mac}/probe", dependencies=[Depends(require_auth)])
 def probe_camera(mac: str) -> dict:
@@ -303,8 +320,11 @@ def ptz_move(mac: str, body: PtzIn) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not ok:
         raise HTTPException(status_code=502, detail="camera did not accept the PTZ command")
-    return {"ok": True, "action": (body.action or "step").lower(),
-            "direction": (body.direction or "").lower()}
+    return {
+        "ok": True,
+        "action": (body.action or "step").lower(),
+        "direction": (body.direction or "").lower(),
+    }
 
 
 @router.post("/cameras/{mac}/reboot", dependencies=[Depends(require_auth)])
@@ -316,13 +336,16 @@ def reboot_camera(mac: str) -> dict:
     try:
         ok = drivers.for_camera(cam).reboot(cam)
     except drivers.Unsupported as exc:
-        raise HTTPException(status_code=501, detail="this camera doesn't support software reboot") from exc
+        raise HTTPException(
+            status_code=501, detail="this camera doesn't support software reboot"
+        ) from exc
     if not ok:
         raise HTTPException(status_code=502, detail="camera did not accept the reboot command")
     return {"ok": True, "rebooting": True}
 
 
 # --- discovery ----------------------------------------------------------------------
+
 
 @router.post("/discovery/scan", dependencies=[Depends(require_auth)])
 def discovery_scan(request: Request, username: str = "", password: str = "") -> dict:
@@ -336,7 +359,7 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
         rekeyed.append((old, new))
         try:
             recorder.rekey_segments(old, new)
-        except Exception as exc:                   # never fail a scan over a housekeeping move
+        except Exception as exc:  # never fail a scan over a housekeeping move
             log.warning("could not migrate recordings %s -> %s: %s", old, new, exc)
 
     configured, candidates = registry.reconcile(hosts, on_rekey=on_rekey)
@@ -352,13 +375,21 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
         except Exception as exc:
             log.warning("backfill capability probe failed for %s: %s", cam.mac, exc)
     if rekeyed:
-        _resync(request)   # go2rtc streams and recorder processes are keyed by MAC
+        _resync(request)  # go2rtc streams and recorder processes are keyed by MAC
     return {
         "configured": [_camera_out(c) for c in configured],
         "candidates": [
-            {"mac": c.mac, "ip": c.ip, "open_ports": c.open_ports,
-             "suggested_path": c.suggested_path, "suggested_username": c.suggested_username,
-             "vendor": c.vendor, "model": c.model, "firmware": c.firmware, "driver": c.driver}
+            {
+                "mac": c.mac,
+                "ip": c.ip,
+                "open_ports": c.open_ports,
+                "suggested_path": c.suggested_path,
+                "suggested_username": c.suggested_username,
+                "vendor": c.vendor,
+                "model": c.model,
+                "firmware": c.firmware,
+                "driver": c.driver,
+            }
             for c in candidates
         ],
     }
@@ -387,7 +418,9 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
-    ble_status = "handshake-ready" if material_path and material_path.is_file() else "discovery-ready"
+    ble_status = (
+        "handshake-ready" if material_path and material_path.is_file() else "discovery-ready"
+    )
     return {
         "local_only": False,
         "lan_only": True,
@@ -485,7 +518,9 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
     """Prepare encrypted GATT writes while keeping cloud material and Wi-Fi plaintext server-side."""
     identity = _inspect_provisioning_label(body)
     if "bluetooth" not in identity["setup_modes"]:
-        raise HTTPException(status_code=422, detail="camera label does not advertise Bluetooth setup")
+        raise HTTPException(
+            status_code=422, detail="camera label does not advertise Bluetooth setup"
+        )
     try:
         network = selected_network(body.wifi_network_id)
     except WifiSelectionError as exc:
@@ -538,7 +573,9 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
     }
 
 
-@router.post("/provisioning/ble/decode-response", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.post(
+    "/provisioning/ble/decode-response", dependencies=_BLE_PROVISIONING, tags=["provisioning"]
+)
 def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: Response) -> dict:
     """Decode a transient camera reply without exposing TanKey or persisting its contents."""
     identity = _inspect_provisioning_label(body)
@@ -572,8 +609,12 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
         # Firmware 40.1.x acknowledges the random challenge with only its trailing bytes (13 on
         # the observed device), while other revisions return a JSON DevBleInfo object. The vendor
         # app tolerates both. Verify the short echo server-side without exposing randNumber.
-        challenge_valid = bool(decoded) and len(decoded) <= len(material.random_number) and hmac.compare_digest(
-            decoded, material.random_number.encode("utf-8")[-len(decoded):]
+        challenge_valid = (
+            bool(decoded)
+            and len(decoded) <= len(material.random_number)
+            and hmac.compare_digest(
+                decoded, material.random_number.encode("utf-8")[-len(decoded) :]
+            )
         )
     wifi_connection = None
     configuration_acknowledged = body.command == 0x83
@@ -595,7 +636,10 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
             except PrivilegedEnrollmentError:
                 # Wi-Fi success remains valid even if its optional, short-lived continuation can no
                 # longer be retained. The explicit next stage will report that it must be repeated.
-                log.warning("BLE privileged handoff expired before retention device=%s", identity["device_id"])
+                log.warning(
+                    "BLE privileged handoff expired before retention device=%s",
+                    identity["device_id"],
+                )
         wifi_connection = {
             "connected": connect_status == 0,
             "status": connect_status,
@@ -609,8 +653,11 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
         text = ""
         public_payload = None
     if body.command == 0x85:
-        text = json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False) \
-            if public_payload is not None else ""
+        text = (
+            json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
+            if public_payload is not None
+            else ""
+        )
     log.warning(
         "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d json_keys=%s "
         "connect_status=%s privileged_handoff=%d",
@@ -630,7 +677,11 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
         "valid": challenge_valid,
         "text": text[:4096],
         "json": public_payload,
-        "hex": "" if body.command in {0x71, 0x83, 0x85} else decoded[:128].hex() if not text else "",
+        "hex": ""
+        if body.command in {0x71, 0x83, 0x85}
+        else decoded[:128].hex()
+        if not text
+        else "",
         "configuration_acknowledged": configuration_acknowledged,
         "wifi_connection": wifi_connection,
     }
@@ -654,7 +705,9 @@ def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response
     dependencies=_BLE_PROVISIONING,
     tags=["provisioning"],
 )
-def provisioning_privileged_online_status(body: ProvisioningOnlineStatusIn, response: Response) -> dict:
+def provisioning_privileged_online_status(
+    body: ProvisioningOnlineStatusIn, response: Response
+) -> dict:
     """Perform the read-only configToken status lookup used by the vendor APK."""
     identity = _inspect_provisioning_label(body)
     try:
@@ -666,7 +719,9 @@ def provisioning_privileged_online_status(body: ProvisioningOnlineStatusIn, resp
     except (BleCodecError, PrivilegedEnrollmentError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if result.device_id is not None and result.device_id != identity["device_id"]:
-        raise HTTPException(status_code=409, detail="vendor online result belongs to a different camera")
+        raise HTTPException(
+            status_code=409, detail="vendor online result belongs to a different camera"
+        )
     handoff_ready = False
     if result.online:
         remember_privileged_handoff(attempt.material, confirm_key=None)
@@ -701,10 +756,14 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
     except PrivilegedEnrollmentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not result.success:
-        detail = result.message or (str(result.code) if result.code is not None else "unknown error")
+        detail = result.message or (
+            str(result.code) if result.code is not None else "unknown error"
+        )
         raise HTTPException(status_code=409, detail=f"camera P2P enrollment failed: {detail}")
     if not result.dev_token:
-        raise HTTPException(status_code=502, detail="camera P2P enrollment returned no subscription material")
+        raise HTTPException(
+            status_code=502, detail="camera P2P enrollment returned no subscription material"
+        )
     try:
         mark_privileged_enrollment_bound(pending, result.dev_token)
     except PrivilegedEnrollmentError as exc:
@@ -721,23 +780,90 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
     }
 
 
+@router.post(
+    "/provisioning/privileged/p2p-probe",
+    dependencies=_BLE_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Response) -> dict:
+    """Authenticate to the P2P access node and inspect inventory without contacting the camera."""
+    identity = _inspect_provisioning_label(body)
+    try:
+        enrollment = bound_privileged_enrollment(identity["device_id"])
+        inventory = probe_account_inventory(enrollment)
+    except PrivilegedEnrollmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except P2PProbeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "device_id": identity["device_id"],
+        "authenticated": inventory.authenticated,
+        "device_count": inventory.device_count,
+        "online_count": inventory.online_count,
+        "target_visible": inventory.target_visible,
+        "target_online": inventory.target_online,
+        "target_term_resolved": inventory.target_term_resolved,
+        "skipped_incomplete_nodes": inventory.skipped_incomplete_nodes,
+        "camera_contacted": False,
+    }
+
+
+@router.post(
+    "/provisioning/privileged/p2p-route-probe",
+    dependencies=_BLE_PROVISIONING,
+    tags=["provisioning"],
+)
+def provisioning_privileged_p2p_route_probe(body: ProvisioningLabelIn, response: Response) -> dict:
+    """Prove the selected camera's direct P2P route without media or control commands."""
+    identity = _inspect_provisioning_label(body)
+    try:
+        enrollment = bound_privileged_enrollment(identity["device_id"])
+        route = probe_camera_route(enrollment)
+    except PrivilegedEnrollmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except P2PProbeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "device_id": identity["device_id"],
+        "authenticated": route.authenticated,
+        "target_visible": route.target_visible,
+        "target_online": route.target_online,
+        "broker_acknowledged": route.broker_acknowledged,
+        "route_advertised": route.route_advertised,
+        "direct_datagrams": route.direct_datagrams,
+        "direct_handshake": route.direct_handshake,
+        "camera_contacted": route.camera_contacted,
+        "broker_error_code": route.broker_error_code,
+        "media_opened": False,
+        "command_sent": False,
+    }
+
+
 # --- media / storage ----------------------------------------------------------------
+
 
 @router.get("/media/streams", dependencies=[Depends(require_auth)])
 def media_streams(request: Request) -> dict:
     media = getattr(request.app.state, "media", None)
     healthy = bool(media and media.wait_healthy(timeout=1))
     s = get_settings()
-    return {"go2rtc_api": s.go2rtc_api, "healthy": healthy,
-            # Grid tiles in opt-in Auto mode pick their local stream from this: at or below it they
-            # get full resolution, above it the locally downscaled variant.
-            "grid_hd_max_cameras": s.grid_hd_max_cameras,
-            # Encoder bitrate level for the transcodes (media/quality.py). Global, config-driven;
-            # exposed so the UI can show/inform the current quality. Variant selection is
-            # per-camera and client-side; both stream IDs are served from the local media hub.
-            "live_quality": s.live_quality,
-            "quality_levels": list(quality.LEVELS),
-            "live_hwaccel": s.live_hwaccel}
+    return {
+        "go2rtc_api": s.go2rtc_api,
+        "healthy": healthy,
+        # Grid tiles in opt-in Auto mode pick their local stream from this: at or below it they
+        # get full resolution, above it the locally downscaled variant.
+        "grid_hd_max_cameras": s.grid_hd_max_cameras,
+        # Encoder bitrate level for the transcodes (media/quality.py). Global, config-driven;
+        # exposed so the UI can show/inform the current quality. Variant selection is
+        # per-camera and client-side; both stream IDs are served from the local media hub.
+        "live_quality": s.live_quality,
+        "quality_levels": list(quality.LEVELS),
+        "live_hwaccel": s.live_hwaccel,
+    }
 
 
 @router.get("/media/activity", dependencies=[Depends(require_auth)])
@@ -748,8 +874,14 @@ def media_activity(request: Request) -> dict:
 
 
 _MEDIA_CLIENT_EVENTS = {
-    "waiting", "stalled", "playing", "catchup_start", "catchup_end",
-    "live_edge_jump", "mse_failure", "watchdog_recovery",
+    "waiting",
+    "stalled",
+    "playing",
+    "catchup_start",
+    "catchup_end",
+    "live_edge_jump",
+    "mse_failure",
+    "watchdog_recovery",
 }
 
 
@@ -820,7 +952,7 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
     the app port needs to be reachable/tunnelled for signalling — go2rtc stays fully loopback-bound.
     """
     if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
-        await websocket.close(code=1008)   # policy violation (unauthenticated)
+        await websocket.close(code=1008)  # policy violation (unauthenticated)
         return
     src = websocket.query_params.get("src", "")
     if not src:
@@ -832,6 +964,7 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         async with websockets.connect(upstream_url, open_timeout=5, max_size=None) as up:
+
             async def browser_to_go2rtc() -> None:
                 while True:
                     msg = await websocket.receive()
@@ -849,7 +982,10 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
                     else:
                         await websocket.send_text(frame)
 
-            tasks = [asyncio.create_task(browser_to_go2rtc()), asyncio.create_task(go2rtc_to_browser())]
+            tasks = [
+                asyncio.create_task(browser_to_go2rtc()),
+                asyncio.create_task(go2rtc_to_browser()),
+            ]
             _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
@@ -858,7 +994,7 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
             # keep relay resources alive until garbage collection (especially harmful for MSE,
             # where this socket carries the media itself rather than signalling only).
             await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as exc:   # upstream connect/relay failure — just close the browser socket
+    except Exception as exc:  # upstream connect/relay failure — just close the browser socket
         log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
     finally:
         # Best-effort close: the browser is usually already gone (that is what ended the relay),
@@ -887,6 +1023,7 @@ def storage_status(request: Request) -> dict:
 
 # --- recordings ---------------------------------------------------------------------
 
+
 def _recording_target(path: str) -> tuple[Path, Path]:
     """Resolve a recording path and keep every recording endpoint inside its configured root."""
     root = Path(get_settings().recordings_dir).resolve()
@@ -895,16 +1032,23 @@ def _recording_target(path: str) -> tuple[Path, Path]:
         raise HTTPException(status_code=404, detail="not found")
     return root, target
 
+
 @router.get("/recordings", dependencies=[Depends(require_auth)])
-def recordings(mac: str | None = None, day_from: str | None = None,
-               day_to: str | None = None, limit: int = 50, offset: int = 0) -> dict:
+def recordings(
+    mac: str | None = None,
+    day_from: str | None = None,
+    day_to: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
     """Paginated recordings query — returns {items, total, limit, offset, retention_days}.
 
     ``retention_days`` is page context (0 = kept forever) so the browser can tell the user how
     long footage is kept before the retention job deletes it (see docs/DECISIONS.md §22).
     """
-    res = recorder.query_segments(mac=mac, day_from=day_from, day_to=day_to,
-                                  limit=limit, offset=offset)
+    res = recorder.query_segments(
+        mac=mac, day_from=day_from, day_to=day_to, limit=limit, offset=offset
+    )
     res["retention_days"] = get_settings().recording_retention_days
     return res
 

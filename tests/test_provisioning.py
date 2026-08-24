@@ -13,6 +13,7 @@ from starlette.requests import Request
 from backend.app.api import routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.config import get_settings
+from backend.app.db import p2p
 from backend.app.main import app
 from backend.app.provisioning import (
     BleCodecError,
@@ -54,6 +55,9 @@ from backend.app.provisioning.wifi import (
     selected_ssid,
     sign_network,
 )
+from backend.app.vendor_p2p import P2PInventory, P2PRouteProbe
+
+SUBSCRIPTION_TOKEN = "ab" * 64
 
 
 def _request(
@@ -62,7 +66,9 @@ def _request(
     **headers: str,
 ) -> Request:
     raw_headers = [(b"host", host.encode())]
-    raw_headers.extend((name.replace("_", "-").encode(), value.encode()) for name, value in headers.items())
+    raw_headers.extend(
+        (name.replace("_", "-").encode(), value.encode()) for name, value in headers.items()
+    )
     return Request(
         {
             "type": "http",
@@ -96,14 +102,24 @@ def _start_ble_attempt(path, device_id="7443576841"):
 
 
 def test_local_guard_accepts_loopback_and_same_origin_private_lan():
-    assert require_local_request(
-        _request(origin="http://localhost:3200", forwarded="for=127.0.0.1;proto=http")
-    ) is None
+    assert (
+        require_local_request(
+            _request(origin="http://localhost:3200", forwarded="for=127.0.0.1;proto=http")
+        )
+        is None
+    )
     assert require_local_request(_request(client="::1", host="[::1]:3200")) is None
-    assert require_local_request(_request(
-        client="192.168.1.20", host="192.168.1.10:3200",
-        origin="http://192.168.1.10:3200", sec_fetch_site="same-origin",
-    )) is None
+    assert (
+        require_local_request(
+            _request(
+                client="192.168.1.20",
+                host="192.168.1.10:3200",
+                origin="http://192.168.1.10:3200",
+                sec_fetch_site="same-origin",
+            )
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -120,7 +136,9 @@ def test_local_guard_rejects_remote_or_forwarded_requests(client, host, headers)
     with pytest.raises(HTTPException) as caught:
         require_local_request(_request(client=client, host=host, **headers))
     assert caught.value.status_code == 403
-    assert caught.value.detail == "provisioning is available only from the authenticated local network"
+    assert (
+        caught.value.detail == "provisioning is available only from the authenticated local network"
+    )
 
 
 def test_remote_ble_guard_requires_explicit_opt_in_and_same_origin_https(monkeypatch):
@@ -162,9 +180,7 @@ def test_scanned_label_is_normalised_and_decoded():
 
 
 def test_manual_label_fields_and_mac_are_supported():
-    out = inspect_label(
-        device_id="7443576841", capability_code="0x8034", mac="AABBCCDDEEFF"
-    )
+    out = inspect_label(device_id="7443576841", capability_code="0x8034", mac="AABBCCDDEEFF")
     assert out["device_id"] == "7443576841"
     assert out["capability_code"] == "8034"
     assert out["mac"] == "aa:bb:cc:dd:ee:ff"
@@ -196,13 +212,16 @@ def test_recovered_ble_fragment_header_matches_native_sdk():
         mtu=23,
     ) == [bytes.fromhex("01701003") + b"abc"]
 
-    assert [frame.hex() for frame in fragment_ble_message(
-        command=0x82,
-        data=bytes(range(25)),
-        encrypted=True,
-        message_id=2,
-        mtu=12,
-    )] == [
+    assert [
+        frame.hex()
+        for frame in fragment_ble_message(
+            command=0x82,
+            data=bytes(range(25)),
+            encrypted=True,
+            message_id=2,
+            mtu=12,
+        )
+    ] == [
         "128240080001020304050607",
         "1282410808090a0b0c0d0e0f",
         "128242081011121314151617",
@@ -216,9 +235,7 @@ def test_recovered_ble_aes_matches_vendor_full_block_semantics():
         "00112233445566778899aabbccddeeff",
     )
     assert encrypted.hex() == (
-        "2f91bab6d230ca7ac75dba0c2d2c0ac3"
-        "31d157546278685b867e493090c1bfff"
-        "202122"
+        "2f91bab6d230ca7ac75dba0c2d2c0ac331d157546278685b867e493090c1bfff202122"
     )
     assert encrypted[-3:] == bytes((32, 33, 34))
     with pytest.raises(BleCodecError, match="TanKey"):
@@ -262,20 +279,26 @@ def test_malformed_ble_notifications_fail_closed():
 
 def test_ble_handshake_material_is_owner_only_scoped_and_builds_exact_stages(tmp_path):
     path = tmp_path / "ble.json"
-    path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-token",
-        "serverUserId": 0x81234567,
-        "captured_at": 100,
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-token",
+                "serverUserId": 0x81234567,
+                "captured_at": 100,
+            }
+        )
+    )
     path.chmod(0o600)
     material = load_ble_provisioning_material(
         path, expected_device_id="7443576841", max_age_seconds=60, now=120
     )
     wifi_payload = build_wifi_payload(
-        ssid="Home", password="secret", user_id=material.server_user_id,
+        ssid="Home",
+        password="secret",
+        user_id=material.server_user_id,
         config_token=material.config_token,
     )
     stages = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=23)
@@ -287,7 +310,8 @@ def test_ble_handshake_material_is_owner_only_scoped_and_builds_exact_stages(tmp
         link_message = link_assembler.add(frame) or link_message
     assert link_message is not None and link_message.command == 0x72 and link_message.encrypted
     assert json.loads(decrypt_ble_payload(link_message.data, material.tan_key)) == {
-        "linkType": 1, "linkTypeName": "WIFI",
+        "linkType": 1,
+        "linkTypeName": "WIFI",
     }
 
     challenge = BleMessageAssembler().add(stages["challenge"][0])
@@ -329,7 +353,10 @@ def test_qr_uses_the_same_high_error_correction_as_the_apk(monkeypatch):
 
     monkeypatch.setattr(routes.render_svg_base64.__globals__["qrcode"], "QRCode", recording_qr)
     render_svg_base64(build_wifi_payload(ssid="Home", password="secret"))
-    assert captured["error_correction"] == routes.render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
+    assert (
+        captured["error_correction"]
+        == routes.render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
+    )
 
 
 def test_start_returns_experimental_qr_without_leaking_plain_credentials():
@@ -367,19 +394,27 @@ def test_start_fails_closed_for_camera_without_qr_capability():
 
 def test_ble_prepare_returns_only_encrypted_wire_frames(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(
-        provisioning_ble_material_file=material_path,
-        provisioning_ble_material_max_age_seconds=1800,
-    ))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=material_path,
+            provisioning_ble_material_max_age_seconds=1800,
+        ),
+    )
     body = routes.ProvisioningStartIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         wifi_network_id=sign_network("Home Wi-Fi", "WPA2"),
@@ -390,8 +425,10 @@ def test_ble_prepare_returns_only_encrypted_wire_frames(monkeypatch, tmp_path):
     serialized = json.dumps(result)
     assert result["status"] == "ready_for_explicit_browser_send"
     assert result["expected_responses"] == {
-        "challenge": 0x71, "wifi_list": 0x81,
-        "wifi_config_ack": 0x83, "wifi_connection": 0x85,
+        "challenge": 0x71,
+        "wifi_list": 0x81,
+        "wifi_config_ack": 0x83,
+        "wifi_connection": 0x85,
     }
     assert len(result["attempt_id"]) >= 20
     assert 0 < result["attempt_expires_in"] <= 180
@@ -405,14 +442,18 @@ def test_ble_prepare_returns_only_encrypted_wire_frames(monkeypatch, tmp_path):
 
 def test_ble_attempt_pins_one_key_and_expires_independently_of_the_material_file(tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "first-token",
-        "serverUserId": 0x81234567,
-        "captured_at": 100,
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "first-token",
+                "serverUserId": 0x81234567,
+                "captured_at": 100,
+            }
+        )
+    )
     material_path.chmod(0o600)
     material = load_ble_provisioning_material(
         material_path, expected_device_id="7443576841", max_age_seconds=60, now=120
@@ -421,32 +462,36 @@ def test_ble_attempt_pins_one_key_and_expires_independently_of_the_material_file
 
     # A capture refresh cannot change the key/token of an exchange already in flight.
     material_path.write_text("{}")
-    pinned = ble_provisioning_attempt(
-        attempt.attempt_id, expected_device_id="7443576841", now=299
-    )
+    pinned = ble_provisioning_attempt(attempt.attempt_id, expected_device_id="7443576841", now=299)
     assert pinned.material.config_token == "first-token"
     with pytest.raises(BleCodecError, match="expired"):
-        ble_provisioning_attempt(
-            attempt.attempt_id, expected_device_id="7443576841", now=300
-        )
+        ble_provisioning_attempt(attempt.attempt_id, expected_device_id="7443576841", now=300)
 
 
 def test_ble_response_decoder_uses_server_key_without_returning_it(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
     key = "00112233445566778899aabbccddeeff"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": key,
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": key,
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(
-        provisioning_ble_material_file=material_path,
-        provisioning_ble_material_max_age_seconds=1800,
-    ))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=material_path,
+            provisioning_ble_material_max_age_seconds=1800,
+        ),
+    )
     source = b'{"wifiList":[{"ssid":"Camera-visible 2G","level":80}]}'
     body = routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
@@ -464,19 +509,27 @@ def test_ble_response_decoder_uses_server_key_without_returning_it(monkeypatch, 
 def test_ble_response_decoder_validates_short_random_challenge_echo(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
     random_number = "1234567890ABCDEF1232B6F2EF737FF9"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": random_number,
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": random_number,
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(
-        provisioning_ble_material_file=material_path,
-        provisioning_ble_material_max_age_seconds=300,
-    ))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=material_path,
+            provisioning_ble_material_max_age_seconds=300,
+        ),
+    )
     body = routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         attempt_id=_start_ble_attempt(material_path),
@@ -494,14 +547,18 @@ def test_ble_response_decoder_validates_short_random_challenge_echo(monkeypatch,
 def test_ble_wifi_ack_never_returns_decrypted_wifi_credentials(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
     key = "00112233445566778899aabbccddeeff"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": key,
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": key,
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
     source = b"005Home Wi-Fi10fsuper-secret-password2013088123456740185020bind-secret"
     result = routes.provisioning_ble_decode_response(
@@ -525,27 +582,33 @@ def test_ble_wifi_ack_never_returns_decrypted_wifi_credentials(monkeypatch, tmp_
 
 def test_ble_wifi_confirmation_does_not_bind_or_expose_privileged_proof(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(
-        provisioning_ble_material_file=material_path,
-        provisioning_ble_material_max_age_seconds=300,
-    ))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=material_path,
+            provisioning_ble_material_max_age_seconds=300,
+        ),
+    )
     body = routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         attempt_id=_start_ble_attempt(material_path),
         command=0x85,
         encrypted=False,
-        data_base64=base64.b64encode(
-            b'{"confirmKey":"one-time-proof","connectStatus":0}'
-        ).decode(),
+        data_base64=base64.b64encode(b'{"confirmKey":"one-time-proof","connectStatus":0}').decode(),
     )
 
     result = routes.provisioning_ble_decode_response(body, Response())
@@ -566,24 +629,32 @@ def test_ble_wifi_confirmation_does_not_bind_or_expose_privileged_proof(monkeypa
 
 def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-        "cloudAuth": {
-            "accessToken": "11" * 64,
-            "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
-            "headers": {"x-iotvideo-accessid": "123"},
-        },
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+                "cloudAuth": {
+                    "accessToken": "11" * 64,
+                    "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
+                    "headers": {"x-iotvideo-accessid": "123"},
+                },
+            }
+        )
+    )
     material_path.chmod(0o600)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(
-        provisioning_ble_material_file=material_path,
-        provisioning_ble_material_max_age_seconds=300,
-    ))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            provisioning_ble_material_file=material_path,
+            provisioning_ble_material_max_age_seconds=300,
+        ),
+    )
     decoded = routes.provisioning_ble_decode_response(
         routes.ProvisioningBleResponseIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
@@ -601,7 +672,7 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
 
     def fake_bind(item, *, time_area, time_zone):
         called.append((item.device_id, item.confirm_key, time_area, time_zone))
-        return VendorBindResult(True, 0, "", "subscription-secret")
+        return VendorBindResult(True, 0, "", SUBSCRIPTION_TOKEN)
 
     monkeypatch.setattr(routes, "bind_vendor_device", fake_bind)
     response = routes.provisioning_privileged_bind(
@@ -621,8 +692,12 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
         "p2p_session": "pending",
         "rtsp": "pending",
     }
-    assert "subscription-secret" not in json.dumps(response)
+    assert SUBSCRIPTION_TOKEN not in json.dumps(response)
     assert privileged_enrollment_status("7443576841")["bound"] is True
+    _clear_privileged_enrollments_for_tests()
+    restarted = privileged_enrollment_status("7443576841")
+    assert restarted["bound"] is True
+    assert restarted["subscription_material_ready"] is True
 
 
 def test_privileged_binding_without_fresh_handoff_fails_closed():
@@ -637,27 +712,120 @@ def test_privileged_binding_without_fresh_handoff_fails_closed():
     assert "fresh" in caught.value.detail
 
 
+def test_privileged_p2p_probe_returns_only_sanitized_inventory(monkeypatch):
+    p2p.upsert_enrollment(
+        "7443576841",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=SUBSCRIPTION_TOKEN,
+    )
+    monkeypatch.setattr(
+        routes,
+        "probe_account_inventory",
+        lambda _enrollment: P2PInventory(
+            device_id="7443576841",
+            authenticated=True,
+            device_count=3,
+            online_count=3,
+            target_visible=True,
+            target_online=True,
+            target_term_resolved=True,
+            skipped_incomplete_nodes=1,
+        ),
+    )
+
+    result = routes.provisioning_privileged_p2p_probe(
+        routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+        Response(),
+    )
+
+    assert result == {
+        "device_id": "7443576841",
+        "authenticated": True,
+        "device_count": 3,
+        "online_count": 3,
+        "target_visible": True,
+        "target_online": True,
+        "target_term_resolved": True,
+        "skipped_incomplete_nodes": 1,
+        "camera_contacted": False,
+    }
+    assert SUBSCRIPTION_TOKEN not in json.dumps(result)
+
+
+def test_privileged_p2p_probe_requires_durable_material():
+    with pytest.raises(HTTPException) as caught:
+        routes.provisioning_privileged_p2p_probe(
+            routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+            Response(),
+        )
+    assert caught.value.status_code == 409
+    assert "durable" in caught.value.detail
+
+
+def test_privileged_p2p_route_probe_returns_no_peer_or_session_secrets(monkeypatch):
+    p2p.upsert_enrollment(
+        "7443576841",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=SUBSCRIPTION_TOKEN,
+    )
+    monkeypatch.setattr(
+        routes,
+        "probe_camera_route",
+        lambda _enrollment: P2PRouteProbe(
+            device_id="7443576841",
+            authenticated=True,
+            target_visible=True,
+            target_online=True,
+            broker_acknowledged=True,
+            route_advertised=True,
+            direct_datagrams=6,
+            direct_handshake=True,
+            camera_contacted=True,
+            broker_error_code=None,
+        ),
+    )
+
+    result = routes.provisioning_privileged_p2p_route_probe(
+        routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+        Response(),
+    )
+
+    assert result["direct_handshake"] is True
+    assert result["camera_contacted"] is True
+    assert result["media_opened"] is False
+    assert result["command_sent"] is False
+    serialized = json.dumps(result)
+    assert SUBSCRIPTION_TOKEN not in serialized
+    assert "peer" not in serialized
+
+
 def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-        "cloudAuth": {
-            "accessToken": "11" * 64,
-            "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
-            "headers": {
-                "x-iotvideo-accessid": "123",
-                "x-iotvideo-area": "area",
-                "x-iotvideo-appver": "6.36",
-                "x-iotvideo-appid": "app",
-                "x-iotvideo-uniqueid": "terminal",
-            },
-        },
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+                "cloudAuth": {
+                    "accessToken": "11" * 64,
+                    "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
+                    "headers": {
+                        "x-iotvideo-accessid": "123",
+                        "x-iotvideo-area": "area",
+                        "x-iotvideo-appver": "6.36",
+                        "x-iotvideo-appid": "app",
+                        "x-iotvideo-uniqueid": "terminal",
+                    },
+                },
+            }
+        )
+    )
     material_path.chmod(0o600)
     material = load_ble_provisioning_material(
         material_path, expected_device_id="7443576841", max_age_seconds=300
@@ -676,7 +844,7 @@ def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monk
             return False
 
         def read(self):
-            return b'{"code":0,"data":{"devToken":"subscription-secret"}}'
+            return json.dumps({"code": 0, "data": {"devToken": SUBSCRIPTION_TOKEN}}).encode()
 
     def fake_urlopen(request, timeout):
         captured["url"] = request.full_url
@@ -686,9 +854,7 @@ def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monk
         return Reply()
 
     monkeypatch.setattr(privileged_module, "urlopen", fake_urlopen)
-    result = bind_vendor_device(
-        pending, time_area="America/Sao_Paulo", time_zone=-10_800
-    )
+    result = bind_vendor_device(pending, time_area="America/Sao_Paulo", time_zone=-10_800)
 
     assert captured["url"].endswith("/openapi/app/user/device/bind")
     assert captured["body"]["devId"] == "7443576841"
@@ -697,24 +863,28 @@ def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monk
     assert captured["body"]["permission"] == 3
     assert captured["body"]["linkType"] == 1
     assert any(key.lower() == "x-iotvideo-signature" for key in captured["headers"])
-    assert result == VendorBindResult(True, 0, "", "subscription-secret")
+    assert result == VendorBindResult(True, 0, "", SUBSCRIPTION_TOKEN)
 
 
 def test_vendor_online_lookup_and_null_confirm_key_match_apk_fallback(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-        "cloudAuth": {
-            "accessToken": "11" * 64,
-            "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
-            "headers": {"x-iotvideo-accessid": "123"},
-        },
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+                "cloudAuth": {
+                    "accessToken": "11" * 64,
+                    "common": {"language": "pt", "terminalOS": "2", "accessId": "123"},
+                    "headers": {"x-iotvideo-accessid": "123"},
+                },
+            }
+        )
+    )
     material_path.chmod(0o600)
     material = load_ble_provisioning_material(
         material_path, expected_device_id="7443576841", max_age_seconds=300
@@ -744,25 +914,31 @@ def test_vendor_online_lookup_and_null_confirm_key_match_apk_fallback(monkeypatc
     assert requests[0][1]["token"] == "bind-secret"
 
     remember_privileged_handoff(material, confirm_key=None)
-    body = json.loads(privileged_module._bind_body(
-        pending_privileged_enrollment("7443576841"),
-        time_area="America/Sao_Paulo",
-        time_zone=-10_800,
-    ))
+    body = json.loads(
+        privileged_module._bind_body(
+            pending_privileged_enrollment("7443576841"),
+            time_area="America/Sao_Paulo",
+            time_zone=-10_800,
+        )
+    )
     assert body["bindToken"] == "bind-secret"
     assert "confirmKey" not in body
 
 
 def test_online_status_route_retains_null_proof_for_explicit_bind(monkeypatch, tmp_path):
     material_path = tmp_path / "ble.json"
-    material_path.write_text(json.dumps({
-        "device_id": "7443576841",
-        "tanKey": "00112233445566778899aabbccddeeff",
-        "randNumber": "0123456789abcdef0123456789abcdef",
-        "configToken": "bind-secret",
-        "serverUserId": 0x81234567,
-        "captured_at": int(time.time()),
-    }))
+    material_path.write_text(
+        json.dumps(
+            {
+                "device_id": "7443576841",
+                "tanKey": "00112233445566778899aabbccddeeff",
+                "randNumber": "0123456789abcdef0123456789abcdef",
+                "configToken": "bind-secret",
+                "serverUserId": 0x81234567,
+                "captured_at": int(time.time()),
+            }
+        )
+    )
     material_path.chmod(0o600)
     attempt_id = _start_ble_attempt(material_path)
     monkeypatch.setattr(
@@ -791,9 +967,7 @@ def test_wifi_selection_is_signed_and_cannot_be_edited():
 
 
 def test_manual_network_is_validated_before_it_is_signed():
-    assert manual_network("  Home Wi-Fi  ", "wpa") == WifiNetwork(
-        "Home Wi-Fi", security="WPA/WPA2"
-    )
+    assert manual_network("  Home Wi-Fi  ", "wpa") == WifiNetwork("Home Wi-Fi", security="WPA/WPA2")
     with pytest.raises(ValueError, match="1 to 32 UTF-8 bytes"):
         manual_network("é" * 17, "wpa")
     with pytest.raises(ValueError, match="unsupported"):
@@ -836,9 +1010,7 @@ def test_wifi_scanner_parsers_dedupe_and_decode_networks():
 
 
 def test_provisioning_api_accepts_authenticated_loopback_client():
-    with TestClient(
-        app, base_url="http://localhost", client=("127.0.0.1", 50000)
-    ) as client:
+    with TestClient(app, base_url="http://localhost", client=("127.0.0.1", 50000)) as client:
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
         status = client.get("/api/provisioning/status")
         assert status.status_code == 200
@@ -867,9 +1039,7 @@ def test_provisioning_api_accepts_authenticated_loopback_client():
 
 
 def test_provisioning_api_accepts_authenticated_private_lan_client():
-    with TestClient(
-        app, base_url="http://192.168.1.10", client=("192.168.1.20", 50000)
-    ) as client:
+    with TestClient(app, base_url="http://192.168.1.10", client=("192.168.1.20", 50000)) as client:
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
         status = client.get(
             "/api/provisioning/status",
@@ -880,10 +1050,11 @@ def test_provisioning_api_accepts_authenticated_private_lan_client():
 
 
 def test_provisioning_api_rejects_authenticated_public_client():
-    with TestClient(
-        app, base_url="http://localhost", client=("192.0.2.40", 50000)
-    ) as client:
+    with TestClient(app, base_url="http://localhost", client=("192.0.2.40", 50000)) as client:
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
         response = client.get("/api/provisioning/status")
         assert response.status_code == 403
-        assert response.json()["detail"] == "provisioning is available only from the authenticated local network"
+        assert (
+            response.json()["detail"]
+            == "provisioning is available only from the authenticated local network"
+        )

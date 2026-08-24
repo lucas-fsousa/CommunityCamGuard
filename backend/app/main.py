@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.routes import router
 from .config import get_settings
-from .db import registry
+from .db import p2p, registry
 from .frontend_build import build_version
 from .media.go2rtc import Go2rtc
 from .recording.playback import Warmer
@@ -32,6 +32,7 @@ from .recording.storage import StorageMonitor
 async def lifespan(app: FastAPI):
     settings = get_settings()
     registry.init_db()
+    p2p.init_db()
 
     media = Go2rtc()
     rec = Recorder()

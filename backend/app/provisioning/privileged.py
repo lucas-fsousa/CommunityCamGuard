@@ -13,12 +13,14 @@ import hashlib
 import hmac
 import json
 import secrets
+import sqlite3
 import threading
 import time
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from ..db import p2p
 from .ble import BleProvisioningMaterial
 
 _HOST = "openapi-iot.cloudlinks.cn"
@@ -107,12 +109,16 @@ def privileged_enrollment_status(device_id: str, *, now: float | None = None) ->
         _purge_expired(current)
         pending = _pending.get(str(device_id))
         bound = _bound.get(str(device_id))
+    durable = p2p.get_enrollment(str(device_id))
     return {
         "device_id": str(device_id),
         "handoff_ready": pending is not None,
         "expires_in": max(0, int(pending.expires_at - current)) if pending else 0,
-        "bound": bound is not None,
-        "subscription_material_ready": bool(bound and bound.dev_token),
+        "bound": bound is not None or bool(durable and durable.dev_token),
+        "subscription_material_ready": bool(
+            (bound and bound.dev_token) or (durable and durable.dev_token)
+        ),
+        "p2p_access_ready": durable is not None,
         "rtsp_ready": False,
     }
 
@@ -133,12 +139,41 @@ def mark_privileged_enrollment_bound(item: PendingEnrollment, dev_token: str) ->
     token = str(dev_token)
     if not token:
         raise PrivilegedEnrollmentError("vendor binding returned no P2P subscription material")
+    material = item.material
+    if material.cloud_access_token is None or material.cloud_headers is None:
+        raise PrivilegedEnrollmentError("authenticated P2P material is unavailable")
+    try:
+        signed_access_id = int(material.cloud_headers["x-iotvideo-accessid"])
+        access_id = signed_access_id & 0xFFFFFFFFFFFFFFFF
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PrivilegedEnrollmentError("authenticated P2P identity is unavailable") from exc
     with _lock:
         current = _pending.get(item.device_id)
         if current is not item:
             raise PrivilegedEnrollmentError("camera enrollment handoff changed or expired")
+        try:
+            # Persist before consuming the one-time handoff. A failed disk/validation operation
+            # leaves the handoff intact so the caller can retry instead of losing the only token.
+            p2p.upsert_enrollment(
+                item.device_id,
+                access_id=access_id,
+                access_token=material.cloud_access_token,
+                dev_token=token,
+            )
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            raise PrivilegedEnrollmentError(
+                "P2P subscription material could not be stored securely"
+            ) from exc
         _pending.pop(item.device_id, None)
         _bound[item.device_id] = BoundEnrollment(item.device_id, token, _now())
+
+
+def bound_privileged_enrollment(device_id: str) -> p2p.P2PEnrollment:
+    """Load durable P2P credentials for backend-only transport initialization."""
+    enrollment = p2p.get_enrollment(str(device_id))
+    if enrollment is None:
+        raise PrivilegedEnrollmentError("durable P2P subscription material is unavailable")
+    return enrollment
 
 
 def _signature(fields: dict[str, str], access_token: bytes) -> str:

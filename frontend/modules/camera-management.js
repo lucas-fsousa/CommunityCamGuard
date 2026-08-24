@@ -464,9 +464,36 @@ function openProvisioningModal() {
         }),
       });
       if (response.p2p_binding !== "bound") throw new Error(t("provision.privilegedBindInvalid"));
+      let p2pProbe = null;
+      let p2pRouteProbe = null;
+      let p2pProbeError = null;
+      try {
+        p2pProbe = await api("/provisioning/privileged/p2p-probe", {
+          method: "POST", body: JSON.stringify(identityPayload()),
+        });
+        if (p2pProbe?.target_online) {
+          p2pRouteProbe = await api("/provisioning/privileged/p2p-route-probe", {
+            method: "POST", body: JSON.stringify(identityPayload()),
+          });
+        }
+      } catch (probeError) {
+        // Binding is already durable. A transient access-node failure must never re-enable the
+        // bind button or encourage the user to submit the one-time enrollment twice.
+        p2pProbeError = probeError;
+      }
       try {
         await finishBluetooth();
-        result.textContent = t("provision.privilegedBound");
+        if (p2pRouteProbe?.direct_handshake) {
+          result.textContent = t("provision.privilegedBoundP2pConfirmed", {
+            count: p2pProbe.device_count,
+          });
+        } else if (p2pProbe) {
+          result.textContent = t("provision.privilegedBoundP2pPending");
+        } else {
+          result.textContent = t("provision.privilegedBoundP2pProbeFailed", {
+            message: p2pProbeError?.message || t("provision.privilegedProbeUnknown"),
+          });
+        }
       } catch (finishError) {
         // The account link has already succeeded. A failed optional 0x88 write must not invite a
         // duplicate bind; disconnect the browser transport and continue with P2P confirmation.

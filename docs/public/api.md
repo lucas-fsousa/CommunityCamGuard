@@ -129,6 +129,8 @@ subset may additionally use an explicitly enabled, same-origin HTTPS tunnel.
 | POST | `/api/provisioning/privileged/online-status` | `ProvisioningOnlineStatusIn` | Read-only APK-compatible lookup of the current `configToken`. A successful `status == 1` creates the alternative no-`confirmKey` handoff. |
 | POST | `/api/provisioning/privileged/status` | `ProvisioningLabelIn` | Reports whether a fresh post-Wi-Fi P2P handoff is pending; returns no proof/token. |
 | POST | `/api/provisioning/privileged/bind` | `ProvisioningPrivilegedBindIn` | Explicit stage 2: bind the camera to the captured IoTVideo account. It still does not enable RTSP. |
+| POST | `/api/provisioning/privileged/p2p-probe` | `ProvisioningLabelIn` | Uses encrypted post-bind material to authenticate to the P2P access node, inspect aggregate account/target visibility, heartbeat and resolve the selected target's TermDNS route. It does not CALL or send any command to the camera. |
+| POST | `/api/provisioning/privileged/p2p-route-probe` | `ProvisioningLabelIn` | Performs a bounded brokered CALLING and direct CA/CB NAT handshake for the selected camera. It exposes no peer address/session secret and opens neither media nor a control channel. |
 
 `ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
 `capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
@@ -163,6 +165,13 @@ homologated post-bind sequence still has to initialize P2P, enable `onvifEn`, in
 HA1 password value, verify real RTSP media and insert the encrypted clear credential in the
 registry. See
 [Bluetooth onboarding](bluetooth-onboarding.md#post-wi-fi-p2p-and-rtsp-stage) for the exact contract.
+The successful bind persists the 64-byte terminal access token and 128-hex device subscription
+token together as one Fernet-encrypted SQLite value. They never cross back into the browser.
+`p2p-probe` validates node certification, account inventory, heartbeat and optional target TermDNS
+after a restart while deliberately stopping before direct camera contact. The explicit
+`p2p-route-probe` continues through A4/A3 rendezvous and CA/CB to prove that the selected camera is
+reachable. It returns only booleans/counts: the broker/camera address, link ID, call ID, cookie,
+session key and credentials never cross the API boundary.
 
 When the server has no Wi-Fi radio/scanner, `GET /provisioning/networks` returns
 `manual_entry_allowed: true`. The localhost UI then accepts an explicit 1–32-byte SSID and

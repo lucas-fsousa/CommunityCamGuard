@@ -20,6 +20,7 @@ from .labels import LabelError, inspect_label
 from .privileged import (
     PrivilegedEnrollmentError,
     bind_vendor_device,
+    bound_privileged_enrollment,
     mark_privileged_enrollment_bound,
     pending_privileged_enrollment,
     privileged_enrollment_status,
@@ -42,6 +43,7 @@ __all__ = [
     "begin_ble_provisioning_attempt",
     "bind_vendor_device",
     "ble_provisioning_attempt",
+    "bound_privileged_enrollment",
     "build_ble_provisioning_frames",
     "build_wifi_payload",
     "decrypt_ble_payload",

@@ -104,7 +104,7 @@ def _encrypt(password: str) -> bytes:
     return _fernet().encrypt(password.encode("utf-8"))
 
 
-def _decrypt(token: bytes | None) -> str:
+def _decrypt(token: bytes | None, *, label: str = "camera password") -> str:
     if not token:
         return ""
     try:
@@ -113,8 +113,8 @@ def _decrypt(token: bytes | None) -> str:
         # A stored password exists but won't decrypt — almost always because
         # DASHBOARD_SECRET_KEY changed since it was saved. Surface it (streams would
         # silently lose auth otherwise) and treat as no stored password.
-        log.warning("stored camera password failed to decrypt — was DASHBOARD_SECRET_KEY "
-                    "changed since the camera was added? Re-enter the password to fix.")
+        log.warning("stored %s failed to decrypt — was DASHBOARD_SECRET_KEY changed? "
+                    "Re-enter/re-enroll the credential to fix.", label)
         return ""
 
 

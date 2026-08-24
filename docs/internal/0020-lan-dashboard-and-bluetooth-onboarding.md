@@ -64,3 +64,29 @@ ends after bind and reports RTSP as pending. The next implementation stage is a 
 P2P client that executes `bind -> session -> onvifEn -> HA1 -> media proof -> registry` as an
 explicit, observable transaction. No ACK alone may advance it, and no clear credential may be
 persisted before media proof.
+
+### Production P2P extraction addendum
+
+The first production slice after homologation makes the bind durable and proves authentication
+without touching camera state:
+
+- the bind transaction validates the 64-byte account access token, unsigned access ID and 128-hex
+  device subscription token, then stores them as one Fernet-encrypted SQLite payload before it
+  consumes the one-time BLE/cloud handoff;
+- status after a process restart is based on successful decryption/validation, not merely on a row
+  existing;
+- `vendor_p2p` contains the recovered GAT authentication, gute/RC5 crypto, list, certification,
+  init-info parsing, heartbeat, selected-target TermDNS and A4/A3 plus CA/CB rendezvous primitives
+  needed by the production backend;
+- `/provisioning/privileged/p2p-probe` reports only aggregate counts and whether the requested
+  target is visible/online. It never exposes tokens or identities of other cameras;
+- `/provisioning/privileged/p2p-route-probe` is the explicit next boundary: it contacts only the
+  selected online camera, proves broker acknowledgement, route advertisement and direct CA/CB, and
+  exposes no peer endpoint or ephemeral session identifiers;
+- both probes stop before subscription, thing-model access, application commands or media. A live
+  2026-08-24 validation authenticated three devices and completed the selected camera's direct
+  handshake with no broker error.
+
+An enrollment completed by an older running container remains memory-only; it must be bound once
+through the new version before restart durability can be claimed. No process-memory extraction or
+secret-returning compatibility endpoint is introduced.

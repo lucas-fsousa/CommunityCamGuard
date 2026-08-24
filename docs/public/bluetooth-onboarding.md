@@ -96,6 +96,14 @@ The low-level P2P/RTSP stage is homologated but not yet exposed as one automatic
 Until that integration lands, a successful **Link P2P access** still reports RTSP as pending rather
 than claiming that the stream was configured.
 
+New binds now preserve the terminal access identity and device subscription token as a single
+encrypted database record. This closes the earlier restart gap where successful enrollment existed
+only in process memory. The authenticated `p2p-probe` endpoint can use that durable record to
+certify an access-node session, inspect aggregate device visibility and confirm a heartbeat. The
+separate `p2p-route-probe` performs a bounded brokered CALLING and direct CA/CB handshake with only
+the selected camera. Both stages are read-only: they neither open media nor send `onvifEn`, RTSP,
+light, audio or reboot commands.
+
 ## Homologated wire sequence
 
 - GATT service `8922a5c3-1e44-403e-a587-bcf972e398b4`.
