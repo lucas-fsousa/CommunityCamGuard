@@ -129,6 +129,56 @@ def test_model_read_builder_is_allowlisted_and_contains_no_write_value():
         client.build_model_read(node, 7000000002, "ProWritable.unknown", 18, 19)
 
 
+def test_orientation_builder_matches_recovered_typed_d2_contract():
+    node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    wire = client.build_orientation_write(node, 7000000002, "inverted", 18, 19)
+    plain = gute_mode2_decrypt(wire, node.session_key)
+
+    assert plain[:2] == b"\x7e\xd2"
+    assert plain[0x18] == 2
+    assert struct.unpack_from("<I", plain, 0x20)[0] == 19
+    assert struct.unpack_from("<H", plain, 0x24)[0] == 1
+    assert plain[0x26] == 7
+    path_length = plain[0x27]
+    json_length = struct.unpack_from("<H", plain, 0x28)[0]
+    cursor = 0x2A
+    assert struct.unpack_from("<Q", plain, cursor)[0] == 7000000002
+    cursor += 8
+    assert plain[cursor : cursor + path_length].decode() == client.ORIENTATION_PATH
+    cursor += path_length + 1
+    assert plain[cursor : cursor + json_length] == b"3"
+    assert not hasattr(client, "build_model_write")
+    assert not hasattr(client, "build_model_action")
+
+
+def test_orientation_response_requires_matching_application_message():
+    response = bytearray(0x36)
+    response[:2] = b"\x7e\xd3"
+    struct.pack_into("<I", response, 0x30, 19)
+    struct.pack_into("<H", response, 0x34, 0)
+
+    assert client.parse_orientation_write_response(bytes(response), 19) == 0
+    assert client.parse_orientation_write_response(bytes(response), 20) is None
+
+
+def test_orientation_values_are_strict_and_reject_before_network(monkeypatch):
+    monkeypatch.setattr(
+        socket,
+        "socket",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("network opened")),
+    )
+    enrollment = P2PEnrollment(
+        device_id="7000000002",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=None,
+        created_at="now",
+        updated_at="now",
+    )
+    with pytest.raises(ValueError, match="normal or inverted"):
+        client.set_camera_orientation(enrollment, "mirror")
+
+
 def test_model_read_response_requires_the_selected_device():
     value = {"setVal": {"multiFlip": 1}, "t": 1787545850}
     encoded = json.dumps(value, separators=(",", ":")).encode()
@@ -316,3 +366,109 @@ def test_property_read_selects_only_bound_online_camera(monkeypatch):
         ("read", 7000000002, "ProWritable.videoParm", 11),
     ]
     assert result.value == {"setVal": {"multiFlip": 1}}
+
+
+def test_orientation_change_requires_preflight_d3_and_fresh_readback(monkeypatch):
+    enrollment = P2PEnrollment(
+        device_id="7000000002",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=None,
+        created_at="now",
+        updated_at="now",
+    )
+    node = client.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
+    target = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    calls = []
+
+    class FakeSocket:
+        def bind(self, address):
+            calls.append(("bind", address))
+
+        def close(self):
+            calls.append(("close",))
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(
+        client,
+        "_camera_session",
+        lambda *_args: (node, target, 40),
+    )
+
+    reads = iter(
+        (
+            client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}}),
+            client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}}),
+            client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 3}}),
+        )
+    )
+
+    def fake_read(_sock, _node, device, path, sequence, _timeout, **_kwargs):
+        calls.append(("read", device.device_id, path, sequence))
+        return next(reads)
+
+    def fake_write(_sock, _node, device, orientation, sequence, _timeout, **_kwargs):
+        calls.append(("write", device.device_id, orientation, sequence))
+        return client.ModelWriteResult(True, 0)
+
+    monkeypatch.setattr(client, "exchange_model_read", fake_read)
+    monkeypatch.setattr(client, "exchange_orientation_write", fake_write)
+    monkeypatch.setattr(client.time, "sleep", lambda _seconds: None)
+
+    result = client.set_camera_orientation(enrollment, "inverted")
+
+    assert calls == [
+        ("bind", ("", 0)),
+        ("read", 7000000002, client.ORIENTATION_READ_PATH, 40),
+        ("write", 7000000002, "inverted", 41),
+        ("read", 7000000002, client.ORIENTATION_READ_PATH, 42),
+        ("read", 7000000002, client.ORIENTATION_READ_PATH, 43),
+        ("close",),
+    ]
+    assert result.previous_value == 1
+    assert result.requested_value == 3
+    assert result.changed is True
+    assert result.transport_acknowledged is True
+    assert result.error_code == 0
+    assert result.verified is True
+
+
+def test_orientation_change_is_idempotent_and_never_writes_when_already_set(monkeypatch):
+    enrollment = P2PEnrollment(
+        device_id="7000000002",
+        access_id=123,
+        access_token=bytes(range(64)),
+        dev_token=None,
+        created_at="now",
+        updated_at="now",
+    )
+    node = client.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
+    target = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+
+    class FakeSocket:
+        def bind(self, _address):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(client, "_camera_session", lambda *_args: (node, target, 8))
+    monkeypatch.setattr(
+        client,
+        "exchange_model_read",
+        lambda *_args, **_kwargs: client.ModelReadResult(
+            True, 0, {"setVal": {"multiFlip": 1}}
+        ),
+    )
+    monkeypatch.setattr(
+        client,
+        "exchange_orientation_write",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("write sent")),
+    )
+
+    result = client.set_camera_orientation(enrollment, "normal")
+
+    assert result.changed is False
+    assert result.verified is True
+    assert result.previous_value == result.requested_value == 1

@@ -158,6 +158,12 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
             f"ffmpeg:{hd_sid}{sd_vid}{audio_part}{sub_raw}")
     return {
         "api": {"listen": _api_listen()},
+        # go2rtc's streams producer warnings include the complete source URL, including RTSP
+        # userinfo. The config/API stay loopback-only, but Docker logs are routinely collected
+        # for support and must never turn into a second plaintext credential store. Disable only
+        # that module while retaining startup/API/WebRTC diagnostics from the rest of go2rtc.
+        # The exec module stays at error: its official debug mode prints full FFmpeg arguments.
+        "log": {"level": "info", "streams": "disabled", "exec": "error"},
         "rtsp": {"listen": f"{s.go2rtc_host}:{s.go2rtc_rtsp_port}"},
         "webrtc": {"listen": f"{s.go2rtc_host}:{s.go2rtc_webrtc_port}"},
         # Override the built-in software preset so frame pacing/GOP are the *last* video options.

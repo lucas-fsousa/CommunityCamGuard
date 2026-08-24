@@ -205,6 +205,15 @@ def test_go2rtc_config_binds_loopback():
         assert listen.startswith("127.0.0.1:")
 
 
+def test_go2rtc_suppresses_modules_that_log_plaintext_source_credentials():
+    cfg = go2rtc.build_config(cameras=[])
+    assert cfg["log"] == {
+        "level": "info",
+        "streams": "disabled",
+        "exec": "error",
+    }
+
+
 def test_stream_id_and_restream_url():
     assert go2rtc.stream_id("aa:bb:cc:dd:ee:01") == "cam_aabbccddee01"
     assert go2rtc.web_stream_id("aa:bb:cc:dd:ee:01") == "cam_aabbccddee01_web"

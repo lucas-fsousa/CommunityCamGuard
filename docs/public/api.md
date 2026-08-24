@@ -134,7 +134,7 @@ subset may additionally use an explicitly enabled, same-origin HTTPS tunnel.
 | POST | `/api/provisioning/privileged/bind` | `ProvisioningPrivilegedBindIn` | Explicit stage 2: bind the camera to the captured IoTVideo account. It still does not enable RTSP. |
 | POST | `/api/provisioning/privileged/p2p-probe` | `ProvisioningLabelIn` | Uses encrypted post-bind material to authenticate to the P2P access node, inspect aggregate account/target visibility, heartbeat and resolve the selected target's TermDNS route. It does not CALL or send any command to the camera. |
 | POST | `/api/provisioning/privileged/p2p-route-probe` | `ProvisioningLabelIn` | Performs a bounded brokered CALLING and direct CA/CB NAT handshake for the selected camera. It exposes no peer address/session secret and opens neither media nor a control channel. |
-| POST | `/api/provisioning/privileged/p2p-property-read` | `ProvisioningP2PPropertyReadIn` | Trusted-LAN only. Opens the selected camera route and sends one allowlisted B7 thing-model read. Unknown paths are rejected before network I/O; the backend contains no write/action builder in this production slice. |
+| POST | `/api/provisioning/privileged/p2p-property-read` | `ProvisioningP2PPropertyReadIn` | Trusted-LAN only. Opens the selected camera route and sends one allowlisted B7 thing-model read. Unknown paths are rejected before network I/O. There is no arbitrary write/action API. |
 
 `ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
 `capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
@@ -190,6 +190,11 @@ the capability roots recovered from the APK and compiled into the backend allowl
 `Action.*` roots are queried with B7 and are never executed with AC. The response contains the
 camera-owned JSON value, transport acknowledgement and device error code. Unlike the temporary
 Web-Bluetooth subset, this route never accepts the remote HTTPS-tunnel exception.
+
+The driver also contains one internal typed D2 operation for image orientation. It accepts only
+normal/180°, uses a fixed property path and requires a successful B7 preflight, correlated D3 and
+fresh B7 readback. It is not exposed as an HTTP endpoint yet; no arbitrary property writer or action
+endpoint exists.
 
 When the server has no Wi-Fi radio/scanner, `GET /provisioning/networks` returns
 `manual_entry_allowed: true`. The localhost UI then accepts an explicit 1–32-byte SSID and

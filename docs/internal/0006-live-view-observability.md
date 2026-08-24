@@ -61,4 +61,7 @@ GET /api/media/client-events
 | process state `D` or `Z` | Blocked I/O/kernel wait or unreaped process |
 
 Commands and RTSP URLs are recorded only to distinguish recorder and live transcodes. RTSP userinfo is
-redacted, and camera credentials/media payloads are never written.
+redacted, and camera credentials/media payloads are never written. The generated go2rtc config
+also disables its `streams` logger because upstream producer warnings embed the complete RTSP
+source URL; `exec` is held at `error` because its debug mode prints full FFmpeg arguments. Other
+module/startup logs remain available, and Docker's bounded rotation still prevents disk growth.

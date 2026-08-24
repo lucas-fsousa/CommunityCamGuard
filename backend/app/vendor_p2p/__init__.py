@@ -9,20 +9,25 @@ from .account import (
 )
 from .client import (
     MODEL_READ_PATHS,
+    ORIENTATION_VALUES,
     P2PInventory,
+    P2POrientationWrite,
     P2PProbeError,
     P2PPropertyRead,
     P2PRouteProbe,
     probe_account_inventory,
     probe_camera_route,
     read_camera_property,
+    set_camera_orientation,
 )
 
 __all__ = [
     "MODEL_READ_PATHS",
+    "ORIENTATION_VALUES",
     "AccountCredentials",
     "AccountSession",
     "P2PInventory",
+    "P2POrientationWrite",
     "P2PProbeError",
     "P2PPropertyRead",
     "P2PRouteProbe",
@@ -32,4 +37,5 @@ __all__ = [
     "probe_camera_route",
     "read_camera_property",
     "refresh_account_session",
+    "set_camera_orientation",
 ]

@@ -90,11 +90,13 @@ without touching camera state:
 
 The next read-only slice adds `/provisioning/privileged/p2p-property-read`. It accepts only the
 fixed B7 allowlist recovered from the APK, selects the durable enrollment's exact device ID and
-requires a direct handshake before issuing one property read. There is intentionally no D2 writer
-or AC action constructor in the production package yet. Live validation against the designated
-test camera returned `ProWritable.videoParm` with transport ACK/error zero and did not contact the
-two monitoring cameras. This endpoint uses the strict trusted-LAN guard, not the opt-in remote HTTPS
-exception reserved for the Web-Bluetooth onboarding subset.
+requires a direct handshake before issuing one property read. No arbitrary D2 writer or AC action
+constructor is exposed. Live validation against the designated test camera returned
+`ProWritable.videoParm` with transport ACK/error zero and did not contact the two monitoring
+cameras. The production driver now has one separate, fixed-path D2 orientation operation accepting
+only normal/180°, with a mandatory B7 preflight, matching D3 response and fresh B7 readback. It is
+not yet exposed through HTTP or the dashboard. This endpoint uses the strict trusted-LAN guard, not
+the opt-in remote HTTPS exception reserved for the Web-Bluetooth onboarding subset.
 
 An enrollment completed by an older running container remains memory-only; it must be bound once
 through the new version before restart durability can be claimed. No process-memory extraction or
