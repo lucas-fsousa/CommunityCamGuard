@@ -1,6 +1,6 @@
 # 0019 — Progressive first playback with seekable cache promotion
 
-**Status:** accepted · **Date:** 2026-08-17
+**Status:** superseded by [ADR 0021](0021-seekable-first-recording-playback.md) · **Date:** 2026-08-17
 
 ## Context
 

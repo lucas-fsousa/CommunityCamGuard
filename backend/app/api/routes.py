@@ -24,7 +24,7 @@ from pathlib import Path
 
 import websockets
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, SecretStr
 from starlette.websockets import WebSocketState
 
@@ -1267,39 +1267,47 @@ def recording_file(path: str):
     """Serve one segment for playback/download, guarded to the recordings root.
 
     Segments are HEVC, which browsers can't decode in a ``<video>`` tag, so HEVC segments are
-    transcoded to H.264 for playback: a cached copy (seekable) if we have one, else a progressive
-    stream that also warms the cache (see :mod:`..recording.playback`). H.264 segments are served
-    directly.
+    prepared as a complete, seekable H.264 cache before playback. H.264 segments are served
+    directly. The dashboard starts preparation through ``/recordings/prepare``.
     """
     _root, target = _recording_target(path)
-    # Cache hit -> seekable immediately. Browser-native codec -> original immediately. The first
-    # HEVC view tails one shared fragmented encode, which becomes the seekable cache when complete.
     playable = playback.cached_path(target)
     if playable is not None:
         return FileResponse(playable, media_type="video/mp4")
     if not playback.needs_transcode(target):
         return FileResponse(target, media_type="video/mp4")
-    return StreamingResponse(
-        playback.streaming_transcode(target),
-        media_type="video/mp4",
-        headers={
-            "Cache-Control": "private, no-store",
-            "Accept-Ranges": "none",
-            "X-Playback-Mode": "progressive",
-        },
+    playback.prepare_transcode(target)
+    raise HTTPException(
+        status_code=409,
+        detail="seekable playback is still being prepared",
     )
 
 
-@router.get("/recordings/playback-status", dependencies=[Depends(require_auth)])
-def recording_playback_status(path: str) -> dict:
-    """Tell the player when the progressive first view has become seekable."""
-    _root, target = _recording_target(path)
+def _recording_playback_state(target: Path) -> dict:
     if playback.cached_path(target) is not None:
         return {"ready": True, "cached": True, "transcoding": False}
     if playback.transcode_in_progress(target):
         return {"ready": False, "cached": False, "transcoding": True}
     browser_playable = not playback.needs_transcode(target)
     return {"ready": browser_playable, "cached": False, "transcoding": False}
+
+
+@router.post("/recordings/prepare", dependencies=[Depends(require_auth)])
+def prepare_recording_playback(path: str) -> dict:
+    """Start one shared background HEVC -> seekable H.264 preparation job."""
+    _root, target = _recording_target(path)
+    state = _recording_playback_state(target)
+    if not state["ready"] and not state["transcoding"]:
+        playback.prepare_transcode(target)
+        state = _recording_playback_state(target)
+    return state
+
+
+@router.get("/recordings/playback-status", dependencies=[Depends(require_auth)])
+def recording_playback_status(path: str) -> dict:
+    """Tell the player when the complete seekable artifact is ready."""
+    _root, target = _recording_target(path)
+    return _recording_playback_state(target)
 
 
 def _recording_download_name(target: Path, root: Path) -> str:

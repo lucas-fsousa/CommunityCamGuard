@@ -38,6 +38,22 @@ export function renderRecordings(stage) {
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  function playSeekable(fileUrl, selection, announceReady = false) {
+    if (selection !== playbackSelection) return;
+    if (announceReady) playbackState.textContent = t("rec.seekableReady");
+    player.addEventListener("playing", () => {
+      if (selection === playbackSelection) playbackState.textContent = "";
+    }, { once: true });
+    player.addEventListener("loadedmetadata", () => {
+      if (selection !== playbackSelection) return;
+      player.play().catch(() => {
+        if (selection === playbackSelection) playbackState.textContent = t("rec.readyPressPlay");
+      });
+    }, { once: true });
+    player.src = fileUrl + "&ready=" + Date.now();
+    player.load();
+  }
+
   async function waitForSeekable(path, fileUrl, selection) {
     let idleChecks = 0;
     while (selection === playbackSelection) {
@@ -50,25 +66,8 @@ export function renderRecordings(stage) {
         return;
       }
       if (selection !== playbackSelection) return;
-      if (status.cached) {
-        const resumeAt = Number.isFinite(player.currentTime) ? player.currentTime : 0;
-        const shouldResume = !player.paused;
-        playbackState.textContent = t("rec.seekableReady");
-        player.addEventListener("loadedmetadata", () => {
-          if (selection !== playbackSelection) return;
-          if (resumeAt > 0 && Number.isFinite(player.duration)) {
-            player.currentTime = Math.min(resumeAt, Math.max(0, player.duration - 0.1));
-          }
-          if (shouldResume) player.play().catch(() => {});
-          playbackState.textContent = "";
-        }, { once: true });
-        // Same endpoint, cache-busted so the browser cannot reuse the earlier chunked response.
-        player.src = fileUrl + "&ready=" + Date.now();
-        player.load();
-        return;
-      }
       if (status.ready) {
-        playbackState.textContent = "";       // source codec was browser-native
+        playSeekable(fileUrl, selection, status.cached);
         return;
       }
       if (status.transcoding) {
@@ -84,6 +83,34 @@ export function renderRecordings(stage) {
         return;
       }
     }
+  }
+
+  async function preparePlayback(path, fileUrl, selection) {
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    playbackState.textContent = t("rec.startingPlayback");
+    let status;
+    try {
+      status = await api(
+        "/recordings/prepare?path=" + encodeURIComponent(path),
+        { method: "POST" },
+      );
+    } catch (_) {
+      if (selection === playbackSelection) playbackState.textContent = t("rec.playbackFailed");
+      return;
+    }
+    if (selection !== playbackSelection) return;
+    if (status.ready) {
+      playSeekable(fileUrl, selection, status.cached);
+      return;
+    }
+    if (!status.transcoding) {
+      playbackState.textContent = t("rec.playbackFailed");
+      return;
+    }
+    playbackState.textContent = t("rec.preparingSeekable");
+    waitForSeekable(path, fileUrl, selection);
   }
 
   async function load() {
@@ -128,10 +155,7 @@ export function renderRecordings(stage) {
         row.classList.add("active");
         const selection = ++playbackSelection;
         const fileUrl = "/api/recordings/file?path=" + encodeURIComponent(s.path);
-        playbackState.textContent = t("rec.startingPlayback");
-        player.src = fileUrl;
-        player.play().catch(() => {});   // first HEVC view starts progressively while cache warms
-        waitForSeekable(s.path, fileUrl, selection);
+        preparePlayback(s.path, fileUrl, selection);
       });
       list.append(row);
     });

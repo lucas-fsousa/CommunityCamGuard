@@ -5,12 +5,12 @@ can't decode HEVC in a ``<video>`` tag (black screen, and the failed video track
 down with it). So an HEVC segment is transcoded to **H.264 on demand** the first time it is
 opened, and the result is cached, so later views are instant.
 
-The first viewer no longer waits for the whole transcode. FFmpeg writes a fragmented MP4 which is
-tailed to the response as it grows; when encoding finishes, that same output is cheaply remuxed
-(``-c copy``) into a **faststart** cache file (``moov`` at the front, real duration, seekable).
-The frontend then swaps to the finished cache while preserving the current position. Audio is
-``-c:a copy`` (already AAC). ffprobe/ffmpeg come from the image. Segments already H.264 are served
-as-is.
+The first viewer starts one background preparation job and waits for a complete **faststart** MP4
+(``moov`` at the front, real duration, seekable) before attaching it to the browser player. A
+fragmented preview was previously streamed while encoding, but that exposed only a few seconds at
+a time and made arbitrary seeking impossible -- the opposite of what a recordings reviewer needs.
+Audio is ``-c:a copy`` (already AAC). ffprobe/ffmpeg come from the image. Segments already H.264
+are served as-is.
 """
 from __future__ import annotations
 
@@ -20,17 +20,13 @@ import os
 import shutil
 import subprocess
 import threading
-import time
 import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 from ..config import get_settings
 
 # Codecs a browser plays natively in a <video> tag → serve the original, don't transcode.
 _BROWSER_VIDEO = {"h264", "avc1", "vp8", "vp9", "av1"}
-_STREAM_CHUNK = 256 * 1024
-_STREAM_POLL_SECONDS = 0.05
 _JOBS_LOCK = threading.Lock()
 _JOBS: dict[Path, _TranscodeJob] = {}
 log = logging.getLogger(__name__)
@@ -123,20 +119,6 @@ def _ffmpeg_cmd(src: Path, dst: Path) -> list[str]:
             "-movflags", "+faststart", "-f", "mp4", str(dst)]
 
 
-def _stream_ffmpeg_cmd(src: Path, dst: Path) -> list[str]:
-    """Encode H.264 into an MP4 that can be read while FFmpeg is still writing it."""
-    return [*_ffmpeg_prefix(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-c:a", "copy",
-            "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-            "-flush_packets", "1", "-f", "mp4", str(dst)]
-
-
-def _faststart_remux_cmd(src: Path, dst: Path) -> list[str]:
-    """Turn the completed fragmented preview into a seekable cache without re-encoding."""
-    return [*_ffmpeg_prefix(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-            "-map", "0", "-c", "copy", "-movflags", "+faststart", "-f", "mp4", str(dst)]
-
-
 def cached_path(segment: Path) -> Path | None:
     """Return and touch an existing derived cache file, without starting any work."""
     cache = cache_path(segment)
@@ -178,23 +160,19 @@ def transcoded_path(segment: Path) -> Path | None:
 
 
 class _TranscodeJob:
-    """One shared progressive encode for every viewer requesting the same segment.
+    """One shared seekable-cache preparation for every viewer requesting a segment.
 
-    The encoder continues after a browser disconnects so the expensive work still produces a
-    useful cache entry. Multiple viewers tail the same temporary file rather than starting one
-    FFmpeg process each.
+    The work is independent of the HTTP request, so leaving the view does not waste the encode.
+    Concurrent viewers poll the same job instead of starting duplicate FFmpeg processes.
     """
 
     def __init__(self, segment: Path) -> None:
         self.segment = segment.resolve()
         self.cache = cache_path(self.segment)
         nonce = uuid.uuid4().hex
-        self.stream_part = self.cache.with_name(f"{self.cache.stem}.{nonce}.stream.part.mp4")
-        self.final_part = self.cache.with_name(f"{self.cache.stem}.{nonce}.final.part.mp4")
+        self.part = self.cache.with_name(f"{self.cache.stem}.{nonce}.part.mp4")
         self.done = threading.Event()
         self.failed = False
-        self._reader_lock = threading.Lock()
-        self._readers = 0
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
@@ -203,82 +181,33 @@ class _TranscodeJob:
     def _run(self) -> None:
         try:
             encoded = subprocess.run(
-                _stream_ffmpeg_cmd(self.segment, self.stream_part),
+                _ffmpeg_cmd(self.segment, self.part),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=600,
             )
-            if encoded.returncode != 0 or not self.stream_part.is_file():
+            if encoded.returncode != 0 or not self.part.is_file():
                 self.failed = True
-                log.warning("progressive playback encode failed for %s", self.segment)
+                log.warning("seekable playback preparation failed for %s", self.segment)
                 return
-            # A concurrent cache warmer may have finished while this preview was encoding.
             if not self.cache.is_file():
-                remuxed = subprocess.run(
-                    _faststart_remux_cmd(self.stream_part, self.final_part),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=120,
-                )
-                if remuxed.returncode != 0 or not self.final_part.is_file():
-                    self.failed = True
-                    log.warning("playback faststart remux failed for %s", self.segment)
-                    return
-                os.replace(self.final_part, self.cache)
-                _evict(keep=self.cache)
+                os.replace(self.part, self.cache)
+            _evict(keep=self.cache)
         except (OSError, subprocess.SubprocessError) as exc:
             self.failed = True
             log.warning("playback preparation failed for %s: %s", self.segment, exc)
         finally:
-            self.final_part.unlink(missing_ok=True)
+            self.part.unlink(missing_ok=True)
             self.done.set()
             with _JOBS_LOCK:
                 if _JOBS.get(self.segment) is self:
                     _JOBS.pop(self.segment, None)
-            self._cleanup_stream_if_idle()
-
-    def _cleanup_stream_if_idle(self) -> None:
-        with self._reader_lock:
-            if self.done.is_set() and self._readers == 0:
-                self.stream_part.unlink(missing_ok=True)
-
-    def reader(self) -> Iterator[bytes]:
-        """Tail the growing fragmented MP4, or the final cache if encoding won the race."""
-        with self._reader_lock:
-            self._readers += 1
-
-        def chunks() -> Iterator[bytes]:
-            try:
-                source: Path | None = None
-                while source is None:
-                    if self.stream_part.is_file():
-                        source = self.stream_part
-                    elif self.done.is_set():
-                        source = self.cache if self.cache.is_file() else None
-                        break
-                    else:
-                        time.sleep(_STREAM_POLL_SECONDS)
-                if source is None:
-                    return
-                with source.open("rb") as handle:
-                    while True:
-                        data = handle.read(_STREAM_CHUNK)
-                        if data:
-                            yield data
-                            continue
-                        if self.done.is_set():
-                            break
-                        time.sleep(_STREAM_POLL_SECONDS)
-            finally:
-                with self._reader_lock:
-                    self._readers -= 1
-                self._cleanup_stream_if_idle()
-
-        return chunks()
 
 
-def streaming_transcode(segment: Path) -> Iterator[bytes]:
-    """Return a reader for a shared progressive HEVC -> H.264 transcode job."""
+def prepare_transcode(segment: Path) -> bool:
+    """Ensure a shared background job is preparing ``segment``; return whether it is running."""
+    if cached_path(segment) is not None or not needs_transcode(segment):
+        return False
     key = segment.resolve()
     with _JOBS_LOCK:
         job = _JOBS.get(key)
@@ -286,11 +215,11 @@ def streaming_transcode(segment: Path) -> Iterator[bytes]:
             job = _TranscodeJob(key)
             _JOBS[key] = job
             job.start()
-    return job.reader()
+    return True
 
 
 def transcode_in_progress(segment: Path) -> bool:
-    """Whether a progressive job currently owns this segment."""
+    """Whether a seekable-cache preparation job currently owns this segment."""
     with _JOBS_LOCK:
         job = _JOBS.get(segment.resolve())
         return bool(job and not job.done.is_set())

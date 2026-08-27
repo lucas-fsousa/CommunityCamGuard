@@ -53,3 +53,7 @@ pause state. Thus startup is progressive, while the steady-state player remains 
 Concurrent viewers of the same segment share one job. A browser disconnect does not cancel it: the
 job completes the reusable cache. Temporary fragments disappear after the last reader closes, and
 the existing bounded LRU policy remains authoritative for completed derived files.
+
+This amendment was superseded by [ADR 0021](0021-seekable-first-recording-playback.md) after real
+review use confirmed that partial duration and the inability to jump ahead were more harmful than
+the shorter time to first picture.

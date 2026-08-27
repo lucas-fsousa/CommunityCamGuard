@@ -213,8 +213,9 @@ const STRINGS = {
     "rec.download": "Download recording",
     "rec.downloadRecording": "Download recording from {camera}",
     "rec.startingPlayback": "Starting playback…",
-    "rec.preparingSeekable": "Playing while the seekable version is prepared…",
-    "rec.seekableReady": "Seekable version ready. Resuming…",
+    "rec.preparingSeekable": "Preparing the complete recording so seeking is available…",
+    "rec.seekableReady": "Complete seekable recording ready. Starting…",
+    "rec.readyPressPlay": "Recording ready. Press play to start.",
     "rec.playbackFailed": "The browser-compatible version could not be prepared.",
   },
   "pt-BR": {
@@ -417,8 +418,9 @@ const STRINGS = {
     "rec.download": "Baixar gravação",
     "rec.downloadRecording": "Baixar gravação da câmera {camera}",
     "rec.startingPlayback": "Iniciando reprodução…",
-    "rec.preparingSeekable": "Reproduzindo enquanto a versão navegável é preparada…",
-    "rec.seekableReady": "Versão navegável pronta. Retomando…",
+    "rec.preparingSeekable": "Preparando a gravação completa para permitir o avanço…",
+    "rec.seekableReady": "Gravação completa e navegável pronta. Iniciando…",
+    "rec.readyPressPlay": "Gravação pronta. Pressione reproduzir para iniciar.",
     "rec.playbackFailed": "Não foi possível preparar a versão compatível com o navegador.",
   },
 };

@@ -45,22 +45,42 @@ def test_recording_file_serves_an_existing_segment(monkeypatch):
     assert resp.status_code == 200                     # a FileResponse for the segment
 
 
-def test_recording_file_streams_first_hevc_view_and_reports_progress(monkeypatch):
+def test_recording_file_refuses_partial_hevc_and_starts_preparation(monkeypatch):
     root = Path(get_settings().recordings_dir)
     seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
     seg.parent.mkdir(parents=True, exist_ok=True)
     seg.write_bytes(b"hevc")
     monkeypatch.setattr(routes.playback, "cached_path", lambda t: None)
     monkeypatch.setattr(routes.playback, "needs_transcode", lambda t: True)
-    monkeypatch.setattr(routes.playback, "streaming_transcode", lambda t: iter([b"fragment"]))
-    monkeypatch.setattr(routes.playback, "transcode_in_progress", lambda t: True)
+    started = []
+    monkeypatch.setattr(routes.playback, "prepare_transcode", lambda t: started.append(t) or True)
 
-    resp = routes.recording_file(path=str(seg))
+    try:
+        routes.recording_file(path=str(seg))
+    except routes.HTTPException as exc:
+        assert exc.status_code == 409
+    else:
+        raise AssertionError("uncached HEVC was served before it became seekable")
 
-    assert resp.status_code == 200
-    assert resp.headers["x-playback-mode"] == "progressive"
-    assert resp.headers["accept-ranges"] == "none"
-    assert routes.recording_playback_status(path=str(seg)) == {
+    assert started == [seg.resolve()]
+
+
+def test_prepare_recording_starts_shared_job_and_reports_progress(monkeypatch):
+    root = Path(get_settings().recordings_dir)
+    seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
+    seg.parent.mkdir(parents=True, exist_ok=True)
+    seg.write_bytes(b"hevc")
+    monkeypatch.setattr(routes.playback, "cached_path", lambda t: None)
+    monkeypatch.setattr(routes.playback, "needs_transcode", lambda t: True)
+    running = {"value": False}
+    monkeypatch.setattr(routes.playback, "transcode_in_progress", lambda t: running["value"])
+    monkeypatch.setattr(
+        routes.playback,
+        "prepare_transcode",
+        lambda t: running.update(value=True) or True,
+    )
+
+    assert routes.prepare_recording_playback(path=str(seg)) == {
         "ready": False, "cached": False, "transcoding": True,
     }
 

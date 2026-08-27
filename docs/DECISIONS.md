@@ -1373,3 +1373,17 @@ LRU cache. The frontend polls `/recordings/playback-status`, then swaps to that 
 same playback position. Concurrent viewers share the job, disconnects do not waste the cache work,
 and the HEVC archive/download remains unchanged. See ADR
 `docs/internal/0019-progressive-first-recording-playback.md`.
+
+## 37. Recording review returns to seekable-first playback (2026-08-27)
+
+Real review exposed the cost hidden by §36: the fragmented preview revealed only the portion FFmpeg
+had encoded, so the duration grew in small steps and a reviewer could not jump to a future point in
+the recording. That behavior is appropriate for a live stream, not an archived clip.
+
+The dashboard now starts one shared background preparation job through
+`POST /api/recordings/prepare`, shows an explicit preparation state, and attaches `/recordings/file`
+only after the complete H.264 faststart artifact is ready. The player therefore receives the real
+duration and a range-capable file from its first frame. Leaving the view does not cancel useful
+work, concurrent requests share the job, later plays remain instant through the bounded cache, and
+the original HEVC recording/download stays untouched. See ADR
+`docs/internal/0021-seekable-first-recording-playback.md`.
