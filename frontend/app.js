@@ -9,6 +9,7 @@ import {
   renderPlayers,
   setPlayersLive,
   STALL_POLL_MS,
+  syncCameraStatusDots,
 } from "ccg/live";
 import {
   configureCameraManagement,
@@ -25,6 +26,7 @@ if (versionBadge) versionBadge.textContent = "build " + APP_VERSION;
 
 let storageTimer = 0;
 let watchdogTimer = 0;
+let cameraStatusTimer = 0;
 
 function stopDashboardSession() {
   if (storageTimer) {
@@ -34,6 +36,10 @@ function stopDashboardSession() {
   if (watchdogTimer) {
     clearInterval(watchdogTimer);
     watchdogTimer = 0;
+  }
+  if (cameraStatusTimer) {
+    clearInterval(cameraStatusTimer);
+    cameraStatusTimer = 0;
   }
   setPlayersLive(false);
 }
@@ -89,6 +95,15 @@ async function loadCameras() {
   render();
 }
 
+async function loadCameraStatuses() {
+  try {
+    const statuses = await api("/cameras/status");
+    const byMac = new Map(statuses.map((item) => [item.mac, item]));
+    state.cameras.forEach((camera) => Object.assign(camera, byMac.get(camera.mac) || {}));
+    syncCameraStatusDots();
+  } catch {}
+}
+
 function setupLanguageSelector() {
   const selector = $("#lang");
   const labels = { en: "EN", "pt-BR": "PT" };
@@ -120,6 +135,7 @@ async function boot() {
   await Promise.all([loadCameras(), loadStorage(), loadProvisioningStatus()]);
   if (!storageTimer) storageTimer = setInterval(loadStorage, 15000);
   if (!watchdogTimer) watchdogTimer = setInterval(freezeWatchdog, STALL_POLL_MS);
+  if (!cameraStatusTimer) cameraStatusTimer = setInterval(loadCameraStatuses, 5000);
 }
 
 onUnauthorized(showLogin);

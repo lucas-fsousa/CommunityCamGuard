@@ -1,6 +1,6 @@
 import { t } from "ccg/i18n";
 import { api, el, state, svgIcon } from "ccg/core";
-import { capBadges, probeBtn, removeBtn } from "ccg/live";
+import { cameraStatusDot, capBadges, probeBtn, removeBtn } from "ccg/live";
 import { connectProvisioningCamera, supportsWebBluetooth } from "ccg/provisioning-ble";
 
 let loadCameras = async () => {};
@@ -94,12 +94,11 @@ function candidateForm(c) {
 
 // Manage card for a configured camera: identity + status + probe/remove.
 function configuredCard(cam) {
-  const rec = el("span", { className: "rec" + (cam.recording ? " on" : ""),
-    title: cam.recording ? t("cam.recording") : t("cam.idle") });
+  const status = cameraStatusDot(cam);
   const meta = [cam.vendor, (cam.capabilities || {}).driver].filter(Boolean).join(" · ");
   return el("div", { className: "cam-card configured" },
     el("div", { className: "cam-card-head" },
-      rec,
+      status,
       el("strong", { className: "name", textContent: cam.name || t("cam.unnamed") }),
     ),
     el("small", { className: "muted", textContent: [cam.last_ip, meta].filter(Boolean).join(" · ") }),

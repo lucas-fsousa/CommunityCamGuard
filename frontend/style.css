@@ -162,8 +162,8 @@ header {
   min-width: 0; }
 .bar .ip { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
 .bar-spacer { flex: 1 1 auto; }
-.rec { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
-.rec.on { background: var(--full); box-shadow: 0 0 6px var(--full); }
+.camera-status { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+.camera-status.online { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 
 /* Action cluster + inline PTZ arrows (all one row, right-aligned). */
 .bar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }

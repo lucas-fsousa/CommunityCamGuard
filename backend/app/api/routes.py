@@ -208,7 +208,28 @@ def _camera_out(cam: registry.Camera) -> dict:
         "has_quality_variants": True,
         "webrtc_url": go2rtc.webrtc_page_url(cam.mac),
         "recording": False,  # live flag filled in by list_cameras()
+        "online": False,  # live RTSP packet progress filled in by list_cameras()
     }
+
+
+def _camera_runtime_statuses(request: Request, cameras: list[registry.Camera]) -> list[dict]:
+    """Read media activity once and map it to the configured camera identities."""
+
+    media = getattr(request.app.state, "media", None)
+    rec = getattr(request.app.state, "rec", None)
+    try:
+        online_probe = getattr(media, "stream_online", None)
+        online_streams = online_probe() if callable(online_probe) else {}
+    except (OSError, ValueError):
+        online_streams = {}
+    return [
+        {
+            "mac": cam.mac,
+            "online": bool(online_streams.get(go2rtc.stream_id(cam.mac), False)),
+            "recording": bool(rec and rec.is_recording(cam.mac)),
+        }
+        for cam in cameras
+    ]
 
 
 def _resync(request: Request) -> None:
@@ -257,13 +278,21 @@ def me(request: Request) -> dict:
 
 @router.get("/cameras", dependencies=[Depends(require_auth)])
 def list_cameras(request: Request) -> list[dict]:
-    rec = getattr(request.app.state, "rec", None)
+    cameras = registry.list_cameras()
+    statuses = {item["mac"]: item for item in _camera_runtime_statuses(request, cameras)}
     out = []
-    for cam in registry.list_cameras():
+    for cam in cameras:
         d = _camera_out(cam)
-        d["recording"] = bool(rec and rec.is_recording(cam.mac))
+        d.update(statuses[cam.mac])
         out.append(d)
     return out
+
+
+@router.get("/cameras/status", dependencies=[Depends(require_auth)])
+def camera_statuses(request: Request) -> list[dict]:
+    """Small polling surface for online/recording indicators; contains no credentials."""
+
+    return _camera_runtime_statuses(request, registry.list_cameras())
 
 
 def _probe_and_store(cam: registry.Camera) -> registry.Camera:
@@ -1222,6 +1251,13 @@ def recordings(
     res = recorder.query_segments(
         mac=mac, day_from=day_from, day_to=day_to, limit=limit, offset=offset
     )
+    camera_names = {
+        camera.mac.replace(":", "").replace("-", "").lower(): camera.name or camera.mac
+        for camera in registry.list_cameras()
+    }
+    for item in res["items"]:
+        key = str(item.get("mac") or "").replace(":", "").replace("-", "").lower()
+        item["camera_name"] = camera_names.get(key, item.get("mac") or "camera")
     res["retention_days"] = get_settings().recording_retention_days
     return res
 

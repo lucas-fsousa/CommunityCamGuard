@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -208,6 +209,8 @@ class Go2rtc:
         # (compose): we only regenerate its config and ask it to reload — never spawn a binary.
         self.manage = settings.manage_go2rtc if manage is None else manage
         self._proc: subprocess.Popen | None = None
+        self._activity_lock = threading.Lock()
+        self._packet_progress: dict[str, tuple[int, float]] = {}
 
     # --- config -------------------------------------------------------------------
     def write_config(self, cameras: list[Camera] | None = None) -> Path:
@@ -295,6 +298,38 @@ class Go2rtc:
             )
             out[sid] = {"video_packets": video_packets, "consumers": len(consumers)}
         return out
+
+    def stream_online(self, *, stale_after: float = 15.0) -> dict[str, bool]:
+        """Return producer liveness based on video packets advancing in wall-clock time.
+
+        Merely having a go2rtc producer object is insufficient: disconnected sources can leave a
+        placeholder behind, and a historical non-zero packet counter says nothing about the
+        camera's current state. The first non-zero sample is accepted immediately; subsequent
+        samples must advance within ``stale_after`` seconds. Counter resets are treated as a new
+        producer and therefore as progress.
+        """
+
+        activity = self.stream_activity()
+        if not activity:
+            return {}
+        now = time.monotonic()
+        max_age = max(3.0, float(stale_after))
+        online: dict[str, bool] = {}
+        with self._activity_lock:
+            for sid, sample in activity.items():
+                packets = max(0, int(sample.get("video_packets") or 0))
+                previous = self._packet_progress.get(sid)
+                if packets > 0 and (
+                    previous is None or packets != previous[0]
+                ):
+                    last_progress = now
+                else:
+                    last_progress = previous[1] if previous is not None else 0.0
+                self._packet_progress[sid] = (packets, last_progress)
+                online[sid] = packets > 0 and now - last_progress <= max_age
+            for sid in set(self._packet_progress) - set(activity):
+                self._packet_progress.pop(sid, None)
+        return online
 
     def restart_preload(self, sid: str, *, disconnect_grace: float = 2.0) -> bool:
         """Restart one preloaded *local* producer without touching the base camera/recording feed.

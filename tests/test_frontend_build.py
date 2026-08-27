@@ -149,6 +149,18 @@ def test_recording_rows_offer_download_without_triggering_playback_selection():
     assert 'event.stopPropagation()' in recordings
     assert 'svgIcon("i-download")' in recordings
     assert 'id="i-download"' in index
+    assert "s.camera_name || nameOf[cameraKey(s.mac)]" in recordings
+
+
+def test_camera_status_indicator_uses_online_stream_liveness():
+    frontend = Path(__file__).parents[1] / "frontend"
+    app = (frontend / "app.js").read_text()
+    live = (frontend / "modules" / "live-cameras.js").read_text()
+
+    assert 'api("/cameras/status")' in app
+    assert "setInterval(loadCameraStatuses, 5000)" in app
+    assert 't(cam.online ? "cam.online" : "cam.offline")' in live
+    assert 'className: "camera-status" +' in live
 
 
 def test_recording_first_view_polls_until_seekable_cache_is_ready():

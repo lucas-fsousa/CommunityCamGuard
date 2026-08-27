@@ -41,6 +41,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 | Method | Path | Body / Params | Notes |
 |---|---|---|---|
 | GET | `/api/cameras` | — | List configured cameras (see the camera object below). |
+| GET | `/api/cameras/status` | — | Lightweight runtime status for polling (`mac`, `online`, and `recording`). |
 | POST | `/api/cameras` | `CameraIn` | Add **or update** a camera (keyed by MAC). Validates RTSP creds and probes capabilities on add; a wrong password returns **422**. |
 | DELETE | `/api/cameras/{mac}` | — | Remove a camera and stop its streams. |
 | POST | `/api/cameras/{mac}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
@@ -82,12 +83,15 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   "has_substream": true,
   "has_quality_variants": true,
   "webrtc_url": "http://127.0.0.1:3201/webrtc.html?src=cam_aabbccddeeff",
+  "online": true,
   "recording": true
 }
 ```
 
 The password is **never** returned — only `has_password`. Stream IDs are go2rtc stream names (see
-Media). `recording` is whether the recorder is currently writing this camera.
+Media). `online` means that video packets in the camera's shared base stream are currently advancing;
+`recording` is whether the recorder process is currently running for the camera. The dashboard polls
+`/api/cameras/status` without rebuilding the players.
 
 **PTZ (`PtzIn`)** — press-and-hold semantics:
 
@@ -260,7 +264,7 @@ timestamp and, when available, a snapshot of the matching go2rtc stream packet/c
 
 | Method | Path | Params | Notes |
 |---|---|---|---|
-| GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Includes `total` and `retention_days`. |
+| GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Each item includes the registry-resolved `camera_name`; the response also includes `total` and `retention_days`. |
 | GET | `/api/recordings/file` | `path` (required) | Play a recorded `.mp4`. A first HEVC view is transcoded progressively while a seekable H.264 cache is built; cache hits and browser-native codecs are served directly. |
 | GET | `/api/recordings/playback-status` | `path` (required) | Reports `{ready, cached, transcoding}` so a first progressive view can switch to the completed seekable cache. |
 | GET | `/api/recordings/download` | `path` (required) | Download the original `.mp4` with `attachment` disposition and a server-generated `Camera_UTC-timestamp.mp4` filename. |

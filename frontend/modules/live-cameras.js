@@ -9,6 +9,26 @@ export function configureLiveCameraHandlers(handlers) {
   refreshView = handlers.refreshView;
 }
 
+export function cameraStatusDot(cam) {
+  const dot = el("span", {
+    className: "camera-status" + (cam.online ? " online" : " offline"),
+    title: t(cam.online ? "cam.online" : "cam.offline"),
+  });
+  dot.dataset.mac = cam.mac;
+  return dot;
+}
+
+export function syncCameraStatusDots() {
+  const byMac = new Map(state.cameras.map((camera) => [camera.mac, camera]));
+  document.querySelectorAll(".camera-status[data-mac]").forEach((dot) => {
+    const camera = byMac.get(dot.dataset.mac);
+    if (!camera) return;
+    dot.classList.toggle("online", Boolean(camera.online));
+    dot.classList.toggle("offline", !camera.online);
+    dot.title = t(camera.online ? "cam.online" : "cam.offline");
+  });
+}
+
 // --- camera tiles ------------------------------------------------------------------
 // Every stream the player is pointed at is H.264 + AAC/Opus. VideoRTC negotiates WebRTC and MSE
 // together, then its codec weights prefer WebRTC for these tracks; MSE remains the transport fallback.
@@ -106,7 +126,7 @@ export function probeBtn(cam) {
 }
 
 function camBar(cam) {
-  const rec = el("span", { className: "rec" + (cam.recording ? " on" : ""), title: cam.recording ? t("cam.recording") : t("cam.idle") });
+  const status = cameraStatusDot(cam);
   const del = removeBtn(cam);
   const probe = probeBtn(cam);
   const reload = el("button", { className: "icon-btn", title: t("cam.restart"), innerHTML: svgIcon("i-refresh") });
@@ -126,7 +146,7 @@ function camBar(cam) {
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
-    rec,
+    status,
     el("span", { className: "name", textContent: cam.name || t("cam.unnamed") }),
     el("span", { className: "ip", textContent: cam.last_ip || "" }),
     capBadges(cam),
@@ -527,7 +547,7 @@ function buildRail() {
   rail.innerHTML = "";
   state.cameras.forEach((c) => {
     const item = el("div", { className: "rail-item" + (c.mac === state.selected ? " active" : "") },
-      el("span", { className: "rec" + (c.recording ? " on" : "") }),
+      cameraStatusDot(c),
       el("span", { className: "rail-name", textContent: c.name || c.mac }),
     );
     item.addEventListener("click", () => {

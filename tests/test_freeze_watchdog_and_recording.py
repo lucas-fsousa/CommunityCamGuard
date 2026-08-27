@@ -53,6 +53,28 @@ def test_stream_activity_empty_on_go2rtc_error(monkeypatch):
     assert go2rtc.Go2rtc(manage=False).stream_activity() == {}
 
 
+def test_stream_online_requires_recent_video_packet_progress(monkeypatch):
+    media = go2rtc.Go2rtc(manage=False)
+    clock = [100.0]
+    packets = [20]
+    monkeypatch.setattr(go2rtc.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        media,
+        "stream_activity",
+        lambda: {"cam_x": {"video_packets": packets[0], "consumers": 1}},
+    )
+
+    assert media.stream_online(stale_after=15)["cam_x"] is True
+    clock[0] += 10
+    assert media.stream_online(stale_after=15)["cam_x"] is True
+    clock[0] += 6
+    assert media.stream_online(stale_after=15)["cam_x"] is False
+    packets[0] += 1
+    assert media.stream_online(stale_after=15)["cam_x"] is True
+    packets[0] = 0
+    assert media.stream_online(stale_after=15)["cam_x"] is False
+
+
 def test_media_activity_route_proxies_the_monitor():
     media = SimpleNamespace(stream_activity=lambda: {"cam_x": {"video_packets": 5, "consumers": 2}})
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from backend.app import config
 from backend.app.api import routes
-from backend.app.db import connect
+from backend.app.db import connect, registry
 from backend.app.media import go2rtc, quality
 from backend.app.recording import recorder
 
@@ -53,6 +53,7 @@ def test_query_day_range_filter():
 
 
 def test_recordings_endpoint_includes_retention_days(monkeypatch):
+    registry.init_db()
     _seed(3)
     monkeypatch.setenv("RECORDING_RETENTION_DAYS", "7")
     config.get_settings.cache_clear()
@@ -61,6 +62,17 @@ def test_recordings_endpoint_includes_retention_days(monkeypatch):
     monkeypatch.setenv("RECORDING_RETENTION_DAYS", "0")
     config.get_settings.cache_clear()
     assert routes.recordings()["retention_days"] == 0          # 0 = kept forever
+
+
+def test_recordings_endpoint_resolves_safe_mac_to_friendly_camera_name():
+    registry.init_db()
+    registry.upsert_camera("aa:bb:cc:dd:ee:01", name="Front door")
+    _seed(1, mac="aabbccddee01")
+
+    item = routes.recordings()["items"][0]
+
+    assert item["mac"] == "aabbccddee01"
+    assert item["camera_name"] == "Front door"
 
 
 def test_media_streams_reports_quality(monkeypatch):

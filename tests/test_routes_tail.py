@@ -15,6 +15,23 @@ def test_list_cameras_marks_the_recording_flag():
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=rec)))
     out = routes.list_cameras(req)
     assert len(out) == 1 and out[0]["recording"] is True
+    assert out[0]["online"] is False
+
+
+def test_camera_status_uses_base_stream_packet_liveness():
+    registry.init_db()
+    cam = registry.upsert_camera(
+        "aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1"
+    )
+    media = SimpleNamespace(
+        stream_online=lambda: {routes.go2rtc.stream_id(cam.mac): True}
+    )
+    rec = SimpleNamespace(is_recording=lambda _mac: True)
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media, rec=rec)))
+
+    assert routes.camera_statuses(req) == [
+        {"mac": cam.mac, "online": True, "recording": True}
+    ]
 
 
 def test_recording_file_serves_an_existing_segment(monkeypatch):

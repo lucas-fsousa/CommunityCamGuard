@@ -6,13 +6,18 @@ function field(label, input) {
   return el("label", { className: "field" }, el("span", { textContent: label }), input);
 }
 
+function cameraKey(mac) {
+  return String(mac || "").replace(/[:-]/g, "").toLowerCase();
+}
+
 export function renderRecordings(stage) {
   stage.innerHTML = "";   // rebuilt each time the view is entered (no live camera frames here)
   const r = state.rec;
   const today = new Date().toISOString().slice(0, 10);
   if (!r.from) r.from = today;
   if (!r.to) r.to = today;
-  const nameOf = Object.fromEntries(state.cameras.map((c) => [c.mac, c.name || c.mac]));
+  const nameOf = Object.fromEntries(
+    state.cameras.map((c) => [cameraKey(c.mac), c.name || c.mac]));
 
   const camSel = el("select");
   camSel.append(el("option", { value: "", textContent: t("rec.allCameras") }));
@@ -103,18 +108,19 @@ export function renderRecordings(stage) {
       return;
     }
     res.items.forEach((s) => {
+      const cameraName = s.camera_name || nameOf[cameraKey(s.mac)] || s.mac;
       const download = el("a", {
         className: "rec-download",
         href: "/api/recordings/download?path=" + encodeURIComponent(s.path),
         title: t("rec.download"),
-        ariaLabel: t("rec.downloadRecording", { camera: nameOf[s.mac] || s.mac }),
+        ariaLabel: t("rec.downloadRecording", { camera: cameraName }),
         innerHTML: svgIcon("i-download"),
       });
       download.addEventListener("click", (event) => event.stopPropagation());
       const row = el("div", { className: "rec-row" },
         el("div", { className: "rec-row-copy" },
           el("span", { textContent: `${s.day} ${s.started_at.slice(11, 19)}` }),
-          el("small", { textContent: `${nameOf[s.mac] || s.mac} · ${(s.size_bytes / 1e6).toFixed(1)} MB` })),
+          el("small", { textContent: `${cameraName} · ${(s.size_bytes / 1e6).toFixed(1)} MB` })),
         download,
       );
       row.addEventListener("click", () => {
