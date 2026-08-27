@@ -78,6 +78,12 @@ _BACKOFF_BASE = 5.0
 _BACKOFF_MAX = 120.0
 _HEALTHY_AFTER = 60.0  # a process that ran at least this long counts as healthy: reset backoff
 
+# FFmpeg's segment muxer cannot create directories. Keep a full day prepared so a transient
+# maintenance failure cannot turn the next hour boundary into a recording outage. The maintenance
+# loop refreshes this horizon every few seconds; retention deliberately preserves current/future
+# empty directories (see retention.py).
+_DIR_LOOKAHEAD_HOURS = 24
+
 
 def _rss_bytes(pid: int) -> int | None:
     """Resident set size of a process, or ``None`` if it is gone / unreadable."""
@@ -136,7 +142,8 @@ class Recorder:
         # Must use the same clock basis as ffmpeg's UTC strftime expansion below.  Using naive
         # local time here can pre-create the wrong hour and make ffmpeg fail at a rollover.
         now = datetime.now(UTC)
-        for when in (now, now + timedelta(hours=1)):  # cover hour/day rollover
+        for offset in range(_DIR_LOOKAHEAD_HOURS + 1):
+            when = now + timedelta(hours=offset)
             sub = Path(when.strftime("%Y-%m-%d")) / when.strftime("%H")
             for mac in macs:
                 (self._cam_dir(mac) / sub).mkdir(parents=True, exist_ok=True)
@@ -334,15 +341,32 @@ class Recorder:
     # --- maintenance loop ---------------------------------------------------------
     def _maintain(self) -> None:
         while not self._stop.is_set():
-            self._ensure_dirs(self._macs)
+            # These operations intentionally fail independently. Before this guard, one transient
+            # indexing/SQLite/filesystem exception killed the only maintenance thread. FFmpeg then
+            # kept writing until the first directory rollover, exited with ENOENT, and was never
+            # supervised again until the whole container was restarted.
+            macs = list(self._macs)
+            try:
+                self._ensure_dirs(macs)
+            except Exception:
+                log.exception("recorder maintenance could not prepare output directories")
             if not self._paused:
-                with self._lock:  # supervise: reap runaways, then (re)spawn any crashed ffmpeg
-                    self._watchdog_locked()
-                    for mac in self._macs:
-                        self._spawn_locked(mac)
-            for mac in self._macs:
-                self._trim_log(mac)
-            self._index()
+                try:
+                    with self._lock:  # reap runaways, then (re)spawn any crashed ffmpeg
+                        self._watchdog_locked()
+                        for mac in macs:
+                            self._spawn_locked(mac)
+                except Exception:
+                    log.exception("recorder maintenance supervision pass failed")
+            try:
+                for mac in macs:
+                    self._trim_log(mac)
+            except Exception:
+                log.exception("recorder maintenance log pass failed")
+            try:
+                self._index()
+            except Exception:
+                log.exception("recorder maintenance indexing pass failed")
             self._stop.wait(self.maint_interval)
 
     def _index(self, list_all: bool = False) -> int:

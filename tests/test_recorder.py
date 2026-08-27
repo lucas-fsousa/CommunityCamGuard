@@ -71,6 +71,27 @@ def test_ensure_dirs_uses_utc_across_hour_and_day_rollover(monkeypatch):
     root = rec.root / recorder._safe_mac(mac)
     assert (root / "2026-08-31" / "23").is_dir()
     assert (root / "2026-09-01" / "00").is_dir()
+    assert (root / "2026-09-01" / "23").is_dir()          # full-day outage cushion
+    assert len(list(root.glob("*/*"))) == recorder._DIR_LOOKAHEAD_HOURS + 1
+
+
+def test_maintenance_survives_a_transient_index_failure(monkeypatch, caplog):
+    rec = Recorder(segment_seconds=300, maint_interval=0.001)
+    rec._macs = []
+    calls = {"index": 0}
+
+    def flaky_index():
+        calls["index"] += 1
+        if calls["index"] == 1:
+            raise RuntimeError("temporary database lock")
+        rec._stop.set()
+        return 0
+
+    monkeypatch.setattr(rec, "_index", flaky_index)
+    rec._maintain()
+
+    assert calls["index"] == 2
+    assert "recorder maintenance indexing pass failed" in caplog.text
 
 
 # --- _index: pick up finalized segments ---------------------------------------------

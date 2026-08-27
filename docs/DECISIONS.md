@@ -1387,3 +1387,20 @@ duration and a range-capable file from its first frame. Leaving the view does no
 work, concurrent requests share the job, later plays remain instant through the bounded cache, and
 the original HEVC recording/download stays untouched. See ADR
 `docs/internal/0021-seekable-first-recording-playback.md`.
+
+## 38. Recording rollover survives maintenance failures (2026-08-27)
+
+The archive stopped at `2026-08-26/05`. Recorder logs proved that both FFmpeg processes reached the
+next UTC hour and failed to open `2026-08-26/06/...mp4` with `No such file or directory`. They did
+not recover until the container restart created the missing directories on 27 August.
+
+FFmpeg's segment muxer cannot create directories. Directory preparation, process supervision and
+full index scanning shared one unguarded maintenance thread, so any transient filesystem/SQLite
+error in the index silently killed all three responsibilities. The retention cleaner could also
+remove empty future directories, racing with the recorder's small one-hour reserve.
+
+Each maintenance responsibility is now exception-isolated and retried on the next pass. The
+recorder keeps the current plus 24 future UTC hour directories prepared, while retention prunes
+only empty hours strictly older than the current UTC hour. A transient maintenance failure can no
+longer silently become a permanent recording outage at rollover. See ADR
+`docs/internal/0022-resilient-recording-directory-rollover.md`.

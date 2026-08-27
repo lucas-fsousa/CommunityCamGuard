@@ -32,6 +32,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0019](0019-progressive-first-recording-playback.md) | Superseded: progressive first playback while the full transcode is cached |
 | [0020](0020-lan-dashboard-and-bluetooth-onboarding.md) | LAN dashboard with trusted-LAN provisioning and homologated BLE onboarding |
 | [0021](0021-seekable-first-recording-playback.md) | Seekable-first recording playback with asynchronous shared preparation |
+| [0022](0022-resilient-recording-directory-rollover.md) | Resilient recording directory rollover and isolated maintenance failures |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,

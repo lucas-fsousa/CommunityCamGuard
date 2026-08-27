@@ -50,6 +50,27 @@ def test_purge_prunes_empty_dirs(tmp_path):
     assert not old.parent.exists() and not day_dir.exists()  # empty hour + day dirs removed
 
 
+def test_prune_preserves_current_and_future_recorder_directories(tmp_path):
+    cleaner = retention.RetentionCleaner(retention_days=7)
+    cleaner.root = tmp_path
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    mac_root = tmp_path / "aabbccddeeff"
+
+    def hour_dir(when):
+        path = mac_root / when.strftime("%Y-%m-%d") / when.strftime("%H")
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    old = hour_dir(now - timedelta(days=2))
+    current = hour_dir(now)
+    future = hour_dir(now + timedelta(hours=24))
+
+    cleaner._prune_empty_dirs()
+
+    assert not old.exists()
+    assert current.is_dir() and future.is_dir()
+
+
 def test_purge_also_drops_playback_cache(tmp_path, monkeypatch):
     from backend.app.recording import playback
     old = _seed_segment(tmp_path, started=datetime.now(UTC) - timedelta(days=10))

@@ -81,9 +81,10 @@ class RetentionCleaner:
         return len(purged_ids)
 
     def _prune_empty_dirs(self) -> None:
-        """Remove empty ``<mac>/<day>/<hour>`` and ``<mac>/<day>`` dirs left after deletions."""
+        """Remove expired empty dirs without touching the recorder's current/future reserve."""
         if not self.root.exists():
             return
+        current_hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
         for cam in self.root.iterdir():
             if not cam.is_dir():
                 continue
@@ -91,9 +92,17 @@ class RetentionCleaner:
                 if not day.is_dir():
                     continue
                 for hour in list(day.iterdir()):
-                    if hour.is_dir():
+                    if not hour.is_dir():
+                        continue
+                    try:
+                        represented_hour = datetime.strptime(
+                            f"{day.name}/{hour.name}", "%Y-%m-%d/%H"
+                        ).replace(tzinfo=UTC)
+                    except ValueError:
+                        continue  # unknown user-owned layout: never remove it speculatively
+                    if represented_hour < current_hour:
                         _rmdir_if_empty(hour)
-                _rmdir_if_empty(day)                        # recorder recreates current dirs as needed
+                _rmdir_if_empty(day)                        # succeeds only when no reserved hour remains
 
     # --- background loop ----------------------------------------------------------
     def start(self) -> None:
