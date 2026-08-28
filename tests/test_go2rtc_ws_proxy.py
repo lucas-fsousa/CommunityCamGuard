@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from starlette.websockets import WebSocketState
 
-from backend.app.api import routes
+from backend.app.api import media as media_routes
 
 
 class _Upstream:
@@ -37,7 +37,7 @@ class _Upstream:
 
 class _Browser:
     def __init__(self) -> None:
-        self.cookies = {routes.COOKIE_NAME: "test-token"}
+        self.cookies = {media_routes.COOKIE_NAME: "test-token"}
         self.query_params = {"src": "cam_test_hd"}
         self.application_state = WebSocketState.CONNECTING
         self._messages = iter((
@@ -69,11 +69,15 @@ def test_ws_proxy_cancels_and_awaits_upstream_reader_on_browser_disconnect(monke
         urls.append(url)
         return upstream
 
-    monkeypatch.setattr(routes.websockets, "connect", connect)
-    monkeypatch.setattr(routes, "verify_token", lambda _token: True)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(go2rtc_api="http://go2rtc:1984"))
+    monkeypatch.setattr(media_routes.websockets, "connect", connect)
+    monkeypatch.setattr(media_routes, "verify_token", lambda _token: True)
+    monkeypatch.setattr(
+        media_routes,
+        "get_settings",
+        lambda: SimpleNamespace(go2rtc_api="http://go2rtc:1984"),
+    )
 
-    asyncio.run(routes.go2rtc_ws(_Browser()))
+    asyncio.run(media_routes.go2rtc_ws(_Browser()))
 
     assert urls and urls[0].endswith("/api/ws?src=cam_test_hd")
     assert upstream.sent == ['{"type":"webrtc/offer","value":"test"}']

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from backend.app.api import media as media_routes
 from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
 from backend.app.db import registry
@@ -171,7 +172,7 @@ def test_discovery_scan_returns_configured_and_candidates(monkeypatch):
 
 
 def test_media_restart_ok():
-    out = routes.media_restart(_req(media=None, rec=None))
+    out = media_routes.media_restart(_req(media=None, rec=None))
     assert out == {"ok": True}
 
 

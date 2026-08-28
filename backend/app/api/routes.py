@@ -10,20 +10,14 @@ config and the recorder is re-synced to the new camera list.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import hmac
 import json
 import logging
 import time
-import urllib.parse
-from collections import deque
-from datetime import UTC, datetime
 
-import websockets
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, SecretStr
-from starlette.websockets import WebSocketState
 
 from .. import drivers
 from ..auth import (
@@ -33,9 +27,8 @@ from ..auth import (
     is_authenticated,
     issue_token,
     require_auth,
-    verify_token,
 )
-from ..camera_identity import stable_camera_id, valid_camera_id
+from ..camera_identity import stable_camera_id
 from ..config import get_settings
 from ..db import registry
 from ..discovery import active_scan, rtsp
@@ -51,7 +44,7 @@ from ..drivers.yoosee.p2p import (
     read_camera_property,
     refresh_account_session,
 )
-from ..media import go2rtc, quality
+from ..media import go2rtc
 from ..provisioning import (
     BleCodecError,
     LabelError,
@@ -81,11 +74,11 @@ from ..provisioning import (
 )
 from ..recording import recorder
 from ..services import control_catalog
+from ..services.camera_runtime import resolve_camera, resync_services
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
-_client_media_events: deque[dict] = deque(maxlen=200)
 
 
 # --- schemas -----------------------------------------------------------------------
@@ -177,16 +170,6 @@ class PtzIn(BaseModel):
     action: str = "step"  # "start" (hold) | "stop" (release) | "step" (one nudge)
 
 
-class MediaClientEventIn(BaseModel):
-    """Small, bounded browser snapshot emitted only on live-view state transitions."""
-
-    event: str = Field(min_length=1, max_length=40)
-    camera_id: str = Field(default="", max_length=64)
-    mac: str = Field(default="", max_length=64)  # deprecated compatibility input
-    stream: str = Field(min_length=1, max_length=128)
-    metrics: dict[str, bool | int | float | str | None] = Field(default_factory=dict)
-
-
 def _camera_out(cam: registry.Camera) -> dict:
     """Registry camera as JSON, without leaking the stored password."""
     controls = control_catalog(cam)
@@ -247,16 +230,7 @@ def _resync(request: Request) -> None:
     reconfiguring the live services must not fail the API call (it used to 500 the whole add/
     delete). We log and move on; the next scan/restart reconciles.
     """
-    media = getattr(request.app.state, "media", None)
-    rec = getattr(request.app.state, "rec", None)
-    try:
-        if media is not None:
-            media.restart()
-            media.wait_healthy(timeout=6)
-        if rec is not None:
-            rec.start()
-    except Exception as exc:  # keep the CRUD op successful regardless
-        log.warning("service resync after registry change failed: %s", exc)
+    resync_services(request)
 
 
 # --- auth ---------------------------------------------------------------------------
@@ -312,9 +286,7 @@ def _probe_and_store(cam: registry.Camera) -> registry.Camera:
 def _camera_from_reference(camera_id: str) -> registry.Camera | None:
     """Resolve the public ID, retaining a bounded MAC fallback for pre-0.1 API clients."""
 
-    if valid_camera_id(camera_id):
-        return registry.get_camera_by_id(camera_id)
-    return registry.get_camera(camera_id)
+    return resolve_camera(camera_id)
 
 
 @router.post("/cameras", dependencies=[Depends(require_auth)])
@@ -1062,183 +1034,6 @@ def provisioning_privileged_p2p_property_read(
         "write_capable": False,
         "action_capable": False,
     }
-
-
-# --- media / storage ----------------------------------------------------------------
-
-
-@router.get("/media/streams", dependencies=[Depends(require_auth)])
-def media_streams(request: Request) -> dict:
-    media = getattr(request.app.state, "media", None)
-    healthy = bool(media and media.wait_healthy(timeout=1))
-    s = get_settings()
-    return {
-        "go2rtc_api": s.go2rtc_api,
-        "healthy": healthy,
-        # Grid tiles in opt-in Auto mode pick their local stream from this: at or below it they
-        # get full resolution, above it the locally downscaled variant.
-        "grid_hd_max_cameras": s.grid_hd_max_cameras,
-        # Encoder bitrate level for the transcodes (media/quality.py). Global, config-driven;
-        # exposed so the UI can show/inform the current quality. Variant selection is
-        # per-camera and client-side; both stream IDs are served from the local media hub.
-        "live_quality": s.live_quality,
-        "quality_levels": list(quality.LEVELS),
-        "live_hwaccel": s.live_hwaccel,
-    }
-
-
-@router.get("/media/activity", dependencies=[Depends(require_auth)])
-def media_activity(request: Request) -> dict:
-    """Per-stream video-packet liveness, for the dashboard's freeze watchdog (see go2rtc)."""
-    media = getattr(request.app.state, "media", None)
-    return media.stream_activity() if media else {}
-
-
-_MEDIA_CLIENT_EVENTS = {
-    "waiting",
-    "stalled",
-    "playing",
-    "catchup_start",
-    "catchup_end",
-    "live_edge_jump",
-    "mse_failure",
-    "watchdog_recovery",
-}
-
-
-@router.post("/media/client-event", dependencies=[Depends(require_auth)])
-def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
-    """Correlate a browser stall/catch-up with the server's stream counters at that instant.
-
-    This deliberately accepts only scalar metrics and a short allow-list of transition names. It
-    never receives camera credentials, media data or arbitrary browser logs. Events are rare (not a
-    periodic beacon), kept in a 200-entry in-memory ring and also emitted as one structured log line.
-    """
-    if body.event not in _MEDIA_CLIENT_EVENTS:
-        raise HTTPException(status_code=422, detail="unknown media client event")
-    if len(body.metrics) > 40:
-        raise HTTPException(status_code=413, detail="too many media metrics")
-    # Resolve the reference instead of merely accepting a syntactically valid ID. Besides rejecting
-    # orphan diagnostics, this preserves the stored public identity when a legacy client still
-    # reports the camera by MAC after the registry has re-keyed its native address.
-    reference = body.camera_id if valid_camera_id(body.camera_id) else body.mac
-    camera = _camera_from_reference(reference) if reference else None
-    if camera is None:
-        raise HTTPException(status_code=422, detail="configured camera_id is required")
-    event = body.model_dump(exclude={"mac"})
-    event["camera_id"] = camera.camera_id
-    event["at"] = datetime.now(UTC).isoformat(timespec="milliseconds")
-    media = getattr(request.app.state, "media", None)
-    try:
-        activity = media.stream_activity().get(body.stream) if media else None
-    except Exception:  # diagnostics must never interfere with live playback
-        activity = None
-    if activity is not None:
-        event["server"] = activity
-    encoded = json.dumps(event, separators=(",", ":"), sort_keys=True)
-    if len(encoded) > 8192:
-        raise HTTPException(status_code=413, detail="media event too large")
-    _client_media_events.append(event)
-    log.warning("live_view_event %s", encoded)
-    return {"ok": True}
-
-
-@router.get("/media/client-events", dependencies=[Depends(require_auth)])
-def media_client_events() -> list[dict]:
-    """Recent browser transition snapshots, oldest first (process-local, bounded to 200)."""
-    return list(_client_media_events)
-
-
-@router.post("/media/recover/{camera_id}", dependencies=[Depends(require_auth)])
-def media_recover(camera_id: str, request: Request) -> dict:
-    """Restart one camera's local H.264 producer, never its RTSP/recording producer."""
-    try:
-        cam = _camera_from_reference(camera_id)
-    except (KeyError, ValueError):
-        cam = None
-    if cam is None:
-        raise HTTPException(status_code=404, detail="camera not found")
-    media = getattr(request.app.state, "media", None)
-    if media is None:
-        raise HTTPException(status_code=503, detail="media engine not running")
-    ok = media.restart_preload(go2rtc.hd_stream_id(cam.camera_id))
-    if not ok:
-        raise HTTPException(status_code=502, detail="local stream recovery failed")
-    return {"ok": True}
-
-
-@router.websocket("/go2rtc/ws")
-async def go2rtc_ws(websocket: WebSocket) -> None:
-    """Authenticated same-origin proxy to go2rtc's stream WebSocket.
-
-    The live player (``frontend/player.js``) is served from the app origin so the dashboard can
-    read the real ``<video>`` for the freeze watchdog — but go2rtc rejects a cross-origin WS
-    handshake (403 on any foreign ``Origin``). Rather than open go2rtc up with ``api.origin: "*"``
-    (go2rtc has no auth and can run ``exec:`` sources — a CSRF/RCE surface reachable through the
-    user's tunnel), we bridge here: the browser connects to this same-origin endpoint (carrying the
-    session cookie, so only a logged-in dashboard can use it), and we relay to go2rtc **without**
-    forwarding the browser ``Origin`` header (go2rtc accepts an origin-less handshake). Bonus: only
-    the app port needs to be reachable/tunnelled for signalling — go2rtc stays fully loopback-bound.
-    """
-    if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
-        await websocket.close(code=1008)  # policy violation (unauthenticated)
-        return
-    src = websocket.query_params.get("src", "")
-    if not src:
-        await websocket.close(code=1008)
-        return
-
-    api = get_settings().go2rtc_api.rstrip("/")
-    upstream_url = "ws" + api[4:] + "/api/ws?src=" + urllib.parse.quote(src)  # http->ws, no Origin
-    await websocket.accept()
-    try:
-        async with websockets.connect(upstream_url, open_timeout=5, max_size=None) as up:
-
-            async def browser_to_go2rtc() -> None:
-                while True:
-                    msg = await websocket.receive()
-                    if msg["type"] == "websocket.disconnect":
-                        return
-                    if msg.get("text") is not None:
-                        await up.send(msg["text"])
-                    elif msg.get("bytes") is not None:
-                        await up.send(msg["bytes"])
-
-            async def go2rtc_to_browser() -> None:
-                async for frame in up:
-                    if isinstance(frame, (bytes, bytearray)):
-                        await websocket.send_bytes(bytes(frame))
-                    else:
-                        await websocket.send_text(frame)
-
-            tasks = [
-                asyncio.create_task(browser_to_go2rtc()),
-                asyncio.create_task(go2rtc_to_browser()),
-            ]
-            _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for task in pending:
-                task.cancel()
-            # Consume both the completed direction and the cancellation. Without this, normal
-            # browser disconnects leave "Task exception was never retrieved" warnings and can
-            # keep relay resources alive until garbage collection (especially harmful for MSE,
-            # where this socket carries the media itself rather than signalling only).
-            await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as exc:  # upstream connect/relay failure — just close the browser socket
-        log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
-    finally:
-        # Best-effort close: the browser is usually already gone (that is what ended the relay),
-        # so closing can itself raise ClientDisconnected/WebSocketDisconnect — which is not an error.
-        if websocket.application_state != WebSocketState.DISCONNECTED:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
-
-
-@router.post("/media/restart", dependencies=[Depends(require_auth)])
-def media_restart(request: Request) -> dict:
-    _resync(request)
-    return {"ok": True}
 
 
 @router.get("/storage", dependencies=[Depends(require_auth)])

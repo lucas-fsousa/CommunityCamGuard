@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from backend.app import config
+from backend.app.api import media as media_routes
 from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
 from backend.app.camera_identity import stable_camera_id
@@ -161,7 +162,7 @@ def test_media_streams_reports_quality(monkeypatch):
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=None)))
     monkeypatch.setenv("LIVE_QUALITY", "high")
     config.get_settings.cache_clear()
-    out = routes.media_streams(req)
+    out = media_routes.media_streams(req)
     assert out["live_quality"] == "high"
     assert out["quality_levels"] == list(quality.LEVELS)
     assert out["healthy"] is False
