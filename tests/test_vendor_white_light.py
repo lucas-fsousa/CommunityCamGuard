@@ -6,9 +6,9 @@ import struct
 import pytest
 
 from backend.app.db.p2p import P2PEnrollment
-from backend.app.vendor_p2p import client as transport
-from backend.app.vendor_p2p import white_light
-from backend.app.vendor_p2p.crypto import gute_mode2_decrypt
+from backend.app.drivers.yoosee.p2p import client as transport
+from backend.app.drivers.yoosee.p2p import white_light
+from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 
 
 def _enrollment() -> P2PEnrollment:

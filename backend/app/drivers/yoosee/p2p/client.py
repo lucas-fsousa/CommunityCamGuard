@@ -18,7 +18,7 @@ import struct
 import time
 from dataclasses import dataclass
 
-from ..db.p2p import P2PEnrollment
+from ....db.p2p import P2PEnrollment
 from .auth import build_conn_auth_blob
 from .crypto import (
     RC5,

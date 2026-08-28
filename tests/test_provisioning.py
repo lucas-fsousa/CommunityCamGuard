@@ -15,6 +15,12 @@ from backend.app.api.local_only import require_local_or_remote_ble_request, requ
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
 from backend.app.db import p2p
+from backend.app.drivers.yoosee.p2p import (
+    AccountSession,
+    P2PInventory,
+    P2PPropertyRead,
+    P2PRouteProbe,
+)
 from backend.app.main import app
 from backend.app.provisioning import (
     BleCodecError,
@@ -56,12 +62,6 @@ from backend.app.provisioning.wifi import (
     selected_network,
     selected_ssid,
     sign_network,
-)
-from backend.app.vendor_p2p import (
-    AccountSession,
-    P2PInventory,
-    P2PPropertyRead,
-    P2PRouteProbe,
 )
 
 SUBSCRIPTION_TOKEN = "ab" * 64

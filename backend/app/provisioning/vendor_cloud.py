@@ -11,7 +11,7 @@ import json
 import time
 from collections.abc import Mapping
 
-from ..vendor_p2p.account import (
+from ..drivers.yoosee.p2p.account import (
     INTEGER_BODY_NAMES,
     AccountSession,
     PostFunction,

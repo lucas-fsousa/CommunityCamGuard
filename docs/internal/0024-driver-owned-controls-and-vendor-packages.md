@@ -1,6 +1,6 @@
 # 0024 — Driver-owned controls and vendor packages
 
-**Status:** accepted · **Date:** 2026-08-28
+**Status:** accepted, P2P verticalization implemented · **Date:** 2026-08-28
 
 ## Context
 
@@ -21,6 +21,10 @@ string alone must never grant another driver's controls.
   read or write controls for the camera.
 - Camera-family code is organized as a package under `drivers/<family>/`. The Yoosee package owns
   the adapter from semantic controls to its encrypted P2P enrollment and protocol operations.
+- The recovered GAT/IoTVideo transport, crypto, authentication, RTSP setup and typed feature
+  operations live under `drivers/yoosee/p2p`; there is no application-global `vendor_p2p` package.
+  Generic services may depend on driver contracts, while Yoosee-specific onboarding adapters import
+  this vertical implementation explicitly.
 - The driver-generated control catalog is authoritative for API/UI gating. The old
   `vendor_controls` response is a temporary compatibility projection of that catalog.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
@@ -37,6 +41,6 @@ string alone must never grant another driver's controls.
 - Vendor transports can keep rich typed internal results while returning a stable public result.
 - New semantic control kinds still require an intentional contract/UI addition; this is preferable
   to an unsafe generic command tunnel.
-- This is the first migration slice. ADR 0025 subsequently removed MAC from media stream and
-  recorder-process identity. Factory provisioning, vendor account storage and the legacy recording
-  storage/index layout still need their own migrations behind driver/application boundaries.
+- ADRs 0025–0027 subsequently remove MAC from media, recording and registry identity. The proprietary
+  P2P implementation is now inside the Yoosee driver. Factory provisioning orchestration and vendor
+  account storage still need narrower driver-owned ports instead of imports from the generic router.

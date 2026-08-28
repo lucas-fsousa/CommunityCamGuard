@@ -18,7 +18,7 @@ from ..db import p2p, registry
 from ..db.p2p import P2PEnrollment
 from ..discovery import active_scan
 from ..drivers.base import Capabilities, classify_ports
-from ..vendor_p2p import (
+from ..drivers.yoosee.p2p import (
     P2PProbeError,
     generate_rtsp_password,
     prepare_camera_rtsp,

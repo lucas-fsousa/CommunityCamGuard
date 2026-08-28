@@ -6,8 +6,8 @@ import threading
 from collections.abc import Callable
 from typing import TypeVar
 
-from ..db import p2p, vendor_account
-from ..db.p2p import P2PEnrollment
+from ....db import p2p, vendor_account
+from ....db.p2p import P2PEnrollment
 from .account import VendorAccountError, refresh_account_session
 from .client import InitInfoRejectedError, P2PProbeError
 

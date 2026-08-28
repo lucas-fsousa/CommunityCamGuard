@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from ..vendor_p2p.account import AccountCredentials, AccountSession
+from ..drivers.yoosee.p2p.account import AccountCredentials, AccountSession
 from . import connect
 from .registry import _decrypt, _encrypt
 

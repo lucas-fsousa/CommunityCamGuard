@@ -1,7 +1,7 @@
 """Yoosee implementations of vendor-neutral semantic camera controls.
 
 This adapter is the only driver-layer module that knows how an opaque camera association becomes
-Gwell P2P enrollment material.  Protocol modules stay typed and bounded under ``vendor_p2p``;
+Gwell P2P enrollment material. Protocol modules stay typed and bounded inside this driver package;
 HTTP and the generic application service never import them directly.
 """
 
@@ -10,13 +10,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ...db import p2p
-from ...vendor_p2p import (
-    P2PProbeError,
-    read_camera_white_light,
-    run_with_fresh_access,
-    set_camera_orientation,
-    set_camera_white_light,
-)
 from ..base import Unsupported
 from ..contracts import (
     ControlDescriptor,
@@ -24,6 +17,13 @@ from ..contracts import (
     ControlOperationError,
     ControlResult,
     ControlValue,
+)
+from .p2p import (
+    P2PProbeError,
+    read_camera_white_light,
+    run_with_fresh_access,
+    set_camera_orientation,
+    set_camera_white_light,
 )
 
 if TYPE_CHECKING:

@@ -16,7 +16,7 @@ import struct
 import time
 from dataclasses import dataclass
 
-from ..db.p2p import P2PEnrollment
+from ....db.p2p import P2PEnrollment
 from . import client as transport
 
 ONVIF_READ_PATH = "ProWritable.onvifEn"

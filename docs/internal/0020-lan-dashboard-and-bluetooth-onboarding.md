@@ -76,7 +76,7 @@ without touching camera state:
   consumes the one-time BLE/cloud handoff;
 - status after a process restart is based on successful decryption/validation, not merely on a row
   existing;
-- `vendor_p2p` contains the recovered GAT authentication, gute/RC5 crypto, list, certification,
+- `drivers/yoosee/p2p` contains the recovered GAT authentication, gute/RC5 crypto, list, certification,
   init-info parsing, heartbeat, selected-target TermDNS and A4/A3 plus CA/CB rendezvous primitives
   needed by the production backend;
 - `/provisioning/privileged/p2p-probe` reports only aggregate counts and whether the requested

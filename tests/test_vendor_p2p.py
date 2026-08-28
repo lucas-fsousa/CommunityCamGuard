@@ -7,9 +7,9 @@ import struct
 import pytest
 
 from backend.app.db.p2p import P2PEnrollment
-from backend.app.vendor_p2p import client, orientation
-from backend.app.vendor_p2p.auth import build_conn_authinfo, parse_conn_authinfo
-from backend.app.vendor_p2p.crypto import (
+from backend.app.drivers.yoosee.p2p import client, orientation
+from backend.app.drivers.yoosee.p2p.auth import build_conn_authinfo, parse_conn_authinfo
+from backend.app.drivers.yoosee.p2p.crypto import (
     gute_mode0_decrypt,
     gute_mode1_decrypt,
     gute_mode1_encrypt,

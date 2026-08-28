@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from backend.app.vendor_p2p.account import (
+from backend.app.drivers.yoosee.p2p.account import (
     APP_VERSION,
     HEADER_APP_ID,
     AccountCredentials,

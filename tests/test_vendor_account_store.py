@@ -4,7 +4,7 @@ import sqlite3
 
 from backend.app.config import get_settings
 from backend.app.db import vendor_account
-from backend.app.vendor_p2p.account import AccountCredentials, AccountSession
+from backend.app.drivers.yoosee.p2p.account import AccountCredentials, AccountSession
 
 
 def _credentials() -> AccountCredentials:

@@ -42,6 +42,17 @@ from ..camera_identity import stable_camera_id, valid_camera_id
 from ..config import get_settings
 from ..db import registry, vendor_account
 from ..discovery import active_scan, rtsp
+from ..drivers.yoosee.p2p import (
+    MODEL_READ_PATHS,
+    AccountCredentials,
+    P2PProbeError,
+    VendorAccountError,
+    login_account,
+    probe_account_inventory,
+    probe_camera_route,
+    read_camera_property,
+    refresh_account_session,
+)
 from ..media import go2rtc, quality
 from ..provisioning import (
     BleCodecError,
@@ -72,17 +83,6 @@ from ..provisioning import (
 )
 from ..recording import playback, recorder
 from ..services import control_catalog
-from ..vendor_p2p import (
-    MODEL_READ_PATHS,
-    AccountCredentials,
-    P2PProbeError,
-    VendorAccountError,
-    login_account,
-    probe_account_inventory,
-    probe_camera_route,
-    read_camera_property,
-    refresh_account_session,
-)
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")

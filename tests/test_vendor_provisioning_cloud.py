@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from backend.app.drivers.yoosee.p2p.account import AccountSession
 from backend.app.provisioning.vendor_cloud import (
     BIND_TOKEN_PATH,
     TANKEY_PATH,
@@ -12,7 +13,6 @@ from backend.app.provisioning.vendor_cloud import (
     build_tankey_body,
     fetch_native_ble_material,
 )
-from backend.app.vendor_p2p.account import AccountSession
 
 
 def _session() -> AccountSession:

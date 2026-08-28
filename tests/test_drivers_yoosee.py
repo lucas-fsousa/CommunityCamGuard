@@ -9,7 +9,7 @@ from backend.app.db.registry import Camera
 from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
-from backend.app.vendor_p2p import P2PWhiteLightWrite
+from backend.app.drivers.yoosee.p2p import P2PWhiteLightWrite
 
 
 def _drv():
