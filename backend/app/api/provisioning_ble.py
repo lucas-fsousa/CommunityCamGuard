@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import base64
-import hmac
-import json
-import logging
 import time
 
 from fastapi import APIRouter, HTTPException, Response
@@ -17,12 +14,7 @@ from ..drivers.onboarding import (
     OnboardingTransportError,
 )
 from ..provisioning import (
-    BleCodecError,
-    PrivilegedEnrollmentError,
     WifiSelectionError,
-    ble_provisioning_attempt,
-    decrypt_ble_payload,
-    remember_privileged_handoff,
     selected_network,
 )
 from .provisioning_common import (
@@ -34,7 +26,6 @@ from .provisioning_common import (
 )
 
 router = APIRouter(prefix="/api/provisioning/ble", tags=["provisioning"])
-log = logging.getLogger(__name__)
 
 
 @router.post("/prepare", dependencies=BLE_PROVISIONING)
@@ -96,99 +87,30 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
     """Decode a transient camera reply without exposing or persisting secret material."""
 
     identity = inspect_provisioning_label(body)
-    if body.command not in {0x71, 0x73, 0x81, 0x83, 0x85}:
-        raise HTTPException(status_code=422, detail="unsupported BLE provisioning response")
     try:
         raw = base64.b64decode(body.data_base64, validate=True) if body.data_base64 else b""
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail="invalid BLE response encoding") from exc
     try:
-        attempt = ble_provisioning_attempt(
-            body.attempt_id,
-            expected_device_id=identity["device_id"],
+        decoded = onboarding().decode_ble(
+            device_id=identity["device_id"],
+            attempt_id=body.attempt_id,
+            command=body.command,
+            encrypted=body.encrypted,
+            raw=raw,
         )
-        material = attempt.material
-        decoded = decrypt_ble_payload(raw, material.tan_key) if body.encrypted else raw
-    except (BleCodecError, ValueError) as exc:
+    except OnboardingInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    text = ""
-    payload = None
-    try:
-        text = decoded.rstrip(b"\x00").decode("utf-8")
-        payload = json.loads(text) if text else None
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        pass
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    challenge_valid = None
-    if body.command == 0x71:
-        challenge_valid = (
-            bool(decoded)
-            and len(decoded) <= len(material.random_number)
-            and hmac.compare_digest(
-                decoded,
-                material.random_number.encode("utf-8")[-len(decoded) :],
-            )
-        )
-    wifi_connection = None
-    configuration_acknowledged = body.command == 0x83
-    public_payload = payload
-    if body.command == 0x85 and isinstance(payload, dict):
-        confirm_key = payload.get("confirmKey")
-        connect_status = payload.get("connectStatus")
-        public_payload = {key: value for key, value in payload.items() if key != "confirmKey"}
-        text = json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
-        handoff_ready = False
-        if connect_status == 0 and isinstance(confirm_key, str) and confirm_key:
-            try:
-                remember_privileged_handoff(material, confirm_key=confirm_key)
-                handoff_ready = True
-            except PrivilegedEnrollmentError:
-                log.warning(
-                    "BLE privileged handoff expired before retention device=%s",
-                    identity["device_id"],
-                )
-        wifi_connection = {
-            "connected": connect_status == 0,
-            "status": connect_status,
-            "privileged_handoff_advertised": isinstance(confirm_key, str) and bool(confirm_key),
-            "privileged_handoff_ready": handoff_ready,
-        }
-    # 0x71 is handshake material and 0x83 echoes plaintext provisioning, including the password.
-    if body.command in {0x71, 0x83}:
-        text = ""
-        public_payload = None
-    if body.command == 0x85:
-        text = (
-            json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
-            if public_payload is not None
-            else ""
-        )
-    log.warning(
-        "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d json_keys=%s "
-        "connect_status=%s privileged_handoff=%d",
-        identity["device_id"],
-        body.command,
-        len(decoded),
-        int(body.encrypted),
-        int(bool(text)),
-        sorted(str(key) for key in payload) if isinstance(payload, dict) else [],
-        payload.get("connectStatus", "-") if isinstance(payload, dict) else "-",
-        int(bool(payload.get("confirmKey"))) if isinstance(payload, dict) else 0,
-    )
     return {
-        "command": body.command,
-        "encrypted": body.encrypted,
-        "length": len(decoded),
-        "valid": challenge_valid,
-        "text": text[:4096],
-        "json": public_payload,
-        "hex": ""
-        if body.command in {0x71, 0x83, 0x85}
-        else decoded[:128].hex()
-        if not text
-        else "",
-        "configuration_acknowledged": configuration_acknowledged,
-        "wifi_connection": wifi_connection,
+        "command": decoded.command,
+        "encrypted": decoded.encrypted,
+        "length": decoded.length,
+        "valid": decoded.valid,
+        "text": decoded.text,
+        "json": decoded.public_payload,
+        "hex": decoded.hex_preview,
+        "configuration_acknowledged": decoded.configuration_acknowledged,
+        "wifi_connection": decoded.wifi_connection,
     }

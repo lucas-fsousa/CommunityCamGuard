@@ -24,6 +24,7 @@ from ...provisioning import (
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ..onboarding import (
     AccountLogin,
+    BleDecodeResult,
     BlePreparation,
     CompletionMediaProof,
     CompletionResult,
@@ -38,6 +39,7 @@ from ..onboarding import (
     RouteResult,
 )
 from . import account_store
+from .ble_onboarding import decode_response
 from .p2p import (
     MODEL_READ_PATHS,
     AccountCredentials,
@@ -171,6 +173,23 @@ class YooseeOnboarding:
             attempt_id=attempt.attempt_id,
             expires_at=attempt.expires_at,
             frames=frames,
+        )
+
+    def decode_ble(
+        self,
+        *,
+        device_id: str,
+        attempt_id: str,
+        command: int,
+        encrypted: bool,
+        raw: bytes,
+    ) -> BleDecodeResult:
+        return decode_response(
+            device_id=device_id,
+            attempt_id=attempt_id,
+            command=command,
+            encrypted=encrypted,
+            raw=raw,
         )
 
     def probe_inventory(self, device_id: str) -> InventoryResult:

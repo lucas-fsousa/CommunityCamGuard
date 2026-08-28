@@ -104,6 +104,19 @@ class BlePreparation:
     frames: dict[str, list[bytes]]
 
 
+@dataclass(frozen=True, slots=True)
+class BleDecodeResult:
+    command: int
+    encrypted: bool
+    length: int
+    valid: bool | None
+    text: str
+    public_payload: object
+    hex_preview: str
+    configuration_acknowledged: bool
+    wifi_connection: dict[str, object] | None
+
+
 class OnboardingPort(Protocol):
     """Driver-owned operations needed by the generic onboarding HTTP workflow."""
 
@@ -136,6 +149,16 @@ class OnboardingPort(Protocol):
         fallback_file: Path | None,
         max_age_seconds: int,
     ) -> BlePreparation: ...
+
+    def decode_ble(
+        self,
+        *,
+        device_id: str,
+        attempt_id: str,
+        command: int,
+        encrypted: bool,
+        raw: bytes,
+    ) -> BleDecodeResult: ...
 
     def login(self, request: AccountLogin) -> None: ...
 
