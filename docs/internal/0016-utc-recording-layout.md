@@ -15,7 +15,8 @@ device clock.
 ## Decision
 
 - Recording paths are defined as UTC:
-  `recordings/<mac>/<YYYY-MM-DD>/<HH>/<YYYYMMDD_HHMMSS>.mp4`.
+  `recordings/<camera_id>/<YYYY-MM-DD>/<HH>/<YYYYMMDD_HHMMSS>.mp4` (ADR 0026). Historical
+  MAC-directory segments remain valid and indexed in place; only new output uses the opaque ID.
 - Each recorder FFmpeg child receives `TZ=UTC0`; this controls the segment muxer's `strftime`
   expansion even outside Docker and does not require zoneinfo files.
 - Directory pre-creation uses `datetime.now(UTC)` so it agrees with FFmpeg at hour/day rollover.

@@ -23,9 +23,10 @@ Close both on the one code path that surfaces them — a scan reconciling agains
 - `reconcile()` re-keys when the ONVIF MAC is unknown but the ARP MAC is registered, and reports the
   move via an **`on_rekey(old, new)` callback** — keeping layering honest (the registry must not
   import the recording layer; the caller wires them).
-- **Recordings follow the camera**: `recorder.rekey_segments(old, new)` renames `recordings/<mac>/` and
-  repoints the index (the browser filters by MAC, so otherwise the history is stranded). Non-destructive
-  if the destination already exists.
+- **Recordings followed the camera** initially through `recorder.rekey_segments(old, new)`, which
+  renamed MAC directories and repointed the index. ADR 0026 supersedes that mechanism: canonical
+  ownership and new directories use `camera_id`; the helper now updates only the deprecated MAC
+  projection and never moves archive files.
 - **Capability backfill**: on a scan, any configured camera that returns with no capabilities and a
   known IP is re-probed via the shared `_probe_and_store` — best-effort per camera, so one timing out
   never fails the scan. A scan is the right moment (the camera just answered; it's already the slow,
@@ -35,6 +36,5 @@ Close both on the one code path that surfaces them — a scan reconciling agains
 
 - A camera that gains an authoritative MAC keeps its identity, credentials and full recording history —
   no duplicate candidate, no stranded footage. Verified through the real scan route.
-- Re-keys trigger `_resync`. Since ADR 0025, go2rtc streams and recorder supervision keep their
-  opaque IDs; the resync remains necessary while recording directories are MAC-based, so FFmpeg
-  reopens the directory after `rekey_segments` moves it.
+- Since ADRs 0025/0026, re-keys do not restart media or recording services: stream, process and new
+  archive identities remain stable, and historical paths are deliberately left untouched.

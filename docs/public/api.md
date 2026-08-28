@@ -305,14 +305,14 @@ timestamp and, when available, a snapshot of the matching go2rtc stream packet/c
 
 | Method | Path | Params | Notes |
 |---|---|---|---|
-| GET | `/api/recordings` | `mac`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Each item includes the registry-resolved `camera_name`; the response also includes `total` and `retention_days`. |
+| GET | `/api/recordings` | `camera_id`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Each item includes canonical `camera_id` and registry-resolved `camera_name`; the response also includes `total` and `retention_days`. Deprecated `mac` remains an optional compatibility filter. |
 | POST | `/api/recordings/prepare` | `path` (required) | Starts one shared background HEVC→H.264 preparation job. Returns `{ready, cached, transcoding}`. |
 | GET | `/api/recordings/file` | `path` (required) | Plays only a complete, seekable MP4. Cache hits and browser-native codecs are served directly; an unprepared HEVC file returns `409`. |
 | GET | `/api/recordings/playback-status` | `path` (required) | Reports `{ready, cached, transcoding}` while the dashboard waits for the complete seekable artifact. |
 | GET | `/api/recordings/download` | `path` (required) | Download the original `.mp4` with `attachment` disposition and a server-generated `Camera_UTC-timestamp.mp4` filename. |
 
 ```bash
-curl -b jar.txt "http://127.0.0.1:3200/api/recordings?mac=aa:bb:cc:dd:ee:ff&limit=50"
+curl -b jar.txt "http://127.0.0.1:3200/api/recordings?camera_id=cam_0123456789abcdef01234567&limit=50"
 ```
 
 ### Health

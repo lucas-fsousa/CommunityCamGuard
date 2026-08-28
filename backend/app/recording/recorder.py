@@ -4,7 +4,7 @@ One ffmpeg per camera copies the camera's **go2rtc restream** (not the camera di
 go2rtc absorbs the RTSP quirks) into fixed-length segments laid out by day/hour and indexed
 in SQLite:
 
-    recordings/<mac>/<YYYY-MM-DD>/<HH>/<YYYYMMDD_HHMMSS>.mp4
+    recordings/<camera_id>/<YYYY-MM-DD>/<HH>/<YYYYMMDD_HHMMSS>.mp4
 
 Every date/time component in that layout is **UTC**.  This is deliberately independent of the
 camera timezone, the host timezone and the container's ``TZ`` setting.
@@ -34,6 +34,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import connect, registry
 from ..media import go2rtc
@@ -44,6 +45,7 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS recordings (
     id          INTEGER PRIMARY KEY,
     mac         TEXT NOT NULL,
+    camera_id   TEXT NOT NULL DEFAULT '',
     path        TEXT NOT NULL UNIQUE,
     started_at  TEXT NOT NULL,
     day         TEXT NOT NULL,
@@ -54,6 +56,10 @@ CREATE TABLE IF NOT EXISTS recordings (
 );
 CREATE INDEX IF NOT EXISTS idx_recordings_mac_day ON recordings (mac, day);
 """
+
+_MIGRATIONS = {
+    "camera_id": "ALTER TABLE recordings ADD COLUMN camera_id TEXT NOT NULL DEFAULT ''",
+}
 
 # A segment is "finalized" once ffmpeg has moved on to the next one; we treat it as done
 # when it hasn't been written to for this many seconds, then it is safe to index.
@@ -101,6 +107,29 @@ def _safe_mac(mac: str) -> str:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(_SCHEMA)
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(recordings)")}
+        for column, ddl in _MIGRATIONS.items():
+            if column not in existing:
+                conn.execute(ddl)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_recordings_camera_day "
+            "ON recordings (camera_id, day)"
+        )
+        cameras_exist = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cameras'"
+        ).fetchone()
+        if cameras_exist:
+            # Historical rows used a compact MAC as their archive key. Backfill only exact known
+            # cameras; orphan footage remains queryable without inventing an identity.
+            conn.execute(
+                """UPDATE recordings
+                   SET camera_id = COALESCE((
+                       SELECT cameras.camera_id FROM cameras
+                       WHERE replace(replace(lower(cameras.mac), ':', ''), '-', '') =
+                             replace(replace(lower(recordings.mac), ':', ''), '-', '')
+                   ), '')
+                   WHERE camera_id = ''"""
+            )
 
 
 def _now() -> str:
@@ -119,8 +148,8 @@ class Recorder:
         self._spawned_at: dict[str, float] = {}   # monotonic start time, for the health check
         self._fails: dict[str, int] = {}          # consecutive short-lived runs, drives backoff
         self._retry_at: dict[str, float] = {}     # monotonic time an ID may be respawned again
-        # Process supervision is keyed by the driver-independent ID. The legacy on-disk layout
-        # remains MAC-based until its separate, backwards-compatible data migration.
+        # Process supervision and new archive paths are keyed by the driver-independent ID.
+        # The indexer still recognizes historical MAC directories without moving their files.
         self._cameras: dict[str, registry.Camera] = {}
         self._paused = False
         self._lock = threading.Lock()
@@ -128,27 +157,31 @@ class Recorder:
         self._maint: threading.Thread | None = None
 
     # --- paths --------------------------------------------------------------------
-    def _cam_dir(self, mac: str) -> Path:
-        return self.root / _safe_mac(mac)
+    def _cam_dir(self, camera_id: str) -> Path:
+        if not valid_camera_id(camera_id):
+            raise ValueError("a valid opaque camera_id is required for recording output")
+        return self.root / camera_id
 
     def _log_path(self, camera_id: str) -> Path:
+        if not valid_camera_id(camera_id):
+            raise ValueError("a valid opaque camera_id is required for recorder logs")
         return Path(get_settings().db_path).parent / f"rec_{camera_id}.log"
 
-    def _output_template(self, mac: str) -> str:
+    def _output_template(self, camera_id: str) -> str:
         # strftime placeholders are expanded by ffmpeg's segment muxer.  _spawn gives that child
         # a fixed UTC timezone so this path cannot drift when the host/container/camera timezone
         # changes.  Camera packet timestamps are separately replaced with server wall-clock time.
-        return str(self._cam_dir(mac) / "%Y-%m-%d" / "%H" / "%Y%m%d_%H%M%S.mp4")
+        return str(self._cam_dir(camera_id) / "%Y-%m-%d" / "%H" / "%Y%m%d_%H%M%S.mp4")
 
-    def _ensure_dirs(self, macs: list[str]) -> None:
+    def _ensure_dirs(self, camera_ids: list[str]) -> None:
         # Must use the same clock basis as ffmpeg's UTC strftime expansion below.  Using naive
         # local time here can pre-create the wrong hour and make ffmpeg fail at a rollover.
         now = datetime.now(UTC)
         for offset in range(_DIR_LOOKAHEAD_HOURS + 1):
             when = now + timedelta(hours=offset)
             sub = Path(when.strftime("%Y-%m-%d")) / when.strftime("%H")
-            for mac in macs:
-                (self._cam_dir(mac) / sub).mkdir(parents=True, exist_ok=True)
+            for camera_id in camera_ids:
+                (self._cam_dir(camera_id) / sub).mkdir(parents=True, exist_ok=True)
 
     # --- lifecycle ----------------------------------------------------------------
     def start(self, cameras: list[registry.Camera] | None = None) -> list[str]:
@@ -159,19 +192,13 @@ class Recorder:
         new_cameras = {c.camera_id: c for c in cameras if c.rtsp_url and c.camera_id}
         camera_ids = list(new_cameras)
         self._paused = False
-        self._ensure_dirs([camera.mac for camera in new_cameras.values()])
+        self._ensure_dirs(camera_ids)
         with self._lock:
-            previous_cameras = self._cameras
             self._cameras = new_cameras
-            # Drop cameras no longer in the set (e.g. deleted via the API).
-            replaced = {
-                camera_id
-                for camera_id, previous in previous_cameras.items()
-                if camera_id in self._cameras
-                and previous.mac != self._cameras[camera_id].mac
-            }
+            # Drop cameras no longer in the set (e.g. deleted via the API). A native MAC change
+            # does not restart this process: both its go2rtc source and output path now use ID.
             for camera_id in [
-                key for key in self._procs if key not in self._cameras or key in replaced
+                key for key in self._procs if key not in self._cameras
             ]:
                 proc = self._procs[camera_id]
                 if proc.poll() is None:
@@ -279,7 +306,6 @@ class Recorder:
         log.info("truncated oversized recorder log %s", path.name)
 
     def _spawn(self, camera_id: str) -> subprocess.Popen:
-        camera = self._cameras[camera_id]
         src = go2rtc.restream_rtsp_url(camera_id)
         self._trim_log(camera_id)
         logfile = self._log_path(camera_id).open("ab")
@@ -321,7 +347,7 @@ class Recorder:
             # clean finalize, so an abrupt crash loses the whole current segment).
             "-segment_format_options",
             "movflags=+frag_keyframe+empty_moov+default_base_moof",
-            self._output_template(camera.mac),
+            self._output_template(camera_id),
         ]
         # FFmpeg's segment muxer has no per-output "strftime in UTC" flag; strftime follows the
         # process timezone.  Pin only the child to POSIX UTC0, which works both in and outside
@@ -365,10 +391,9 @@ class Recorder:
             # indexing/SQLite/filesystem exception killed the only maintenance thread. FFmpeg then
             # kept writing until the first directory rollover, exited with ENOENT, and was never
             # supervised again until the whole container was restarted.
-            cameras = list(self._cameras.values())
-            camera_ids = [camera.camera_id for camera in cameras]
+            camera_ids = list(self._cameras)
             try:
-                self._ensure_dirs([camera.mac for camera in cameras])
+                self._ensure_dirs(camera_ids)
             except Exception:
                 log.exception("recorder maintenance could not prepare output directories")
             if not self._paused:
@@ -396,10 +421,26 @@ class Recorder:
         """Index finalized segments not yet recorded. Returns how many were added."""
         now = time.time()
         rows: list[tuple] = []
+        with connect() as conn:
+            camera_rows = conn.execute(
+                "SELECT camera_id, mac FROM cameras"
+            ).fetchall() if conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cameras'"
+            ).fetchone() else []
+        identities: dict[str, tuple[str, str]] = {}
+        for camera in camera_rows:
+            safe_mac = _safe_mac(camera["mac"])
+            identity = (camera["camera_id"], safe_mac)
+            identities[camera["camera_id"]] = identity
+            identities[safe_mac] = identity
         for cam_dir in self.root.iterdir() if self.root.exists() else []:
             if not cam_dir.is_dir():
                 continue
-            mac = cam_dir.name
+            directory_key = cam_dir.name
+            camera_id, mac = identities.get(directory_key, ("", directory_key))
+            if valid_camera_id(directory_key):
+                camera_id = directory_key
+                mac = identities.get(directory_key, (directory_key, ""))[1]
             for path in cam_dir.rglob("*.mp4"):
                 try:
                     st = path.stat()
@@ -415,7 +456,7 @@ class Recorder:
                     started = datetime.strptime(path.stem, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
                 except ValueError:
                     continue
-                rows.append((mac, str(path), started.isoformat(timespec="seconds"),
+                rows.append((mac, camera_id, str(path), started.isoformat(timespec="seconds"),
                              started.strftime("%Y-%m-%d"), started.hour,
                              st.st_size, self.segment_seconds, _now()))
         if not rows:
@@ -427,68 +468,75 @@ class Recorder:
             # for finalized segments), so this also self-heals rows indexed before this fix.
             cur = conn.executemany(
                 """INSERT INTO recordings
-                   (mac, path, started_at, day, hour, size_bytes, duration_s, indexed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   (mac, camera_id, path, started_at, day, hour, size_bytes, duration_s, indexed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(path) DO UPDATE SET
+                       mac = CASE WHEN excluded.mac <> '' AND
+                                           (excluded.camera_id <> '' OR recordings.camera_id = '')
+                                  THEN excluded.mac ELSE recordings.mac END,
+                       camera_id = CASE WHEN excluded.camera_id <> ''
+                                        THEN excluded.camera_id ELSE recordings.camera_id END,
                        size_bytes = excluded.size_bytes,
                        indexed_at = excluded.indexed_at
-                   WHERE recordings.size_bytes <> excluded.size_bytes""",
+                   WHERE recordings.size_bytes <> excluded.size_bytes
+                      OR (excluded.mac <> ''
+                          AND (excluded.camera_id <> '' OR recordings.camera_id = '')
+                          AND recordings.mac <> excluded.mac)
+                      OR (excluded.camera_id <> ''
+                          AND recordings.camera_id <> excluded.camera_id)""",
                 rows,
             )
             return cur.rowcount
 
 
 def rekey_segments(old_mac: str, new_mac: str) -> int:
-    """Move a camera's recordings when its registry key changes (``registry.rekey_camera``).
+    """Update only the deprecated MAC projection after a native-identity correction.
 
-    Segments live under ``recordings/<safemac>/`` and the index stores that same safe MAC plus the
-    absolute path, so a re-keyed camera would otherwise lose its entire history — the recordings
-    browser filters by MAC and would come back empty. Renames the directory, then repoints the
-    index rows (MAC + path prefix). Returns how many rows moved.
-
-    Best-effort and non-destructive: if the destination directory already exists (a real second
-    camera, or a half-finished earlier move) nothing is renamed and the index is left alone, so
-    no recording is ever overwritten or orphaned by this function.
+    Opaque-ID archive paths and filters need no move. Historical MAC directories also stay where
+    they are: their indexed absolute paths remain valid and ``camera_id`` already preserves camera
+    ownership. Keeping this compatibility helper avoids destructive filesystem renames.
     """
     old, new = _safe_mac(old_mac), _safe_mac(new_mac)
     if old == new:
         return 0
     init_db()   # a scan can re-key before the recorder ever ran (autostart off / first boot)
-    root = Path(get_settings().recordings_dir)
-    old_dir, new_dir = root / old, root / new
-    if old_dir.is_dir():
-        if new_dir.exists():
-            log.warning("not moving recordings %s -> %s: destination already exists", old, new)
-            return 0
-        try:
-            old_dir.rename(new_dir)
-        except OSError as exc:
-            log.warning("could not move recordings %s -> %s: %s", old, new, exc)
-            return 0
     with connect() as conn:
+        cameras_exist = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cameras'"
+        ).fetchone()
+        camera = conn.execute(
+            "SELECT camera_id FROM cameras WHERE mac = ?", (new_mac.lower(),)
+        ).fetchone() if cameras_exist else None
+        camera_id = str(camera["camera_id"]) if camera else ""
         cur = conn.execute(
-            "UPDATE recordings SET mac = ?, path = replace(path, ?, ?) WHERE mac = ?",
-            (new, str(old_dir), str(new_dir), old),
+            """UPDATE recordings SET mac = ?,
+                   camera_id = CASE WHEN camera_id = '' THEN ? ELSE camera_id END
+               WHERE mac = ?""",
+            (new, camera_id, old),
         )
-    log.info("re-keyed %d recording rows %s -> %s", cur.rowcount, old, new)
+    log.info("updated deprecated MAC on %d recording rows %s -> %s", cur.rowcount, old, new)
     return cur.rowcount
 
 
 MAX_PAGE = 200  # hard cap so one request can never pull a whole library
 
 
-def query_segments(mac: str | None = None, day_from: str | None = None,
+def query_segments(camera_id: str | None = None, mac: str | None = None,
+                   day_from: str | None = None,
                    day_to: str | None = None, limit: int = 50, offset: int = 0) -> dict:
     """Paginated query over the recording index (for the recordings browser).
 
-    Filters by camera (MAC) and an inclusive ``day_from``..``day_to`` range (``YYYY-MM-DD``).
+    Filters by opaque camera ID and an inclusive ``day_from``..``day_to`` range (``YYYY-MM-DD``).
+    ``mac`` is a temporary compatibility filter for old clients and orphan historical rows.
     Newest first. ``limit`` is clamped to ``MAX_PAGE`` so a big library can never be pulled
     in one heavy response. Returns ``{items, total, limit, offset}``.
     """
     limit = max(1, min(int(limit or 50), MAX_PAGE))
     offset = max(0, int(offset or 0))
     where, params = [], []
-    if mac:
+    if camera_id:
+        where.append("camera_id = ?"); params.append(camera_id)
+    elif mac:
         where.append("mac = ?"); params.append(_safe_mac(mac))
     if day_from:
         where.append("day >= ?"); params.append(day_from)
@@ -502,3 +550,13 @@ def query_segments(mac: str | None = None, day_from: str | None = None,
             [*params, limit, offset],
         ).fetchall()
     return {"items": [dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+
+
+def segment_camera_id(path: str) -> str:
+    """Return the indexed canonical owner of one segment, if known."""
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT camera_id FROM recordings WHERE path = ?", (str(path),)
+        ).fetchone()
+    return str(row["camera_id"]) if row and row["camera_id"] else ""

@@ -15,7 +15,7 @@ export const state = {
   cameras: [],
   view: "grid",
   selected: null,
-  rec: { mac: "", from: "", to: "", page: 0, pageSize: 50 },
+  rec: { cameraId: "", from: "", to: "", page: 0, pageSize: 50 },
   candidates: [],
   camFilter: "all",
   provisioning: null,

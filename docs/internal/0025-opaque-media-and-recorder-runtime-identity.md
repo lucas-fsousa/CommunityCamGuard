@@ -20,10 +20,9 @@ live archive safely is a separate data migration and must not be hidden inside a
   application camera identity.
 - Key recorder processes, health/backoff state, logs and `is_recording` queries by `camera_id`.
 - Keep segment directories and the current recording-index `mac` column unchanged in this slice.
-  The recorder carries the selected camera record so it can combine an opaque runtime/source key
-  with the compatible legacy output path.
-- On a native MAC correction, keep the media stream ID stable but restart that camera's recorder so
-  FFmpeg reopens the directory moved by `rekey_segments`.
+  This transitional constraint is subsequently removed for new output by ADR 0026.
+- At this point a native MAC correction kept the media stream ID stable but restarted the recorder
+  to reopen the moved legacy directory. ADR 0026 makes that restart unnecessary.
 - Return `id` in the lightweight camera-status response and correlate status in the dashboard by it.
   Keep `mac` in that response temporarily for cached-client compatibility, not as the join key.
 
@@ -32,5 +31,5 @@ live archive safely is a separate data migration and must not be hidden inside a
 - Media and recording processes no longer assume a camera has a MAC or expose it in stream names.
 - A native identifier correction does not invalidate a player URL, quality variant or liveness key.
 - Existing footage remains readable without a risky bulk filesystem migration.
-- A follow-up must migrate the recording archive/index/filter contract to `camera_id`, then retire
-  `rekey_segments` and the status/API compatibility MAC fields.
+- ADR 0026 completes the recording archive/index/filter migration. Status/API compatibility MAC
+  fields remain temporarily available to older clients.

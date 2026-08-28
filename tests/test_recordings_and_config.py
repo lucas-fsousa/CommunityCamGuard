@@ -24,14 +24,18 @@ def _raw(*, hd: bool, has_audio: bool = True) -> str:
     )
 
 
-def _seed(n, mac="aabbccddeeff", day="2026-07-27"):
+def _seed(n, mac="aabbccddeeff", camera_id="", day="2026-07-27"):
     recorder.init_db()
     with connect() as c:
         c.execute("DELETE FROM recordings")
         c.executemany(
-            "INSERT INTO recordings (mac,path,started_at,day,hour,size_bytes,duration_s,indexed_at)"
-            " VALUES (?,?,?,?,?,?,?,?)",
-            [(mac, f"/r/{i}.mp4", f"{day}T00:{i:02d}:00", day, 0, 1000, 60, "x") for i in range(n)],
+            "INSERT INTO recordings "
+            "(mac,camera_id,path,started_at,day,hour,size_bytes,duration_s,indexed_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            [
+                (mac, camera_id, f"/r/{i}.mp4", f"{day}T00:{i:02d}:00", day, 0, 1000, 60, "x")
+                for i in range(n)
+            ],
         )
 
 
@@ -60,6 +64,13 @@ def test_query_day_range_filter():
     assert recorder.query_segments(day_from="2026-07-01", day_to="2026-07-31")["total"] == 10
 
 
+def test_query_filters_by_opaque_camera_id():
+    camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+    _seed(3, camera_id=camera_id)
+    assert recorder.query_segments(camera_id=camera_id)["total"] == 3
+    assert recorder.query_segments(camera_id=stable_camera_id("mac", "aa:bb:cc:dd:ee:02"))["total"] == 0
+
+
 def test_recordings_endpoint_includes_retention_days(monkeypatch):
     registry.init_db()
     _seed(3)
@@ -74,13 +85,58 @@ def test_recordings_endpoint_includes_retention_days(monkeypatch):
 
 def test_recordings_endpoint_resolves_safe_mac_to_friendly_camera_name():
     registry.init_db()
-    registry.upsert_camera("aa:bb:cc:dd:ee:01", name="Front door")
-    _seed(1, mac="aabbccddee01")
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01", name="Front door")
+    _seed(1, mac="aabbccddee01", camera_id=camera.camera_id)
 
     item = routes.recordings()["items"][0]
 
     assert item["mac"] == "aabbccddee01"
+    assert item["camera_id"] == camera.camera_id
     assert item["camera_name"] == "Front door"
+
+
+def test_recording_schema_backfills_legacy_rows_from_registered_mac():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    _seed(1, mac="aabbccddee01")
+
+    recorder.init_db()
+
+    assert recorder.query_segments()["items"][0]["camera_id"] == camera.camera_id
+
+
+def test_recording_schema_migrates_a_pre_camera_id_database():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    with connect() as connection:
+        connection.executescript(
+            """CREATE TABLE recordings (
+                   id INTEGER PRIMARY KEY, mac TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
+                   started_at TEXT NOT NULL, day TEXT NOT NULL, hour INTEGER NOT NULL,
+                   size_bytes INTEGER NOT NULL, duration_s INTEGER NOT NULL, indexed_at TEXT NOT NULL
+               );"""
+        )
+        connection.execute(
+            "INSERT INTO recordings "
+            "(mac,path,started_at,day,hour,size_bytes,duration_s,indexed_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            ("aabbccddee01", "/legacy.mp4", "2026-08-01T12:00:00+00:00",
+             "2026-08-01", 12, 100, 60, "x"),
+        )
+
+    recorder.init_db()
+
+    with connect() as connection:
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(recordings)")}
+    assert "camera_id" in columns
+    assert recorder.query_segments()["items"][0]["camera_id"] == camera.camera_id
+
+
+def test_recordings_endpoint_rejects_invalid_camera_id():
+    registry.init_db()
+    with pytest.raises(routes.HTTPException) as error:
+        routes.recordings(camera_id="aa:bb:cc:dd:ee:01")
+    assert error.value.status_code == 422
 
 
 def test_media_streams_reports_quality(monkeypatch):
@@ -326,30 +382,47 @@ def _seed_on_disk(mac_safe, day="2026-07-27"):
     return root, seg
 
 
-def test_rekey_segments_moves_files_and_index():
+def test_rekey_segments_updates_compatibility_mac_without_moving_history():
     root, seg = _seed_on_disk("aabbccddeeff")
     moved = recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:01")
     assert moved == 1
-    assert not seg.exists()                                   # directory renamed
-    new_seg = root / "aabbccddee01" / "2026-07-27" / "00" / "20260727_000000.mp4"
-    assert new_seg.exists()
-    # the recordings browser filters by MAC — the history must follow the camera
+    assert seg.exists()                                       # archive paths are never rewritten
+    assert not (root / "aabbccddee01").exists()
+    # Cached clients may still filter by the corrected MAC; canonical clients use camera_id.
     assert recorder.query_segments(mac="aa:bb:cc:dd:ee:01")["total"] == 1
     assert recorder.query_segments(mac="aa:bb:cc:dd:ee:ff")["total"] == 0
-    assert recorder.query_segments()["items"][0]["path"] == str(new_seg)
+    assert recorder.query_segments()["items"][0]["path"] == str(seg)
 
 
-def test_rekey_segments_refuses_to_clobber_an_existing_destination():
+def test_rekey_segments_never_touches_an_existing_destination():
     root, seg = _seed_on_disk("aabbccddeeff")
-    (root / "aabbccddee01").mkdir(parents=True)                # destination already in use
-    assert recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:01") == 0
-    assert seg.exists()                                        # nothing moved, nothing lost
-    assert recorder.query_segments(mac="aa:bb:cc:dd:ee:ff")["total"] == 1
+    destination = root / "aabbccddee01"
+    destination.mkdir(parents=True)
+    marker = destination / "keep"
+    marker.write_text("second camera")
+    assert recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:01") == 1
+    assert seg.exists() and marker.read_text() == "second camera"
 
 
 def test_rekey_segments_same_mac_is_a_noop():
     _seed_on_disk("aabbccddeeff")
     assert recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "AA:BB:CC:DD:EE:FF") == 0
+
+
+def test_reindexing_legacy_directory_preserves_owner_after_native_rekey():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    root, seg = _seed_on_disk("aabbccddeeff")
+    assert recorder.rekey_segments("aa:bb:cc:dd:ee:ff", camera.mac) == 1
+
+    rec = recorder.Recorder(segment_seconds=60)
+    rec.root = root
+    rec._index(list_all=True)
+
+    item = recorder.query_segments()["items"][0]
+    assert item["path"] == str(seg)
+    assert item["camera_id"] == camera.camera_id
+    assert item["mac"] == "aabbccddee01"
 
 
 def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():

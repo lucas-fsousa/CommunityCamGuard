@@ -26,9 +26,9 @@ re-keyed from an ARP-derived MAC to its authoritative identity.
 - Address camera CRUD operations, capability probing, PTZ, reboot, live-player recovery and browser
   diagnostics by `camera_id`. An exact-MAC resolver remains temporarily at these endpoints for
   clients predating this migration; new clients must not use it.
-- Keep MAC as the current discovery and recording-archive implementation key during their own
-  compatibility migrations. ADR 0025 moves media streams and recorder runtime state to `camera_id`;
-  MAC is no longer the public or media identity contract.
+- Keep MAC only as a discovery/native compatibility value. ADR 0025 moves media streams and
+  recorder runtime state to `camera_id`; ADR 0026 does the same for new archive paths, index
+  ownership and recording filters.
 - Associate proprietary P2P enrollment material with `camera_id`, not MAC or vendor device ID.
   Tokens and native identifiers remain backend-only.
 
@@ -42,5 +42,5 @@ re-keyed from an ARP-derived MAC to its authoritative identity.
 - A fresh installation reproduces an ID when it discovers the same identity namespace/value. If a
   future driver can supply a stronger stable identity, it should do so at initial enrollment; an
   existing public ID is not silently replaced.
-- The bundled dashboard no longer sends MAC as the target of camera operations. Removal of the
-  compatibility resolver and migration of the recording archive/index keys are explicit follow-ups.
+- The bundled dashboard no longer sends MAC as a camera-operation or recording-filter target.
+  Removal of deprecated compatibility inputs/columns remains an explicit follow-up.

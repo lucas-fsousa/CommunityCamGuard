@@ -431,12 +431,10 @@ def reboot_camera(camera_id: str) -> dict:
 def discovery_scan(request: Request, username: str = "", password: str = "") -> dict:
     """Gentle subnet scan. Returns known cameras (IP refreshed) and new candidates."""
     hosts = active_scan.scan(username=username, password=password)
-    rekeyed: list[tuple[str, str]] = []
 
     def on_rekey(old: str, new: str) -> None:
-        # A camera moved to its authoritative ONVIF MAC: carry its recordings across too, or the
-        # history would be stranded under the old key (see recorder.rekey_segments).
-        rekeyed.append((old, new))
+        # Only the deprecated recording-index MAC projection follows a corrected native value.
+        # Opaque media/process/archive identities remain stable, so no service restart is needed.
         try:
             recorder.rekey_segments(old, new)
         except Exception as exc:  # never fail a scan over a housekeeping move
@@ -454,10 +452,6 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
             configured[i] = _probe_and_store(cam)
         except Exception as exc:
             log.warning("backfill capability probe failed for %s: %s", cam.mac, exc)
-    if rekeyed:
-        # Stream/process identities stay stable, but the recorder must reopen its still-legacy
-        # MAC-based output directory after rekey_segments moves the camera's history.
-        _resync(request)
     return {
         "configured": [_camera_out(c) for c in configured],
         "candidates": [
@@ -1261,6 +1255,10 @@ def storage_status(request: Request) -> dict:
 # --- recordings ---------------------------------------------------------------------
 
 
+def _legacy_recording_mac(value: str) -> str:
+    return str(value).replace(":", "").replace("-", "").lower()
+
+
 def _recording_target(path: str) -> tuple[Path, Path]:
     """Resolve a recording path and keep every recording endpoint inside its configured root."""
     root = Path(get_settings().recordings_dir).resolve()
@@ -1272,6 +1270,7 @@ def _recording_target(path: str) -> tuple[Path, Path]:
 
 @router.get("/recordings", dependencies=[Depends(require_auth)])
 def recordings(
+    camera_id: str | None = None,
     mac: str | None = None,
     day_from: str | None = None,
     day_to: str | None = None,
@@ -1280,19 +1279,29 @@ def recordings(
 ) -> dict:
     """Paginated recordings query — returns {items, total, limit, offset, retention_days}.
 
+    ``camera_id`` is the canonical filter. ``mac`` remains a temporary compatibility input for
+    cached clients and orphan historical rows that predate opaque identities.
     ``retention_days`` is page context (0 = kept forever) so the browser can tell the user how
     long footage is kept before the retention job deletes it (see docs/DECISIONS.md §22).
     """
+    if camera_id and not valid_camera_id(camera_id):
+        raise HTTPException(status_code=422, detail="invalid camera_id")
     res = recorder.query_segments(
-        mac=mac, day_from=day_from, day_to=day_to, limit=limit, offset=offset
+        camera_id=camera_id, mac=mac, day_from=day_from, day_to=day_to,
+        limit=limit, offset=offset,
     )
-    camera_names = {
-        camera.mac.replace(":", "").replace("-", "").lower(): camera.name or camera.mac
-        for camera in registry.list_cameras()
+    cameras = registry.list_cameras()
+    names_by_id = {camera.camera_id: camera.name or camera.mac for camera in cameras}
+    names_by_mac = {
+        _legacy_recording_mac(camera.mac): camera.name or camera.mac for camera in cameras
     }
     for item in res["items"]:
-        key = str(item.get("mac") or "").replace(":", "").replace("-", "").lower()
-        item["camera_name"] = camera_names.get(key, item.get("mac") or "camera")
+        item_id = str(item.get("camera_id") or "")
+        legacy_mac = _legacy_recording_mac(str(item.get("mac") or ""))
+        item["camera_name"] = (
+            names_by_id.get(item_id) or names_by_mac.get(legacy_mac)
+            or item.get("mac") or "camera"
+        )
     res["retention_days"] = get_settings().recording_retention_days
     return res
 
@@ -1348,16 +1357,20 @@ def recording_playback_status(path: str) -> dict:
 def _recording_download_name(target: Path, root: Path) -> str:
     """Build ``Camera_Name_<original UTC timestamp>.mp4`` without trusting client text."""
     relative = target.relative_to(root)
-    recording_mac = relative.parts[0] if relative.parts else ""
-    camera = next(
-        (
-            item
-            for item in registry.list_cameras()
-            if item.mac.replace(":", "").lower() == recording_mac.lower()
-        ),
-        None,
-    )
-    label = (camera.name if camera and camera.name.strip() else recording_mac) or "camera"
+    directory_key = relative.parts[0] if relative.parts else ""
+    camera_id = recorder.segment_camera_id(str(target))
+    if not camera_id and valid_camera_id(directory_key):
+        camera_id = directory_key
+    camera = registry.get_camera_by_id(camera_id) if camera_id else None
+    if camera is None:
+        camera = next(
+            (
+                item for item in registry.list_cameras()
+                if _legacy_recording_mac(item.mac) == directory_key
+            ),
+            None,
+        )
+    label = (camera.name if camera and camera.name.strip() else directory_key) or "camera"
     safe_label = re.sub(r"[^\w.-]+", "_", label, flags=re.UNICODE).strip("._")[:80] or "camera"
     return f"{safe_label}_{target.name}"
 

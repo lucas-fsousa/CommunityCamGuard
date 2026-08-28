@@ -185,7 +185,9 @@ def test_recording_rows_offer_download_without_triggering_playback_selection():
     assert 'event.stopPropagation()' in recordings
     assert 'svgIcon("i-download")' in recordings
     assert 'id="i-download"' in index
-    assert "s.camera_name || nameOf[cameraKey(s.mac)]" in recordings
+    assert "s.camera_name || nameOf[s.camera_id]" in recordings
+    assert "camera_id: r.cameraId" in recordings
+    assert "value: c.id" in recordings
 
 
 def test_camera_status_indicator_uses_online_stream_liveness():

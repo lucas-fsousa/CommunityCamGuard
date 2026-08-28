@@ -6,10 +6,6 @@ function field(label, input) {
   return el("label", { className: "field" }, el("span", { textContent: label }), input);
 }
 
-function cameraKey(mac) {
-  return String(mac || "").replace(/[:-]/g, "").toLowerCase();
-}
-
 export function renderRecordings(stage) {
   stage.innerHTML = "";   // rebuilt each time the view is entered (no live camera frames here)
   const r = state.rec;
@@ -17,12 +13,12 @@ export function renderRecordings(stage) {
   if (!r.from) r.from = today;
   if (!r.to) r.to = today;
   const nameOf = Object.fromEntries(
-    state.cameras.map((c) => [cameraKey(c.mac), c.name || c.mac]));
+    state.cameras.map((c) => [c.id, c.name || c.mac]));
 
   const camSel = el("select");
   camSel.append(el("option", { value: "", textContent: t("rec.allCameras") }));
   state.cameras.forEach((c) => camSel.append(
-    el("option", { value: c.mac, textContent: c.name || c.mac, selected: c.mac === r.mac })));
+    el("option", { value: c.id, textContent: c.name || c.mac, selected: c.id === r.cameraId })));
   const fromI = el("input", { type: "date", value: r.from });
   const toI = el("input", { type: "date", value: r.to });
   const search = el("button", { className: "btn-primary", innerHTML: svgIcon("i-scan") + `<span>${t("rec.search")}</span>` });
@@ -114,10 +110,10 @@ export function renderRecordings(stage) {
   }
 
   async function load() {
-    r.mac = camSel.value; r.from = fromI.value; r.to = toI.value;
+    r.cameraId = camSel.value; r.from = fromI.value; r.to = toI.value;
     list.innerHTML = `<p class='muted'>${t("rec.loading")}</p>`;
     const qs = new URLSearchParams({
-      mac: r.mac, day_from: r.from, day_to: r.to,
+      camera_id: r.cameraId, day_from: r.from, day_to: r.to,
       limit: r.pageSize, offset: r.page * r.pageSize,
     });
     const res = await api("/recordings?" + qs.toString());
@@ -135,7 +131,7 @@ export function renderRecordings(stage) {
       return;
     }
     res.items.forEach((s) => {
-      const cameraName = s.camera_name || nameOf[cameraKey(s.mac)] || s.mac;
+      const cameraName = s.camera_name || nameOf[s.camera_id] || s.mac || t("rec.camera");
       const download = el("a", {
         className: "rec-download",
         href: "/api/recordings/download?path=" + encodeURIComponent(s.path),

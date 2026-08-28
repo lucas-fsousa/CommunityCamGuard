@@ -36,6 +36,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0023](0023-opaque-driver-independent-camera-id.md) | Opaque public camera identity with backend driver-native mapping |
 | [0024](0024-driver-owned-controls-and-vendor-packages.md) | Driver-owned semantic controls and vertical vendor packages |
 | [0025](0025-opaque-media-and-recorder-runtime-identity.md) | Opaque media stream and recorder runtime identity |
+| [0026](0026-opaque-recording-archive-identity.md) | Opaque recording archive identity with safe legacy backfill |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,
