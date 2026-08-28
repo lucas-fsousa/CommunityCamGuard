@@ -16,7 +16,6 @@ from .ble import (
     load_ble_provisioning_material,
     parse_ble_frame,
 )
-from .labels import LabelError, inspect_label
 from .privileged import (
     PrivilegedEnrollmentError,
     bind_vendor_device,
@@ -28,7 +27,6 @@ from .privileged import (
     query_vendor_device_online,
     remember_privileged_handoff,
 )
-from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
 from .rtsp_completion import (
     CompletedCamera,
     LocatedCamera,
@@ -49,7 +47,6 @@ __all__ = [
     "BleProvisioningAttempt",
     "BleProvisioningMaterial",
     "CompletedCamera",
-    "LabelError",
     "LocatedCamera",
     "OnboardingCompletionError",
     "PrivilegedEnrollmentError",
@@ -62,14 +59,11 @@ __all__ = [
     "bound_privileged_enrollment",
     "bound_privileged_enrollment_for_camera",
     "build_ble_provisioning_frames",
-    "build_wifi_payload",
     "complete_camera_onboarding",
     "decrypt_ble_payload",
     "encrypt_ble_payload",
-    "encryption_from_scan",
     "fetch_native_ble_material",
     "fragment_ble_message",
-    "inspect_label",
     "load_ble_provisioning_material",
     "locate_camera_by_mac",
     "manual_network",
@@ -80,7 +74,6 @@ __all__ = [
     "prove_rtsp_media",
     "query_vendor_device_online",
     "remember_privileged_handoff",
-    "render_svg_base64",
     "scan_wifi_networks",
     "selected_network",
 ]

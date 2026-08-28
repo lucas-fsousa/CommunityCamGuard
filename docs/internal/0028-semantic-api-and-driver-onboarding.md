@@ -44,8 +44,11 @@ generic API and startup code even when its implementation already fit the camera
   P2P lifecycle code in one Python module.
 - Common Wi-Fi selection and HTTP validation remain reusable. Yoosee's protocol recovery adapter
   can move more implementation files beneath its package incrementally without changing the port.
+- Label parsing and the recovered Wi-Fi QR wire format/rendering now live under
+  `drivers/yoosee`; they are manufacturer behavior, not generic provisioning utilities.
 - The driver registry remains explicit and auditable; onboarding is not discovered by arbitrary
   filesystem imports.
-- Recovered Yoosee codec/transport implementation files still under the historical top-level
-  `provisioning` package are the next verticalization step. Moving them under the Yoosee package
-  must preserve the driver port and must not reintroduce vendor imports into generic HTTP code.
+- Recovered Yoosee BLE, privileged-cloud and completion implementation files still under the
+  historical top-level `provisioning` package are the next verticalization steps. Moving them
+  under the Yoosee package must preserve the driver port and must not reintroduce vendor imports
+  into generic HTTP code.

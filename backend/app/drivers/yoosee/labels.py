@@ -3,6 +3,7 @@
 The parser is intentionally independent from the transport.  It lets the UI validate a scanned
 label now while SoftAP/BLE/QR transports are implemented behind the same provisioning API.
 """
+
 from __future__ import annotations
 
 import re

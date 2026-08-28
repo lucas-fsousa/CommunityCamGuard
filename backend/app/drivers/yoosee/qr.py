@@ -1,4 +1,5 @@
 """Yoosee/Gwell first-time Wi-Fi QR artifacts recovered from the Android client."""
+
 from __future__ import annotations
 
 import base64

@@ -20,29 +20,30 @@ from backend.app.config import get_settings
 from backend.app.db import p2p
 from backend.app.drivers.yoosee import account_store
 from backend.app.drivers.yoosee import onboarding as yoosee_onboarding
+from backend.app.drivers.yoosee.labels import LabelError, inspect_label
 from backend.app.drivers.yoosee.p2p import (
     AccountSession,
     P2PInventory,
     P2PPropertyRead,
     P2PRouteProbe,
 )
+from backend.app.drivers.yoosee.qr import (
+    build_wifi_payload,
+    encryption_from_scan,
+    render_svg_base64,
+)
 from backend.app.main import app
 from backend.app.provisioning import (
     BleCodecError,
     BleMessageAssembler,
     BleProvisioningMaterial,
-    LabelError,
     begin_ble_provisioning_attempt,
     build_ble_provisioning_frames,
-    build_wifi_payload,
     decrypt_ble_payload,
     encrypt_ble_payload,
-    encryption_from_scan,
     fragment_ble_message,
-    inspect_label,
     load_ble_provisioning_material,
     parse_ble_frame,
-    render_svg_base64,
 )
 from backend.app.provisioning import privileged as privileged_module
 from backend.app.provisioning.ble import (

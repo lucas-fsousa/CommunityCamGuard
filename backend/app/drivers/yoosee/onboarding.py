@@ -6,7 +6,6 @@ from pathlib import Path
 
 from ...provisioning import (
     BleCodecError,
-    LabelError,
     PrivilegedEnrollmentError,
     VendorProvisioningCloudError,
     begin_ble_provisioning_attempt,
@@ -14,11 +13,8 @@ from ...provisioning import (
     ble_provisioning_attempt,
     bound_privileged_enrollment,
     build_ble_provisioning_frames,
-    build_wifi_payload,
     complete_camera_onboarding,
-    encryption_from_scan,
     fetch_native_ble_material,
-    inspect_label,
     load_ble_provisioning_material,
     locate_camera_by_mac,
     mark_privileged_enrollment_bound,
@@ -26,7 +22,6 @@ from ...provisioning import (
     privileged_enrollment_status,
     query_vendor_device_online,
     remember_privileged_handoff,
-    render_svg_base64,
 )
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ..onboarding import (
@@ -48,6 +43,7 @@ from ..onboarding import (
 )
 from . import account_store
 from .ble_onboarding import decode_response
+from .labels import LabelError, inspect_label
 from .p2p import (
     MODEL_READ_PATHS,
     AccountCredentials,
@@ -59,6 +55,7 @@ from .p2p import (
     read_camera_property,
     refresh_account_session,
 )
+from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
 
 
 class YooseeOnboarding:
