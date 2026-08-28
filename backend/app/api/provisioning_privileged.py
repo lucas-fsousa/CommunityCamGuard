@@ -7,18 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Response
 
 from ..camera_identity import stable_camera_id
-from ..drivers.onboarding import OnboardingTransportError
-from ..provisioning import (
-    BleCodecError,
-    PrivilegedEnrollmentError,
-    bind_vendor_device,
-    ble_provisioning_attempt,
-    mark_privileged_enrollment_bound,
-    pending_privileged_enrollment,
-    privileged_enrollment_status,
-    query_vendor_device_online,
-    remember_privileged_handoff,
-)
+from ..drivers.onboarding import OnboardingStateError, OnboardingTransportError
 from .provisioning_common import (
     BLE_PROVISIONING,
     LOCAL_PROVISIONING,
@@ -41,7 +30,7 @@ def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response
     identity = inspect_provisioning_label(body)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return privileged_enrollment_status(identity["device_id"])
+    return onboarding().privileged_status(identity["device_id"])
 
 
 @router.post("/online-status", dependencies=BLE_PROVISIONING)
@@ -53,31 +42,21 @@ def provisioning_privileged_online_status(
 
     identity = inspect_provisioning_label(body)
     try:
-        attempt = ble_provisioning_attempt(
-            body.attempt_id,
-            expected_device_id=identity["device_id"],
+        result = onboarding().online_status(
+            device_id=identity["device_id"],
+            attempt_id=body.attempt_id,
         )
-        result = query_vendor_device_online(attempt.material)
-    except (BleCodecError, PrivilegedEnrollmentError) as exc:
+    except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if result.device_id is not None and result.device_id != identity["device_id"]:
-        raise HTTPException(
-            status_code=409,
-            detail="vendor online result belongs to a different camera",
-        )
-    handoff_ready = False
-    if result.online:
-        remember_privileged_handoff(attempt.material, confirm_key=None)
-        handoff_ready = True
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
         "device_id": identity["device_id"],
-        "query_succeeded": result.success,
+        "query_succeeded": result.query_succeeded,
         "online": result.online,
         "terminal_failure": result.terminal_failure,
         "code": result.code,
-        "privileged_handoff_ready": handoff_ready,
+        "privileged_handoff_ready": result.handoff_ready,
     }
 
 
@@ -87,32 +66,16 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
 
     identity = inspect_provisioning_label(body)
     try:
-        pending = pending_privileged_enrollment(identity["device_id"])
-        result = bind_vendor_device(
-            pending,
+        onboarding().bind(
+            device_id=identity["device_id"],
             time_area=body.time_area,
             time_zone=body.time_zone,
-        )
-    except PrivilegedEnrollmentError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if not result.success:
-        detail = result.message or (
-            str(result.code) if result.code is not None else "unknown error"
-        )
-        raise HTTPException(status_code=409, detail=f"camera P2P enrollment failed: {detail}")
-    if not result.dev_token:
-        raise HTTPException(
-            status_code=502,
-            detail="camera P2P enrollment returned no subscription material",
-        )
-    try:
-        mark_privileged_enrollment_bound(
-            pending,
-            result.dev_token,
             camera_id=(stable_camera_id("mac", identity["mac"]) if identity["mac"] else None),
         )
-    except PrivilegedEnrollmentError as exc:
+    except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OnboardingTransportError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     log.info("Privileged P2P enrollment accepted device=%s", identity["device_id"])
@@ -132,7 +95,7 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
     identity = inspect_provisioning_label(body)
     try:
         inventory = onboarding().probe_inventory(identity["device_id"])
-    except PrivilegedEnrollmentError as exc:
+    except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -161,7 +124,7 @@ def provisioning_privileged_p2p_route_probe(
     identity = inspect_provisioning_label(body)
     try:
         route = onboarding().probe_route(identity["device_id"])
-    except PrivilegedEnrollmentError as exc:
+    except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -196,7 +159,7 @@ def provisioning_privileged_p2p_property_read(
         raise HTTPException(status_code=422, detail="thing-model path is not read-only allowlisted")
     try:
         result = provider.read_property(identity["device_id"], body.property_path)
-    except PrivilegedEnrollmentError as exc:
+    except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

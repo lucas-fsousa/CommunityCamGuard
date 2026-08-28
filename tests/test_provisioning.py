@@ -751,7 +751,7 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
         called.append((item.device_id, item.confirm_key, time_area, time_zone))
         return VendorBindResult(True, 0, "", SUBSCRIPTION_TOKEN)
 
-    monkeypatch.setattr(privileged_routes, "bind_vendor_device", fake_bind)
+    monkeypatch.setattr(yoosee_onboarding, "bind_vendor_device", fake_bind)
     response = privileged_routes.provisioning_privileged_bind(
         privileged_routes.ProvisioningPrivilegedBindIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
@@ -1089,7 +1089,7 @@ def test_online_status_route_retains_null_proof_for_explicit_bind(monkeypatch, t
     material_path.chmod(0o600)
     attempt_id = _start_ble_attempt(material_path)
     monkeypatch.setattr(
-        privileged_routes,
+        yoosee_onboarding,
         "query_vendor_device_online",
         lambda _material: VendorOnlineResult(True, 0, "", True, False, "7443576841"),
     )

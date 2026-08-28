@@ -117,6 +117,15 @@ class BleDecodeResult:
     wifi_connection: dict[str, object] | None
 
 
+@dataclass(frozen=True, slots=True)
+class OnlineStatusResult:
+    query_succeeded: bool
+    online: bool
+    terminal_failure: bool
+    code: int | None
+    handoff_ready: bool
+
+
 class OnboardingPort(Protocol):
     """Driver-owned operations needed by the generic onboarding HTTP workflow."""
 
@@ -159,6 +168,19 @@ class OnboardingPort(Protocol):
         encrypted: bool,
         raw: bytes,
     ) -> BleDecodeResult: ...
+
+    def privileged_status(self, device_id: str) -> dict: ...
+
+    def online_status(self, *, device_id: str, attempt_id: str) -> OnlineStatusResult: ...
+
+    def bind(
+        self,
+        *,
+        device_id: str,
+        time_area: str,
+        time_zone: int,
+        camera_id: str | None,
+    ) -> None: ...
 
     def login(self, request: AccountLogin) -> None: ...
 

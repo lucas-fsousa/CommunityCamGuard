@@ -10,6 +10,8 @@ from ...provisioning import (
     PrivilegedEnrollmentError,
     VendorProvisioningCloudError,
     begin_ble_provisioning_attempt,
+    bind_vendor_device,
+    ble_provisioning_attempt,
     bound_privileged_enrollment,
     build_ble_provisioning_frames,
     build_wifi_payload,
@@ -19,6 +21,11 @@ from ...provisioning import (
     inspect_label,
     load_ble_provisioning_material,
     locate_camera_by_mac,
+    mark_privileged_enrollment_bound,
+    pending_privileged_enrollment,
+    privileged_enrollment_status,
+    query_vendor_device_online,
+    remember_privileged_handoff,
     render_svg_base64,
 )
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
@@ -35,6 +42,7 @@ from ..onboarding import (
     OnboardingLabelError,
     OnboardingStateError,
     OnboardingTransportError,
+    OnlineStatusResult,
     PropertyReadResult,
     RouteResult,
 )
@@ -192,10 +200,67 @@ class YooseeOnboarding:
             raw=raw,
         )
 
-    def probe_inventory(self, device_id: str) -> InventoryResult:
-        enrollment = bound_privileged_enrollment(device_id)
+    def privileged_status(self, device_id: str) -> dict:
+        return privileged_enrollment_status(device_id)
+
+    def online_status(self, *, device_id: str, attempt_id: str) -> OnlineStatusResult:
         try:
+            attempt = ble_provisioning_attempt(attempt_id, expected_device_id=device_id)
+            result = query_vendor_device_online(attempt.material)
+            if result.device_id is not None and result.device_id != device_id:
+                raise OnboardingStateError("vendor online result belongs to a different camera")
+            handoff_ready = False
+            if result.online:
+                remember_privileged_handoff(attempt.material, confirm_key=None)
+                handoff_ready = True
+        except (BleCodecError, PrivilegedEnrollmentError) as exc:
+            raise OnboardingStateError(str(exc)) from exc
+        return OnlineStatusResult(
+            query_succeeded=result.success,
+            online=result.online,
+            terminal_failure=result.terminal_failure,
+            code=result.code,
+            handoff_ready=handoff_ready,
+        )
+
+    def bind(
+        self,
+        *,
+        device_id: str,
+        time_area: str,
+        time_zone: int,
+        camera_id: str | None,
+    ) -> None:
+        try:
+            pending = pending_privileged_enrollment(device_id)
+            result = bind_vendor_device(
+                pending,
+                time_area=time_area,
+                time_zone=time_zone,
+            )
+            if not result.success:
+                detail = result.message or (
+                    str(result.code) if result.code is not None else "unknown error"
+                )
+                raise OnboardingStateError(f"camera P2P enrollment failed: {detail}")
+            if not result.dev_token:
+                raise OnboardingTransportError(
+                    "camera P2P enrollment returned no subscription material"
+                )
+            mark_privileged_enrollment_bound(
+                pending,
+                result.dev_token,
+                camera_id=camera_id,
+            )
+        except PrivilegedEnrollmentError as exc:
+            raise OnboardingStateError(str(exc)) from exc
+
+    def probe_inventory(self, device_id: str) -> InventoryResult:
+        try:
+            enrollment = bound_privileged_enrollment(device_id)
             result = probe_account_inventory(enrollment)
+        except PrivilegedEnrollmentError as exc:
+            raise OnboardingStateError(str(exc)) from exc
         except P2PProbeError as exc:
             raise OnboardingTransportError(str(exc)) from exc
         return InventoryResult(
@@ -209,9 +274,11 @@ class YooseeOnboarding:
         )
 
     def probe_route(self, device_id: str) -> RouteResult:
-        enrollment = bound_privileged_enrollment(device_id)
         try:
+            enrollment = bound_privileged_enrollment(device_id)
             result = probe_camera_route(enrollment)
+        except PrivilegedEnrollmentError as exc:
+            raise OnboardingStateError(str(exc)) from exc
         except P2PProbeError as exc:
             raise OnboardingTransportError(str(exc)) from exc
         return RouteResult(
@@ -227,9 +294,11 @@ class YooseeOnboarding:
         )
 
     def read_property(self, device_id: str, property_path: str) -> PropertyReadResult:
-        enrollment = bound_privileged_enrollment(device_id)
         try:
+            enrollment = bound_privileged_enrollment(device_id)
             result = read_camera_property(enrollment, property_path)
+        except PrivilegedEnrollmentError as exc:
+            raise OnboardingStateError(str(exc)) from exc
         except P2PProbeError as exc:
             raise OnboardingTransportError(str(exc)) from exc
         return PropertyReadResult(
