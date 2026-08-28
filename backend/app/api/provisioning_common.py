@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from .. import drivers
 from ..auth import require_auth
-from ..provisioning import LabelError, inspect_label
+from ..drivers.onboarding import OnboardingLabelError
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
@@ -90,12 +90,12 @@ def inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
     """Validate a public label model and translate parser failures to HTTP 422."""
 
     try:
-        return inspect_label(
+        return onboarding().inspect_label(
             label=body.label,
             device_id=body.device_id,
             capability_code=body.capability_code,
             firmware_version=body.firmware_version,
             mac=body.mac,
         )
-    except LabelError as exc:
+    except OnboardingLabelError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

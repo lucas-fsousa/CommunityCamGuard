@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ...provisioning import (
+    LabelError,
     PrivilegedEnrollmentError,
     bound_privileged_enrollment,
     complete_camera_onboarding,
     fetch_native_ble_material,
+    inspect_label,
     load_ble_provisioning_material,
     locate_camera_by_mac,
 )
+from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ..onboarding import (
     AccountLogin,
     CompletionMediaProof,
@@ -20,6 +22,7 @@ from ..onboarding import (
     InventoryResult,
     OnboardingAccountError,
     OnboardingCompletionError,
+    OnboardingLabelError,
     OnboardingStateError,
     OnboardingTransportError,
     PropertyReadResult,
@@ -48,6 +51,26 @@ class YooseeOnboarding:
 
     def account_configured(self) -> bool:
         return account_store.get_account() is not None
+
+    def inspect_label(
+        self,
+        *,
+        label: str,
+        device_id: str,
+        capability_code: str,
+        firmware_version: str,
+        mac: str,
+    ) -> dict:
+        try:
+            return inspect_label(
+                label=label,
+                device_id=device_id,
+                capability_code=capability_code,
+                firmware_version=firmware_version,
+                mac=mac,
+            )
+        except LabelError as exc:
+            raise OnboardingLabelError(str(exc)) from exc
 
     def login(self, request: AccountLogin) -> None:
         try:

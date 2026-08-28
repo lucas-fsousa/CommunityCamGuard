@@ -11,6 +11,10 @@ class OnboardingAccountError(RuntimeError):
     """A driver's remote account operation failed."""
 
 
+class OnboardingLabelError(ValueError):
+    """A printed/scanned identity is not valid for the selected camera family."""
+
+
 class OnboardingTransportError(RuntimeError):
     """A driver's privileged camera transport failed."""
 
@@ -98,6 +102,16 @@ class OnboardingPort(Protocol):
     def init(self) -> None: ...
 
     def account_configured(self) -> bool: ...
+
+    def inspect_label(
+        self,
+        *,
+        label: str,
+        device_id: str,
+        capability_code: str,
+        firmware_version: str,
+        mac: str,
+    ) -> dict: ...
 
     def login(self, request: AccountLogin) -> None: ...
 
