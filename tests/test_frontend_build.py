@@ -61,16 +61,20 @@ def test_live_restart_cycles_producer_and_mse_discards_stale_video():
     assert "Math.min(1.25, gap)" not in video_rtc
 
 
-def test_vendor_controls_use_opaque_camera_id_and_explicit_target_states():
+def test_camera_controls_use_driver_catalog_and_semantic_api():
     live = (
         Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js"
     ).read_text()
 
     assert "encodeURIComponent(cam.id)" in live
-    assert "encodeURIComponent(cam.mac)}/${endpoint}" not in live
-    assert "cam.controls || cam.vendor_controls" in live
-    assert '"white-light", (value) => ({ enabled: value === "on" })' in live
-    assert '"orientation", (orientation) => ({ orientation })' in live
+    assert "cam.controls || cam.vendor_controls" not in live
+    assert "const available = cam.controls || {}" in live
+    assert "available.white_light?.writable" in live
+    assert '"white_light", (value) => value === "on"' in live
+    assert '"orientation", (orientation) => orientation' in live
+    assert "/controls/${encodeURIComponent(controlKey)}`" in live
+    assert "JSON.stringify({ value: valueFor(selected) })" in live
+    assert "/vendor-controls/" not in live
     assert "Nothing is read automatically" in live
 
 

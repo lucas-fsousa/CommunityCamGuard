@@ -34,6 +34,8 @@ string alone must never grant another driver's controls.
   a scalar semantic value and the application service rejects keys or operations absent from that
   camera driver's catalog before transport dispatch. The older `/api/vendor-controls/...` routes
   remain temporarily for client compatibility.
+- The bundled dashboard consumes only the authoritative `controls` descriptors and canonical
+  camera-control route. Compatibility fields/routes are no longer dependencies of current UI code.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.

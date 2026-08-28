@@ -149,8 +149,8 @@ function camBar(cam) {
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz) actions.append(ptzControls(cam));
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
-  if (Object.keys(cam.controls || cam.vendor_controls || {}).length) {
-    actions.append(vendorControls(cam));
+  if (Object.keys(cam.controls || {}).length) {
+    actions.append(cameraControls(cam));
   }
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
@@ -163,17 +163,17 @@ function camBar(cam) {
   );
 }
 
-// Proprietary controls are grouped behind one compact menu. Nothing is read automatically when a
+// Camera controls are grouped behind one compact menu. Nothing is read automatically when a
 // tile renders: opening the dashboard must not create extra P2P sessions on resource-limited
 // cameras. Each option is an explicit target state; the backend performs its own preflight and
 // skips the write when the camera is already in that state.
-function vendorControls(cam) {
-  const available = cam.controls || cam.vendor_controls || {};
-  const status = el("small", { className: "vendor-control-status" });
-  const menu = el("div", { className: "vendor-control-menu" });
+function cameraControls(cam) {
+  const available = cam.controls || {};
+  const status = el("small", { className: "camera-control-status" });
+  const menu = el("div", { className: "camera-control-menu" });
 
-  const actionSelect = (placeholder, options, endpoint, payloadFor) => {
-    const select = el("select", { className: "vendor-control-select", title: placeholder });
+  const actionSelect = (placeholder, options, controlKey, valueFor) => {
+    const select = el("select", { className: "camera-control-select", title: placeholder });
     select.append(el("option", { value: "", textContent: placeholder, disabled: true, selected: true }));
     for (const [value, label] of options) {
       select.append(el("option", { value, textContent: label }));
@@ -185,16 +185,16 @@ function vendorControls(cam) {
       const selected = select.value;
       select.disabled = true;
       status.classList.remove("error");
-      status.textContent = t("vendor.applying");
+      status.textContent = t("control.applying");
       try {
-        await api(`/vendor-controls/${encodeURIComponent(cam.id)}/${endpoint}`, {
+        await api(`/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`, {
           method: "PUT",
-          body: JSON.stringify(payloadFor(selected)),
+          body: JSON.stringify({ value: valueFor(selected) }),
         });
-        status.textContent = t("vendor.applied");
+        status.textContent = t("control.applied");
       } catch (error) {
         status.classList.add("error");
-        status.textContent = t("vendor.failed", { msg: error.message });
+        status.textContent = t("control.failed", { msg: error.message });
       } finally {
         select.selectedIndex = 0;
         select.disabled = false;
@@ -203,22 +203,22 @@ function vendorControls(cam) {
     return select;
   };
 
-  if (available.white_light) {
-    menu.append(actionSelect(t("vendor.whiteLight"), [
-      ["on", t("vendor.lightOn")],
-      ["off", t("vendor.lightOff")],
-    ], "white-light", (value) => ({ enabled: value === "on" })));
+  if (available.white_light?.writable) {
+    menu.append(actionSelect(t("control.whiteLight"), [
+      ["on", t("control.lightOn")],
+      ["off", t("control.lightOff")],
+    ], "white_light", (value) => value === "on"));
   }
-  if (available.orientation) {
-    menu.append(actionSelect(t("vendor.orientation"), [
-      ["normal", t("vendor.orientationNormal")],
-      ["inverted", t("vendor.orientationInverted")],
-    ], "orientation", (orientation) => ({ orientation })));
+  if (available.orientation?.writable) {
+    menu.append(actionSelect(t("control.orientation"), [
+      ["normal", t("control.orientationNormal")],
+      ["inverted", t("control.orientationInverted")],
+    ], "orientation", (orientation) => orientation));
   }
   menu.append(status);
 
-  const details = el("details", { className: "vendor-controls" },
-    el("summary", { className: "icon-btn", textContent: "⚙", title: t("vendor.menu") }),
+  const details = el("details", { className: "camera-controls" },
+    el("summary", { className: "icon-btn", textContent: "⚙", title: t("control.menu") }),
     menu,
   );
   details.addEventListener("click", (event) => event.stopPropagation());
