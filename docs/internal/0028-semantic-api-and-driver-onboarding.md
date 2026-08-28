@@ -12,8 +12,11 @@ generic API and startup code even when its implementation already fit the camera
 
 ## Decision
 
-- HTTP endpoints are grouped into semantic routers (`cameras`, `discovery`, `media`, `recordings`
-  and provisioning) while retaining the existing `/api/...` paths and authentication rules.
+- HTTP endpoints are grouped into semantic routers (`auth`, `cameras`, `discovery`, `media`,
+  `recordings`, `storage` and provisioning) while retaining existing `/api/...` paths and guards.
+- Provisioning is further split by responsibility: shared request contracts/guards, provider
+  account, Wi-Fi/QR, encrypted BLE, privileged P2P and completion. The root status router remains
+  intentionally small.
 - Shared camera lookup, capability probing and media/recorder reconciliation are application
   services. Camera JSON shaping is one API presenter instead of being copied across routers.
 - Factory enrollment operations that vary by manufacturer use `OnboardingPort`. A driver may
@@ -22,6 +25,9 @@ generic API and startup code even when its implementation already fit the camera
   account persistence, account protocol, inventory probes, direct-route probes or property reads.
 - Startup initializes onboarding stores by iterating registered providers, so a new provider does
   not add a vendor import to `main.py`.
+- The final P2P → RTSP → authenticated-media → registry transaction is also a driver-port
+  operation. The HTTP layer receives only a public completion DTO and uses the common runtime
+  reconciliation service after the registry commit.
 - P2P operations cross the port as typed, secret-free DTOs. Raw session tokens, native payloads and
   peer coordinates remain inside the driver package.
 - While Yoosee is the sole onboarding provider, omission of a driver key resolves it unambiguously.
@@ -34,7 +40,12 @@ generic API and startup code even when its implementation already fit the camera
   startup or importing their protocols into HTTP code.
 - The external API is unchanged; direct imports of old route functions were internal test details
   and now point at their semantic modules.
+- Large provisioning edits no longer mix cloud-account, radio discovery, BLE secret handling and
+  P2P lifecycle code in one Python module.
 - Common Wi-Fi selection and HTTP validation remain reusable. Yoosee's protocol recovery adapter
   can move more implementation files beneath its package incrementally without changing the port.
 - The driver registry remains explicit and auditable; onboarding is not discovered by arbitrary
   filesystem imports.
+- Recovered Yoosee codec/transport implementation files still under the historical top-level
+  `provisioning` package are the next verticalization step. Moving them under the Yoosee package
+  must preserve the driver port and must not reintroduce vendor imports into generic HTTP code.
