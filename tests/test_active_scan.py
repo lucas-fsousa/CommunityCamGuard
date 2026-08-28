@@ -89,7 +89,11 @@ def test_probe_rtsp_returns_empty_when_not_rtsp(monkeypatch):
 
 
 def test_probe_rtsp_collects_200_and_401_paths(monkeypatch):
-    monkeypatch.setattr(drivers, "rtsp_paths", lambda u, p: ["/onvif1", "/onvif2"])
+    monkeypatch.setattr(
+        drivers,
+        "rtsp_paths_for",
+        lambda _key, _user, _password, **_kwargs: ["/onvif1", "/onvif2"],
+    )
     # OPTIONS ok; /onvif1 -> 200; /onvif2 -> 401 (real path, needs creds)
     monkeypatch.setattr(active_scan.rtsp, "parse_status",
                         lambda r: {"OPTS": 200, "D200": 200, "D401": 401}[r])
@@ -100,7 +104,11 @@ def test_probe_rtsp_collects_200_and_401_paths(monkeypatch):
 
 
 def test_probe_rtsp_retries_401_with_auth(monkeypatch):
-    monkeypatch.setattr(drivers, "rtsp_paths", lambda u, p: ["/onvif1"])
+    monkeypatch.setattr(
+        drivers,
+        "rtsp_paths_for",
+        lambda _key, _user, _password, **_kwargs: ["/onvif1"],
+    )
     monkeypatch.setattr(active_scan.rtsp, "auth_header", lambda *a, **k: "Digest x")
     monkeypatch.setattr(active_scan.rtsp, "parse_status",
                         lambda r: {"OPTS": 200, "D401": 401, "D200": 200}[r])
@@ -152,7 +160,8 @@ def test_probe_host_merges_ports_reads_arp_and_identifies(monkeypatch):
     monkeypatch.setattr(active_scan.rtsp, "RtspSession",
                         lambda *a, **k: type("S", (), {"close": lambda self: None})())
     monkeypatch.setattr(active_scan, "_probe_rtsp",
-                        lambda sess, port, u, p: [RtspStream("rtsp://10.0.0.9/onvif1", 200)])
+                        lambda sess, port, u, p, **kwargs:
+                        [RtspStream("rtsp://10.0.0.9/onvif1", 200)])
     host = active_scan._probe_host("10.0.0.9", [554], "admin", "pw", 3.0, 0.3)
     assert host.open_ports == [554, 5000, 50000]      # merged + sorted
     assert host.arp_mac == "aa:bb:cc:dd:ee:09"

@@ -40,6 +40,10 @@ class MyBrandDriver(CameraDriver):
         return "mybrand" in ctx.vendor.lower()
 ```
 
+For ambiguous families, override `match_confidence()` (`0..100`) instead. Strong manufacturer,
+model, serial or protocol evidence should outrank a shared open-port fingerprint. Add a collision
+test proving that another registered family is not incorrectly claimed.
+
 Path templates may use `[USERNAME]`, `[PASSWORD]`, `[CHANNEL]` — a template with `[PASSWORD]`
 is only tried when credentials are supplied. The generic capability probe (video/audio tracks
 + codecs from the RTSP SDP) works for you automatically.

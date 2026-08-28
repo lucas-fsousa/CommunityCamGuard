@@ -55,6 +55,7 @@ __all__ = [
     "get",
     "probe",
     "rtsp_paths",
+    "rtsp_paths_for",
 ]
 
 
@@ -76,16 +77,25 @@ def for_camera(camera: Camera) -> CameraDriver:
 
     return detect(DetectContext(
         vendor=getattr(camera, "vendor", "") or "",
+        model=str(caps.get("model") or ""),
+        firmware=str(caps.get("firmware") or ""),
         open_ports=caps.get("open_ports") or []
     ))
 
 
 def detect(ctx: DetectContext) -> CameraDriver:
-    """Pick the most specific driver that claims ``ctx`` (generic if none)."""
-    return next(
-        iter(driver for driver in DRIVERS if driver is not GENERIC and driver.matches(ctx)),
-        GENERIC
-    )
+    """Pick the highest-confidence driver, preserving registration order for exact ties."""
+
+    selected = GENERIC
+    selected_confidence = 0
+    for driver in DRIVERS:
+        if driver is GENERIC:
+            continue
+        confidence = max(0, min(100, int(driver.match_confidence(ctx))))
+        if confidence > selected_confidence:
+            selected = driver
+            selected_confidence = confidence
+    return selected
 
 
 def _fill(template: str, username: str, password: str, channel: int) -> str:
@@ -115,10 +125,37 @@ def rtsp_paths(username: str = "", password: str = "", channel: int = 1) -> list
     return out
 
 
+def rtsp_paths_for(
+    driver_key: str | None,
+    username: str = "",
+    password: str = "",
+    channel: int = 1,
+    discovered: list[str] | tuple[str, ...] = (),
+) -> list[str]:
+    """Return camera-reported paths plus only the selected family's guesses.
+
+    Unknown/generic hosts retain the full compatibility union because no family evidence exists.
+    Identified cameras are never probed with every other installed driver's paths.
+    """
+
+    have_creds = bool(username and password)
+    selected = get(driver_key)
+    families = DRIVERS if selected is GENERIC else (selected,)
+    candidates = [path for path in discovered if isinstance(path, str) and path.startswith("/")]
+    for driver in families:
+        for template in driver.rtsp_paths:
+            if "[PASSWORD]" in template and not have_creds:
+                continue
+            candidates.append(_fill(template, username, password, channel))
+    return list(dict.fromkeys(candidates))
+
+
 def probe(camera: Camera, open_ports: list[int] | None = None) -> Capabilities:
     """Detect the camera's driver (from its vendor + open ports) and probe with it."""
     ctx = DetectContext(
         vendor=getattr(camera, "vendor", "") or "",
+        model=str((getattr(camera, "capabilities", None) or {}).get("model") or ""),
+        firmware=str((getattr(camera, "capabilities", None) or {}).get("firmware") or ""),
         open_ports=sorted(set(open_ports or []))
     )
     return detect(ctx).probe(camera, open_ports)

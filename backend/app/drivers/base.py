@@ -88,6 +88,10 @@ class DetectContext:
     """What discovery already knows about a host, used to pick the right driver."""
 
     vendor: str = ""                       # SDP/device manufacturer string, if any
+    model: str = ""
+    firmware: str = ""
+    serial: str = ""
+    hardware: str = ""
     open_ports: list[int] = field(default_factory=list)
     sdp: str = ""
 
@@ -108,6 +112,11 @@ class CameraDriver:
     def matches(self, ctx: DetectContext) -> bool:
         """Does this camera belong to this family? The generic fallback never matches."""
         return False
+
+    def match_confidence(self, ctx: DetectContext) -> int:
+        """Return 0..100 confidence; explicit family evidence should outrank port fingerprints."""
+
+        return 80 if self.matches(ctx) else 0
 
     # --- capability probe --------------------------------------------------------------
     def probe(self, camera: Camera, open_ports: list[int] | None = None) -> Capabilities:

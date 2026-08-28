@@ -28,6 +28,26 @@ def test_channel_placeholder_filled():
     assert dahua and "channel=3" in dahua[0]
 
 
+def test_identified_driver_gets_only_its_paths_with_camera_reported_path_first():
+    paths = drivers.rtsp_paths_for(
+        "dahua",
+        channel=2,
+        discovered=["/camera-reported", "/camera-reported"],
+    )
+
+    assert paths[0] == "/camera-reported"
+    assert any(path.startswith("/cam/realmonitor") for path in paths)
+    assert "/onvif1" not in paths
+    assert "/Streaming/Channels/101" not in paths
+
+
+def test_unknown_driver_retains_cross_family_fallback_paths():
+    paths = drivers.rtsp_paths_for("generic")
+
+    assert "/onvif1" in paths
+    assert "/Streaming/Channels/101" in paths
+
+
 # --- driver detection & selection --------------------------------------------------
 
 def test_detect_yoosee_by_ports():
@@ -37,6 +57,16 @@ def test_detect_yoosee_by_ports():
 
 def test_detect_dahua_by_vendor():
     assert drivers.detect(drivers.DetectContext(vendor="Dahua Technology")).key == "dahua"
+
+
+def test_strong_vendor_identity_outranks_yoosee_port_fingerprint():
+    context = drivers.DetectContext(
+        vendor="Dahua Technology",
+        model="IPC-HDW",
+        open_ports=[554, 5000],
+    )
+
+    assert drivers.detect(context).key == "dahua"
 
 
 def test_detect_falls_back_to_generic():

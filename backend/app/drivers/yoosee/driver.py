@@ -28,13 +28,18 @@ class YooseeDriver(CameraDriver):
     features = frozenset({"ptz", "audio_in", "led"})
 
     def matches(self, ctx: DetectContext) -> bool:
+        return self.match_confidence(ctx) > 0
+
+    def match_confidence(self, ctx: DetectContext) -> int:
         vendor = ctx.vendor.lower()
-        return (
-            "rtspserver" in vendor
-            or "yoosee" in vendor
-            or "hisilicon" in vendor
-            or (5000 in ctx.open_ports and 554 in ctx.open_ports)
-        )
+        model = ctx.model.lower()
+        if any(marker in vendor for marker in ("rtspserver", "yoosee", "hisilicon")):
+            return 100
+        if "gwell" in vendor or "yoosee" in model:
+            return 95
+        if 5000 in ctx.open_ports and 554 in ctx.open_ports:
+            return 60
+        return 0
 
     def _probe_controls(self, camera: Camera, caps: Capabilities) -> None:
         ip = camera.last_ip

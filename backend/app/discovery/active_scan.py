@@ -171,8 +171,15 @@ def _mac_for(ip: str) -> str | None:
 
 # --- gentle RTSP probing (built on the rtsp client module) -------------------------
 
-def _probe_rtsp(session: rtsp.RtspSession, port: int, username: str,
-                password: str) -> list[RtspStream]:
+def _probe_rtsp(
+    session: rtsp.RtspSession,
+    port: int,
+    username: str,
+    password: str,
+    *,
+    driver_key: str | None = None,
+    discovered_paths: list[str] | None = None,
+) -> list[RtspStream]:
     """Confirm RTSP with one OPTIONS, then DESCRIBE the candidate paths on the same conn."""
     opts = session.request("OPTIONS", session.base + "/")
     if opts is None or rtsp.parse_status(opts) == 0:
@@ -180,7 +187,12 @@ def _probe_rtsp(session: rtsp.RtspSession, port: int, username: str,
 
     streams: list[RtspStream] = []
     from .. import drivers  # local import keeps the discovery<->drivers module load order simple
-    for path in drivers.rtsp_paths(username, password):
+    for path in drivers.rtsp_paths_for(
+        driver_key,
+        username,
+        password,
+        discovered=discovered_paths or (),
+    ):
         uri = session.base + path
         resp = session.request("DESCRIBE", uri, accept_sdp=True)
         if resp is None:
@@ -259,7 +271,12 @@ def _identify(host: ScannedHost) -> None:
                 host.mac = onvif_mac
             break
     # Pick the driver from what we learned (vendor/model + open ports); generic if nothing claims it.
-    ctx = drivers.DetectContext(vendor=host.vendor, open_ports=host.open_ports)
+    ctx = drivers.DetectContext(
+        vendor=host.vendor,
+        model=host.model,
+        firmware=host.firmware,
+        open_ports=host.open_ports,
+    )
     host.driver = drivers.detect(ctx).key
 
 
@@ -272,6 +289,10 @@ def _probe_host(ip: str, open_ports: list[int], username: str, password: str,
         open_ports = sorted(set(open_ports) | set(enumerate_ports(ip)))
     arp_mac = _mac_for(ip)
     host = ScannedHost(address=ip, mac=arp_mac, arp_mac=arp_mac, open_ports=open_ports)
+    # Identify first so an installed driver contributes paths only to its own family. Unknown
+    # cameras retain the broad compatibility union, but adding a driver no longer adds probes to
+    # every already-identifiable camera on the network.
+    _identify(host)
     for port in open_ports:
         if port not in RTSP_PORTS:
             continue
@@ -280,10 +301,18 @@ def _probe_host(ip: str, open_ports: list[int], username: str, password: str,
         except OSError:
             continue
         try:
-            host.streams.extend(_probe_rtsp(session, port, username, password))
+            host.streams.extend(
+                _probe_rtsp(
+                    session,
+                    port,
+                    username,
+                    password,
+                    driver_key=host.driver,
+                    discovered_paths=host.stream_paths,
+                )
+            )
         finally:
             session.close()
-    _identify(host)   # no-auth identity/paths/driver across open ports, before any login
     return host
 
 
