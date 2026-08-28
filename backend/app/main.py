@@ -25,6 +25,7 @@ from .api.discovery import router as discovery_router
 from .api.media import router as media_router
 from .api.onboarding import router as onboarding_router
 from .api.provisioning import router as provisioning_router
+from .api.provisioning_account import router as provisioning_account_router
 from .api.recordings import router as recordings_router
 from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
@@ -118,6 +119,7 @@ app = FastAPI(
 )
 app.include_router(auth_router)
 app.include_router(provisioning_router)
+app.include_router(provisioning_account_router)
 app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)

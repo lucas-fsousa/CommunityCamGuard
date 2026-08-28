@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from backend.app.api import provisioning as routes
+from backend.app.api import provisioning_account as account_routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
@@ -1206,8 +1207,8 @@ def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):
     )
     monkeypatch.setattr(yoosee_onboarding, "login_account", lambda _credentials: session)
     response = Response()
-    result = routes.provisioning_vendor_account_login(
-        routes.ProvisioningVendorAccountLoginIn(
+    result = account_routes.provisioning_vendor_account_login(
+        account_routes.ProvisioningVendorAccountLoginIn(
             account_type="email",
             account="person@example.invalid",
             password="account-password",

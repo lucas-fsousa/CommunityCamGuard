@@ -13,7 +13,6 @@ from fastapi import APIRouter, HTTPException, Response
 from ..camera_identity import stable_camera_id
 from ..config import get_settings
 from ..drivers.onboarding import (
-    AccountLogin,
     OnboardingAccountError,
     OnboardingTransportError,
 )
@@ -49,7 +48,6 @@ from .provisioning_common import (
     ProvisioningP2PPropertyReadIn,
     ProvisioningPrivilegedBindIn,
     ProvisioningStartIn,
-    ProvisioningVendorAccountLoginIn,
     inspect_provisioning_label,
     onboarding,
 )
@@ -97,83 +95,6 @@ def provisioning_status() -> dict:
             "bluetooth": ble_status,
             "wired": "planned",
         },
-    }
-
-
-@router.get(
-    "/provisioning/vendor-account/status",
-    dependencies=_LOCAL_PROVISIONING,
-)
-def provisioning_vendor_account_status(response: Response) -> dict:
-    """Report enrollment state without disclosing an account identity or token."""
-
-    onboarding = _onboarding()
-    configured = onboarding.account_configured()
-    response.headers["Cache-Control"] = "no-store"
-    return {
-        "provider": onboarding.provider,
-        "configured": configured,
-        "renewable_session": configured,
-        "vendor_cloud_required": True,
-    }
-
-
-@router.post(
-    "/provisioning/vendor-account/login",
-    dependencies=_LOCAL_PROVISIONING,
-)
-def provisioning_vendor_account_login(
-    body: ProvisioningVendorAccountLoginIn,
-    response: Response,
-) -> dict:
-    """Establish and encrypt a renewable native session; Android/Frida are not involved."""
-
-    try:
-        onboarding = _onboarding()
-        onboarding.login(
-            AccountLogin(
-                account_type=body.account_type,
-                account=body.account.strip(),
-                password=body.password.get_secret_value(),
-                mobile_area=body.mobile_area,
-                language=body.language,
-                region=body.region,
-                area=body.area,
-            )
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except OnboardingAccountError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["Pragma"] = "no-cache"
-    return {
-        "provider": onboarding.provider,
-        "configured": True,
-        "renewable_session": True,
-    }
-
-
-@router.post(
-    "/provisioning/vendor-account/refresh",
-    dependencies=_LOCAL_PROVISIONING,
-)
-def provisioning_vendor_account_refresh(response: Response) -> dict:
-    """Renew the encrypted native session without returning any credential material."""
-
-    onboarding = _onboarding()
-    try:
-        onboarding.refresh_account()
-    except LookupError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingAccountError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return {
-        "provider": onboarding.provider,
-        "configured": True,
-        "renewable_session": True,
-        "refreshed": True,
     }
 
 
