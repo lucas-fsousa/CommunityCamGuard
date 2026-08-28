@@ -1,12 +1,4 @@
-"""REST API for the dashboard.
-
-Endpoints are split into: auth (login/logout, public), and the protected surface —
-cameras (CRUD), discovery scan, media/stream info, storage status, and the recording
-timeline. Everything but login requires the session cookie (see :mod:`..auth`).
-
-Mutating the camera set (add/delete) reconfigures the live services: go2rtc gets a fresh
-config and the recorder is re-synced to the new camera list.
-"""
+"""Factory-new camera provisioning HTTP workflow."""
 
 from __future__ import annotations
 
@@ -16,18 +8,11 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, SecretStr
 
 from .. import drivers
-from ..auth import (
-    COOKIE_NAME,
-    MAX_AGE,
-    check_key,
-    is_authenticated,
-    issue_token,
-    require_auth,
-)
+from ..auth import require_auth
 from ..camera_identity import stable_camera_id
 from ..config import get_settings
 from ..drivers.onboarding import (
@@ -61,7 +46,7 @@ from ..provisioning import (
 )
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["provisioning"])
 log = logging.getLogger(__name__)
 
 
@@ -72,10 +57,6 @@ def _onboarding():
 
 
 # --- schemas -----------------------------------------------------------------------
-
-
-class LoginIn(BaseModel):
-    key: str
 
 
 class ProvisioningLabelIn(BaseModel):
@@ -144,28 +125,6 @@ class ProvisioningVendorAccountLoginIn(BaseModel):
     area: str = Field(default="us", max_length=16)
 
 
-# --- auth ---------------------------------------------------------------------------
-
-
-@router.post("/login")
-def login(body: LoginIn, response: Response) -> dict:
-    if not check_key(body.key):
-        raise HTTPException(status_code=401, detail="Invalid key")
-    response.set_cookie(COOKIE_NAME, issue_token(), httponly=True, samesite="lax", max_age=MAX_AGE)
-    return {"ok": True}
-
-
-@router.post("/logout")
-def logout(response: Response) -> dict:
-    response.delete_cookie(COOKIE_NAME)
-    return {"ok": True}
-
-
-@router.get("/me")
-def me(request: Request) -> dict:
-    return {"authenticated": is_authenticated(request)}
-
-
 # --- factory-new provisioning (strictly localhost-only) -----------------------------
 
 _LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
@@ -185,7 +144,7 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/provisioning/status", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.get("/provisioning/status", dependencies=_BLE_PROVISIONING)
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
@@ -222,7 +181,6 @@ def provisioning_status() -> dict:
 @router.get(
     "/provisioning/vendor-account/status",
     dependencies=_LOCAL_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_vendor_account_status(response: Response) -> dict:
     """Report enrollment state without disclosing an account identity or token."""
@@ -241,7 +199,6 @@ def provisioning_vendor_account_status(response: Response) -> dict:
 @router.post(
     "/provisioning/vendor-account/login",
     dependencies=_LOCAL_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_vendor_account_login(
     body: ProvisioningVendorAccountLoginIn,
@@ -278,7 +235,6 @@ def provisioning_vendor_account_login(
 @router.post(
     "/provisioning/vendor-account/refresh",
     dependencies=_LOCAL_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_vendor_account_refresh(response: Response) -> dict:
     """Renew the encrypted native session without returning any credential material."""
@@ -299,13 +255,13 @@ def provisioning_vendor_account_refresh(response: Response) -> dict:
     }
 
 
-@router.post("/provisioning/inspect", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.post("/provisioning/inspect", dependencies=_BLE_PROVISIONING)
 def provisioning_inspect(body: ProvisioningLabelIn) -> dict:
     """Validate and decode a scanned/typed factory label without contacting the camera."""
     return _inspect_provisioning_label(body)
 
 
-@router.get("/provisioning/networks", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.get("/provisioning/networks", dependencies=_BLE_PROVISIONING)
 def provisioning_networks(response: Response) -> dict:
     """Read-only scan from the server's Wi-Fi radio; SSIDs carry short-lived signed IDs."""
     networks, scanner, error = scan_wifi_networks()
@@ -318,7 +274,7 @@ def provisioning_networks(response: Response) -> dict:
     }
 
 
-@router.post("/provisioning/networks/manual", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.post("/provisioning/networks/manual", dependencies=_BLE_PROVISIONING)
 def provisioning_manual_network(body: ProvisioningManualNetworkIn, response: Response) -> dict:
     """Sign an explicit SSID only when automatic Wi-Fi discovery is unavailable."""
     _networks, scanner, _error = scan_wifi_networks()
@@ -335,7 +291,7 @@ def provisioning_manual_network(body: ProvisioningManualNetworkIn, response: Res
     return {"network": network.public()}
 
 
-@router.post("/provisioning/start", dependencies=_LOCAL_PROVISIONING, tags=["provisioning"])
+@router.post("/provisioning/start", dependencies=_LOCAL_PROVISIONING)
 def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
     """Create the recovered vendor Wi-Fi QR without persisting its embedded credentials.
 
@@ -376,7 +332,7 @@ def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
     }
 
 
-@router.post("/provisioning/ble/prepare", dependencies=_BLE_PROVISIONING, tags=["provisioning"])
+@router.post("/provisioning/ble/prepare", dependencies=_BLE_PROVISIONING)
 def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> dict:
     """Prepare encrypted GATT writes while keeping cloud material and Wi-Fi plaintext server-side."""
     identity = _inspect_provisioning_label(body)
@@ -440,9 +396,7 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
     }
 
 
-@router.post(
-    "/provisioning/ble/decode-response", dependencies=_BLE_PROVISIONING, tags=["provisioning"]
-)
+@router.post("/provisioning/ble/decode-response", dependencies=_BLE_PROVISIONING)
 def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: Response) -> dict:
     """Decode a transient camera reply without exposing TanKey or persisting its contents."""
     identity = _inspect_provisioning_label(body)
@@ -557,7 +511,6 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
 @router.post(
     "/provisioning/privileged/status",
     dependencies=_BLE_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response) -> dict:
     """Report whether an unconsumed post-Wi-Fi handoff exists; never return its secrets."""
@@ -570,7 +523,6 @@ def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response
 @router.post(
     "/provisioning/privileged/online-status",
     dependencies=_BLE_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_online_status(
     body: ProvisioningOnlineStatusIn, response: Response
@@ -608,7 +560,6 @@ def provisioning_privileged_online_status(
 @router.post(
     "/provisioning/privileged/bind",
     dependencies=_BLE_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: Response) -> dict:
     """Explicitly enroll one Wi-Fi-connected camera in the vendor IoTVideo/P2P device list."""
@@ -654,7 +605,6 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
 @router.post(
     "/provisioning/privileged/p2p-probe",
     dependencies=_BLE_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Response) -> dict:
     """Authenticate to the P2P access node and inspect inventory without contacting the camera."""
@@ -683,7 +633,6 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
 @router.post(
     "/provisioning/privileged/p2p-route-probe",
     dependencies=_BLE_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_p2p_route_probe(body: ProvisioningLabelIn, response: Response) -> dict:
     """Prove the selected camera's direct P2P route without media or control commands."""
@@ -715,7 +664,6 @@ def provisioning_privileged_p2p_route_probe(body: ProvisioningLabelIn, response:
 @router.post(
     "/provisioning/privileged/p2p-property-read",
     dependencies=_LOCAL_PROVISIONING,
-    tags=["provisioning"],
 )
 def provisioning_privileged_p2p_property_read(
     body: ProvisioningP2PPropertyReadIn, response: Response
@@ -744,12 +692,3 @@ def provisioning_privileged_p2p_property_read(
         "write_capable": False,
         "action_capable": False,
     }
-
-
-@router.get("/storage", dependencies=[Depends(require_auth)])
-def storage_status(request: Request) -> dict:
-    monitor = getattr(request.app.state, "storage", None)
-    if monitor is None:
-        raise HTTPException(status_code=503, detail="storage monitor not running")
-    st = monitor.state()
-    return st.__dict__

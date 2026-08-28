@@ -10,7 +10,7 @@ from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from backend.app.api import routes
+from backend.app.api import provisioning as routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings

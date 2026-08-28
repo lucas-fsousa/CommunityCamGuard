@@ -1,12 +1,12 @@
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 from backend.app import config
 from backend.app.api import cameras as camera_routes
 from backend.app.api import media as media_routes
 from backend.app.api import recordings as recording_routes
-from backend.app.api import routes
 from backend.app.camera_identity import stable_camera_id
 from backend.app.db import connect, registry
 from backend.app.db.registry import Camera
@@ -245,7 +245,7 @@ def test_add_camera_rejects_wrong_credentials(monkeypatch):
     monkeypatch.setattr(
         camera_routes.rtsp, "check_credentials", lambda *a, **k: "auth"
     )  # camera rejects creds
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
     assert (
         ei.value.status_code == 422

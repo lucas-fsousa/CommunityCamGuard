@@ -19,12 +19,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import drivers
+from .api.auth import router as auth_router
 from .api.cameras import router as cameras_router
 from .api.discovery import router as discovery_router
 from .api.media import router as media_router
 from .api.onboarding import router as onboarding_router
+from .api.provisioning import router as provisioning_router
 from .api.recordings import router as recordings_router
-from .api.routes import router
+from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
 from .db import p2p, registry
@@ -114,13 +116,15 @@ app = FastAPI(
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
     ],
 )
-app.include_router(router)
+app.include_router(auth_router)
+app.include_router(provisioning_router)
 app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)
 app.include_router(media_router)
 app.include_router(cameras_router)
 app.include_router(discovery_router)
+app.include_router(storage_router)
 
 
 @app.middleware("http")

@@ -6,12 +6,13 @@ a stub Request; drivers and the network are monkeypatched, so these are fast and
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from backend.app.api import cameras as camera_routes
 from backend.app.api import discovery as discovery_routes
 from backend.app.api import media as media_routes
 from backend.app.api import recordings as recording_routes
-from backend.app.api import routes
+from backend.app.api import storage as storage_routes
 from backend.app.db import registry
 
 MAC = "aa:bb:cc:dd:ee:ff"
@@ -57,14 +58,14 @@ def test_delete_camera_removes_it():
 
 def test_probe_unknown_camera_is_404():
     registry.init_db()
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.probe_camera("00:00:00:00:00:00")
     assert ei.value.status_code == 404
 
 
 def test_probe_camera_without_ip_is_409():
     camera = _seed_camera(last_ip="")
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.probe_camera(camera.camera_id)
     assert ei.value.status_code == 409
 
@@ -86,7 +87,7 @@ def test_probe_camera_success(monkeypatch):
 
 def test_ptz_unknown_camera_is_404():
     registry.init_db()
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.ptz_move(
             "00:00:00:00:00:00", camera_routes.PtzIn(direction="left", action="start")
         )
@@ -109,7 +110,7 @@ def test_ptz_unsupported_is_501(monkeypatch):
         "for_camera",
         lambda cam: FakeDriver(raises=camera_routes.drivers.Unsupported("ptz")),
     )
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.ptz_move(
             camera.camera_id, camera_routes.PtzIn(direction="left", action="start")
         )
@@ -123,7 +124,7 @@ def test_ptz_bad_direction_is_400(monkeypatch):
         "for_camera",
         lambda cam: FakeDriver(raises=ValueError("unknown direction")),
     )
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.ptz_move(
             camera.camera_id, camera_routes.PtzIn(direction="sideways", action="step")
         )
@@ -133,7 +134,7 @@ def test_ptz_bad_direction_is_400(monkeypatch):
 def test_ptz_rejected_is_502(monkeypatch):
     camera = _seed_camera()
     monkeypatch.setattr(camera_routes.drivers, "for_camera", lambda cam: FakeDriver(ptz_result=False))
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.ptz_move(
             camera.camera_id, camera_routes.PtzIn(direction="left", action="start")
         )
@@ -156,14 +157,14 @@ def test_reboot_unsupported_is_501(monkeypatch):
         "for_camera",
         lambda cam: FakeDriver(raises=camera_routes.drivers.Unsupported("reboot")),
     )
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.reboot_camera(camera.camera_id)
     assert ei.value.status_code == 501
 
 
 def test_reboot_unknown_camera_is_404():
     registry.init_db()
-    with pytest.raises(routes.HTTPException) as ei:
+    with pytest.raises(HTTPException) as ei:
         camera_routes.reboot_camera("00:00:00:00:00:00")
     assert ei.value.status_code == 404
 
@@ -197,8 +198,8 @@ def test_media_restart_ok():
 
 
 def test_storage_status_503_without_monitor():
-    with pytest.raises(routes.HTTPException) as ei:
-        routes.storage_status(_req())
+    with pytest.raises(HTTPException) as ei:
+        storage_routes.storage_status(_req())
     assert ei.value.status_code == 503
 
 
@@ -206,7 +207,7 @@ def test_storage_status_returns_monitor_state():
     # the handler returns state().__dict__, so use an object whose real __dict__ is the payload
     state = SimpleNamespace(percent=42, status="ok", paused=False)
     monitor = SimpleNamespace(state=lambda: state)
-    out = routes.storage_status(_req(storage=monitor))
+    out = storage_routes.storage_status(_req(storage=monitor))
     assert out == {"percent": 42, "status": "ok", "paused": False}
 
 
