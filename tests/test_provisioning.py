@@ -874,6 +874,7 @@ def test_privileged_p2p_route_probe_returns_no_peer_or_session_secrets(monkeypat
 
     assert result["direct_handshake"] is True
     assert result["camera_contacted"] is True
+    assert result["direct_datagrams"] == 6
     assert result["media_opened"] is False
     assert result["command_sent"] is False
     serialized = json.dumps(result)

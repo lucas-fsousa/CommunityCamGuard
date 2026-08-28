@@ -64,7 +64,7 @@ class RouteResult:
     target_online: bool
     broker_acknowledged: bool
     route_advertised: bool
-    direct_datagrams: bool
+    direct_datagrams: int
     direct_handshake: bool
     camera_contacted: bool
     broker_error_code: int | None
