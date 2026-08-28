@@ -6,18 +6,8 @@ from pathlib import Path
 
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ...provisioning import (
-    PrivilegedEnrollmentError,
-    VendorProvisioningCloudError,
-    bind_vendor_device,
-    bound_privileged_enrollment,
     complete_camera_onboarding,
-    fetch_native_ble_material,
     locate_camera_by_mac,
-    mark_privileged_enrollment_bound,
-    pending_privileged_enrollment,
-    privileged_enrollment_status,
-    query_vendor_device_online,
-    remember_privileged_handoff,
 )
 from ..onboarding import (
     AccountLogin,
@@ -57,7 +47,18 @@ from .p2p import (
     read_camera_property,
     refresh_account_session,
 )
+from .privileged import (
+    PrivilegedEnrollmentError,
+    bind_vendor_device,
+    bound_privileged_enrollment,
+    mark_privileged_enrollment_bound,
+    pending_privileged_enrollment,
+    privileged_enrollment_status,
+    query_vendor_device_online,
+    remember_privileged_handoff,
+)
 from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
+from .vendor_cloud import VendorProvisioningCloudError, fetch_native_ble_material
 
 
 class YooseeOnboarding:

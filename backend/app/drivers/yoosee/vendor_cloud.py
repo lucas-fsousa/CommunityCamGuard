@@ -11,8 +11,8 @@ import json
 import time
 from collections.abc import Mapping
 
-from ..drivers.yoosee.ble import BleProvisioningMaterial
-from ..drivers.yoosee.p2p.account import (
+from .ble import BleProvisioningMaterial
+from .p2p.account import (
     INTEGER_BODY_NAMES,
     AccountSession,
     PostFunction,

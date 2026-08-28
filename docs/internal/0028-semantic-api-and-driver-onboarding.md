@@ -48,9 +48,11 @@ generic API and startup code even when its implementation already fit the camera
   `drivers/yoosee`; they are manufacturer behavior, not generic provisioning utilities.
 - The encrypted BLE codec, transient attempt store and recovered GATT framing also live in the
   Yoosee driver; the generic API only handles base64 HTTP transport around port DTOs.
+- Vendor-cloud BLE material acquisition and post-Wi-Fi privileged binding are contained in the
+  same driver. Their cloud dependency is explicit and can later be replaced without changing the
+  generic onboarding API.
 - The driver registry remains explicit and auditable; onboarding is not discovered by arbitrary
   filesystem imports.
-- Recovered Yoosee privileged-cloud and completion implementation files still under the historical
-  top-level `provisioning` package are the next verticalization steps. Moving them under the
-  Yoosee package must preserve the driver port and must not reintroduce vendor imports into generic
-  HTTP code.
+- Recovered Yoosee RTSP completion is the final manufacturer implementation still under the
+  historical top-level `provisioning` package. Moving it under the Yoosee package must preserve the
+  driver port and must not reintroduce vendor imports into generic HTTP code.

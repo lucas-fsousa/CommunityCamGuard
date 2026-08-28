@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from ..db import p2p
-from ..drivers.yoosee.ble import BleProvisioningMaterial
+from ...db import p2p
+from .ble import BleProvisioningMaterial
 
 _HOST = "openapi-iot.cloudlinks.cn"
 _BIND_PATH = "/openapi/app/user/device/bind"

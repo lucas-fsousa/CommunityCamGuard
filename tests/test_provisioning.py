@@ -20,6 +20,7 @@ from backend.app.config import get_settings
 from backend.app.db import p2p
 from backend.app.drivers.yoosee import account_store
 from backend.app.drivers.yoosee import onboarding as yoosee_onboarding
+from backend.app.drivers.yoosee import privileged as privileged_module
 from backend.app.drivers.yoosee.ble import (
     BleCodecError,
     BleMessageAssembler,
@@ -41,14 +42,7 @@ from backend.app.drivers.yoosee.p2p import (
     P2PPropertyRead,
     P2PRouteProbe,
 )
-from backend.app.drivers.yoosee.qr import (
-    build_wifi_payload,
-    encryption_from_scan,
-    render_svg_base64,
-)
-from backend.app.main import app
-from backend.app.provisioning import privileged as privileged_module
-from backend.app.provisioning.privileged import (
+from backend.app.drivers.yoosee.privileged import (
     VendorBindResult,
     VendorOnlineResult,
     _clear_privileged_enrollments_for_tests,
@@ -58,6 +52,12 @@ from backend.app.provisioning.privileged import (
     query_vendor_device_online,
     remember_privileged_handoff,
 )
+from backend.app.drivers.yoosee.qr import (
+    build_wifi_payload,
+    encryption_from_scan,
+    render_svg_base64,
+)
+from backend.app.main import app
 from backend.app.provisioning.wifi import (
     WifiNetwork,
     _parse_iw,

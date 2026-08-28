@@ -5,7 +5,7 @@ import json
 import pytest
 
 from backend.app.drivers.yoosee.p2p.account import AccountSession
-from backend.app.provisioning.vendor_cloud import (
+from backend.app.drivers.yoosee.vendor_cloud import (
     BIND_TOKEN_PATH,
     TANKEY_PATH,
     VendorProvisioningCloudError,
@@ -76,15 +76,11 @@ def test_fetch_native_ble_material_uses_only_renewable_account_session():
                 }
             ).encode()
         if url.endswith(BIND_TOKEN_PATH):
-            return 200, json.dumps(
-                {"code": 0, "data": {"token": "temporary-bind-token"}}
-            ).encode()
+            return 200, json.dumps({"code": 0, "data": {"token": "temporary-bind-token"}}).encode()
         raise AssertionError("unexpected URL")
 
     session = _session()
-    material = fetch_native_ble_material(
-        session, device_id="7443576841", timeout=9, post=post
-    )
+    material = fetch_native_ble_material(session, device_id="7443576841", timeout=9, post=post)
 
     assert len(observed) == 2
     assert all(item[2]["x-iotvideo-signature"] for item in observed)
