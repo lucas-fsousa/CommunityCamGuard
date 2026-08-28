@@ -1,6 +1,6 @@
 # 0001 — Pluggable camera drivers
 
-**Status:** accepted · **Date:** 2026-07-27
+**Status:** accepted, refined by [ADR 0024](0024-driver-owned-controls-and-vendor-packages.md) · **Date:** 2026-07-27
 
 ## Context
 
@@ -29,8 +29,9 @@ brand. Registration is one entry in the ordered `DRIVERS` tuple (most-specific f
 
 ## Consequences
 
-- **Adding a brand = one file in `drivers/` + one line in the registry** — no engine changes
-  (see `CONTRIBUTING.md`).
+- Adding an RTSP discovery-only family remains one file plus explicit registration. A family with
+  provisioning or proprietary controls owns a vertical package under `drivers/`; generic API and
+  services still change only when a genuinely new semantic capability is introduced.
 - Partial drivers are fine and honest: unimplemented controls surface as `501`, not broken UI.
 - The former `discovery/profiles.py` and `discovery/capabilities.py` were removed — drivers supersede
   both. Shipped: `yoosee` (full ONVIF PTZ + device info), plus `dahua`/`hikvision`/`xiongmai`/`generic`

@@ -68,6 +68,7 @@ def test_vendor_controls_use_opaque_camera_id_and_explicit_target_states():
 
     assert "encodeURIComponent(cam.id)" in live
     assert "encodeURIComponent(cam.mac)}/${endpoint}" not in live
+    assert "cam.controls || cam.vendor_controls" in live
     assert '"white-light", (value) => ({ enabled: value === "on" })' in live
     assert '"orientation", (orientation) => ({ orientation })' in live
     assert "Nothing is read automatically" in live

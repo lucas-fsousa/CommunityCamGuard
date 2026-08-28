@@ -144,7 +144,9 @@ function camBar(cam) {
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz) actions.append(ptzControls(cam));
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
-  if (Object.keys(cam.vendor_controls || {}).length) actions.append(vendorControls(cam));
+  if (Object.keys(cam.controls || cam.vendor_controls || {}).length) {
+    actions.append(vendorControls(cam));
+  }
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
     status,
@@ -161,7 +163,7 @@ function camBar(cam) {
 // cameras. Each option is an explicit target state; the backend performs its own preflight and
 // skips the write when the camera is already in that state.
 function vendorControls(cam) {
-  const available = cam.vendor_controls || {};
+  const available = cam.controls || cam.vendor_controls || {};
   const status = el("small", { className: "vendor-control-status" });
   const menu = el("div", { className: "vendor-control-menu" });
 

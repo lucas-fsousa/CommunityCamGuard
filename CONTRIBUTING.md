@@ -16,15 +16,16 @@ See `README.md` for the full architecture and `docs/DECISIONS.md` for the design
 
 ## Adding support for a new camera — write a driver
 
-All camera-family knowledge lives in **one place**: the `backend/app/drivers/` package. A
-**driver** is the single plug-in unit — it bundles discovery paths, family detection, and
-controls (PTZ, reboot, ...). The rest of the app (discovery, the capability probe, the API,
-the dashboard) is generic and talks only to the `CameraDriver` interface, so adding a brand
-is **one new file + one line in the registry** — no engine changes.
+All camera-family knowledge lives in **one place**: the `backend/app/drivers/` package. A simple
+RTSP discovery driver is one file plus explicit registration. A family with proprietary controls
+or provisioning gets its own package (`drivers/mybrand/`) containing its driver, model profiles,
+controls and protocol adapters. Generic API code accepts only semantic operations and dispatches
+them through `CameraDriver`; never add vendor imports or raw command payloads to an API router.
 
 ### 1. Discovery-only driver (just RTSP paths)
 
-Create `backend/app/drivers/mybrand.py`:
+Create `backend/app/drivers/mybrand.py` (or `drivers/mybrand/driver.py` when the family needs more
+than discovery metadata):
 
 ```python
 from .base import CameraDriver, DetectContext
@@ -45,9 +46,8 @@ is only tried when credentials are supplied. The generic capability probe (video
 
 ### 2. Add controls (PTZ, reboot, ...)
 
-Override the hooks and reuse the ONVIF toolbox in `control/` (`ptz.py`, `device.py`) — or add
-a new toolbox for a non-ONVIF brand. See `drivers/yoosee.py` for a full example (ONVIF PTZ on
-port 5000 + device info):
+Override the hooks and reuse the ONVIF toolbox in `control/` (`ptz.py`, `device.py`) — or keep a
+non-ONVIF adapter inside the family package. See `drivers/yoosee/` for the current example:
 
 ```python
     features = frozenset({"ptz"})           # advertise what you support
@@ -62,6 +62,10 @@ port 5000 + device info):
 
 Anything you don't override stays **`Unsupported`** (the API returns 501), so a partial driver
 is fine and honest.
+
+For an existing semantic control, implement `control_catalog`, `read_control` and/or
+`write_control`. Return the neutral descriptors/results from `drivers/contracts.py`; translate to
+the vendor protocol only inside the family package. Do not expose a generic JSON/opcode sender.
 
 ### 3. Register it
 

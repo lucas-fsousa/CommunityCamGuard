@@ -10,6 +10,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .base import CameraDriver, Capabilities, DetectContext, Unsupported, classify_ports
+from .contracts import (
+    ControlDescriptor,
+    ControlNotReady,
+    ControlOperationError,
+    ControlResult,
+    ControlValue,
+)
 from .dahua import DahuaDriver
 from .generic import GenericDriver
 from .hikvision import HikvisionDriver
@@ -35,6 +42,11 @@ __all__ = [
     "GENERIC",
     "CameraDriver",
     "Capabilities",
+    "ControlDescriptor",
+    "ControlNotReady",
+    "ControlOperationError",
+    "ControlResult",
+    "ControlValue",
     "DetectContext",
     "Unsupported",
     "classify_ports",

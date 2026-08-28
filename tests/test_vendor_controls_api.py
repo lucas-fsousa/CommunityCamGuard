@@ -1,55 +1,38 @@
 from __future__ import annotations
 
-from fastapi import Response
+import pytest
+from fastapi import HTTPException, Response
 
 from backend.app.api import vendor_controls
 from backend.app.api.local_only import require_local_request
 from backend.app.camera_identity import stable_camera_id
-from backend.app.db import registry
-from backend.app.db.p2p import P2PEnrollment
-from backend.app.vendor_p2p import (
-    P2POrientationWrite,
-    P2PWhiteLightState,
-    P2PWhiteLightWrite,
-)
+from backend.app.drivers import ControlNotReady, ControlOperationError, ControlResult, Unsupported
+from backend.app.services import CameraNotFound
 
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:02")
 
 
-def _enrollment() -> P2PEnrollment:
-    return P2PEnrollment(
-        device_id="7000000002",
-        access_id=123,
-        access_token=bytes(range(64)),
-        dev_token=None,
-        created_at="now",
-        updated_at="now",
-    )
-
-
-def test_white_light_read_returns_only_sanitized_typed_state(monkeypatch):
-    enrollment = _enrollment()
-    monkeypatch.setattr(registry, "get_camera_by_id", lambda _camera_id: object())
+def test_white_light_read_returns_only_sanitized_driver_state(monkeypatch):
     observed = []
-    monkeypatch.setattr(
-        vendor_controls,
-        "bound_privileged_enrollment_for_camera",
-        lambda camera_id: observed.append(("enrollment", camera_id)) or enrollment,
-    )
-    monkeypatch.setattr(
-        vendor_controls,
-        "read_camera_white_light",
-        lambda selected: observed.append(("read", selected.device_id))
-        or P2PWhiteLightState(selected.device_id, False, True, True, True, True),
-    )
+
+    def fake_read(camera_id, key):
+        observed.append((camera_id, key))
+        return ControlResult(
+            key,
+            False,
+            verified=True,
+            authenticated=True,
+            direct_connection=True,
+            transport_acknowledged=True,
+            application_acknowledged=True,
+        )
+
+    monkeypatch.setattr(vendor_controls, "read_control", fake_read)
     response = Response()
 
     result = vendor_controls.white_light_state(response, CAMERA_ID)
 
-    assert observed == [
-        ("enrollment", CAMERA_ID),
-        ("read", "7000000002"),
-    ]
+    assert observed == [(CAMERA_ID, "white_light")]
     assert result == {
         "id": CAMERA_ID,
         "enabled": False,
@@ -61,21 +44,22 @@ def test_white_light_read_returns_only_sanitized_typed_state(monkeypatch):
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_white_light_write_passes_only_boolean_to_exact_enrollment(monkeypatch):
-    enrollment = _enrollment()
-    monkeypatch.setattr(registry, "get_camera_by_id", lambda _camera_id: object())
+def test_white_light_write_passes_only_semantic_boolean(monkeypatch):
     observed = []
-    monkeypatch.setattr(
-        vendor_controls,
-        "bound_privileged_enrollment_for_camera",
-        lambda camera_id: observed.append(("enrollment", camera_id)) or enrollment,
-    )
 
-    def fake_write(selected, enabled):
-        observed.append(("write", selected.device_id, enabled))
-        return P2PWhiteLightWrite(selected.device_id, enabled, False, True, True, True, True)
+    def fake_write(camera_id, key, value):
+        observed.append((camera_id, key, value))
+        return ControlResult(
+            key,
+            value,
+            previous_value=False,
+            changed=True,
+            verified=True,
+            transport_acknowledged=True,
+            application_acknowledged=True,
+        )
 
-    monkeypatch.setattr(vendor_controls, "set_camera_white_light", fake_write)
+    monkeypatch.setattr(vendor_controls, "write_control", fake_write)
 
     result = vendor_controls.update_white_light(
         vendor_controls.WhiteLightIn(enabled=True),
@@ -83,10 +67,7 @@ def test_white_light_write_passes_only_boolean_to_exact_enrollment(monkeypatch):
         CAMERA_ID,
     )
 
-    assert observed == [
-        ("enrollment", CAMERA_ID),
-        ("write", "7000000002", True),
-    ]
+    assert observed == [(CAMERA_ID, "white_light", True)]
     assert result["enabled"] is True
     assert result["previous_enabled"] is False
     assert result["verified"] is True
@@ -99,23 +80,23 @@ def test_vendor_control_routes_are_authenticated_and_lan_only():
         assert require_local_request in dependencies
 
 
-def test_orientation_write_uses_same_opaque_camera_association(monkeypatch):
-    enrollment = _enrollment()
-    monkeypatch.setattr(registry, "get_camera_by_id", lambda _camera_id: object())
+def test_orientation_write_uses_driver_dispatch(monkeypatch):
     observed = []
-    monkeypatch.setattr(
-        vendor_controls,
-        "bound_privileged_enrollment_for_camera",
-        lambda camera_id: observed.append(("enrollment", camera_id)) or enrollment,
-    )
 
-    def fake_orientation(selected, orientation):
-        observed.append(("orientation", selected.device_id, orientation))
-        return P2POrientationWrite(
-            selected.device_id, orientation, 1, 3, True, True, 0, True
+    def fake_write(camera_id, key, value):
+        observed.append((camera_id, key, value))
+        return ControlResult(
+            key,
+            value,
+            changed=True,
+            verified=True,
+            transport_acknowledged=True,
+            error_code=0,
+            native_previous_value=1,
+            native_requested_value=3,
         )
 
-    monkeypatch.setattr(vendor_controls, "set_camera_orientation", fake_orientation)
+    monkeypatch.setattr(vendor_controls, "write_control", fake_write)
 
     result = vendor_controls.update_orientation(
         vendor_controls.OrientationIn(orientation="inverted"),
@@ -123,9 +104,34 @@ def test_orientation_write_uses_same_opaque_camera_association(monkeypatch):
         CAMERA_ID,
     )
 
-    assert observed == [
-        ("enrollment", CAMERA_ID),
-        ("orientation", "7000000002", "inverted"),
-    ]
+    assert observed == [(CAMERA_ID, "orientation", "inverted")]
     assert result["orientation"] == "inverted"
+    assert result["previous_value"] == 1
+    assert result["requested_value"] == 3
     assert result["verified"] is True
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (CameraNotFound("camera not found"), 404),
+        (Unsupported("orientation"), 501),
+        (ControlNotReady("driver material missing"), 409),
+        (ControlOperationError("camera transport failed"), 502),
+    ],
+)
+def test_driver_failures_have_stable_http_semantics(monkeypatch, error, status):
+    monkeypatch.setattr(
+        vendor_controls,
+        "write_control",
+        lambda *_args: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(HTTPException) as caught:
+        vendor_controls.update_orientation(
+            vendor_controls.OrientationIn(orientation="normal"),
+            Response(),
+            CAMERA_ID,
+        )
+
+    assert caught.value.status_code == status

@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ..discovery import rtsp
+from .contracts import ControlDescriptor, ControlResult, ControlValue
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
@@ -151,6 +152,23 @@ class CameraDriver:
 
     def _probe_controls(self, camera: Camera, caps: Capabilities) -> None:
         """Hook: fill family-specific capabilities (PTZ, reboot, model...). Default: none."""
+
+    def control_catalog(self, camera: Camera) -> tuple[ControlDescriptor, ...]:
+        """Describe semantic controls available for this exact camera."""
+
+        return ()
+
+    def read_control(self, camera: Camera, key: str) -> ControlResult:
+        """Read one allowlisted semantic control; family drivers opt in explicitly."""
+
+        raise Unsupported(key)
+
+    def write_control(
+        self, camera: Camera, key: str, value: ControlValue
+    ) -> ControlResult:
+        """Write one allowlisted semantic control; raw vendor payloads are never accepted."""
+
+        raise Unsupported(key)
 
     # --- controls (default: unsupported) -----------------------------------------------
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:

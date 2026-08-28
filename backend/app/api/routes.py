@@ -40,7 +40,7 @@ from ..auth import (
 )
 from ..camera_identity import stable_camera_id
 from ..config import get_settings
-from ..db import p2p, registry, vendor_account
+from ..db import registry, vendor_account
 from ..discovery import active_scan, rtsp
 from ..media import go2rtc, quality
 from ..provisioning import (
@@ -71,6 +71,7 @@ from ..provisioning import (
     selected_network,
 )
 from ..recording import playback, recorder
+from ..services import control_catalog
 from ..vendor_p2p import (
     MODEL_READ_PATHS,
     AccountCredentials,
@@ -189,6 +190,7 @@ class MediaClientEventIn(BaseModel):
 
 def _camera_out(cam: registry.Camera) -> dict:
     """Registry camera as JSON, without leaking the stored password."""
+    controls = control_catalog(cam)
     return {
         "id": cam.camera_id,
         "mac": cam.mac,
@@ -208,12 +210,10 @@ def _camera_out(cam: registry.Camera) -> dict:
         # HD and SD are now server-local variants for every camera. This is separate from the
         # vendor camera advertising `/onvif2`, which we intentionally do not open concurrently.
         "has_quality_variants": True,
-        "vendor_controls": {
-            "white_light": True,
-            "orientation": True,
-        }
-        if p2p.has_enrollment_for_camera(cam.camera_id)
-        else {},
+        "controls": controls,
+        # Compatibility alias for older dashboard/API consumers. The driver catalog above is the
+        # authoritative source; remove this after clients have migrated to ``controls``.
+        "vendor_controls": {key: True for key in controls},
         "webrtc_url": go2rtc.webrtc_page_url(cam.mac),
         "recording": False,  # live flag filled in by list_cameras()
         "online": False,  # live RTSP packet progress filled in by list_cameras()

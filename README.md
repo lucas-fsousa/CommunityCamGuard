@@ -27,13 +27,13 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 
 ## Supported cameras & adding your own
 
-Camera-family knowledge lives in a **pluggable driver layer** (`backend/app/drivers/`). A driver
-bundles a family's RTSP paths, detection, capability-probe hooks and controls (PTZ, reboot, …); the
-rest of the app is generic and talks only to the driver interface. Verified: **Yoosee / generic
-HiSilicon** (full — ONVIF PTZ on port 5000, real RTSP paths via the ONVIF media service). Shipped
-discovery drivers: XiongMai / XMEye, Dahua- and Hikvision-style, plus a generic fallback. **Adding a
-brand is one file in `drivers/` + one line in the registry** — see `CONTRIBUTING.md`. Contributions
-for specific models are very welcome.
+Camera-family knowledge lives in a **pluggable driver layer** (`backend/app/drivers/`). A simple
+RTSP family contributes discovery paths and detection through one registered module; a proprietary
+family owns a vertical package with model profiles, provisioning and typed control adapters. The
+API dispatches semantic controls through the selected driver and never accepts raw vendor commands.
+Verified: **Yoosee / generic HiSilicon** (ONVIF PTZ plus typed P2P controls). Shipped discovery
+drivers: XiongMai / XMEye, Dahua- and Hikvision-style, plus a generic fallback. See
+`CONTRIBUTING.md`; contributions for specific models are very welcome.
 
 ## Why it exists
 

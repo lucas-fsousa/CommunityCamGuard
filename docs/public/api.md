@@ -77,6 +77,10 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   "last_ip": "192.168.1.50",
   "vendor": "yoosee",
   "capabilities": { "video_codec": "h265", "has_audio": true, "ptz": true, "stream_paths": ["/onvif1", "/onvif2"] },
+  "controls": {
+    "white_light": { "kind": "boolean", "readable": true, "writable": true, "options": [] },
+    "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] }
+  },
   "has_audio": true,
   "stream_id": "cam_aabbccddeeff",
   "web_stream_id": "cam_aabbccddeeff_web",
@@ -123,8 +127,10 @@ Like provisioning, they reject public/proxied origins even when the dashboard se
 | PUT | `/api/vendor-controls/{camera_id}/white-light` | `{"enabled": true|false}` | Typed type 11 ON/OFF. Performs an exact-device state preflight, skips an idempotent write, never retries actuation and requires fresh readback. |
 | PUT | `/api/vendor-controls/{camera_id}/orientation` | `{"orientation":"normal"|"inverted"}` | Fixed-path normal/180° operation with state preflight, correlated response and fresh readback. |
 
-The control currently uses the vendor P2P rendezvous infrastructure; it is host-only but not yet
-LAN-only. The first production validation must target only the designated test camera. API results
+The generic control service resolves the opaque camera ID and delegates only to that camera's
+selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous
+infrastructure, so it is host-only but not yet LAN-only. The first production validation must target
+only the designated test camera. API results
 contain state/acknowledgement booleans but no access token, route, session key or raw camera payload.
 If the access node returns the explicit stale-session code, the backend renews the encrypted native
 vendor-account session and retries exactly once. Without a vendor account configured in the

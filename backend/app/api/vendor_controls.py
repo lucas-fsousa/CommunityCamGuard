@@ -13,18 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Response
 from pydantic import BaseModel
 
 from ..auth import require_auth
-from ..db import registry
-from ..provisioning import (
-    PrivilegedEnrollmentError,
-    bound_privileged_enrollment_for_camera,
+from ..drivers import (
+    ControlNotReady,
+    ControlOperationError,
+    Unsupported,
 )
-from ..vendor_p2p import (
-    P2PProbeError,
-    read_camera_white_light,
-    run_with_fresh_access,
-    set_camera_orientation,
-    set_camera_white_light,
-)
+from ..services import CameraNotFound, read_control, write_control
 from .local_only import require_local_request
 
 router = APIRouter(
@@ -44,13 +38,28 @@ class OrientationIn(BaseModel):
     orientation: Literal["normal", "inverted"]
 
 
-def _enrollment(camera_id: str):
-    if registry.get_camera_by_id(camera_id) is None:
-        raise HTTPException(status_code=404, detail="camera not found")
+def _failure(exc: Exception) -> HTTPException:
+    if isinstance(exc, CameraNotFound):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, Unsupported):
+        return HTTPException(status_code=501, detail="this camera doesn't support that control")
+    if isinstance(exc, ControlNotReady):
+        return HTTPException(status_code=409, detail=str(exc))
+    return HTTPException(status_code=502, detail=str(exc))
+
+
+def _read(camera_id: str, key: str):
     try:
-        return bound_privileged_enrollment_for_camera(camera_id)
-    except PrivilegedEnrollmentError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return read_control(camera_id, key)
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+        raise _failure(exc) from exc
+
+
+def _write(camera_id: str, key: str, value: bool | str):
+    try:
+        return write_control(camera_id, key, value)
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+        raise _failure(exc) from exc
 
 
 @router.get("/{camera_id}/white-light")
@@ -60,17 +69,14 @@ def white_light_state(
 ) -> dict:
     """Read the selected enrolled camera's physical white-floodlight state."""
 
-    try:
-        result = run_with_fresh_access(_enrollment(camera_id), read_camera_white_light)
-    except P2PProbeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    result = _read(camera_id, "white_light")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
         "id": camera_id,
-        "enabled": result.enabled,
+        "enabled": result.value,
         "authenticated": result.authenticated,
-        "direct_handshake": result.direct_handshake,
+        "direct_handshake": result.direct_connection,
         "transport_acknowledged": result.transport_acknowledged,
         "application_acknowledged": result.application_acknowledged,
     }
@@ -84,19 +90,13 @@ def update_white_light(
 ) -> dict:
     """Set ON/OFF through the typed, preflighted and readback-verified operation."""
 
-    try:
-        result = run_with_fresh_access(
-            _enrollment(camera_id),
-            lambda enrollment: set_camera_white_light(enrollment, body.enabled),
-        )
-    except P2PProbeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    result = _write(camera_id, "white_light", body.enabled)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
         "id": camera_id,
-        "enabled": result.enabled,
-        "previous_enabled": result.previous_enabled,
+        "enabled": result.value,
+        "previous_enabled": result.previous_value,
         "changed": result.changed,
         "transport_acknowledged": result.transport_acknowledged,
         "application_acknowledged": result.application_acknowledged,
@@ -112,20 +112,14 @@ def update_orientation(
 ) -> dict:
     """Set normal/180° image orientation through the fixed, typed D2 property."""
 
-    try:
-        result = run_with_fresh_access(
-            _enrollment(camera_id),
-            lambda enrollment: set_camera_orientation(enrollment, body.orientation),
-        )
-    except P2PProbeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    result = _write(camera_id, "orientation", body.orientation)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
         "id": camera_id,
-        "orientation": result.orientation,
-        "previous_value": result.previous_value,
-        "requested_value": result.requested_value,
+        "orientation": result.value,
+        "previous_value": result.native_previous_value,
+        "requested_value": result.native_requested_value,
         "changed": result.changed,
         "transport_acknowledged": result.transport_acknowledged,
         "error_code": result.error_code,
