@@ -67,3 +67,5 @@ generic API and startup code even when its implementation already fit the camera
 - No recovered manufacturer protocol remains in the top-level `provisioning` package. New camera
   families should add their own onboarding adapter and codecs under their driver rather than
   extending that generic Wi-Fi utility package.
+- Architecture tests enforce both boundaries: generic API/services cannot import the Yoosee
+  implementation, and the shared provisioning package cannot silently regain vendor codecs.
