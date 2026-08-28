@@ -30,7 +30,8 @@ def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response
     identity = inspect_provisioning_label(body)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return onboarding().privileged_status(identity["device_id"])
+    provider = onboarding(body.driver) if body.driver else onboarding()
+    return provider.privileged_status(identity["device_id"])
 
 
 @router.post("/online-status", dependencies=BLE_PROVISIONING)
@@ -42,7 +43,8 @@ def provisioning_privileged_online_status(
 
     identity = inspect_provisioning_label(body)
     try:
-        result = onboarding().online_status(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        result = provider.online_status(
             device_id=identity["device_id"],
             attempt_id=body.attempt_id,
         )
@@ -66,7 +68,8 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
 
     identity = inspect_provisioning_label(body)
     try:
-        onboarding().bind(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        provider.bind(
             device_id=identity["device_id"],
             time_area=body.time_area,
             time_zone=body.time_zone,
@@ -94,7 +97,8 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
 
     identity = inspect_provisioning_label(body)
     try:
-        inventory = onboarding().probe_inventory(identity["device_id"])
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        inventory = provider.probe_inventory(identity["device_id"])
     except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OnboardingTransportError as exc:
@@ -123,7 +127,8 @@ def provisioning_privileged_p2p_route_probe(
 
     identity = inspect_provisioning_label(body)
     try:
-        route = onboarding().probe_route(identity["device_id"])
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        route = provider.probe_route(identity["device_id"])
     except OnboardingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OnboardingTransportError as exc:
@@ -154,7 +159,7 @@ def provisioning_privileged_p2p_property_read(
     """Read one allowlisted property from exactly the requested camera."""
 
     identity = inspect_provisioning_label(body)
-    provider = onboarding()
+    provider = onboarding(body.driver) if body.driver else onboarding()
     if body.property_path not in provider.read_only_property_paths:
         raise HTTPException(status_code=422, detail="thing-model path is not read-only allowlisted")
     try:

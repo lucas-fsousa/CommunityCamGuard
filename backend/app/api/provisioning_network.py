@@ -78,7 +78,8 @@ def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     password = body.wifi_password.get_secret_value()
     try:
-        qr_data = onboarding().build_wifi_qr(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        qr_data = provider.build_wifi_qr(
             ssid=network.ssid,
             password=password,
             security=network.security,

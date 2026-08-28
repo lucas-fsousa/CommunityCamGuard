@@ -129,6 +129,7 @@ class OnlineStatusResult:
 class OnboardingPort(Protocol):
     """Driver-owned operations needed by the generic onboarding HTTP workflow."""
 
+    driver_key: str
     provider: str
     read_only_property_paths: frozenset[str]
 

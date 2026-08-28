@@ -75,7 +75,23 @@ For an existing semantic control, implement `control_catalog`, `read_control` an
 `write_control`. Return the neutral descriptors/results from `drivers/contracts.py`; translate to
 the vendor protocol only inside the family package. Do not expose a generic JSON/opcode sender.
 
-### 3. Register it
+### 3. Add factory onboarding (optional)
+
+Keep label parsing, QR/BLE codecs, cloud handshakes and post-Wi-Fi enrollment inside
+`drivers/mybrand/`. Implement the structural `OnboardingPort` from `drivers/onboarding.py` and
+return the adapter from `MyBrandDriver.onboarding()`. The port crosses into generic API code only
+through typed, secret-free DTOs; never return native tokens, peer coordinates, raw frames or a
+generic command sender.
+
+Set a stable `driver_key` matching the registered driver key and a human/provider identifier. The
+shared provisioning request contracts carry the driver key. Omission is accepted only while the
+registry contains exactly one onboarding provider, so tests for a new provider must exercise
+explicit selection and ambiguous-selection rejection.
+
+Use the Yoosee package as a layout example, not as a protocol dependency: another family must not
+import its codecs, account store or P2P implementation.
+
+### 4. Register it
 
 Add your driver to `DRIVERS` in `backend/app/drivers/__init__.py` (most-specific first; the
 generic fallback stays last).

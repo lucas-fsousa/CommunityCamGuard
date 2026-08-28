@@ -45,7 +45,8 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
 
     settings = get_settings()
     try:
-        prepared = onboarding().prepare_ble(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        prepared = provider.prepare_ble(
             device_id=identity["device_id"],
             ssid=network.ssid,
             password=body.wifi_password.get_secret_value(),
@@ -92,7 +93,8 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail="invalid BLE response encoding") from exc
     try:
-        decoded = onboarding().decode_ble(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        decoded = provider.decode_ble(
             device_id=identity["device_id"],
             attempt_id=body.attempt_id,
             command=body.command,

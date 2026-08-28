@@ -92,7 +92,9 @@ def test_onboarding_is_resolved_through_the_selected_driver():
     provider = drivers.onboarding_provider("yoosee")
 
     assert provider is drivers.get("yoosee").onboarding()
+    assert provider.driver_key == "yoosee"
     assert provider.provider == "yoosee-gwell"
+    assert drivers.onboarding_providers() == (("yoosee", provider),)
 
 
 def test_driver_without_onboarding_rejects_factory_enrollment():

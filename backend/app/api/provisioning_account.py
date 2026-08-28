@@ -18,10 +18,10 @@ router = APIRouter(
 
 
 @router.get("/status", dependencies=LOCAL_PROVISIONING)
-def provisioning_vendor_account_status(response: Response) -> dict:
+def provisioning_vendor_account_status(response: Response, driver: str | None = None) -> dict:
     """Report enrollment state without disclosing an account identity or token."""
 
-    provider = onboarding()
+    provider = onboarding(driver) if driver else onboarding()
     configured = provider.account_configured()
     response.headers["Cache-Control"] = "no-store"
     return {
@@ -39,7 +39,7 @@ def provisioning_vendor_account_login(
 ) -> dict:
     """Establish and encrypt a renewable native session without Android or Frida."""
 
-    provider = onboarding()
+    provider = onboarding(body.driver) if body.driver else onboarding()
     try:
         provider.login(
             AccountLogin(
@@ -66,10 +66,10 @@ def provisioning_vendor_account_login(
 
 
 @router.post("/refresh", dependencies=LOCAL_PROVISIONING)
-def provisioning_vendor_account_refresh(response: Response) -> dict:
+def provisioning_vendor_account_refresh(response: Response, driver: str | None = None) -> dict:
     """Renew the encrypted native session without returning credential material."""
 
-    provider = onboarding()
+    provider = onboarding(driver) if driver else onboarding()
     try:
         provider.refresh_account()
     except LookupError as exc:

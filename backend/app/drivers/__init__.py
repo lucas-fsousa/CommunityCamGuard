@@ -26,6 +26,7 @@ from .yoosee import YooseeDriver
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
+    from .onboarding import OnboardingPort
 
 # Ordered most-specific first; the generic fallback must stay last (it matches nothing itself).
 DRIVERS: tuple[CameraDriver, ...] = (
@@ -56,6 +57,7 @@ __all__ = [
     "get",
     "init_onboarding",
     "onboarding_provider",
+    "onboarding_providers",
     "probe",
     "rtsp_paths",
     "rtsp_paths_for",
@@ -100,6 +102,16 @@ def onboarding_provider(driver_key: str | None = None):
     if len(providers) != 1:
         raise LookupError("an explicit onboarding driver is required")
     return providers[0]
+
+
+def onboarding_providers() -> tuple[tuple[str, OnboardingPort], ...]:
+    """List explicitly registered factory-onboarding providers by stable driver key."""
+
+    return tuple(
+        (driver.key, provider)
+        for driver in DRIVERS
+        if (provider := driver.onboarding()) is not None
+    )
 
 
 def init_onboarding() -> None:

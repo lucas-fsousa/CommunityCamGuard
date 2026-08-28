@@ -1194,6 +1194,38 @@ def test_provisioning_api_accepts_authenticated_private_lan_client():
         )
         assert status.status_code == 200
         assert status.json()["lan_only"] is True
+        assert status.json()["driver"] == "yoosee"
+        assert status.json()["providers"] == [{"driver": "yoosee", "provider": "yoosee-gwell"}]
+
+
+def test_provisioning_inspection_selects_driver_explicitly():
+    with TestClient(app, base_url="http://localhost", client=("127.0.0.1", 50000)) as client:
+        assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
+        response = client.post(
+            "/api/provisioning/inspect",
+            json={
+                "driver": "yoosee",
+                "label": "http://yoosee.co/?D=0-7443576841-8034",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["driver"] == "yoosee"
+
+
+def test_provisioning_rejects_unknown_explicit_driver():
+    with TestClient(app, base_url="http://localhost", client=("127.0.0.1", 50000)) as client:
+        assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
+        response = client.post(
+            "/api/provisioning/inspect",
+            json={
+                "driver": "missing-driver",
+                "label": "http://yoosee.co/?D=0-7443576841-8034",
+            },
+        )
+
+    assert response.status_code == 422
+    assert "does not support factory onboarding" in response.json()["detail"]
 
 
 def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):

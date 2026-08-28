@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .. import drivers
 from ..config import get_settings
 from .provisioning_common import (
     BLE_PROVISIONING,
@@ -16,10 +17,11 @@ _onboarding = onboarding
 
 
 @router.get("/provisioning/status", dependencies=_BLE_PROVISIONING)
-def provisioning_status() -> dict:
+def provisioning_status(driver: str | None = None) -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
-    native_account = _onboarding().account_configured()
+    provider = _onboarding(driver) if driver else _onboarding()
+    native_account = provider.account_configured()
     ble_status = (
         "handshake-ready"
         if native_account or (material_path and material_path.is_file())
@@ -33,6 +35,11 @@ def provisioning_status() -> dict:
         "transport_ready": True,
         "vendor_cloud_required": True,
         "vendor_account_configured": native_account,
+        "driver": provider.driver_key,
+        "providers": [
+            {"driver": key, "provider": candidate.provider}
+            for key, candidate in drivers.onboarding_providers()
+        ],
         "ble_material_source": (
             "native-account"
             if native_account

@@ -33,6 +33,10 @@ generic API and startup code even when its implementation already fit the camera
 - While Yoosee is the sole onboarding provider, omission of a driver key resolves it unambiguously.
   When a second provider is registered, callers must select a driver explicitly; silent selection
   is rejected.
+- Provisioning label/account request contracts carry that optional stable driver key, label
+  inspection returns the resolved key, and the status endpoint lists registered providers. This
+  makes the explicit-selection rule usable before a second family lands, without breaking the
+  current one-provider dashboard.
 
 ## Consequences
 

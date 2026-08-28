@@ -61,6 +61,7 @@ from .vendor_cloud import VendorProvisioningCloudError, fetch_native_ble_materia
 
 
 class YooseeOnboarding:
+    driver_key = "yoosee"
     provider = account_store.PROVIDER
     read_only_property_paths = frozenset(MODEL_READ_PATHS)
 

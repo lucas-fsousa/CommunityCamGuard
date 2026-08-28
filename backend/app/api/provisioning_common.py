@@ -14,15 +14,19 @@ LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
 BLE_PROVISIONING = [Depends(require_auth), Depends(require_local_or_remote_ble_request)]
 
 
-def onboarding():
+def onboarding(driver_key: str | None = None):
     """Resolve onboarding behavior through the registered camera driver."""
 
-    return drivers.onboarding_provider()
+    try:
+        return drivers.onboarding_provider(driver_key)
+    except LookupError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class ProvisioningLabelIn(BaseModel):
     """Identity visible on a factory-new camera; none of these fields are credentials."""
 
+    driver: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,63}$")
     label: str = Field(default="", max_length=512)
     device_id: str = Field(default="", max_length=20)
     capability_code: str = Field(default="", max_length=10)
@@ -77,6 +81,7 @@ class ProvisioningP2PPropertyReadIn(ProvisioningLabelIn):
 class ProvisioningVendorAccountLoginIn(BaseModel):
     """Vendor credentials accepted only by the authenticated local-network route."""
 
+    driver: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,63}$")
     account_type: str = Field(pattern="^(email|mobile|userId)$")
     account: str = Field(min_length=1, max_length=320)
     password: SecretStr = Field(min_length=1, max_length=256)
@@ -90,12 +95,14 @@ def inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
     """Validate a public label model and translate parser failures to HTTP 422."""
 
     try:
-        return onboarding().inspect_label(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        identity = provider.inspect_label(
             label=body.label,
             device_id=body.device_id,
             capability_code=body.capability_code,
             firmware_version=body.firmware_version,
             mac=body.mac,
         )
+        return {**identity, "driver": provider.driver_key}
     except OnboardingLabelError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

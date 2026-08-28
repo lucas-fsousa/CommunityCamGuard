@@ -44,7 +44,8 @@ def complete_onboarding(
             detail="the printed MAC address is required to locate and register this camera",
         )
     try:
-        completed = onboarding().complete(
+        provider = onboarding(body.driver) if body.driver else onboarding()
+        completed = provider.complete(
             device_id=identity["device_id"],
             mac=identity["mac"],
             name=body.name,

@@ -153,6 +153,11 @@ dashboard, it fails closed instead of reading Frida captures or accepting expire
 
 ### Factory provisioning (authenticated trusted LAN only)
 
+Provisioning request bodies that identify a factory camera accept an optional `driver` key (for
+example `"yoosee"`). `/api/provisioning/status` lists the registered `{driver, provider}` pairs and
+returns the selected driver. The key may be omitted while exactly one onboarding driver is
+installed; once multiple providers exist, selection is mandatory and ambiguity fails closed.
+
 These endpoints are intentionally distinct from adding a camera that is already on the LAN. They
 require authentication and a direct trusted-LAN request using a literal loopback, RFC1918 or IPv6
 ULA/link-local address. The Origin/Referer must match Host; public clients, DNS rebinding names,
