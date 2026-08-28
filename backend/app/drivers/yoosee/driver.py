@@ -18,6 +18,7 @@ from . import controls
 
 if TYPE_CHECKING:
     from ...db.registry import Camera
+    from ..onboarding import OnboardingPort
 
 
 class YooseeDriver(CameraDriver):
@@ -26,6 +27,11 @@ class YooseeDriver(CameraDriver):
     rtsp_paths = ("/onvif1", "/onvif2", "/11", "/12", "/live.sdp", "/0", "/1")
     transport = "udp"
     features = frozenset({"ptz", "audio_in", "led"})
+
+    def onboarding(self) -> OnboardingPort:
+        from .onboarding import ONBOARDING
+
+        return ONBOARDING
 
     def matches(self, ctx: DetectContext) -> bool:
         return self.match_confidence(ctx) > 0
@@ -67,7 +73,5 @@ class YooseeDriver(CameraDriver):
     def read_control(self, camera: Camera, key: str) -> ControlResult:
         return controls.read(camera, key)
 
-    def write_control(
-        self, camera: Camera, key: str, value: ControlValue
-    ) -> ControlResult:
+    def write_control(self, camera: Camera, key: str, value: ControlValue) -> ControlResult:
         return controls.write(camera, key, value)

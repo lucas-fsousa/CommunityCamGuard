@@ -19,6 +19,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, SecretStr
 
+from .. import drivers
 from ..auth import (
     COOKIE_NAME,
     MAX_AGE,
@@ -29,17 +30,10 @@ from ..auth import (
 )
 from ..camera_identity import stable_camera_id
 from ..config import get_settings
-from ..drivers.yoosee import account_store
-from ..drivers.yoosee.p2p import (
-    MODEL_READ_PATHS,
-    AccountCredentials,
-    P2PProbeError,
-    VendorAccountError,
-    login_account,
-    probe_account_inventory,
-    probe_camera_route,
-    read_camera_property,
-    refresh_account_session,
+from ..drivers.onboarding import (
+    AccountLogin,
+    OnboardingAccountError,
+    OnboardingTransportError,
 )
 from ..provisioning import (
     BleCodecError,
@@ -50,14 +44,11 @@ from ..provisioning import (
     begin_ble_provisioning_attempt,
     bind_vendor_device,
     ble_provisioning_attempt,
-    bound_privileged_enrollment,
     build_ble_provisioning_frames,
     build_wifi_payload,
     decrypt_ble_payload,
     encryption_from_scan,
-    fetch_native_ble_material,
     inspect_label,
-    load_ble_provisioning_material,
     manual_network,
     mark_privileged_enrollment_bound,
     pending_privileged_enrollment,
@@ -72,6 +63,12 @@ from .local_only import require_local_or_remote_ble_request, require_local_reque
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
+
+
+def _onboarding():
+    """Resolve onboarding behavior through the registered camera driver."""
+
+    return drivers.onboarding_provider()
 
 
 # --- schemas -----------------------------------------------------------------------
@@ -192,7 +189,7 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
-    native_account = account_store.get_account() is not None
+    native_account = _onboarding().account_configured()
     ble_status = (
         "handshake-ready"
         if native_account or (material_path and material_path.is_file())
@@ -230,10 +227,11 @@ def provisioning_status() -> dict:
 def provisioning_vendor_account_status(response: Response) -> dict:
     """Report enrollment state without disclosing an account identity or token."""
 
-    configured = account_store.get_account() is not None
+    onboarding = _onboarding()
+    configured = onboarding.account_configured()
     response.headers["Cache-Control"] = "no-store"
     return {
-        "provider": account_store.PROVIDER,
+        "provider": onboarding.provider,
         "configured": configured,
         "renewable_session": configured,
         "vendor_cloud_required": True,
@@ -252,25 +250,26 @@ def provisioning_vendor_account_login(
     """Establish and encrypt a renewable native session; Android/Frida are not involved."""
 
     try:
-        credentials = AccountCredentials.from_password(
-            account_type=body.account_type,
-            account=body.account.strip(),
-            password=body.password.get_secret_value(),
-            mobile_area=body.mobile_area,
-            language=body.language,
-            region=body.region,
-            area=body.area,
+        onboarding = _onboarding()
+        onboarding.login(
+            AccountLogin(
+                account_type=body.account_type,
+                account=body.account.strip(),
+                password=body.password.get_secret_value(),
+                mobile_area=body.mobile_area,
+                language=body.language,
+                region=body.region,
+                area=body.area,
+            )
         )
-        session = login_account(credentials)
-        account_store.save_account(credentials, session)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except VendorAccountError as exc:
+    except OnboardingAccountError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
-        "provider": account_store.PROVIDER,
+        "provider": onboarding.provider,
         "configured": True,
         "renewable_session": True,
     }
@@ -284,17 +283,16 @@ def provisioning_vendor_account_login(
 def provisioning_vendor_account_refresh(response: Response) -> dict:
     """Renew the encrypted native session without returning any credential material."""
 
-    stored = account_store.get_account()
-    if stored is None:
-        raise HTTPException(status_code=409, detail="vendor account is not configured")
+    onboarding = _onboarding()
     try:
-        refreshed = refresh_account_session(stored.session)
-        account_store.update_session(refreshed)
-    except VendorAccountError as exc:
+        onboarding.refresh_account()
+    except LookupError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OnboardingAccountError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return {
-        "provider": account_store.PROVIDER,
+        "provider": onboarding.provider,
         "configured": True,
         "renewable_session": True,
         "refreshed": True,
@@ -393,27 +391,11 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
 
     settings = get_settings()
     try:
-        stored = account_store.get_account()
-        if stored is not None:
-            refreshed = refresh_account_session(stored.session)
-            account_store.update_session(refreshed)
-            material = fetch_native_ble_material(
-                refreshed,
-                device_id=identity["device_id"],
-            )
-        elif settings.provisioning_ble_material_file is not None:
-            # Temporary research bridge retained for existing installations. A configured native
-            # account always wins and removes all runtime dependence on Frida/capture files.
-            material = load_ble_provisioning_material(
-                settings.provisioning_ble_material_file,
-                expected_device_id=identity["device_id"],
-                max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
-            )
-        else:
-            raise HTTPException(
-                status_code=503,
-                detail="BLE handshake material is unavailable; configure the vendor account",
-            )
+        material = _onboarding().ble_material(
+            identity["device_id"],
+            fallback_file=settings.provisioning_ble_material_file,
+            max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
+        )
         password = body.wifi_password.get_secret_value()
         wifi_payload = build_wifi_payload(
             ssid=network.ssid,
@@ -429,7 +411,9 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
         attempt = begin_ble_provisioning_attempt(material)
     except HTTPException:
         raise
-    except (VendorAccountError, VendorProvisioningCloudError) as exc:
+    except LookupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (OnboardingAccountError, VendorProvisioningCloudError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except (BleCodecError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -676,11 +660,10 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
     """Authenticate to the P2P access node and inspect inventory without contacting the camera."""
     identity = _inspect_provisioning_label(body)
     try:
-        enrollment = bound_privileged_enrollment(identity["device_id"])
-        inventory = probe_account_inventory(enrollment)
+        inventory = _onboarding().probe_inventory(identity["device_id"])
     except PrivilegedEnrollmentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except P2PProbeError as exc:
+    except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -706,11 +689,10 @@ def provisioning_privileged_p2p_route_probe(body: ProvisioningLabelIn, response:
     """Prove the selected camera's direct P2P route without media or control commands."""
     identity = _inspect_provisioning_label(body)
     try:
-        enrollment = bound_privileged_enrollment(identity["device_id"])
-        route = probe_camera_route(enrollment)
+        route = _onboarding().probe_route(identity["device_id"])
     except PrivilegedEnrollmentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except P2PProbeError as exc:
+    except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -740,14 +722,14 @@ def provisioning_privileged_p2p_property_read(
 ) -> dict:
     """Read one allowlisted thing-model property from exactly the requested camera."""
     identity = _inspect_provisioning_label(body)
-    if body.property_path not in MODEL_READ_PATHS:
+    onboarding = _onboarding()
+    if body.property_path not in onboarding.read_only_property_paths:
         raise HTTPException(status_code=422, detail="thing-model path is not read-only allowlisted")
     try:
-        enrollment = bound_privileged_enrollment(identity["device_id"])
-        result = read_camera_property(enrollment, body.property_path)
+        result = onboarding.read_property(identity["device_id"], body.property_path)
     except PrivilegedEnrollmentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except P2PProbeError as exc:
+    except OnboardingTransportError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"

@@ -5,6 +5,7 @@ package and add it to :data:`DRIVERS` below (most-specific first; the generic fa
 last). Everything else — discovery paths, the capability probe, PTZ/reboot routing — flows
 through here automatically.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -53,6 +54,8 @@ __all__ = [
     "detect",
     "for_camera",
     "get",
+    "init_onboarding",
+    "onboarding_provider",
     "probe",
     "rtsp_paths",
     "rtsp_paths_for",
@@ -75,12 +78,39 @@ def for_camera(camera: Camera) -> CameraDriver:
     if caps.get("driver"):
         return get(caps["driver"])
 
-    return detect(DetectContext(
-        vendor=getattr(camera, "vendor", "") or "",
-        model=str(caps.get("model") or ""),
-        firmware=str(caps.get("firmware") or ""),
-        open_ports=caps.get("open_ports") or []
-    ))
+    return detect(
+        DetectContext(
+            vendor=getattr(camera, "vendor", "") or "",
+            model=str(caps.get("model") or ""),
+            firmware=str(caps.get("firmware") or ""),
+            open_ports=caps.get("open_ports") or [],
+        )
+    )
+
+
+def onboarding_provider(driver_key: str | None = None):
+    """Resolve a driver-owned onboarding port without importing a vendor package upstream."""
+
+    if driver_key is not None:
+        provider = get(driver_key).onboarding()
+        if provider is None:
+            raise LookupError(f"driver {driver_key!r} does not support factory onboarding")
+        return provider
+    providers = [provider for driver in DRIVERS if (provider := driver.onboarding()) is not None]
+    if len(providers) != 1:
+        raise LookupError("an explicit onboarding driver is required")
+    return providers[0]
+
+
+def init_onboarding() -> None:
+    """Initialize durable stores owned by registered onboarding providers."""
+
+    seen: set[int] = set()
+    for driver in DRIVERS:
+        provider = driver.onboarding()
+        if provider is not None and id(provider) not in seen:
+            provider.init()
+            seen.add(id(provider))
 
 
 def detect(ctx: DetectContext) -> CameraDriver:
@@ -99,8 +129,8 @@ def detect(ctx: DetectContext) -> CameraDriver:
 
 
 def _fill(template: str, username: str, password: str, channel: int) -> str:
-    return (template
-        .replace("[USERNAME]", username)
+    return (
+        template.replace("[USERNAME]", username)
         .replace("[PASSWORD]", password)
         .replace("[CHANNEL]", str(channel))
     )
@@ -156,6 +186,6 @@ def probe(camera: Camera, open_ports: list[int] | None = None) -> Capabilities:
         vendor=getattr(camera, "vendor", "") or "",
         model=str((getattr(camera, "capabilities", None) or {}).get("model") or ""),
         firmware=str((getattr(camera, "capabilities", None) or {}).get("firmware") or ""),
-        open_ports=sorted(set(open_ports or []))
+        open_ports=sorted(set(open_ports or [])),
     )
     return detect(ctx).probe(camera, open_ports)

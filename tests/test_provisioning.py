@@ -15,6 +15,8 @@ from backend.app.api.local_only import require_local_or_remote_ble_request, requ
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
 from backend.app.db import p2p
+from backend.app.drivers.yoosee import account_store
+from backend.app.drivers.yoosee import onboarding as yoosee_onboarding
 from backend.app.drivers.yoosee.p2p import (
     AccountSession,
     P2PInventory,
@@ -471,18 +473,18 @@ def test_ble_prepare_prefers_native_account_over_research_file(monkeypatch):
     )
     calls = []
     monkeypatch.setattr(
-        routes.account_store,
+        yoosee_onboarding.account_store,
         "get_account",
         lambda: SimpleNamespace(session=session),
     )
     monkeypatch.setattr(
-        routes.account_store,
+        yoosee_onboarding.account_store,
         "update_session",
         lambda refreshed: calls.append(("stored", refreshed)),
     )
-    monkeypatch.setattr(routes, "refresh_account_session", lambda current: current)
+    monkeypatch.setattr(yoosee_onboarding, "refresh_account_session", lambda current: current)
     monkeypatch.setattr(
-        routes,
+        yoosee_onboarding,
         "fetch_native_ble_material",
         lambda current, *, device_id: calls.append(("material", current, device_id)) or material,
     )
@@ -796,7 +798,7 @@ def test_privileged_p2p_probe_returns_only_sanitized_inventory(monkeypatch):
         dev_token=SUBSCRIPTION_TOKEN,
     )
     monkeypatch.setattr(
-        routes,
+        yoosee_onboarding,
         "probe_account_inventory",
         lambda _enrollment: P2PInventory(
             device_id="7443576841",
@@ -847,7 +849,7 @@ def test_privileged_p2p_route_probe_returns_no_peer_or_session_secrets(monkeypat
         dev_token=SUBSCRIPTION_TOKEN,
     )
     monkeypatch.setattr(
-        routes,
+        yoosee_onboarding,
         "probe_camera_route",
         lambda _enrollment: P2PRouteProbe(
             device_id="7443576841",
@@ -885,7 +887,7 @@ def test_privileged_property_read_returns_only_allowlisted_read_result(monkeypat
         dev_token=SUBSCRIPTION_TOKEN,
     )
     monkeypatch.setattr(
-        routes,
+        yoosee_onboarding,
         "read_camera_property",
         lambda _enrollment, path: P2PPropertyRead(
             device_id="7443576841",
@@ -918,7 +920,7 @@ def test_privileged_property_read_rejects_unknown_path_before_transport(monkeypa
         nonlocal called
         called = True
 
-    monkeypatch.setattr(routes, "read_camera_property", unexpected_read)
+    monkeypatch.setattr(yoosee_onboarding, "read_camera_property", unexpected_read)
     with pytest.raises(HTTPException) as caught:
         routes.provisioning_privileged_p2p_property_read(
             routes.ProvisioningP2PPropertyReadIn(
@@ -1202,7 +1204,7 @@ def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):
         terminal_id="-98765",
         user_id="19088743",
     )
-    monkeypatch.setattr(routes, "login_account", lambda _credentials: session)
+    monkeypatch.setattr(yoosee_onboarding, "login_account", lambda _credentials: session)
     response = Response()
     result = routes.provisioning_vendor_account_login(
         routes.ProvisioningVendorAccountLoginIn(
@@ -1223,12 +1225,16 @@ def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):
     assert "person@example.invalid" not in serialized
     assert "account-password" not in serialized
     assert token.hex() not in serialized
-    assert routes.account_store.get_account() is not None
+    assert account_store.get_account() is not None
 
 
 def test_vendor_account_routes_reject_public_client_before_login_call(monkeypatch):
     called = []
-    monkeypatch.setattr(routes, "login_account", lambda credentials: called.append(credentials))
+    monkeypatch.setattr(
+        yoosee_onboarding,
+        "login_account",
+        lambda credentials: called.append(credentials),
+    )
     with TestClient(app, base_url="http://localhost", client=("192.0.2.40", 50000)) as client:
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
         response = client.post(

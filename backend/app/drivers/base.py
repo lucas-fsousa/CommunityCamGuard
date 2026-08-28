@@ -16,6 +16,7 @@ brands). The generic :meth:`CameraDriver.probe` already handles the RTSP SDP (vi
 tracks + codecs) that every RTSP camera shares; families override :meth:`_probe_controls`
 to add what's specific (PTZ, reboot, model/firmware, ...).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ from .contracts import ControlDescriptor, ControlResult, ControlValue
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
+    from .onboarding import OnboardingPort
 
 
 class Unsupported(Exception):
@@ -44,8 +46,8 @@ PORT_ROLES: dict[int, str] = {
     8000: "http",
     8080: "http",
     8899: "http-onvif",
-    5000: "onvif-ptz",       # HiSilicon/Yoosee ONVIF service (PTZ + device) lives here
-    50000: "p2p",            # vendor-app P2P channel (Gwell)
+    5000: "onvif-ptz",  # HiSilicon/Yoosee ONVIF service (PTZ + device) lives here
+    50000: "p2p",  # vendor-app P2P channel (Gwell)
     34567: "proprietary-control",
     37777: "proprietary-control",
 }
@@ -63,18 +65,20 @@ def classify_ports(open_ports: list[int]) -> dict[str, list[int]]:
 class Capabilities:
     """A snapshot of what a camera supports. Serialised to JSON in the registry."""
 
-    driver: str = "generic"                # which driver produced/owns this camera
+    driver: str = "generic"  # which driver produced/owns this camera
     reachable: bool = False
     ptz: bool = False
     ptz_protocol: str = ""
-    reboot: bool = False                   # software reboot available (compliant cams)
+    reboot: bool = False  # software reboot available (compliant cams)
     model: str = ""
     firmware: str = ""
     has_video: bool = False
     has_audio: bool = False
     video_codec: str = ""
     audio_codec: str = ""
-    stream_paths: list[str] = field(default_factory=list)   # RTSP paths the camera itself reports (ONVIF)
+    stream_paths: list[str] = field(
+        default_factory=list
+    )  # RTSP paths the camera itself reports (ONVIF)
     open_ports: list[int] = field(default_factory=list)
     ports_by_role: dict[str, list[int]] = field(default_factory=dict)
     probed_at: str = ""
@@ -87,7 +91,7 @@ class Capabilities:
 class DetectContext:
     """What discovery already knows about a host, used to pick the right driver."""
 
-    vendor: str = ""                       # SDP/device manufacturer string, if any
+    vendor: str = ""  # SDP/device manufacturer string, if any
     model: str = ""
     firmware: str = ""
     serial: str = ""
@@ -105,9 +109,14 @@ class CameraDriver:
 
     key: str = "generic"
     label: str = "Generic RTSP"
-    rtsp_paths: tuple[str, ...] = ()       # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
-    transport: str = "auto"                # media-layer hint: auto | tcp | udp
+    rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
+    transport: str = "auto"  # media-layer hint: auto | tcp | udp
     features: frozenset[str] = frozenset()  # advertised controllable features
+
+    def onboarding(self) -> OnboardingPort | None:
+        """Return this family onboarding port, when factory enrollment is implemented."""
+
+        return None
 
     def matches(self, ctx: DetectContext) -> bool:
         """Does this camera belong to this family? The generic fallback never matches."""
@@ -121,8 +130,9 @@ class CameraDriver:
     # --- capability probe --------------------------------------------------------------
     def probe(self, camera: Camera, open_ports: list[int] | None = None) -> Capabilities:
         """Probe a camera and return its capabilities. Override :meth:`_probe_controls`, not this."""
-        caps = Capabilities(driver=self.key, probed_at=_now(),
-                            open_ports=sorted(set(open_ports or [])))
+        caps = Capabilities(
+            driver=self.key, probed_at=_now(), open_ports=sorted(set(open_ports or []))
+        )
         caps.ports_by_role = classify_ports(caps.open_ports)
         self._probe_rtsp(camera, caps)
         self._probe_controls(camera, caps)
@@ -148,8 +158,11 @@ class CameraDriver:
             resp = session.request("DESCRIBE", uri, accept_sdp=True)
             if resp is not None and rtsp.parse_status(resp) == 401 and camera.username:
                 resp = session.request(
-                    "DESCRIBE", uri, accept_sdp=True,
-                    auth=rtsp.auth_header(resp, "DESCRIBE", uri, camera.username, camera.password))
+                    "DESCRIBE",
+                    uri,
+                    accept_sdp=True,
+                    auth=rtsp.auth_header(resp, "DESCRIBE", uri, camera.username, camera.password),
+                )
             if resp is not None and rtsp.parse_status(resp) == 200:
                 sdp = rtsp.parse_sdp(resp)
                 caps.has_video = bool(sdp["has_video"])
@@ -172,9 +185,7 @@ class CameraDriver:
 
         raise Unsupported(key)
 
-    def write_control(
-        self, camera: Camera, key: str, value: ControlValue
-    ) -> ControlResult:
+    def write_control(self, camera: Camera, key: str, value: ControlValue) -> ControlResult:
         """Write one allowlisted semantic control; raw vendor payloads are never accepted."""
 
         raise Unsupported(key)

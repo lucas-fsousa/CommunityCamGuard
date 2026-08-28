@@ -38,6 +38,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0025](0025-opaque-media-and-recorder-runtime-identity.md) | Opaque media stream and recorder runtime identity |
 | [0026](0026-opaque-recording-archive-identity.md) | Opaque recording archive identity with safe legacy backfill |
 | [0027](0027-camera-id-primary-registry.md) | `camera_id` registry primary key with optional native MAC |
+| [0028](0028-semantic-api-and-driver-onboarding.md) | Semantic API routers and driver-owned factory onboarding port |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,
