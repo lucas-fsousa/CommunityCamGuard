@@ -98,6 +98,9 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 driver's private identity server-side; clients must not derive it or substitute a MAC/vendor ID.
 An exact MAC remains temporarily accepted in these route parameters for compatibility with clients
 older than the opaque-ID migration, but it is deprecated and is not used by the bundled dashboard.
+`mac` may be empty for a driver whose durable native identity is a serial/vendor ID; it is discovery
+metadata, not the registry key. The current manual `POST /cameras` form still targets MAC-addressed
+LAN RTSP enrollment, while driver-owned onboarding can create canonical records without one.
 The password is **never** returned — only `has_password`. Stream IDs are go2rtc stream names (see
 Media). `online` means that video packets in the camera's shared base stream are currently advancing;
 `recording` is whether the recorder process is currently running for the camera. The dashboard polls

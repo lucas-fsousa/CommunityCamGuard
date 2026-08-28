@@ -44,6 +44,10 @@ For ambiguous families, override `match_confidence()` (`0..100`) instead. Strong
 model, serial or protocol evidence should outrank a shared open-port fingerprint. Add a collision
 test proving that another registered family is not incorrectly claimed.
 
+Do not manufacture a MAC for a device that has none. Derive its opaque registry identity from the
+driver's durable `serial` or `vendor_device` value; `camera_id` is the registry/media/archive key and
+MAC is only optional native discovery metadata. See ADR 0027.
+
 Path templates may use `[USERNAME]`, `[PASSWORD]`, `[CHANNEL]` — a template with `[PASSWORD]`
 is only tried when credentials are supplied. The generic capability probe (video/audio tracks
 + codecs from the RTSP SDP) works for you automatically.

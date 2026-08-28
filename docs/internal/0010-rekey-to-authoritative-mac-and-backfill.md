@@ -17,7 +17,9 @@ Close both on the one code path that surfaces them — a scan reconciling agains
 
 - `ScannedHost` carries **both** `mac` (authoritative ONVIF) and `arp_mac`; keeping the ARP value is
   what lets the registry still recognise the old identity.
-- `registry.rekey_camera(old, new)` moves the row's primary key, preserving name/credentials/caps. It
+- `registry.rekey_camera(old, new)` originally moved the row's primary key, preserving
+  name/credentials/caps. Since ADR 0027 it updates only the optional native MAC while the
+  `camera_id` primary key remains stable. It
   **refuses when the target MAC already exists** (a genuinely different camera — merging would discard
   one record's credentials).
 - `reconcile()` re-keys when the ONVIF MAC is unknown but the ARP MAC is registered, and reports the

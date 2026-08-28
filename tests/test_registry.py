@@ -33,6 +33,83 @@ def test_public_camera_id_is_stable_opaque_and_survives_native_mac_rekey():
     assert registry.get_camera_by_id(created.camera_id).mac == "aa:bb:cc:dd:ee:01"
 
 
+def test_registry_primary_key_is_camera_id_and_mac_is_optional():
+    registry.init_db()
+    first = registry.upsert_camera(
+        identity_kind="serial", identity_value="SERIAL-ONE", name="Serial camera"
+    )
+    second = registry.upsert_camera(
+        identity_kind="vendor_device", identity_value="DEVICE-TWO", name="P2P camera"
+    )
+
+    assert first.mac == second.mac == ""
+    assert first.camera_id != second.camera_id
+    assert registry.get_camera_by_id(first.camera_id).name == "Serial camera"
+    with connect() as connection:
+        primary_key = next(
+            row["name"] for row in connection.execute("PRAGMA table_info(cameras)") if row["pk"]
+        )
+    assert primary_key == "camera_id"
+
+
+def test_camera_without_mac_can_be_updated_and_deleted_by_public_id():
+    registry.init_db()
+    camera = registry.upsert_camera(identity_kind="serial", identity_value="SERIAL-ONE")
+
+    updated = registry.upsert_camera(
+        camera_id=camera.camera_id, name="Updated", capabilities={"driver": "generic"}
+    )
+    assert updated.name == "Updated"
+    assert updated.capabilities == {"driver": "generic"}
+
+    registry.delete_camera_by_id(camera.camera_id)
+    assert registry.get_camera_by_id(camera.camera_id) is None
+
+
+def test_legacy_empty_mac_delete_cannot_remove_macless_cameras():
+    registry.init_db()
+    camera = registry.upsert_camera(identity_kind="serial", identity_value="SERIAL-ONE")
+    registry.delete_camera("")
+    assert registry.get_camera_by_id(camera.camera_id) is not None
+
+
+def test_init_migrates_legacy_mac_primary_key_without_reencrypting_password():
+    with connect() as connection:
+        connection.executescript(
+            """CREATE TABLE cameras (
+                   mac TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                   username TEXT NOT NULL DEFAULT 'admin', password_enc BLOB,
+                   stream_path TEXT NOT NULL DEFAULT '', rtsp_port INTEGER NOT NULL DEFAULT 554,
+                   last_ip TEXT NOT NULL DEFAULT '', vendor TEXT NOT NULL DEFAULT '',
+                   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+               );"""
+        )
+        encrypted = registry._encrypt("preserved-secret")
+        connection.execute(
+            """INSERT INTO cameras
+               (mac,name,username,password_enc,stream_path,rtsp_port,last_ip,vendor,
+                created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            ("aa:bb:cc:dd:ee:01", "Legacy", "admin", encrypted, "/onvif1", 554,
+             "10.0.0.5", "legacy", "created", "updated"),
+        )
+
+    registry.init_db()
+
+    migrated = registry.get_camera("aa:bb:cc:dd:ee:01")
+    assert migrated.camera_id == stable_camera_id("mac", migrated.mac)
+    assert migrated.password == "preserved-secret"
+    assert migrated.created_at == "created" and migrated.updated_at == "updated"
+    with connect() as connection:
+        stored = connection.execute(
+            "SELECT password_enc FROM cameras WHERE camera_id = ?", (migrated.camera_id,)
+        ).fetchone()[0]
+        primary_key = next(
+            row["name"] for row in connection.execute("PRAGMA table_info(cameras)") if row["pk"]
+        )
+    assert bytes(stored) == bytes(encrypted)
+    assert primary_key == "camera_id"
+
+
 def test_rtsp_url_built_from_parts():
     registry.init_db()
     registry.upsert_camera("aa:bb:cc:00:11:22", username="admin", password="pw",

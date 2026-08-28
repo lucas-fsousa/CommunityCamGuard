@@ -308,7 +308,9 @@ def camera_statuses(request: Request) -> list[dict]:
 def _probe_and_store(cam: registry.Camera) -> registry.Camera:
     """Detect the driver, probe live capabilities (PTZ, audio/video, ports) and persist them."""
     caps = drivers.probe(cam, active_scan.enumerate_ports(cam.last_ip))
-    return registry.upsert_camera(cam.mac, capabilities=caps.to_dict())
+    return registry.upsert_camera(
+        cam.mac, camera_id=cam.camera_id, capabilities=caps.to_dict()
+    )
 
 
 def _camera_from_reference(camera_id: str) -> registry.Camera | None:
@@ -367,7 +369,7 @@ def delete_camera(camera_id: str, request: Request) -> dict:
     camera = _camera_from_reference(camera_id)
     if camera is None:
         raise HTTPException(status_code=404, detail="camera not found")
-    registry.delete_camera(camera.mac)
+    registry.delete_camera_by_id(camera.camera_id)
     _resync(request)
     return {"ok": True}
 

@@ -1,9 +1,9 @@
 """Camera registry: the durable list of cameras the user has configured.
 
-The current storage/discovery key is MAC, while every row also has an opaque public ``camera_id``
-(ADR 0023). Clients and new cross-driver APIs use that stable ID; drivers translate it to their
-native identity (MAC, serial, vendor device ID, etc.). Each record carries credentials and the
-confirmed RTSP path; IP remains only a mutable last-seen address refreshed by discovery.
+Every row is keyed by an opaque public ``camera_id`` (ADR 0027). MAC is an optional native/discovery
+identifier with a compatibility lookup, not the storage identity. Drivers translate the stable ID
+to their own MAC, serial, vendor device ID, certificate or other native identity. Each record carries
+credentials and the confirmed RTSP path; IP remains only a mutable last-seen discovery address.
 
 Passwords are encrypted at rest with Fernet. The key is derived from the dashboard secret
 in ``.env`` (see ``config``), so the DB file alone never leaks credentials. Note: because
@@ -35,8 +35,8 @@ DEFAULT_RTSP_PORT = 554
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS cameras (
-    mac          TEXT PRIMARY KEY,
-    camera_id    TEXT NOT NULL DEFAULT '',
+    camera_id    TEXT PRIMARY KEY,
+    mac          TEXT NOT NULL DEFAULT '',
     name         TEXT NOT NULL DEFAULT '',
     username     TEXT NOT NULL DEFAULT 'admin',
     password_enc BLOB,
@@ -59,7 +59,7 @@ _MIGRATIONS = {
 
 @dataclass
 class Camera:
-    mac: str
+    mac: str = ""
     name: str = ""
     username: str = DEFAULT_USERNAME
     password: str = ""  # decrypted; never persisted in the clear
@@ -141,8 +141,40 @@ def init_db() -> None:
                 "UPDATE cameras SET camera_id = ? WHERE mac = ?",
                 (stable_camera_id("mac", row["mac"]), row["mac"]),
             )
+        primary_key = next(
+            (row["name"] for row in conn.execute("PRAGMA table_info(cameras)") if row["pk"]),
+            "",
+        )
+        if primary_key != "camera_id":
+            # SQLite cannot alter a primary key in place. Rebuild transactionally after old rows
+            # have received their deterministic IDs; encrypted blobs and timestamps are copied
+            # byte-for-byte.
+            conn.executescript(
+                """BEGIN IMMEDIATE;
+                   CREATE TABLE cameras_v2 (
+                       camera_id TEXT PRIMARY KEY,
+                       mac TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '',
+                       username TEXT NOT NULL DEFAULT 'admin', password_enc BLOB,
+                       stream_path TEXT NOT NULL DEFAULT '', rtsp_port INTEGER NOT NULL DEFAULT 554,
+                       last_ip TEXT NOT NULL DEFAULT '', vendor TEXT NOT NULL DEFAULT '',
+                       capabilities TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+                       updated_at TEXT NOT NULL
+                   );
+                   INSERT INTO cameras_v2
+                       (camera_id, mac, name, username, password_enc, stream_path, rtsp_port,
+                        last_ip, vendor, capabilities, created_at, updated_at)
+                   SELECT camera_id, mac, name, username, password_enc, stream_path, rtsp_port,
+                          last_ip, vendor, capabilities, created_at, updated_at FROM cameras;
+                   DROP TABLE cameras;
+                   ALTER TABLE cameras_v2 RENAME TO cameras;
+                   COMMIT;"""
+            )
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_cameras_camera_id ON cameras(camera_id)"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_cameras_mac "
+            "ON cameras(mac) WHERE mac <> ''"
         )
 
 
@@ -186,6 +218,8 @@ def list_cameras() -> list[Camera]:
 
 
 def get_camera(mac: str) -> Camera | None:
+    if not mac:
+        return None
     with _connect() as conn:
         row = conn.execute("SELECT * FROM cameras WHERE mac = ?", (mac.lower(),)).fetchone()
     return _row_to_camera(row) if row else None
@@ -201,29 +235,44 @@ def get_camera_by_id(camera_id: str) -> Camera | None:
     return _row_to_camera(row) if row else None
 
 
-def upsert_camera(mac: str, *, name: str | None = None, username: str | None = None,
+def upsert_camera(mac: str = "", *, name: str | None = None, username: str | None = None,
                   password: str | None = None, stream_path: str | None = None,
                   rtsp_port: int | None = None, last_ip: str | None = None,
                   vendor: str | None = None, capabilities: dict | None = None,
-                  identity_kind: str = "mac", identity_value: str | None = None) -> Camera:
-    """Insert or update a camera by MAC. Only the provided fields are changed.
+                  identity_kind: str = "mac", identity_value: str | None = None,
+                  camera_id: str | None = None) -> Camera:
+    """Insert or update a camera by canonical identity. Only provided fields are changed.
 
-    ``password`` is encrypted before storage. Pass an empty string to clear it.
+    MAC remains the normal discovery lookup but may be empty when a driver has another durable
+    identity. ``password`` is encrypted before storage. Pass an empty string to clear it.
     """
-    mac = mac.lower()
+    mac = str(mac or "").lower()
+    if camera_id is not None:
+        if not valid_camera_id(camera_id):
+            raise ValueError("camera_id is invalid")
+        derived_id = camera_id
+    else:
+        identity_source = identity_value or mac
+        if not identity_source:
+            raise ValueError("a durable camera identity is required")
+        derived_id = stable_camera_id(identity_kind, identity_source)
     now = _now()
-    existing = get_camera(mac)
+    existing = get_camera_by_id(derived_id)
+    if existing is None:
+        existing = get_camera(mac) if mac else None
 
     if existing is None:
         cam = Camera(
             mac=mac,
             created_at=now,
             updated_at=now,
-            camera_id=stable_camera_id(identity_kind, identity_value or mac),
+            camera_id=derived_id,
         )
     else:
         cam = existing
         cam.updated_at = now
+        if mac:
+            cam.mac = mac
 
     if name is not None:
         cam.name = name
@@ -251,8 +300,8 @@ def upsert_camera(mac: str, *, name: str | None = None, username: str | None = N
             VALUES (:mac, :camera_id, :name, :username, :password_enc, :stream_path,
                     :rtsp_port, :last_ip, :vendor, :capabilities,
                     :created_at, :updated_at)
-            ON CONFLICT(mac) DO UPDATE SET
-                camera_id=excluded.camera_id, name=excluded.name, username=excluded.username,
+            ON CONFLICT(camera_id) DO UPDATE SET
+                mac=excluded.mac, name=excluded.name, username=excluded.username,
                 password_enc=excluded.password_enc, stream_path=excluded.stream_path,
                 rtsp_port=excluded.rtsp_port, last_ip=excluded.last_ip,
                 vendor=excluded.vendor, capabilities=excluded.capabilities,
@@ -272,8 +321,18 @@ def upsert_camera(mac: str, *, name: str | None = None, username: str | None = N
 
 
 def delete_camera(mac: str) -> None:
+    """Deprecated exact-MAC deletion retained for old internal callers."""
+    if not mac:
+        return  # empty MAC is valid for multiple canonical rows and must never become bulk delete
     with _connect() as conn:
         conn.execute("DELETE FROM cameras WHERE mac = ?", (mac.lower(),))
+
+
+def delete_camera_by_id(camera_id: str) -> None:
+    if not valid_camera_id(camera_id):
+        return
+    with _connect() as conn:
+        conn.execute("DELETE FROM cameras WHERE camera_id = ?", (camera_id,))
 
 
 def rekey_camera(old_mac: str, new_mac: str) -> Camera | None:
@@ -296,8 +355,10 @@ def rekey_camera(old_mac: str, new_mac: str) -> Camera | None:
         return None
     cam.mac, cam.updated_at = new_mac, _now()
     with _connect() as conn:
-        conn.execute("UPDATE cameras SET mac = ?, updated_at = ? WHERE mac = ?",
-                     (cam.mac, cam.updated_at, old_mac))
+        conn.execute(
+            "UPDATE cameras SET mac = ?, updated_at = ? WHERE camera_id = ?",
+            (cam.mac, cam.updated_at, cam.camera_id),
+        )
     log.info("camera re-keyed %s -> %s (authoritative ONVIF MAC)", old_mac, new_mac)
     return cam
 

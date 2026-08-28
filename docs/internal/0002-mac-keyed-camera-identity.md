@@ -1,13 +1,13 @@
 # 0002 — Cameras are identified by MAC, read from ONVIF (not ARP)
 
-**Status:** superseded by [0023](0023-opaque-driver-independent-camera-id.md) for public identity;
-retained for MAC discovery · **Date:** 2026-07-28
+**Status:** superseded by [0023](0023-opaque-driver-independent-camera-id.md) and
+[0027](0027-camera-id-primary-registry.md); retained for MAC discovery · **Date:** 2026-07-28
 
 ## Context
 
-A camera's IP is a DHCP lease and changes; its **MAC** is stable. So identity must be the MAC — the
-registry is keyed by it, and a reboot that changes the lease must not lose a camera's name,
-credentials or recording history.
+A camera's IP is a DHCP lease and changes; its **MAC** is stable. The original conclusion was that
+the registry must be keyed by it. ADR 0027 later replaces that storage assumption with `camera_id`
+while retaining the discovery facts below.
 
 The MAC first came only from `/proc/net/arp` (the kernel ARP cache), which **only works on the same
 L2 segment**. That ties stable identity to a specific network setup (e.g. Windows WSL2 in `mirrored`

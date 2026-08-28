@@ -21,6 +21,8 @@ re-keyed from an ARP-derived MAC to its authoritative identity.
   cannot collide semantically.
 - Persist the result and never recompute it during operational changes such as IP renewal or MAC
   correction. Existing records are backfilled deterministically from their MAC.
+- ADR 0027 subsequently makes this ID the physical registry primary key; MAC becomes an optional,
+  partially unique native/discovery attribute with a deprecated compatibility lookup.
 - Return the opaque ID to clients as `camera.id`. New cross-driver routes accept that ID and resolve
   it server-side to the registry row and then to each driver's native identifiers.
 - Address camera CRUD operations, capability probing, PTZ, reboot, live-player recovery and browser
