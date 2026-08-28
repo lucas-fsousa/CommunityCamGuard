@@ -144,6 +144,7 @@ function camBar(cam) {
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz) actions.append(ptzControls(cam));
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
+  if (Object.keys(cam.vendor_controls || {}).length) actions.append(vendorControls(cam));
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
     status,
@@ -153,6 +154,68 @@ function camBar(cam) {
     el("span", { className: "bar-spacer" }),
     actions,
   );
+}
+
+// Proprietary controls are grouped behind one compact menu. Nothing is read automatically when a
+// tile renders: opening the dashboard must not create extra P2P sessions on resource-limited
+// cameras. Each option is an explicit target state; the backend performs its own preflight and
+// skips the write when the camera is already in that state.
+function vendorControls(cam) {
+  const available = cam.vendor_controls || {};
+  const status = el("small", { className: "vendor-control-status" });
+  const menu = el("div", { className: "vendor-control-menu" });
+
+  const actionSelect = (placeholder, options, endpoint, payloadFor) => {
+    const select = el("select", { className: "vendor-control-select", title: placeholder });
+    select.append(el("option", { value: "", textContent: placeholder, disabled: true, selected: true }));
+    for (const [value, label] of options) {
+      select.append(el("option", { value, textContent: label }));
+    }
+    select.addEventListener("click", (event) => event.stopPropagation());
+    select.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      if (!select.value) return;
+      const selected = select.value;
+      select.disabled = true;
+      status.classList.remove("error");
+      status.textContent = t("vendor.applying");
+      try {
+        await api(`/vendor-controls/${encodeURIComponent(cam.id)}/${endpoint}`, {
+          method: "PUT",
+          body: JSON.stringify(payloadFor(selected)),
+        });
+        status.textContent = t("vendor.applied");
+      } catch (error) {
+        status.classList.add("error");
+        status.textContent = t("vendor.failed", { msg: error.message });
+      } finally {
+        select.selectedIndex = 0;
+        select.disabled = false;
+      }
+    });
+    return select;
+  };
+
+  if (available.white_light) {
+    menu.append(actionSelect(t("vendor.whiteLight"), [
+      ["on", t("vendor.lightOn")],
+      ["off", t("vendor.lightOff")],
+    ], "white-light", (value) => ({ enabled: value === "on" })));
+  }
+  if (available.orientation) {
+    menu.append(actionSelect(t("vendor.orientation"), [
+      ["normal", t("vendor.orientationNormal")],
+      ["inverted", t("vendor.orientationInverted")],
+    ], "orientation", (orientation) => ({ orientation })));
+  }
+  menu.append(status);
+
+  const details = el("details", { className: "vendor-controls" },
+    el("summary", { className: "icon-btn", textContent: "⚙", title: t("vendor.menu") }),
+    menu,
+  );
+  details.addEventListener("click", (event) => event.stopPropagation());
+  return details;
 }
 
 // Which go2rtc stream a tile should pull, weighing picture against CPU.

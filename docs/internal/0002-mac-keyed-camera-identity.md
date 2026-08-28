@@ -1,6 +1,7 @@
 # 0002 — Cameras are identified by MAC, read from ONVIF (not ARP)
 
-**Status:** accepted · **Date:** 2026-07-28
+**Status:** superseded by [0023](0023-opaque-driver-independent-camera-id.md) for public identity;
+retained for MAC discovery · **Date:** 2026-07-28
 
 ## Context
 

@@ -12,7 +12,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | ADR | Decision |
 |---|---|
 | [0001](0001-pluggable-camera-drivers.md) | Pluggable camera drivers (the core extensibility architecture) |
-| [0002](0002-mac-keyed-camera-identity.md) | Cameras identified by MAC, read from ONVIF (not ARP) |
+| [0002](0002-mac-keyed-camera-identity.md) | Superseded for public identity; authoritative MAC discovery retained |
 | [0003](0003-layered-gentle-discovery.md) | Layered, gentle camera discovery |
 | [0004](0004-crash-safe-fragmented-mp4-recording.md) | Crash-safe recording via fragmented MP4 |
 | [0005](0005-live-view-transcode-and-codec-ceiling.md) | Live view: go2rtc, mandatory transcode, codec/CPU ceiling |
@@ -33,6 +33,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0020](0020-lan-dashboard-and-bluetooth-onboarding.md) | LAN dashboard with trusted-LAN provisioning and homologated BLE onboarding |
 | [0021](0021-seekable-first-recording-playback.md) | Seekable-first recording playback with asynchronous shared preparation |
 | [0022](0022-resilient-recording-directory-rollover.md) | Resilient recording directory rollover and isolated maintenance failures |
+| [0023](0023-opaque-driver-independent-camera-id.md) | Opaque public camera identity with backend driver-native mapping |
 
 The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.md` is journal:
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,

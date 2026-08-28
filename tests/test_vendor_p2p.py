@@ -7,7 +7,7 @@ import struct
 import pytest
 
 from backend.app.db.p2p import P2PEnrollment
-from backend.app.vendor_p2p import client
+from backend.app.vendor_p2p import client, orientation
 from backend.app.vendor_p2p.auth import build_conn_authinfo, parse_conn_authinfo
 from backend.app.vendor_p2p.crypto import (
     gute_mode0_decrypt,
@@ -131,7 +131,7 @@ def test_model_read_builder_is_allowlisted_and_contains_no_write_value():
 
 def test_orientation_builder_matches_recovered_typed_d2_contract():
     node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
-    wire = client.build_orientation_write(node, 7000000002, "inverted", 18, 19)
+    wire = orientation.build_orientation_write(node, 7000000002, "inverted", 18, 19)
     plain = gute_mode2_decrypt(wire, node.session_key)
 
     assert plain[:2] == b"\x7e\xd2"
@@ -144,7 +144,7 @@ def test_orientation_builder_matches_recovered_typed_d2_contract():
     cursor = 0x2A
     assert struct.unpack_from("<Q", plain, cursor)[0] == 7000000002
     cursor += 8
-    assert plain[cursor : cursor + path_length].decode() == client.ORIENTATION_PATH
+    assert plain[cursor : cursor + path_length].decode() == orientation.ORIENTATION_PATH
     cursor += path_length + 1
     assert plain[cursor : cursor + json_length] == b"3"
     assert not hasattr(client, "build_model_write")
@@ -157,8 +157,8 @@ def test_orientation_response_requires_matching_application_message():
     struct.pack_into("<I", response, 0x30, 19)
     struct.pack_into("<H", response, 0x34, 0)
 
-    assert client.parse_orientation_write_response(bytes(response), 19) == 0
-    assert client.parse_orientation_write_response(bytes(response), 20) is None
+    assert orientation.parse_orientation_write_response(bytes(response), 19) == 0
+    assert orientation.parse_orientation_write_response(bytes(response), 20) is None
 
 
 def test_orientation_values_are_strict_and_reject_before_network(monkeypatch):
@@ -176,7 +176,7 @@ def test_orientation_values_are_strict_and_reject_before_network(monkeypatch):
         updated_at="now",
     )
     with pytest.raises(ValueError, match="normal or inverted"):
-        client.set_camera_orientation(enrollment, "mirror")
+        orientation.set_camera_orientation(enrollment, "mirror")
 
 
 def test_model_read_response_requires_the_selected_device():
@@ -412,17 +412,17 @@ def test_orientation_change_requires_preflight_d3_and_fresh_readback(monkeypatch
         return client.ModelWriteResult(True, 0)
 
     monkeypatch.setattr(client, "exchange_model_read", fake_read)
-    monkeypatch.setattr(client, "exchange_orientation_write", fake_write)
-    monkeypatch.setattr(client.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(orientation, "exchange_orientation_write", fake_write)
+    monkeypatch.setattr(orientation.time, "sleep", lambda _seconds: None)
 
-    result = client.set_camera_orientation(enrollment, "inverted")
+    result = orientation.set_camera_orientation(enrollment, "inverted")
 
     assert calls == [
         ("bind", ("", 0)),
-        ("read", 7000000002, client.ORIENTATION_READ_PATH, 40),
+        ("read", 7000000002, orientation.ORIENTATION_READ_PATH, 40),
         ("write", 7000000002, "inverted", 41),
-        ("read", 7000000002, client.ORIENTATION_READ_PATH, 42),
-        ("read", 7000000002, client.ORIENTATION_READ_PATH, 43),
+        ("read", 7000000002, orientation.ORIENTATION_READ_PATH, 42),
+        ("read", 7000000002, orientation.ORIENTATION_READ_PATH, 43),
         ("close",),
     ]
     assert result.previous_value == 1
@@ -462,12 +462,12 @@ def test_orientation_change_is_idempotent_and_never_writes_when_already_set(monk
         ),
     )
     monkeypatch.setattr(
-        client,
+        orientation,
         "exchange_orientation_write",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("write sent")),
     )
 
-    result = client.set_camera_orientation(enrollment, "normal")
+    result = orientation.set_camera_orientation(enrollment, "normal")
 
     assert result.changed is False
     assert result.verified is True

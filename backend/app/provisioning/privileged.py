@@ -135,7 +135,9 @@ def pending_privileged_enrollment(device_id: str, *, now: float | None = None) -
     return item
 
 
-def mark_privileged_enrollment_bound(item: PendingEnrollment, dev_token: str) -> None:
+def mark_privileged_enrollment_bound(
+    item: PendingEnrollment, dev_token: str, *, camera_id: str | None = None
+) -> None:
     token = str(dev_token)
     if not token:
         raise PrivilegedEnrollmentError("vendor binding returned no P2P subscription material")
@@ -159,6 +161,7 @@ def mark_privileged_enrollment_bound(item: PendingEnrollment, dev_token: str) ->
                 access_id=access_id,
                 access_token=material.cloud_access_token,
                 dev_token=token,
+                camera_id=camera_id,
             )
         except (OSError, ValueError, sqlite3.Error) as exc:
             raise PrivilegedEnrollmentError(
@@ -173,6 +176,18 @@ def bound_privileged_enrollment(device_id: str) -> p2p.P2PEnrollment:
     enrollment = p2p.get_enrollment(str(device_id))
     if enrollment is None:
         raise PrivilegedEnrollmentError("durable P2P subscription material is unavailable")
+    return enrollment
+
+
+def bound_privileged_enrollment_for_camera(camera_id: str) -> p2p.P2PEnrollment:
+    """Resolve P2P credentials through the dashboard's authoritative camera identity."""
+
+    try:
+        enrollment = p2p.get_enrollment_for_camera(camera_id)
+    except ValueError as exc:
+        raise PrivilegedEnrollmentError("camera identity association is invalid") from exc
+    if enrollment is None:
+        raise PrivilegedEnrollmentError("camera has no linked P2P enrollment")
     return enrollment
 
 

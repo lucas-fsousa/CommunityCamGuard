@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.routes import router
+from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
 from .db import p2p, registry, vendor_account
 from .frontend_build import build_version
@@ -94,12 +95,14 @@ app = FastAPI(
         {"name": "cameras", "description": "List, add, remove, probe and control cameras."},
         {"name": "discovery", "description": "Scan the network for cameras."},
         {"name": "provisioning", "description": "Factory-new setup; authenticated trusted LAN only."},
+        {"name": "vendor controls", "description": "Typed proprietary controls; authenticated trusted LAN only."},
         {"name": "media", "description": "Live-stream info and media-engine control."},
         {"name": "storage", "description": "Recording storage status."},
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
     ],
 )
 app.include_router(router)
+app.include_router(vendor_controls_router)
 
 
 @app.middleware("http")

@@ -25,11 +25,17 @@ log = logging.getLogger(__name__)
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS p2p_enrollments (
     device_id   TEXT PRIMARY KEY,
+    camera_id   TEXT NOT NULL DEFAULT '',
     secret_enc  BLOB NOT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
 """
+
+_MIGRATIONS = {
+    "camera_id": "ALTER TABLE p2p_enrollments ADD COLUMN camera_id TEXT NOT NULL DEFAULT ''",
+}
+_CAMERA_ID = re.compile(r"^cam_[0-9a-f]{24}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,11 +46,24 @@ class P2PEnrollment:
     dev_token: str | None
     created_at: str
     updated_at: str
+    camera_id: str | None = None
 
 
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(_SCHEMA)
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(p2p_enrollments)")}
+        for column, ddl in _MIGRATIONS.items():
+            if column not in existing:
+                conn.execute(ddl)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_p2p_enrollments_camera_id "
+            "ON p2p_enrollments(camera_id)"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_p2p_enrollments_camera_id_unique "
+            "ON p2p_enrollments(camera_id) WHERE camera_id != ''"
+        )
 
 
 def _now() -> str:
@@ -74,24 +93,45 @@ def _validate(
     return normalized_device, normalized_access_id, normalized_access_token, normalized_dev_token
 
 
+def _normalize_camera_id(camera_id: str | None) -> str | None:
+    if camera_id is None or not str(camera_id).strip():
+        return None
+    normalized = str(camera_id).strip()
+    if _CAMERA_ID.fullmatch(normalized) is None:
+        raise ValueError("camera ID is invalid")
+    return normalized
+
+
 def upsert_enrollment(
     device_id: str,
     *,
     access_id: int,
     access_token: bytes,
     dev_token: str | None = None,
+    camera_id: str | None = None,
 ) -> P2PEnrollment:
     """Validate and atomically persist one enrollment as a single encrypted payload."""
     device_id, access_id, access_token, dev_token = _validate(
         device_id, access_id, access_token, dev_token
     )
+    camera_id = _normalize_camera_id(camera_id)
     init_db()
     now = _now()
     with connect() as conn:
         existing = conn.execute(
-            "SELECT created_at FROM p2p_enrollments WHERE device_id = ?", (device_id,)
+            "SELECT created_at, camera_id FROM p2p_enrollments WHERE device_id = ?", (device_id,)
         ).fetchone()
         created_at = existing["created_at"] if existing else now
+        if camera_id is None and existing and existing["camera_id"]:
+            camera_id = existing["camera_id"]
+        if camera_id is not None:
+            conflict = conn.execute(
+                "SELECT device_id FROM p2p_enrollments "
+                "WHERE camera_id = ? AND device_id != ?",
+                (camera_id, device_id),
+            ).fetchone()
+            if conflict is not None:
+                raise ValueError("camera ID is already linked to another P2P enrollment")
         payload = json.dumps(
             {
                 "access_id": str(access_id),
@@ -102,15 +142,18 @@ def upsert_enrollment(
         )
         conn.execute(
             """
-            INSERT INTO p2p_enrollments (device_id, secret_enc, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO p2p_enrollments (device_id, camera_id, secret_enc, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(device_id) DO UPDATE SET
+                camera_id=excluded.camera_id,
                 secret_enc=excluded.secret_enc,
                 updated_at=excluded.updated_at
             """,
-            (device_id, _encrypt(payload), created_at, now),
+            (device_id, camera_id or "", _encrypt(payload), created_at, now),
         )
-    return P2PEnrollment(device_id, access_id, access_token, dev_token, created_at, now)
+    return P2PEnrollment(
+        device_id, access_id, access_token, dev_token, created_at, now, camera_id
+    )
 
 
 def get_enrollment(device_id: str) -> P2PEnrollment | None:
@@ -133,8 +176,74 @@ def get_enrollment(device_id: str) -> P2PEnrollment | None:
         log.warning("stored P2P enrollment is invalid for device=%s", row["device_id"])
         return None
     return P2PEnrollment(
-        device_id, access_id, access_token, dev_token, row["created_at"], row["updated_at"]
+        device_id,
+        access_id,
+        access_token,
+        dev_token,
+        row["created_at"],
+        row["updated_at"],
+        row["camera_id"] or None,
     )
+
+
+def get_enrollment_for_camera(camera_id: str) -> P2PEnrollment | None:
+    """Resolve one exact registered-camera identity without exposing the vendor device ID."""
+
+    normalized = _normalize_camera_id(camera_id)
+    if normalized is None:
+        return None
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT device_id FROM p2p_enrollments WHERE camera_id = ?", (normalized,)
+        ).fetchone()
+    return get_enrollment(row["device_id"]) if row else None
+
+
+def has_enrollment_for_camera(camera_id: str) -> bool:
+    """Check an opaque camera association without decrypting P2P credential material."""
+
+    try:
+        normalized = _normalize_camera_id(camera_id)
+    except ValueError:
+        return False
+    if normalized is None:
+        return False
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM p2p_enrollments WHERE camera_id = ?", (normalized,)
+        ).fetchone()
+    return row is not None
+
+
+def link_enrollment_to_camera(device_id: str, camera_id: str) -> P2PEnrollment:
+    """Attach a durable enrollment to one public camera identity, enforcing one-to-one use."""
+
+    normalized = _normalize_camera_id(camera_id)
+    if normalized is None:
+        raise ValueError("camera ID is required")
+    init_db()
+    with connect() as conn:
+        selected = conn.execute(
+            "SELECT 1 FROM p2p_enrollments WHERE device_id = ?", (str(device_id),)
+        ).fetchone()
+        if selected is None:
+            raise ValueError("P2P enrollment is unavailable")
+        conflict = conn.execute(
+            "SELECT device_id FROM p2p_enrollments WHERE camera_id = ? AND device_id != ?",
+            (normalized, str(device_id)),
+        ).fetchone()
+        if conflict is not None:
+            raise ValueError("camera ID is already linked to another P2P enrollment")
+        conn.execute(
+            "UPDATE p2p_enrollments SET camera_id = ?, updated_at = ? WHERE device_id = ?",
+            (normalized, _now(), str(device_id)),
+        )
+    enrollment = get_enrollment(str(device_id))
+    if enrollment is None:  # defensive: the row cannot disappear inside this local transaction
+        raise ValueError("P2P enrollment is unavailable")
+    return enrollment
 
 
 def has_enrollment(device_id: str) -> bool:

@@ -7,7 +7,7 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 
 <sub>open-source NVR · ONVIF · RTSP · Yoosee · self-hosted camera dashboard · WebRTC · go2rtc · home surveillance</sub>
 
-> Status: working end-to-end — no-auth discovery + identification, MAC-keyed camera registry,
+> Status: working end-to-end — no-auth discovery + opaque driver-independent camera identity,
 > credential-validated add with automatic capability probe, live streaming (go2rtc/WebRTC) with
 > listen-in audio, **PTZ** control (press-and-hold), 24/7 crash-safe recording with browser
 > playback + time-based retention, storage policy, a localized (en/pt-BR) web dashboard with a
@@ -173,12 +173,12 @@ Because of this, discovery and probing are deliberately **gentle** (low concurre
 connection per camera, prompt teardown). Even so, rebooting the cameras at the start of a
 session is the reliable way to guarantee a valid baseline.
 
-Tip: cameras are tracked by **MAC address**, not IP, so a reboot that changes the DHCP lease
-does not lose a camera's identity, name or credentials — it is re-matched automatically.
+Tip: clients see a stable opaque camera ID. The current ONVIF/RTSP driver re-matches its private
+MAC identity after DHCP changes; future drivers may map a serial or vendor-native ID instead.
 
 ## Roadmap
 
-Discovery, MAC-keyed registry, go2rtc live view, 24/7 recording + retention, storage policy,
+Discovery, driver-independent camera IDs, go2rtc live view, 24/7 recording + retention, storage policy,
 pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
 API are all **working**. Still open: **two-way audio (talk) and camera reboot** (they live in the
 vendor Gwell P2P channel — see `docs/DECISIONS.md`) and optional S3 tiering.

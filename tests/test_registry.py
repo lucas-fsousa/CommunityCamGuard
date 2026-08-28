@@ -1,3 +1,4 @@
+from backend.app.camera_identity import stable_camera_id
 from backend.app.db import connect, registry
 from backend.app.discovery.active_scan import RtspStream, ScannedHost
 
@@ -15,6 +16,21 @@ def test_password_encrypted_at_rest_and_roundtrips():
         blob = c.execute("SELECT password_enc FROM cameras WHERE mac=?",
                          ("aa:bb:cc:00:11:22",)).fetchone()[0]
     assert b"s3cr3t" not in bytes(blob)
+
+
+def test_public_camera_id_is_stable_opaque_and_survives_native_mac_rekey():
+    registry.init_db()
+    created = registry.upsert_camera("aa:bb:cc:00:11:22", name="Front")
+
+    assert created.camera_id == stable_camera_id("mac", "AA-BB-CC-00-11-22")
+    assert created.camera_id.startswith("cam_")
+    assert "aabbcc" not in created.camera_id
+    assert registry.get_camera_by_id(created.camera_id).mac == "aa:bb:cc:00:11:22"
+
+    moved = registry.rekey_camera("aa:bb:cc:00:11:22", "aa:bb:cc:dd:ee:01")
+    assert moved is not None
+    assert moved.camera_id == created.camera_id
+    assert registry.get_camera_by_id(created.camera_id).mac == "aa:bb:cc:dd:ee:01"
 
 
 def test_rtsp_url_built_from_parts():

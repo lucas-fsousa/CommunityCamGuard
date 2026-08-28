@@ -192,6 +192,21 @@ header {
 .quality-select:hover { background: var(--panel-2); border-color: var(--accent); color: var(--text); }
 .quality-select option { color: var(--text); background: var(--panel); }
 
+/* Driver-specific controls stay behind one compact menu so adding drivers/features does not grow
+   the camera footer horizontally. The menu opens over the video and never probes a camera merely
+   because the dashboard rendered. */
+.vendor-controls { position: relative; }
+.vendor-controls > summary { list-style: none; display: inline-flex; align-items: center;
+  justify-content: center; padding: 3px 7px; font-size: 13px; }
+.vendor-controls > summary::-webkit-details-marker { display: none; }
+.vendor-control-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 4;
+  width: min(230px, 70vw); padding: 9px; display: grid; gap: 7px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.vendor-control-select { width: 100%; font-size: 12px; padding: 6px 8px; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.vendor-control-status { min-height: 1.1em; color: var(--ok); line-height: 1.3; }
+.vendor-control-status.error { color: var(--full); }
+
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }
 .badge { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2);

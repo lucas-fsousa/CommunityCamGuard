@@ -38,8 +38,9 @@ from ..auth import (
     require_auth,
     verify_token,
 )
+from ..camera_identity import stable_camera_id
 from ..config import get_settings
-from ..db import registry, vendor_account
+from ..db import p2p, registry, vendor_account
 from ..discovery import active_scan, rtsp
 from ..media import go2rtc, quality
 from ..provisioning import (
@@ -189,6 +190,7 @@ class MediaClientEventIn(BaseModel):
 def _camera_out(cam: registry.Camera) -> dict:
     """Registry camera as JSON, without leaking the stored password."""
     return {
+        "id": cam.camera_id,
         "mac": cam.mac,
         "name": cam.name,
         "username": cam.username,
@@ -206,6 +208,12 @@ def _camera_out(cam: registry.Camera) -> dict:
         # HD and SD are now server-local variants for every camera. This is separate from the
         # vendor camera advertising `/onvif2`, which we intentionally do not open concurrently.
         "has_quality_variants": True,
+        "vendor_controls": {
+            "white_light": True,
+            "orientation": True,
+        }
+        if p2p.has_enrollment_for_camera(cam.camera_id)
+        else {},
         "webrtc_url": go2rtc.webrtc_page_url(cam.mac),
         "recording": False,  # live flag filled in by list_cameras()
         "online": False,  # live RTSP packet progress filled in by list_cameras()
@@ -933,7 +941,11 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
             status_code=502, detail="camera P2P enrollment returned no subscription material"
         )
     try:
-        mark_privileged_enrollment_bound(pending, result.dev_token)
+        mark_privileged_enrollment_bound(
+            pending,
+            result.dev_token,
+            camera_id=(stable_camera_id("mac", identity["mac"]) if identity["mac"] else None),
+        )
     except PrivilegedEnrollmentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"

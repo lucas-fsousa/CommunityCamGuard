@@ -61,6 +61,18 @@ def test_live_restart_cycles_producer_and_mse_discards_stale_video():
     assert "Math.min(1.25, gap)" not in video_rtc
 
 
+def test_vendor_controls_use_opaque_camera_id_and_explicit_target_states():
+    live = (
+        Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js"
+    ).read_text()
+
+    assert "encodeURIComponent(cam.id)" in live
+    assert "encodeURIComponent(cam.mac)}/${endpoint}" not in live
+    assert '"white-light", (value) => ({ enabled: value === "on" })' in live
+    assert '"orientation", (orientation) => ({ orientation })' in live
+    assert "Nothing is read automatically" in live
+
+
 def test_frontend_entrypoint_only_orchestrates_semantic_modules():
     frontend = Path(__file__).parents[1] / "frontend"
     app = (frontend / "app.js").read_text()

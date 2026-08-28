@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 from backend.app.api import routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
+from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
 from backend.app.db import p2p
 from backend.app.main import app
@@ -749,6 +750,7 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
     response = routes.provisioning_privileged_bind(
         routes.ProvisioningPrivilegedBindIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
+            mac="AA-BB-CC-DD-EE-03",
             time_area="America/Sao_Paulo",
             time_zone=-10_800,
         ),
@@ -769,6 +771,9 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
     restarted = privileged_enrollment_status("7443576841")
     assert restarted["bound"] is True
     assert restarted["subscription_material_ready"] is True
+    assert p2p.get_enrollment("7443576841").camera_id == stable_camera_id(
+        "mac", "aa:bb:cc:dd:ee:03"
+    )
 
 
 def test_privileged_binding_without_fresh_handoff_fails_closed():

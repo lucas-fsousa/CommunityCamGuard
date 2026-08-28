@@ -52,6 +52,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 
 ```json
 {
+  "id": "cam_0123456789abcdef01234567",
   "mac": "aa:bb:cc:dd:ee:ff",
   "name": "Garagem",
   "username": "admin",
@@ -88,6 +89,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 }
 ```
 
+`id` is the stable, opaque application identity. New cross-driver APIs use it and resolve to each
+driver's private identity server-side; clients must not derive it or substitute a MAC/vendor ID.
 The password is **never** returned — only `has_password`. Stream IDs are go2rtc stream names (see
 Media). `online` means that video packets in the camera's shared base stream are currently advancing;
 `recording` is whether the recorder process is currently running for the camera. The dashboard polls
@@ -106,6 +109,26 @@ Media). `online` means that video packets in the camera's shared base stream are
 curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz \
      -H 'Content-Type: application/json' -d '{"direction":"left","action":"start"}'
 ```
+
+### Typed vendor controls (authenticated trusted LAN only)
+
+These endpoints use the durable P2P enrollment created during native onboarding. They accept the
+opaque `camera.id` returned by the camera API and never accept a MAC, vendor device ID, raw
+thing-model path or passthrough JSON payload.
+Like provisioning, they reject public/proxied origins even when the dashboard session is valid.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/api/vendor-controls/{camera_id}/white-light` | — | Reads the physical white-floodlight state through the proven penetrate type 12 contract. |
+| PUT | `/api/vendor-controls/{camera_id}/white-light` | `{"enabled": true|false}` | Typed type 11 ON/OFF. Performs an exact-device state preflight, skips an idempotent write, never retries actuation and requires fresh readback. |
+| PUT | `/api/vendor-controls/{camera_id}/orientation` | `{"orientation":"normal"|"inverted"}` | Fixed-path normal/180° operation with state preflight, correlated response and fresh readback. |
+
+The control currently uses the vendor P2P rendezvous infrastructure; it is host-only but not yet
+LAN-only. The first production validation must target only the designated test camera. API results
+contain state/acknowledgement booleans but no access token, route, session key or raw camera payload.
+If the access node returns the explicit stale-session code, the backend renews the encrypted native
+vendor-account session and retries exactly once. Without a vendor account configured in the
+dashboard, it fails closed instead of reading Frida captures or accepting expired material.
 
 ### Discovery
 
@@ -195,10 +218,9 @@ the capability roots recovered from the APK and compiled into the backend allowl
 camera-owned JSON value, transport acknowledgement and device error code. Unlike the temporary
 Web-Bluetooth subset, this route never accepts the remote HTTPS-tunnel exception.
 
-The driver also contains one internal typed D2 operation for image orientation. It accepts only
-normal/180°, uses a fixed property path and requires a successful B7 preflight, correlated D3 and
-fresh B7 readback. It is not exposed as an HTTP endpoint yet; no arbitrary property writer or action
-endpoint exists.
+The orientation endpoint delegates to an internal typed D2 operation. It accepts only normal/180°,
+uses a fixed property path and requires a successful B7 preflight, correlated D3 and fresh B7
+readback. No arbitrary property writer or action endpoint exists.
 
 When the server has no Wi-Fi radio/scanner, `GET /provisioning/networks` returns
 `manual_entry_allowed: true`. The localhost UI then accepts an explicit 1–32-byte SSID and
