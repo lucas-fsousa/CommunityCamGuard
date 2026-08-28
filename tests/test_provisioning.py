@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 from backend.app.api import provisioning as routes
 from backend.app.api import provisioning_account as account_routes
+from backend.app.api import provisioning_network as network_routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
@@ -355,29 +356,31 @@ def test_qr_is_rendered_as_an_in_memory_svg():
 
 def test_qr_uses_the_same_high_error_correction_as_the_apk(monkeypatch):
     captured = {}
-    real_qr = routes.render_svg_base64.__globals__["qrcode"].QRCode
+    real_qr = network_routes.render_svg_base64.__globals__["qrcode"].QRCode
 
     def recording_qr(*args, **kwargs):
         captured.update(kwargs)
         return real_qr(*args, **kwargs)
 
-    monkeypatch.setattr(routes.render_svg_base64.__globals__["qrcode"], "QRCode", recording_qr)
+    monkeypatch.setattr(
+        network_routes.render_svg_base64.__globals__["qrcode"], "QRCode", recording_qr
+    )
     render_svg_base64(build_wifi_payload(ssid="Home", password="secret"))
     assert (
         captured["error_correction"]
-        == routes.render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
+        == network_routes.render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
     )
 
 
 def test_start_returns_experimental_qr_without_leaking_plain_credentials():
     network_id = sign_network("Home Wi-Fi", "WPA2")
-    body = routes.ProvisioningStartIn(
+    body = network_routes.ProvisioningStartIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         wifi_network_id=network_id,
         wifi_password="not-persisted",
     )
     response = Response()
-    result = routes.provisioning_start(body, response)
+    result = network_routes.provisioning_start(body, response)
     assert result["status"] == "awaiting_camera_scan"
     assert result["transport"] == "qr"
     assert result["experimental"] is True
@@ -389,14 +392,14 @@ def test_start_returns_experimental_qr_without_leaking_plain_credentials():
 
 
 def test_start_fails_closed_for_camera_without_qr_capability():
-    body = routes.ProvisioningStartIn(
+    body = network_routes.ProvisioningStartIn(
         device_id="7443576841",
         capability_code="4",
         wifi_network_id=sign_network("Home Wi-Fi", "WPA2"),
         wifi_password="not-persisted",
     )
     with pytest.raises(HTTPException) as caught:
-        routes.provisioning_start(body, Response())
+        network_routes.provisioning_start(body, Response())
     assert caught.value.status_code == 501
     assert "SoftAP is not ready" in caught.value.detail
     assert "not-persisted" not in caught.value.detail
@@ -1120,23 +1123,23 @@ def test_manual_network_is_validated_before_it_is_signed():
 
 
 def test_manual_network_api_is_available_only_without_a_scanner(monkeypatch):
-    monkeypatch.setattr(routes, "scan_wifi_networks", lambda: ([], "", "no radio"))
+    monkeypatch.setattr(network_routes, "scan_wifi_networks", lambda: ([], "", "no radio"))
     response = Response()
-    result = routes.provisioning_manual_network(
-        routes.ProvisioningManualNetworkIn(ssid="Home Wi-Fi", security="wpa"), response
+    result = network_routes.provisioning_manual_network(
+        network_routes.ProvisioningManualNetworkIn(ssid="Home Wi-Fi", security="wpa"), response
     )
     selected = selected_network(result["network"]["id"])
     assert selected == WifiNetwork("Home Wi-Fi", security="WPA/WPA2")
     assert response.headers["cache-control"] == "no-store"
 
     monkeypatch.setattr(
-        routes,
+        network_routes,
         "scan_wifi_networks",
         lambda: ([WifiNetwork("Detected")], "nmcli", ""),
     )
     with pytest.raises(HTTPException) as caught:
-        routes.provisioning_manual_network(
-            routes.ProvisioningManualNetworkIn(ssid="Other", security="wpa"), Response()
+        network_routes.provisioning_manual_network(
+            network_routes.ProvisioningManualNetworkIn(ssid="Other", security="wpa"), Response()
         )
     assert caught.value.status_code == 409
 
