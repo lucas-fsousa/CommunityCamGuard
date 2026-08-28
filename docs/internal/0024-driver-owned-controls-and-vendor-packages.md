@@ -37,6 +37,6 @@ string alone must never grant another driver's controls.
 - Vendor transports can keep rich typed internal results while returning a stable public result.
 - New semantic control kinds still require an intentional contract/UI addition; this is preferable
   to an unsafe generic command tunnel.
-- This is the first migration slice. Factory provisioning, vendor account storage, native identity,
-  media source selection and recordings still have transitional Yoosee/MAC coupling and will move
-  behind driver/application boundaries in later commits.
+- This is the first migration slice. ADR 0025 subsequently removed MAC from media stream and
+  recorder-process identity. Factory provisioning, vendor account storage and the legacy recording
+  storage/index layout still need their own migrations behind driver/application boundaries.

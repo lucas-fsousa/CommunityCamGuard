@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 from backend.app.api import routes
 from backend.app.db import registry
-from backend.app.db.registry import Camera
 from backend.app.media import go2rtc
 
 _STREAMS = {
@@ -148,7 +147,7 @@ def test_media_recover_targets_hd_preload_not_camera_source():
     media = SimpleNamespace(restart_preload=lambda sid: restarted.append(sid) or True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))
     assert routes.media_recover(cam.camera_id, req) == {"ok": True}
-    assert restarted == [go2rtc.hd_stream_id(cam.mac)]
+    assert restarted == [go2rtc.hd_stream_id(cam.camera_id)]
 
 
 # --- rule: recording always uses the base (main) feed, at full quality --------------
@@ -157,17 +156,21 @@ def test_recording_source_is_the_base_main_stream_not_a_transcode():
     """The recorder records from the base restream (the camera's main feed, -c:v copy), never the
     dashboard's `_web`/`_hd`/`_sub` quality variants — recording stays at the highest quality
     regardless of what the live view is set to."""
-    mac = "aa:bb:cc:dd:ee:01"
-    url = go2rtc.restream_rtsp_url(mac)
-    assert url.endswith(f"/{go2rtc.stream_id(mac)}")      # base stream id
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    url = go2rtc.restream_rtsp_url(camera.camera_id)
+    assert url.endswith(f"/{go2rtc.stream_id(camera.camera_id)}")  # base stream id
     for suffix in ("_web", "_hd", "_sub"):
         assert not url.endswith(suffix)
 
 
 def test_base_stream_is_the_cameras_main_rtsp_url():
-    cam = Camera(mac="aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1",
-                 capabilities={"stream_paths": ["/onvif1", "/onvif2"]})
+    registry.init_db()
+    cam = registry.upsert_camera(
+        "aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1",
+        capabilities={"stream_paths": ["/onvif1", "/onvif2"]},
+    )
     streams = go2rtc.build_config(cameras=[cam])["streams"]
     # the base stream (what the recorder copies) is the MAIN feed /onvif1, not the /onvif2 substream
-    assert streams[go2rtc.stream_id(cam.mac)] == cam.rtsp_url
-    assert streams[go2rtc.stream_id(cam.mac)].endswith("/onvif1")
+    assert streams[go2rtc.stream_id(cam.camera_id)] == cam.rtsp_url
+    assert streams[go2rtc.stream_id(cam.camera_id)].endswith("/onvif1")

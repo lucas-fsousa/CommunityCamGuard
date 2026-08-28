@@ -24,13 +24,13 @@ def test_camera_status_uses_base_stream_packet_liveness():
         "aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1"
     )
     media = SimpleNamespace(
-        stream_online=lambda: {routes.go2rtc.stream_id(cam.mac): True}
+        stream_online=lambda: {routes.go2rtc.stream_id(cam.camera_id): True}
     )
     rec = SimpleNamespace(is_recording=lambda _mac: True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media, rec=rec)))
 
     assert routes.camera_statuses(req) == [
-        {"mac": cam.mac, "online": True, "recording": True}
+        {"id": cam.camera_id, "mac": cam.mac, "online": True, "recording": True}
     ]
 
 

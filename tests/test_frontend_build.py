@@ -88,6 +88,14 @@ def test_camera_operations_address_api_by_opaque_id():
     assert "camera_id: cam.id" in live
 
 
+def test_runtime_statuses_join_cameras_by_opaque_id():
+    app = (Path(__file__).parents[1] / "frontend" / "app.js").read_text()
+
+    assert "new Map(statuses.map((item) => [item.id, item]))" in app
+    assert "byId.get(camera.id)" in app
+    assert "byMac.get(camera.mac)" not in app
+
+
 def test_frontend_entrypoint_only_orchestrates_semantic_modules():
     frontend = Path(__file__).parents[1] / "frontend"
     app = (frontend / "app.js").read_text()

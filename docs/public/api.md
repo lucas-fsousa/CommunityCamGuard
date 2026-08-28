@@ -41,7 +41,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 | Method | Path | Body / Params | Notes |
 |---|---|---|---|
 | GET | `/api/cameras` | — | List configured cameras (see the camera object below). |
-| GET | `/api/cameras/status` | — | Lightweight runtime status for polling (`mac`, `online`, and `recording`). |
+| GET | `/api/cameras/status` | — | Lightweight runtime status for polling (`id`, compatibility `mac`, `online`, and `recording`). |
 | POST | `/api/cameras` | `CameraIn` | Add **or update** a camera (keyed by MAC). Validates RTSP creds and probes capabilities on add; a wrong password returns **422**. |
 | DELETE | `/api/cameras/{camera_id}` | — | Remove a camera and stop its streams. |
 | POST | `/api/cameras/{camera_id}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
@@ -83,12 +83,12 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
     "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] }
   },
   "has_audio": true,
-  "stream_id": "cam_aabbccddeeff",
-  "web_stream_id": "cam_aabbccddeeff_web",
-  "hd_stream_id": "cam_aabbccddeeff_hd",
+  "stream_id": "cam_0123456789abcdef01234567",
+  "web_stream_id": "cam_0123456789abcdef01234567_web",
+  "hd_stream_id": "cam_0123456789abcdef01234567_hd",
   "has_substream": true,
   "has_quality_variants": true,
-  "webrtc_url": "http://127.0.0.1:3201/webrtc.html?src=cam_aabbccddeeff",
+  "webrtc_url": "http://127.0.0.1:3201/webrtc.html?src=cam_0123456789abcdef01234567",
   "online": true,
   "recording": true
 }
@@ -282,7 +282,7 @@ is authenticated and intended for the bundled player, not as a periodic metrics 
 {
   "event": "live_edge_jump",
   "camera_id": "cam_0123456789abcdef01234567",
-  "stream": "cam_aabbccddeeff_hd",
+  "stream": "cam_0123456789abcdef01234567_hd",
   "metrics": {"transport": "mse", "bufferedGap": 2.4, "discardedSeconds": 2.15}
 }
 ```

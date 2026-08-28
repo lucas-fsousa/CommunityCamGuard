@@ -9,6 +9,8 @@ import subprocess
 
 import pytest
 
+from backend.app.camera_identity import stable_camera_id
+from backend.app.db.registry import Camera
 from backend.app.recording import recorder as rec_mod
 from backend.app.recording.recorder import Recorder
 
@@ -46,7 +48,7 @@ def recorder(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "ccg.db"))
     rec = Recorder()
     rec.root = tmp_path / "recordings"
-    rec._macs = ["aa:bb:cc:dd:ee:ff"]
+    rec._cameras = {CAMERA_ID: Camera(mac=MAC, camera_id=CAMERA_ID)}
     rec.spawned = []
 
     def fake_spawn(mac):
@@ -59,6 +61,7 @@ def recorder(tmp_path, monkeypatch):
 
 
 MAC = "aa:bb:cc:dd:ee:ff"
+CAMERA_ID = stable_camera_id("mac", MAC)
 
 
 def _set_rss(monkeypatch, mb):
@@ -66,30 +69,30 @@ def _set_rss(monkeypatch, mb):
 
 
 def test_watchdog_leaves_a_lean_ffmpeg_alone(recorder, monkeypatch):
-    recorder._spawn_locked(MAC)
-    proc = recorder._procs[MAC]
+    recorder._spawn_locked(CAMERA_ID)
+    proc = recorder._procs[CAMERA_ID]
     _set_rss(monkeypatch, 40)  # a healthy remux
     recorder._watchdog_locked()
-    assert not proc.killed and recorder._procs[MAC] is proc
+    assert not proc.killed and recorder._procs[CAMERA_ID] is proc
 
 
 def test_watchdog_kills_a_ballooning_ffmpeg(recorder, monkeypatch):
-    recorder._spawn_locked(MAC)
-    proc = recorder._procs[MAC]
+    recorder._spawn_locked(CAMERA_ID)
+    proc = recorder._procs[CAMERA_ID]
     _set_rss(monkeypatch, 512)  # past _RSS_LIMIT_BYTES (256 MB)
     recorder._watchdog_locked()
     assert proc.killed
-    assert MAC not in recorder._procs        # bookkeeping done by the watchdog itself
-    assert recorder._fails[MAC] == 1         # counted once, so repeats back off
+    assert CAMERA_ID not in recorder._procs  # bookkeeping done by the watchdog itself
+    assert recorder._fails[CAMERA_ID] == 1   # counted once, so repeats back off
 
 
 def test_watchdog_kill_is_not_double_counted(recorder, monkeypatch):
     """The watchdog books the failure; _spawn_locked must not book it a second time."""
-    recorder._spawn_locked(MAC)
+    recorder._spawn_locked(CAMERA_ID)
     _set_rss(monkeypatch, 512)
     recorder._watchdog_locked()
-    recorder._spawn_locked(MAC)
-    assert recorder._fails[MAC] == 1
+    recorder._spawn_locked(CAMERA_ID)
+    assert recorder._fails[CAMERA_ID] == 1
 
 
 def test_backoff_grows_then_resets_after_a_healthy_run(recorder, monkeypatch):
@@ -98,72 +101,72 @@ def test_backoff_grows_then_resets_after_a_healthy_run(recorder, monkeypatch):
 
     delays = []
     for _ in range(4):
-        recorder._spawn_locked(MAC)               # spawn
-        assert MAC in recorder._procs
-        recorder._procs[MAC].alive = False        # dies immediately
-        recorder._spawn_locked(MAC)               # notices the death, books the failure
-        assert MAC not in recorder._procs, "must not respawn in the pass that saw the death"
-        delays.append(recorder._retry_at[MAC] - clock["t"])
+        recorder._spawn_locked(CAMERA_ID)               # spawn
+        assert CAMERA_ID in recorder._procs
+        recorder._procs[CAMERA_ID].alive = False        # dies immediately
+        recorder._spawn_locked(CAMERA_ID)               # notices the death, books the failure
+        assert CAMERA_ID not in recorder._procs, "must not respawn in the pass that saw the death"
+        delays.append(recorder._retry_at[CAMERA_ID] - clock["t"])
         clock["t"] += delays[-1]                  # wait out the backoff
 
     assert delays == [5.0, 10.0, 20.0, 40.0]
 
     # A run that lasts past the healthy threshold clears the penalty.
-    recorder._spawn_locked(MAC)
+    recorder._spawn_locked(CAMERA_ID)
     clock["t"] += rec_mod._HEALTHY_AFTER + 1
-    recorder._procs[MAC].alive = False
-    recorder._spawn_locked(MAC)
-    assert recorder._fails[MAC] == 0
-    assert recorder._retry_at[MAC] == clock["t"]  # eligible immediately
+    recorder._procs[CAMERA_ID].alive = False
+    recorder._spawn_locked(CAMERA_ID)
+    assert recorder._fails[CAMERA_ID] == 0
+    assert recorder._retry_at[CAMERA_ID] == clock["t"]  # eligible immediately
 
 
 def test_backoff_is_honoured_before_it_expires(recorder, monkeypatch):
     clock = {"t": 1000.0}
     monkeypatch.setattr(rec_mod.time, "monotonic", lambda: clock["t"])
-    recorder._spawn_locked(MAC)
-    recorder._procs[MAC].alive = False
-    recorder._spawn_locked(MAC)                   # books failure, retry at +5s
+    recorder._spawn_locked(CAMERA_ID)
+    recorder._procs[CAMERA_ID].alive = False
+    recorder._spawn_locked(CAMERA_ID)             # books failure, retry at +5s
     spawned = len(recorder.spawned)
 
     clock["t"] += 4.0
-    recorder._spawn_locked(MAC)
+    recorder._spawn_locked(CAMERA_ID)
     assert len(recorder.spawned) == spawned, "still inside the backoff window"
 
     clock["t"] += 2.0
-    recorder._spawn_locked(MAC)
+    recorder._spawn_locked(CAMERA_ID)
     assert len(recorder.spawned) == spawned + 1
 
 
 def test_backoff_is_capped(recorder):
-    recorder._fails[MAC] = 50
-    assert recorder._retry_delay(MAC) == rec_mod._BACKOFF_MAX
+    recorder._fails[CAMERA_ID] = 50
+    assert recorder._retry_delay(CAMERA_ID) == rec_mod._BACKOFF_MAX
 
 
 def test_pause_clears_the_backoff(recorder, monkeypatch):
     clock = {"t": 1000.0}
     monkeypatch.setattr(rec_mod.time, "monotonic", lambda: clock["t"])
-    recorder._spawn_locked(MAC)
-    recorder._procs[MAC].alive = False
-    recorder._spawn_locked(MAC)
-    assert recorder._fails[MAC] == 1
+    recorder._spawn_locked(CAMERA_ID)
+    recorder._procs[CAMERA_ID].alive = False
+    recorder._spawn_locked(CAMERA_ID)
+    assert recorder._fails[CAMERA_ID] == 1
 
     recorder.pause()                              # a deliberate stop is not a failure
     assert recorder._fails == {} and recorder._retry_at == {}
 
 
 def test_oversized_log_is_truncated(recorder):
-    path = recorder._log_path(MAC)
+    path = recorder._log_path(CAMERA_ID)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"x" * (rec_mod._MAX_LOG_BYTES + 1))
-    recorder._trim_log(MAC)
+    recorder._trim_log(CAMERA_ID)
     assert path.stat().st_size == 0
 
 
 def test_small_log_is_kept(recorder):
-    path = recorder._log_path(MAC)
+    path = recorder._log_path(CAMERA_ID)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"x" * 100)
-    recorder._trim_log(MAC)
+    recorder._trim_log(CAMERA_ID)
     assert path.stat().st_size == 100
 
 

@@ -118,8 +118,10 @@ class Recorder:
         self._procs: dict[str, subprocess.Popen] = {}
         self._spawned_at: dict[str, float] = {}   # monotonic start time, for the health check
         self._fails: dict[str, int] = {}          # consecutive short-lived runs, drives backoff
-        self._retry_at: dict[str, float] = {}     # monotonic time a mac may be respawned again
-        self._macs: list[str] = []
+        self._retry_at: dict[str, float] = {}     # monotonic time an ID may be respawned again
+        # Process supervision is keyed by the driver-independent ID. The legacy on-disk layout
+        # remains MAC-based until its separate, backwards-compatible data migration.
+        self._cameras: dict[str, registry.Camera] = {}
         self._paused = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -129,8 +131,8 @@ class Recorder:
     def _cam_dir(self, mac: str) -> Path:
         return self.root / _safe_mac(mac)
 
-    def _log_path(self, mac: str) -> Path:
-        return Path(get_settings().db_path).parent / f"rec_{_safe_mac(mac)}.log"
+    def _log_path(self, camera_id: str) -> Path:
+        return Path(get_settings().db_path).parent / f"rec_{camera_id}.log"
 
     def _output_template(self, mac: str) -> str:
         # strftime placeholders are expanded by ffmpeg's segment muxer.  _spawn gives that child
@@ -150,28 +152,43 @@ class Recorder:
 
     # --- lifecycle ----------------------------------------------------------------
     def start(self, cameras: list[registry.Camera] | None = None) -> list[str]:
-        """Start recording every camera that has a usable stream. Returns their MACs."""
+        """Start recording every camera with a usable stream. Return their opaque IDs."""
         init_db()
         if cameras is None:
             cameras = registry.list_cameras()
-        self._macs = [c.mac for c in cameras if c.rtsp_url]
+        new_cameras = {c.camera_id: c for c in cameras if c.rtsp_url and c.camera_id}
+        camera_ids = list(new_cameras)
         self._paused = False
-        self._ensure_dirs(self._macs)
+        self._ensure_dirs([camera.mac for camera in new_cameras.values()])
         with self._lock:
+            previous_cameras = self._cameras
+            self._cameras = new_cameras
             # Drop cameras no longer in the set (e.g. deleted via the API).
-            for mac in [m for m in self._procs if m not in self._macs]:
-                proc = self._procs[mac]
+            replaced = {
+                camera_id
+                for camera_id, previous in previous_cameras.items()
+                if camera_id in self._cameras
+                and previous.mac != self._cameras[camera_id].mac
+            }
+            for camera_id in [
+                key for key in self._procs if key not in self._cameras or key in replaced
+            ]:
+                proc = self._procs[camera_id]
                 if proc.poll() is None:
                     proc.terminate()
-                self._forget(mac)
-            for mac in self._macs:
-                self._spawn_locked(mac)
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                self._forget(camera_id)
+            for camera_id in camera_ids:
+                self._spawn_locked(camera_id)
 
         if self._maint is None or not self._maint.is_alive():
             self._stop.clear()
             self._maint = threading.Thread(target=self._maintain, daemon=True)
             self._maint.start()
-        return self._macs
+        return camera_ids
 
     def pause(self) -> None:
         """Stop writing to disk (go2rtc keeps streaming); resumes via :meth:`resume`."""
@@ -189,52 +206,54 @@ class Recorder:
     def paused(self) -> bool:
         return self._paused
 
-    def _retry_delay(self, mac: str) -> float:
+    def _retry_delay(self, camera_id: str) -> float:
         """Exponential backoff for a camera whose ffmpeg keeps dying young."""
-        fails = self._fails.get(mac, 0)
+        fails = self._fails.get(camera_id, 0)
         if fails <= 0:
             return 0.0
         return min(_BACKOFF_BASE * 2 ** (fails - 1), _BACKOFF_MAX)
 
-    def _forget(self, mac: str) -> None:
+    def _forget(self, camera_id: str) -> None:
         """Drop all supervision state for a camera (removed, paused, or stopped)."""
-        self._procs.pop(mac, None)
-        self._spawned_at.pop(mac, None)
-        self._fails.pop(mac, None)
-        self._retry_at.pop(mac, None)
+        self._procs.pop(camera_id, None)
+        self._spawned_at.pop(camera_id, None)
+        self._fails.pop(camera_id, None)
+        self._retry_at.pop(camera_id, None)
 
-    def _spawn_locked(self, mac: str) -> None:
-        proc = self._procs.get(mac)
+    def _spawn_locked(self, camera_id: str) -> None:
+        proc = self._procs.get(camera_id)
         if proc is not None:
             if proc.poll() is None:
                 return  # already running
             # It exited on its own (stream drop, muxing-queue abort) or the watchdog killed it.
             # Only book the failure here, never respawn in the same pass, so a dead process is
             # counted exactly once.
-            ran = time.monotonic() - self._spawned_at.pop(mac, 0.0)
-            self._procs.pop(mac, None)
-            self._fails[mac] = 0 if ran >= _HEALTHY_AFTER else self._fails.get(mac, 0) + 1
-            self._retry_at[mac] = time.monotonic() + self._retry_delay(mac)
-            if self._fails[mac]:
+            ran = time.monotonic() - self._spawned_at.pop(camera_id, 0.0)
+            self._procs.pop(camera_id, None)
+            self._fails[camera_id] = (
+                0 if ran >= _HEALTHY_AFTER else self._fails.get(camera_id, 0) + 1
+            )
+            self._retry_at[camera_id] = time.monotonic() + self._retry_delay(camera_id)
+            if self._fails[camera_id]:
                 log.warning("recorder ffmpeg for %s exited after %.1fs (failure #%d); "
-                            "retrying in %.0fs", mac, ran, self._fails[mac],
-                            self._retry_delay(mac))
+                            "retrying in %.0fs", camera_id, ran, self._fails[camera_id],
+                            self._retry_delay(camera_id))
             return
-        if time.monotonic() < self._retry_at.get(mac, 0.0):
+        if time.monotonic() < self._retry_at.get(camera_id, 0.0):
             return  # still backing off
-        self._procs[mac] = self._spawn(mac)
-        self._spawned_at[mac] = time.monotonic()
+        self._procs[camera_id] = self._spawn(camera_id)
+        self._spawned_at[camera_id] = time.monotonic()
 
     def _watchdog_locked(self) -> None:
         """Kill any ffmpeg whose memory has run away before it can OOM the host."""
-        for mac, proc in list(self._procs.items()):
+        for camera_id, proc in list(self._procs.items()):
             if proc.poll() is not None:
                 continue
             rss = _rss_bytes(proc.pid)
             if rss is None or rss <= _RSS_LIMIT_BYTES:
                 continue
             log.error("recorder ffmpeg for %s ballooned to %d MB — killing it",
-                      mac, rss // (1024 * 1024))
+                      camera_id, rss // (1024 * 1024))
             proc.kill()
             try:
                 proc.wait(timeout=5)  # reap it here; we drop the handle below
@@ -242,14 +261,14 @@ class Recorder:
                 pass
             # Book it as a failure right here (the process is gone from _procs, so
             # _spawn_locked will not see the exit) so repeated balloons back off.
-            self._procs.pop(mac, None)
-            self._spawned_at.pop(mac, None)
-            self._fails[mac] = self._fails.get(mac, 0) + 1
-            self._retry_at[mac] = time.monotonic() + self._retry_delay(mac)
+            self._procs.pop(camera_id, None)
+            self._spawned_at.pop(camera_id, None)
+            self._fails[camera_id] = self._fails.get(camera_id, 0) + 1
+            self._retry_at[camera_id] = time.monotonic() + self._retry_delay(camera_id)
 
-    def _trim_log(self, mac: str) -> None:
+    def _trim_log(self, camera_id: str) -> None:
         """Truncate an oversized ffmpeg log in place (safe: the writer holds it O_APPEND)."""
-        path = self._log_path(mac)
+        path = self._log_path(camera_id)
         try:
             if path.stat().st_size <= _MAX_LOG_BYTES:
                 return
@@ -259,10 +278,11 @@ class Recorder:
             return
         log.info("truncated oversized recorder log %s", path.name)
 
-    def _spawn(self, mac: str) -> subprocess.Popen:
-        src = go2rtc.restream_rtsp_url(mac)
-        self._trim_log(mac)
-        logfile = self._log_path(mac).open("ab")
+    def _spawn(self, camera_id: str) -> subprocess.Popen:
+        camera = self._cameras[camera_id]
+        src = go2rtc.restream_rtsp_url(camera_id)
+        self._trim_log(camera_id)
+        logfile = self._log_path(camera_id).open("ab")
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error",
             # --- input: repair timestamps and bound the demuxer -----------------------
@@ -301,7 +321,7 @@ class Recorder:
             # clean finalize, so an abrupt crash loses the whole current segment).
             "-segment_format_options",
             "movflags=+frag_keyframe+empty_moov+default_base_moof",
-            self._output_template(mac),
+            self._output_template(camera.mac),
         ]
         # FFmpeg's segment muxer has no per-output "strftime in UTC" flag; strftime follows the
         # process timezone.  Pin only the child to POSIX UTC0, which works both in and outside
@@ -330,12 +350,12 @@ class Recorder:
             except subprocess.TimeoutExpired:
                 proc.kill()
         # A deliberate stop is not a failure: clear the backoff so resume() restarts at once.
-        # Covers macs that are only *pending* a respawn too — those hold no entry in _procs.
-        for mac in {*self._procs, *self._fails, *self._retry_at, *self._spawned_at}:
-            self._forget(mac)
+        # Covers IDs that are only *pending* a respawn too — those hold no entry in _procs.
+        for camera_id in {*self._procs, *self._fails, *self._retry_at, *self._spawned_at}:
+            self._forget(camera_id)
 
-    def is_recording(self, mac: str) -> bool:
-        proc = self._procs.get(mac)
+    def is_recording(self, camera_id: str) -> bool:
+        proc = self._procs.get(camera_id)
         return proc is not None and proc.poll() is None
 
     # --- maintenance loop ---------------------------------------------------------
@@ -345,22 +365,25 @@ class Recorder:
             # indexing/SQLite/filesystem exception killed the only maintenance thread. FFmpeg then
             # kept writing until the first directory rollover, exited with ENOENT, and was never
             # supervised again until the whole container was restarted.
-            macs = list(self._macs)
+            cameras = list(self._cameras.values())
+            camera_ids = [camera.camera_id for camera in cameras]
             try:
-                self._ensure_dirs(macs)
+                self._ensure_dirs([camera.mac for camera in cameras])
             except Exception:
                 log.exception("recorder maintenance could not prepare output directories")
             if not self._paused:
                 try:
                     with self._lock:  # reap runaways, then (re)spawn any crashed ffmpeg
                         self._watchdog_locked()
-                        for mac in macs:
-                            self._spawn_locked(mac)
+                        # Re-read under the lock: start() may have replaced the camera map while
+                        # this maintenance pass was preparing legacy output directories.
+                        for camera_id in self._cameras:
+                            self._spawn_locked(camera_id)
                 except Exception:
                     log.exception("recorder maintenance supervision pass failed")
             try:
-                for mac in macs:
-                    self._trim_log(mac)
+                for camera_id in camera_ids:
+                    self._trim_log(camera_id)
             except Exception:
                 log.exception("recorder maintenance log pass failed")
             try:

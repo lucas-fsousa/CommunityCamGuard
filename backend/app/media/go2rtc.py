@@ -3,8 +3,9 @@
 go2rtc is the media hub (see docs/DECISIONS.md). It pulls each camera's RTSP stream —
 absorbing the transport quirks of cheap cameras that trip up raw ffmpeg — and re-exposes
 clean **WebRTC** (low latency, for the dashboard) and a clean local **RTSP restream** (for
-the segment recorder). Cameras are keyed by MAC, so a stream keeps its identity across
-DHCP changes; we regenerate the config and restart go2rtc whenever the registry changes.
+the segment recorder). Streams are keyed by the registry's opaque public camera ID, so their
+identity survives DHCP and native-identifier changes and carries no driver-specific assumption.
+We regenerate the config and restart go2rtc whenever the registry changes.
 
 The generated config is written as JSON, which is valid YAML — go2rtc parses it fine and we
 avoid a YAML dependency plus any hand-escaping of RTSP URLs (which contain ``:@?&``).
@@ -20,28 +21,31 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
+from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import registry
 from ..db.registry import Camera
 from . import quality
 
 
-def stream_id(mac: str) -> str:
-    """A URL/path-safe go2rtc stream name derived from the stable MAC identity."""
-    return "cam_" + mac.replace(":", "").lower()
+def stream_id(camera_id: str) -> str:
+    """Return the validated opaque ID used as the go2rtc base-stream name."""
+    if not valid_camera_id(camera_id):
+        raise ValueError("a valid opaque camera_id is required for media streams")
+    return camera_id
 
 
-def web_stream_id(mac: str) -> str:
+def web_stream_id(camera_id: str) -> str:
     """Locally downscaled live variant, derived from :func:`hd_stream_id`.
 
     It deliberately does **not** open the camera's secondary RTSP feed. Every browser/consumer
     reads from the server-side hub, keeping the camera at one RTSP session regardless of how many
     clients are open.
     """
-    return stream_id(mac) + "_web"
+    return stream_id(camera_id) + "_web"
 
 
-def sub_stream_id(mac: str) -> str:
+def sub_stream_id(camera_id: str) -> str:
     """The camera's secondary feed, pulled by go2rtc natively.
 
     It has to be its own stream rather than an ffmpeg input: these cameras **reject RTSP over
@@ -49,17 +53,17 @@ def sub_stream_id(mac: str) -> str:
     ffmpeg asks for. go2rtc's own RTSP client negotiates a transport they accept, so ffmpeg
     reads the substream *from go2rtc* instead of from the camera.
     """
-    return stream_id(mac) + "_sub"
+    return stream_id(camera_id) + "_sub"
 
 
-def hd_stream_id(mac: str) -> str:
+def hd_stream_id(camera_id: str) -> str:
     """The full-resolution live variant: the **main** 1080p feed re-encoded to H.264.
 
     The counterpart to :func:`web_stream_id` — same treatment, bigger source, so ~30% of a CPU
     core per camera. It is preloaded once on the server and shared by all browser consumers, so a
     reload never starts another camera session or another HD transcode.
     """
-    return stream_id(mac) + "_hd"
+    return stream_id(camera_id) + "_hd"
 
 
 def _api_listen() -> str:
@@ -68,15 +72,15 @@ def _api_listen() -> str:
     return f"{parts.hostname or '127.0.0.1'}:{parts.port or 3201}"
 
 
-def restream_rtsp_url(mac: str) -> str:
+def restream_rtsp_url(camera_id: str) -> str:
     """Clean local RTSP restream the recorder can ffmpeg ``-c copy`` from."""
     s = get_settings()
-    return f"rtsp://{s.go2rtc_host}:{s.go2rtc_rtsp_port}/{stream_id(mac)}"
+    return f"rtsp://{s.go2rtc_host}:{s.go2rtc_rtsp_port}/{stream_id(camera_id)}"
 
 
-def webrtc_page_url(mac: str) -> str:
+def webrtc_page_url(camera_id: str) -> str:
     """go2rtc's built-in low-latency viewer page for this camera (for the dashboard)."""
-    return f"{get_settings().go2rtc_api.rstrip('/')}/webrtc.html?src={stream_id(mac)}"
+    return f"{get_settings().go2rtc_api.rstrip('/')}/webrtc.html?src={stream_id(camera_id)}"
 
 
 def build_config(cameras: list[Camera] | None = None) -> dict:
@@ -94,7 +98,7 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         url = cam.rtsp_url
         if not url:
             continue
-        sid = stream_id(cam.mac)
+        sid = stream_id(cam.camera_id)
         streams[sid] = url
         # --- browser-facing variants ----------------------------------------------------
         # **Video has to become H.264 for the browser.** This is the same conclusion every
@@ -138,7 +142,7 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         # The video codec directive, optionally hardware-accelerated (see live_hwaccel). Empty
         # hwaccel -> plain `#video=h264` (software), which is the default and current behaviour.
         vid = quality.video_h264_directive(s.live_hwaccel)
-        hd_sid = hd_stream_id(cam.mac)
+        hd_sid = hd_stream_id(cam.camera_id)
         # `#async` makes go2rtc prepend FFmpeg's wall-clock timestamp input options. These cameras
         # have no trustworthy PTS; one unit was empirically running its declared 10 fps timeline at
         # ~3x wall speed (13.1 Mbps and >100% CPU despite a 4.5 Mbps cap). Server wall time makes
@@ -155,7 +159,7 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
         # requested, but never opens the camera's `/onvif2` feed and therefore never adds a second
         # RTSP session to constrained camera hardware.
         sd_vid = quality.video_h264_directive(s.live_hwaccel, codec="h264_sd")
-        streams[web_stream_id(cam.mac)] = (
+        streams[web_stream_id(cam.camera_id)] = (
             f"ffmpeg:{hd_sid}{sd_vid}{audio_part}{sub_raw}")
     return {
         "api": {"listen": _api_listen()},
@@ -385,8 +389,8 @@ class Go2rtc:
         return False
 
     # --- stream surfaces for consumers -------------------------------------------
-    def restream_rtsp_url(self, mac: str) -> str:
-        return restream_rtsp_url(mac)
+    def restream_rtsp_url(self, camera_id: str) -> str:
+        return restream_rtsp_url(camera_id)
 
-    def webrtc_page_url(self, mac: str) -> str:
-        return webrtc_page_url(mac)
+    def webrtc_page_url(self, camera_id: str) -> str:
+        return webrtc_page_url(camera_id)

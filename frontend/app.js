@@ -98,8 +98,8 @@ async function loadCameras() {
 async function loadCameraStatuses() {
   try {
     const statuses = await api("/cameras/status");
-    const byMac = new Map(statuses.map((item) => [item.mac, item]));
-    state.cameras.forEach((camera) => Object.assign(camera, byMac.get(camera.mac) || {}));
+    const byId = new Map(statuses.map((item) => [item.id, item]));
+    state.cameras.forEach((camera) => Object.assign(camera, byId.get(camera.id) || {}));
     syncCameraStatusDots();
   } catch {}
 }

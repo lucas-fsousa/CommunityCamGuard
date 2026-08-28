@@ -35,4 +35,6 @@ Close both on the one code path that surfaces them — a scan reconciling agains
 
 - A camera that gains an authoritative MAC keeps its identity, credentials and full recording history —
   no duplicate candidate, no stranded footage. Verified through the real scan route.
-- Re-keys trigger `_resync` since go2rtc streams and recorder processes are keyed by MAC.
+- Re-keys trigger `_resync`. Since ADR 0025, go2rtc streams and recorder supervision keep their
+  opaque IDs; the resync remains necessary while recording directories are MAC-based, so FFmpeg
+  reopens the directory after `rekey_segments` moves it.

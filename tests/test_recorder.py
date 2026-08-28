@@ -4,6 +4,7 @@ so no real ffmpeg runs.
 """
 from datetime import UTC, datetime
 
+from backend.app.camera_identity import stable_camera_id
 from backend.app.db.registry import Camera
 from backend.app.recording import recorder
 from backend.app.recording.recorder import Recorder
@@ -42,9 +43,13 @@ def test_spawn_builds_a_fragmented_mp4_segment_command(monkeypatch):
         return FakeProc()
 
     monkeypatch.setattr(recorder.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(recorder.go2rtc, "restream_rtsp_url", lambda mac: "rtsp://127.0.0.1:3203/cam_x")
+    monkeypatch.setattr(
+        recorder.go2rtc, "restream_rtsp_url", lambda camera_id: "rtsp://127.0.0.1:3203/cam_x"
+    )
     rec = Recorder(segment_seconds=300)
-    rec._spawn("aa:bb:cc:dd:ee:01")
+    camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+    rec._cameras[camera_id] = Camera(mac="aa:bb:cc:dd:ee:01", camera_id=camera_id)
+    rec._spawn(camera_id)
     cmd = captured["cmd"]
     assert cmd[0] == "ffmpeg"
     assert "-c:v" in cmd and cmd[cmd.index("-c:v") + 1] == "copy"          # remux, no re-encode
@@ -77,7 +82,7 @@ def test_ensure_dirs_uses_utc_across_hour_and_day_rollover(monkeypatch):
 
 def test_maintenance_survives_a_transient_index_failure(monkeypatch, caplog):
     rec = Recorder(segment_seconds=300, maint_interval=0.001)
-    rec._macs = []
+    rec._cameras = {}
     calls = {"index": 0}
 
     def flaky_index():
@@ -139,19 +144,53 @@ def test_index_is_idempotent_for_unchanged_segments():
 
 def test_lifecycle_start_pause_resume_stop(monkeypatch):
     monkeypatch.setattr(recorder.subprocess, "Popen", lambda cmd, **kw: FakeProc())
-    monkeypatch.setattr(recorder.go2rtc, "restream_rtsp_url", lambda mac: "rtsp://127.0.0.1:3203/cam_x")
+    monkeypatch.setattr(
+        recorder.go2rtc, "restream_rtsp_url", lambda camera_id: "rtsp://127.0.0.1:3203/cam_x"
+    )
     rec = Recorder(segment_seconds=300, maint_interval=30)   # slow loop: won't interfere
-    cam = Camera(mac="aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1")
+    camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+    cam = Camera(
+        mac="aa:bb:cc:dd:ee:01", camera_id=camera_id,
+        last_ip="10.0.0.5", stream_path="/onvif1",
+    )
     try:
-        macs = rec.start(cameras=[cam])
-        assert macs == ["aa:bb:cc:dd:ee:01"]
-        assert rec.is_recording("aa:bb:cc:dd:ee:01") is True
+        camera_ids = rec.start(cameras=[cam])
+        assert camera_ids == [camera_id]
+        assert rec.is_recording(camera_id) is True
         assert rec.paused is False
 
         rec.pause()
         assert rec.paused is True
-        assert rec.is_recording("aa:bb:cc:dd:ee:01") is False   # process terminated
+        assert rec.is_recording(camera_id) is False   # process terminated
         rec.resume()
         assert rec.paused is False
     finally:
         rec.stop()   # joins the maintenance thread, terminates procs, final index
+
+
+def test_same_public_id_restarts_recorder_when_native_mac_changes(monkeypatch):
+    """The stream key is stable, but FFmpeg must reopen the moved legacy output directory."""
+    spawned = []
+    monkeypatch.setattr(recorder.subprocess, "Popen", lambda cmd, **kw: FakeProc())
+    rec = Recorder(segment_seconds=300, maint_interval=30)
+    monkeypatch.setattr(rec, "_ensure_dirs", lambda macs: None)
+    monkeypatch.setattr(rec, "_spawn", lambda camera_id: spawned.append(camera_id) or FakeProc())
+    camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+    old = Camera(
+        mac="aa:bb:cc:dd:ee:01", camera_id=camera_id,
+        last_ip="10.0.0.5", stream_path="/onvif1",
+    )
+    moved = Camera(
+        mac="aa:bb:cc:dd:ee:02", camera_id=camera_id,
+        last_ip="10.0.0.5", stream_path="/onvif1",
+    )
+    try:
+        rec.start([old])
+        original = rec._procs[camera_id]
+        rec.start([moved])
+
+        assert original.terminated is True
+        assert spawned == [camera_id, camera_id]
+        assert list(rec._procs) == [camera_id]
+    finally:
+        rec.stop()

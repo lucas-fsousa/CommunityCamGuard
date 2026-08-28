@@ -1,10 +1,18 @@
 from pathlib import Path
 
+import pytest
+
 from backend.app import config
 from backend.app.api import routes
+from backend.app.camera_identity import stable_camera_id
 from backend.app.db import connect, registry
+from backend.app.db.registry import Camera
 from backend.app.media import go2rtc, quality
 from backend.app.recording import recorder
+
+
+def _camera(mac: str, **kwargs) -> Camera:
+    return Camera(mac=mac, camera_id=stable_camera_id("mac", mac), **kwargs)
 
 
 def _raw(*, hd: bool, has_audio: bool = True) -> str:
@@ -227,16 +235,23 @@ def test_go2rtc_suppresses_modules_that_log_plaintext_source_credentials():
 
 
 def test_stream_id_and_restream_url():
-    assert go2rtc.stream_id("aa:bb:cc:dd:ee:01") == "cam_aabbccddee01"
-    assert go2rtc.web_stream_id("aa:bb:cc:dd:ee:01") == "cam_aabbccddee01_web"
-    assert go2rtc.restream_rtsp_url("aa:bb:cc:dd:ee:01").endswith("/cam_aabbccddee01")
+    camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+    assert go2rtc.stream_id(camera_id) == camera_id
+    assert go2rtc.web_stream_id(camera_id) == f"{camera_id}_web"
+    assert go2rtc.restream_rtsp_url(camera_id).endswith(f"/{camera_id}")
+
+
+def test_media_helpers_reject_driver_native_identifiers():
+    with pytest.raises(ValueError, match="opaque camera_id"):
+        go2rtc.stream_id("aa:bb:cc:dd:ee:01")
 
 
 def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track():
-    from backend.app.db.registry import Camera
-    silent = Camera(mac="aa:bb:cc:00:00:01", stream_path="/onvif1", last_ip="10.0.0.1")
-    audible = Camera(mac="aa:bb:cc:00:00:02", stream_path="/onvif1", last_ip="10.0.0.2",
-                     capabilities={"has_audio": True})
+    silent = _camera("aa:bb:cc:00:00:01", stream_path="/onvif1", last_ip="10.0.0.1")
+    audible = _camera(
+        "aa:bb:cc:00:00:02", stream_path="/onvif1", last_ip="10.0.0.2",
+        capabilities={"has_audio": True},
+    )
     streams = go2rtc.build_config(cameras=[silent, audible])["streams"]
     # The live variant is about **video**, not audio: the browser cannot play these cameras'
     # HEVC, so even a silent camera needs an H.264 one. Audio only adds the AAC track.
@@ -245,38 +260,40 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     silent_sub_raw = _raw(hd=False, has_audio=False)
     main_raw = _raw(hd=True)
     sub_raw = _raw(hd=False)
-    assert streams["cam_aabbcc000001"] == "rtsp://admin@10.0.0.1:554/onvif1"      # recording
-    assert streams["cam_aabbcc000001_hd"] == (
-        f"ffmpeg:cam_aabbcc000001#async#video=h264{silent_main_raw}")
-    assert streams["cam_aabbcc000001_web"] == (
-        f"ffmpeg:cam_aabbcc000001_hd#video=h264_sd{silent_sub_raw}")
-    assert streams["cam_aabbcc000002_hd"] == (
-        f"ffmpeg:cam_aabbcc000002#async#video=h264#audio=aac#audio=opus{main_raw}")
-    assert (streams["cam_aabbcc000002_web"]
-            == f"ffmpeg:cam_aabbcc000002_hd"
+    silent_id, audible_id = silent.camera_id, audible.camera_id
+    assert streams[silent_id] == "rtsp://admin@10.0.0.1:554/onvif1"      # recording
+    assert streams[f"{silent_id}_hd"] == (
+        f"ffmpeg:{silent_id}#async#video=h264{silent_main_raw}")
+    assert streams[f"{silent_id}_web"] == (
+        f"ffmpeg:{silent_id}_hd#video=h264_sd{silent_sub_raw}")
+    assert streams[f"{audible_id}_hd"] == (
+        f"ffmpeg:{audible_id}#async#video=h264#audio=aac#audio=opus{main_raw}")
+    assert (streams[f"{audible_id}_web"]
+            == f"ffmpeg:{audible_id}_hd"
                f"#video=h264_sd#audio=aac#audio=opus{sub_raw}")
 
 
 def test_go2rtc_variants_never_open_the_camera_substream():
     """Recording/live/SD share one camera RTSP producer even when `/onvif2` is advertised."""
-    from backend.app.db.registry import Camera
-    cam = Camera(mac="aa:bb:cc:00:00:03", stream_path="/onvif1", last_ip="10.0.0.3",
-                 username="admin", password="pw",
-                 capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
+    cam = _camera(
+        "aa:bb:cc:00:00:03", stream_path="/onvif1", last_ip="10.0.0.3",
+        username="admin", password="pw",
+        capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
+    )
     streams = go2rtc.build_config(cameras=[cam])["streams"]
-    assert streams["cam_aabbcc000003"] == "rtsp://admin:pw@10.0.0.3:554/onvif1"   # recording
-    assert "cam_aabbcc000003_sub" not in streams
+    sid = cam.camera_id
+    assert streams[sid] == "rtsp://admin:pw@10.0.0.3:554/onvif1"   # recording
+    assert f"{sid}_sub" not in streams
     assert "onvif2" not in repr(streams)
-    assert streams["cam_aabbcc000003_hd"].startswith(
-        "ffmpeg:cam_aabbcc000003#async#video=h264")
-    assert streams["cam_aabbcc000003_web"].startswith(
-        "ffmpeg:cam_aabbcc000003_hd#video=h264_sd")
+    assert streams[f"{sid}_hd"].startswith(f"ffmpeg:{sid}#async#video=h264")
+    assert streams[f"{sid}_web"].startswith(f"ffmpeg:{sid}_hd#video=h264_sd")
 
 
 def test_substream_url_none_when_camera_has_one_path():
-    from backend.app.db.registry import Camera
-    cam = Camera(mac="aa:bb:cc:00:00:04", stream_path="/onvif1", last_ip="10.0.0.4",
-                 capabilities={"stream_paths": ["/onvif1"]})
+    cam = _camera(
+        "aa:bb:cc:00:00:04", stream_path="/onvif1", last_ip="10.0.0.4",
+        capabilities={"stream_paths": ["/onvif1"]},
+    )
     assert cam.substream_url is None
 
 
@@ -337,20 +354,23 @@ def test_rekey_segments_same_mac_is_a_noop():
 
 def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():
     """A single shared H.264 producer is hot before browsers connect, for all cameras."""
-    from backend.app.db.registry import Camera
-    dual = Camera(mac="aa:bb:cc:00:00:05", stream_path="/onvif1", last_ip="10.0.0.5",
-                  capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
-    single = Camera(mac="aa:bb:cc:00:00:06", stream_path="/onvif1", last_ip="10.0.0.6",
-                    capabilities={"has_audio": True, "stream_paths": ["/onvif1"]})
+    dual = _camera(
+        "aa:bb:cc:00:00:05", stream_path="/onvif1", last_ip="10.0.0.5",
+        capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
+    )
+    single = _camera(
+        "aa:bb:cc:00:00:06", stream_path="/onvif1", last_ip="10.0.0.6",
+        capabilities={"has_audio": True, "stream_paths": ["/onvif1"]},
+    )
     cfg = go2rtc.build_config(cameras=[dual, single])
     streams = cfg["streams"]
-    assert (streams["cam_aabbcc000005_hd"]
-            == f"ffmpeg:cam_aabbcc000005#async"
+    assert (streams[f"{dual.camera_id}_hd"]
+            == f"ffmpeg:{dual.camera_id}#async"
                f"#video=h264#audio=aac#audio=opus{_raw(hd=True)}")
-    assert "cam_aabbcc000006_hd" in streams
+    assert f"{single.camera_id}_hd" in streams
     assert cfg["preload"] == {
-        "cam_aabbcc000005_hd": "video&audio",
-        "cam_aabbcc000006_hd": "video&audio",
+        f"{dual.camera_id}_hd": "video&audio",
+        f"{single.camera_id}_hd": "video&audio",
     }
 
 
@@ -361,30 +381,32 @@ def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(mon
     silently changing recovery from two to more than four seconds. The fps filter also stops
     output when decoding stops instead of manufacturing fresh timestamps for a frozen picture.
     """
-    from backend.app.db.registry import Camera
     monkeypatch.setenv("LIVE_FPS", "12")
     config.get_settings.cache_clear()
-    cam = Camera(mac="aa:bb:cc:00:00:07", stream_path="/onvif1", last_ip="10.0.0.7",
-                 capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]})
+    cam = _camera(
+        "aa:bb:cc:00:00:07", stream_path="/onvif1", last_ip="10.0.0.7",
+        capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
+    )
     cfg = go2rtc.build_config(cameras=[cam])
     streams = cfg["streams"]
     template = cfg["ffmpeg"]["h264"]
     assert "-vf fps=12" in template
     assert "-g:v 24" in template
     assert "-g 50" not in template
-    assert "-r 12" not in streams["cam_aabbcc000007_web"]
-    assert "-r 12" not in streams["cam_aabbcc000007_hd"]
-    assert "cam_aabbcc000007_live" not in streams
-    assert "ffmpeg:cam_aabbcc000007#async#video=h264" in streams["cam_aabbcc000007_hd"]
-    assert "-af aresample=async=1:first_pts=0" in streams["cam_aabbcc000007_hd"]
-    assert cfg["preload"]["cam_aabbcc000007_hd"] == "video&audio"
+    sid = cam.camera_id
+    assert "-r 12" not in streams[f"{sid}_web"]
+    assert "-r 12" not in streams[f"{sid}_hd"]
+    assert f"{sid}_live" not in streams
+    assert f"ffmpeg:{sid}#async#video=h264" in streams[f"{sid}_hd"]
+    assert "-af aresample=async=1:first_pts=0" in streams[f"{sid}_hd"]
+    assert cfg["preload"][f"{sid}_hd"] == "video&audio"
     assert "nobuffer" not in cfg["ffmpeg"]["rtsp"]
     assert "low_delay" not in cfg["ffmpeg"]["rtsp"]
     assert cfg["ffmpeg"]["rtsp"].endswith("-rtsp_flags prefer_tcp -i {input}")
     assert "-vf fps=12,scale=640:-2" in cfg["ffmpeg"]["h264_sd"]
     assert cfg["ffmpeg"]["output"].endswith("{output}#starttimeout=45")
     # The recording feed is never re-encoded, so it must stay a bare RTSP URL.
-    assert streams["cam_aabbcc000007"] == "rtsp://admin@10.0.0.7:554/onvif1"
+    assert streams[sid] == "rtsp://admin@10.0.0.7:554/onvif1"
     config.get_settings.cache_clear()
 
 

@@ -204,9 +204,9 @@ def _camera_out(cam: registry.Camera) -> dict:
         "vendor": cam.vendor,
         "capabilities": cam.capabilities,
         "has_audio": bool(cam.capabilities.get("has_audio")),
-        "stream_id": go2rtc.stream_id(cam.mac),
-        "web_stream_id": go2rtc.web_stream_id(cam.mac),
-        "hd_stream_id": go2rtc.hd_stream_id(cam.mac),
+        "stream_id": go2rtc.stream_id(cam.camera_id),
+        "web_stream_id": go2rtc.web_stream_id(cam.camera_id),
+        "hd_stream_id": go2rtc.hd_stream_id(cam.camera_id),
         "has_substream": cam.substream_url is not None,
         # HD and SD are now server-local variants for every camera. This is separate from the
         # vendor camera advertising `/onvif2`, which we intentionally do not open concurrently.
@@ -215,7 +215,7 @@ def _camera_out(cam: registry.Camera) -> dict:
         # Compatibility alias for older dashboard/API consumers. The driver catalog above is the
         # authoritative source; remove this after clients have migrated to ``controls``.
         "vendor_controls": {key: True for key in controls},
-        "webrtc_url": go2rtc.webrtc_page_url(cam.mac),
+        "webrtc_url": go2rtc.webrtc_page_url(cam.camera_id),
         "recording": False,  # live flag filled in by list_cameras()
         "online": False,  # live RTSP packet progress filled in by list_cameras()
     }
@@ -233,9 +233,10 @@ def _camera_runtime_statuses(request: Request, cameras: list[registry.Camera]) -
         online_streams = {}
     return [
         {
+            "id": cam.camera_id,
             "mac": cam.mac,
-            "online": bool(online_streams.get(go2rtc.stream_id(cam.mac), False)),
-            "recording": bool(rec and rec.is_recording(cam.mac)),
+            "online": bool(online_streams.get(go2rtc.stream_id(cam.camera_id), False)),
+            "recording": bool(rec and rec.is_recording(cam.camera_id)),
         }
         for cam in cameras
     ]
@@ -288,11 +289,11 @@ def me(request: Request) -> dict:
 @router.get("/cameras", dependencies=[Depends(require_auth)])
 def list_cameras(request: Request) -> list[dict]:
     cameras = registry.list_cameras()
-    statuses = {item["mac"]: item for item in _camera_runtime_statuses(request, cameras)}
+    statuses = {item["id"]: item for item in _camera_runtime_statuses(request, cameras)}
     out = []
     for cam in cameras:
         d = _camera_out(cam)
-        d.update(statuses[cam.mac])
+        d.update(statuses[cam.camera_id])
         out.append(d)
     return out
 
@@ -454,7 +455,9 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
         except Exception as exc:
             log.warning("backfill capability probe failed for %s: %s", cam.mac, exc)
     if rekeyed:
-        _resync(request)  # go2rtc streams and recorder processes are keyed by MAC
+        # Stream/process identities stay stable, but the recorder must reopen its still-legacy
+        # MAC-based output directory after rekey_segments moves the camera's history.
+        _resync(request)
     return {
         "configured": [_camera_out(c) for c in configured],
         "candidates": [
@@ -1166,7 +1169,7 @@ def media_recover(camera_id: str, request: Request) -> dict:
     media = getattr(request.app.state, "media", None)
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
-    ok = media.restart_preload(go2rtc.hd_stream_id(cam.mac))
+    ok = media.restart_preload(go2rtc.hd_stream_id(cam.camera_id))
     if not ok:
         raise HTTPException(status_code=502, detail="local stream recovery failed")
     return {"ok": True}
