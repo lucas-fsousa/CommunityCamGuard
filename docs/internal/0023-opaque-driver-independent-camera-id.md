@@ -1,6 +1,6 @@
 # 0023 — Opaque, driver-independent public camera identity
 
-**Status:** accepted · **Date:** 2026-08-27
+**Status:** accepted, public-operation migration implemented · **Date:** 2026-08-27
 
 ## Context
 
@@ -23,8 +23,11 @@ re-keyed from an ARP-derived MAC to its authoritative identity.
   correction. Existing records are backfilled deterministically from their MAC.
 - Return the opaque ID to clients as `camera.id`. New cross-driver routes accept that ID and resolve
   it server-side to the registry row and then to each driver's native identifiers.
-- Keep MAC as the current discovery/RTSP/recording implementation key during a compatibility
-  migration; it is no longer the required identity contract for new controls.
+- Address camera CRUD operations, capability probing, PTZ, reboot, live-player recovery and browser
+  diagnostics by `camera_id`. An exact-MAC resolver remains temporarily at these endpoints for
+  clients predating this migration; new clients must not use it.
+- Keep MAC as the current discovery/RTSP/recording **internal** implementation key during the next
+  migration phase; it is no longer the public identity contract for camera operations.
 - Associate proprietary P2P enrollment material with `camera_id`, not MAC or vendor device ID.
   Tokens and native identifiers remain backend-only.
 
@@ -38,5 +41,5 @@ re-keyed from an ARP-derived MAC to its authoritative identity.
 - A fresh installation reproduces an ID when it discovers the same identity namespace/value. If a
   future driver can supply a stronger stable identity, it should do so at initial enrollment; an
   existing public ID is not silently replaced.
-- Legacy MAC-addressed endpoints remain temporarily for compatibility and should migrate
-  incrementally to `camera_id`.
+- The bundled dashboard no longer sends MAC as the target of camera operations. Removal of the
+  compatibility resolver and migration of internal media/recording keys are explicit follow-ups.

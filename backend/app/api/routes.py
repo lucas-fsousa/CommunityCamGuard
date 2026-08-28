@@ -38,7 +38,7 @@ from ..auth import (
     require_auth,
     verify_token,
 )
-from ..camera_identity import stable_camera_id
+from ..camera_identity import stable_camera_id, valid_camera_id
 from ..config import get_settings
 from ..db import registry, vendor_account
 from ..discovery import active_scan, rtsp
@@ -183,7 +183,8 @@ class MediaClientEventIn(BaseModel):
     """Small, bounded browser snapshot emitted only on live-view state transitions."""
 
     event: str = Field(min_length=1, max_length=40)
-    mac: str = Field(min_length=1, max_length=64)
+    camera_id: str = Field(default="", max_length=64)
+    mac: str = Field(default="", max_length=64)  # deprecated compatibility input
     stream: str = Field(min_length=1, max_length=128)
     metrics: dict[str, bool | int | float | str | None] = Field(default_factory=dict)
 
@@ -309,6 +310,14 @@ def _probe_and_store(cam: registry.Camera) -> registry.Camera:
     return registry.upsert_camera(cam.mac, capabilities=caps.to_dict())
 
 
+def _camera_from_reference(camera_id: str) -> registry.Camera | None:
+    """Resolve the public ID, retaining a bounded MAC fallback for pre-0.1 API clients."""
+
+    if valid_camera_id(camera_id):
+        return registry.get_camera_by_id(camera_id)
+    return registry.get_camera(camera_id)
+
+
 @router.post("/cameras", dependencies=[Depends(require_auth)])
 def upsert_camera(body: CameraIn, request: Request) -> dict:
     # Validate the RTSP credentials before saving: a camera that authenticates now streams later.
@@ -352,9 +361,12 @@ def upsert_camera(body: CameraIn, request: Request) -> dict:
     return _camera_out(cam)
 
 
-@router.delete("/cameras/{mac}", dependencies=[Depends(require_auth)])
-def delete_camera(mac: str, request: Request) -> dict:
-    registry.delete_camera(mac)
+@router.delete("/cameras/{camera_id}", dependencies=[Depends(require_auth)])
+def delete_camera(camera_id: str, request: Request) -> dict:
+    camera = _camera_from_reference(camera_id)
+    if camera is None:
+        raise HTTPException(status_code=404, detail="camera not found")
+    registry.delete_camera(camera.mac)
     _resync(request)
     return {"ok": True}
 
@@ -362,10 +374,10 @@ def delete_camera(mac: str, request: Request) -> dict:
 # --- device control / capability probe (routed through the camera's driver) --------
 
 
-@router.post("/cameras/{mac}/probe", dependencies=[Depends(require_auth)])
-def probe_camera(mac: str) -> dict:
+@router.post("/cameras/{camera_id}/probe", dependencies=[Depends(require_auth)])
+def probe_camera(camera_id: str) -> dict:
     """Detect the camera's driver and probe its live capabilities (PTZ, audio/video, ports)."""
-    cam = registry.get_camera(mac)
+    cam = _camera_from_reference(camera_id)
     if cam is None:
         raise HTTPException(status_code=404, detail="camera not found")
     if not cam.last_ip:
@@ -373,10 +385,10 @@ def probe_camera(mac: str) -> dict:
     return _camera_out(_probe_and_store(cam))
 
 
-@router.post("/cameras/{mac}/ptz", dependencies=[Depends(require_auth)])
-def ptz_move(mac: str, body: PtzIn) -> dict:
+@router.post("/cameras/{camera_id}/ptz", dependencies=[Depends(require_auth)])
+def ptz_move(camera_id: str, body: PtzIn) -> dict:
     """Pan/tilt the camera. ``action``: ``start``/``stop`` for press-and-hold, ``step`` for a nudge."""
-    cam = registry.get_camera(mac)
+    cam = _camera_from_reference(camera_id)
     if cam is None:
         raise HTTPException(status_code=404, detail="camera not found")
     try:
@@ -394,10 +406,10 @@ def ptz_move(mac: str, body: PtzIn) -> dict:
     }
 
 
-@router.post("/cameras/{mac}/reboot", dependencies=[Depends(require_auth)])
-def reboot_camera(mac: str) -> dict:
+@router.post("/cameras/{camera_id}/reboot", dependencies=[Depends(require_auth)])
+def reboot_camera(camera_id: str) -> dict:
     """Reboot the camera in software, if its driver supports it (e.g. ONVIF SystemReboot)."""
-    cam = registry.get_camera(mac)
+    cam = _camera_from_reference(camera_id)
     if cam is None:
         raise HTTPException(status_code=404, detail="camera not found")
     try:
@@ -1111,7 +1123,15 @@ def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
         raise HTTPException(status_code=422, detail="unknown media client event")
     if len(body.metrics) > 40:
         raise HTTPException(status_code=413, detail="too many media metrics")
-    event = body.model_dump()
+    # Resolve the reference instead of merely accepting a syntactically valid ID. Besides rejecting
+    # orphan diagnostics, this preserves the stored public identity when a legacy client still
+    # reports the camera by MAC after the registry has re-keyed its native address.
+    reference = body.camera_id if valid_camera_id(body.camera_id) else body.mac
+    camera = _camera_from_reference(reference) if reference else None
+    if camera is None:
+        raise HTTPException(status_code=422, detail="configured camera_id is required")
+    event = body.model_dump(exclude={"mac"})
+    event["camera_id"] = camera.camera_id
     event["at"] = datetime.now(UTC).isoformat(timespec="milliseconds")
     media = getattr(request.app.state, "media", None)
     try:
@@ -1134,11 +1154,11 @@ def media_client_events() -> list[dict]:
     return list(_client_media_events)
 
 
-@router.post("/media/recover/{mac}", dependencies=[Depends(require_auth)])
-def media_recover(mac: str, request: Request) -> dict:
+@router.post("/media/recover/{camera_id}", dependencies=[Depends(require_auth)])
+def media_recover(camera_id: str, request: Request) -> dict:
     """Restart one camera's local H.264 producer, never its RTSP/recording producer."""
     try:
-        cam = registry.get_camera(mac)
+        cam = _camera_from_reference(camera_id)
     except (KeyError, ValueError):
         cam = None
     if cam is None:

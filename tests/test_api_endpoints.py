@@ -19,7 +19,7 @@ def _req(**state):
 
 def _seed_camera(**kw):
     registry.init_db()
-    registry.upsert_camera(MAC, last_ip=kw.pop("last_ip", "192.168.1.50"), **kw)
+    return registry.upsert_camera(MAC, last_ip=kw.pop("last_ip", "192.168.1.50"), **kw)
 
 
 class FakeDriver:
@@ -40,8 +40,8 @@ class FakeDriver:
 # --- delete -------------------------------------------------------------------------
 
 def test_delete_camera_removes_it():
-    _seed_camera()
-    out = routes.delete_camera(MAC, _req(media=None, rec=None))
+    camera = _seed_camera()
+    out = routes.delete_camera(camera.camera_id, _req(media=None, rec=None))
     assert out == {"ok": True}
     assert registry.get_camera(MAC) is None
 
@@ -56,17 +56,18 @@ def test_probe_unknown_camera_is_404():
 
 
 def test_probe_camera_without_ip_is_409():
-    _seed_camera(last_ip="")
+    camera = _seed_camera(last_ip="")
     with pytest.raises(routes.HTTPException) as ei:
-        routes.probe_camera(MAC)
+        routes.probe_camera(camera.camera_id)
     assert ei.value.status_code == 409
 
 
 def test_probe_camera_success(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes, "_probe_and_store", lambda cam: registry.get_camera(cam.mac))
-    out = routes.probe_camera(MAC)
+    out = routes.probe_camera(camera.camera_id)
     assert out["mac"] == MAC
+    assert out["id"] == camera.camera_id
 
 
 # --- ptz ----------------------------------------------------------------------------
@@ -79,52 +80,52 @@ def test_ptz_unknown_camera_is_404():
 
 
 def test_ptz_success(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera", lambda cam: FakeDriver(ptz_result=True))
-    out = routes.ptz_move(MAC, routes.PtzIn(direction="Left", action="Start"))
+    out = routes.ptz_move(camera.camera_id, routes.PtzIn(direction="Left", action="Start"))
     assert out == {"ok": True, "action": "start", "direction": "left"}
 
 
 def test_ptz_unsupported_is_501(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera",
                         lambda cam: FakeDriver(raises=routes.drivers.Unsupported("ptz")))
     with pytest.raises(routes.HTTPException) as ei:
-        routes.ptz_move(MAC, routes.PtzIn(direction="left", action="start"))
+        routes.ptz_move(camera.camera_id, routes.PtzIn(direction="left", action="start"))
     assert ei.value.status_code == 501
 
 
 def test_ptz_bad_direction_is_400(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera",
                         lambda cam: FakeDriver(raises=ValueError("unknown direction")))
     with pytest.raises(routes.HTTPException) as ei:
-        routes.ptz_move(MAC, routes.PtzIn(direction="sideways", action="step"))
+        routes.ptz_move(camera.camera_id, routes.PtzIn(direction="sideways", action="step"))
     assert ei.value.status_code == 400
 
 
 def test_ptz_rejected_is_502(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera", lambda cam: FakeDriver(ptz_result=False))
     with pytest.raises(routes.HTTPException) as ei:
-        routes.ptz_move(MAC, routes.PtzIn(direction="left", action="start"))
+        routes.ptz_move(camera.camera_id, routes.PtzIn(direction="left", action="start"))
     assert ei.value.status_code == 502
 
 
 # --- reboot -------------------------------------------------------------------------
 
 def test_reboot_success(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera", lambda cam: FakeDriver(reboot_result=True))
-    assert routes.reboot_camera(MAC) == {"ok": True, "rebooting": True}
+    assert routes.reboot_camera(camera.camera_id) == {"ok": True, "rebooting": True}
 
 
 def test_reboot_unsupported_is_501(monkeypatch):
-    _seed_camera()
+    camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera",
                         lambda cam: FakeDriver(raises=routes.drivers.Unsupported("reboot")))
     with pytest.raises(routes.HTTPException) as ei:
-        routes.reboot_camera(MAC)
+        routes.reboot_camera(camera.camera_id)
     assert ei.value.status_code == 501
 
 
@@ -133,6 +134,13 @@ def test_reboot_unknown_camera_is_404():
     with pytest.raises(routes.HTTPException) as ei:
         routes.reboot_camera("00:00:00:00:00:00")
     assert ei.value.status_code == 404
+
+
+def test_legacy_mac_reference_remains_temporarily_accepted(monkeypatch):
+    """Pre-camera-id API clients retain a bounded exact-MAC compatibility path."""
+    _seed_camera()
+    monkeypatch.setattr(routes.drivers, "for_camera", lambda cam: FakeDriver(reboot_result=True))
+    assert routes.reboot_camera(MAC) == {"ok": True, "rebooting": True}
 
 
 # --- discovery ----------------------------------------------------------------------

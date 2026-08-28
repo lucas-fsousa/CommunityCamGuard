@@ -65,7 +65,9 @@ const PTZ_REPEAT_MS = 450;   // ~= the camera's step duration; its effective max
 function ptzControls(cam) {
   let held = null, timer = null, safety = null;
   const send = (action, direction) =>
-    api(`/cameras/${cam.mac}/ptz`, { method: "POST", body: JSON.stringify({ action, direction }) })
+    api(`/cameras/${encodeURIComponent(cam.id)}/ptz`, {
+      method: "POST", body: JSON.stringify({ action, direction }),
+    })
       .catch((e) => console.warn(`ptz ${action} ${direction || ""}: ${e.message}`));
   const stop = () => {
     if (!held) return;
@@ -106,7 +108,7 @@ export function removeBtn(cam) {
   del.addEventListener("click", async (e) => {
     e.stopPropagation();
     if (confirm(t("cam.removeConfirm", { name: cam.name || cam.mac }))) {
-      await api("/cameras/" + cam.mac, { method: "DELETE" });
+      await api("/cameras/" + encodeURIComponent(cam.id), { method: "DELETE" });
       reloadCameras();
     }
   });
@@ -118,7 +120,10 @@ export function probeBtn(cam) {
   probe.addEventListener("click", async (e) => {
     e.stopPropagation();
     probe.disabled = true; probe.classList.add("spin");
-    try { await api(`/cameras/${cam.mac}/probe`, { method: "POST" }); await reloadCameras(); }
+    try {
+      await api(`/cameras/${encodeURIComponent(cam.id)}/probe`, { method: "POST" });
+      await reloadCameras();
+    }
     catch (err) { alert(t("cam.probeFailed", { msg: err.message })); }
     finally { probe.disabled = false; probe.classList.remove("spin"); }
   });
@@ -135,7 +140,7 @@ function camBar(cam) {
     // A browser-only replacement reconnects to the same hot FFmpeg producer and therefore keeps
     // any delay already accumulated there. The explicit user action means "back to live": detach
     // this consumer, cycle only this camera's local H.264 producer, then create a clean player.
-    void refreshPlayer(cam.mac, reload, true);
+    void refreshPlayer(cam.id, reload, true);
   });
   const caps = cam.capabilities || {};
 
@@ -277,7 +282,7 @@ function reportMediaEvent(cam, frame, detail) {
   }
   void api("/media/client-event", {
     method: "POST",
-    body: JSON.stringify({ event: detail.event, mac: cam.mac, stream: frame.dataset.src, metrics }),
+    body: JSON.stringify({ event: detail.event, camera_id: cam.id, stream: frame.dataset.src, metrics }),
   }).catch((err) => console.debug("media diagnostics unavailable", err));
 }
 
@@ -402,7 +407,7 @@ function qualityControls(cam) {
   sel.addEventListener("change", (e) => {
     e.stopPropagation();
     setQualityPref(cam.mac, sel.value);
-    refreshPlayer(cam.mac);   // rebuild this tile's iframe against the new source
+    refreshPlayer(cam.id);   // rebuild this tile's iframe against the new source
   });
   return sel;
 }
@@ -410,9 +415,9 @@ function qualityControls(cam) {
 // Restart a single camera's player. A lightweight replacement is enough for view/quality changes;
 // an explicit recovery also cycles the server's local H.264 producer so an upstream backlog cannot
 // survive this action the way it survives F5. Neither path reconnects the base camera/recorder feed.
-async function refreshPlayer(mac, btn, restartProducer = false) {
-  const t = tiles.get(mac);
-  const cam = state.cameras.find((c) => c.mac === mac);
+async function refreshPlayer(cameraId, btn, restartProducer = false) {
+  const cam = state.cameras.find((candidate) => candidate.id === cameraId);
+  const t = cam ? tiles.get(cam.mac) : null;
   if (!t || !cam) return;
   if (btn) { btn.disabled = true; btn.classList.add("spin"); }
   try {
@@ -424,8 +429,10 @@ async function refreshPlayer(mac, btn, restartProducer = false) {
       const placeholder = suspendedFrame();
       if (old) old.replaceWith(placeholder); else t.el.prepend(placeholder);
       producerProgress.delete(cam.mac);
-      try { await api(`/media/recover/${encodeURIComponent(mac)}`, { method: "POST" }); }
-      catch (err) { console.warn("[stream recovery] local producer recovery failed", mac, err); }
+      try { await api(`/media/recover/${encodeURIComponent(cameraId)}`, { method: "POST" }); }
+      catch (err) {
+        console.warn("[stream recovery] local producer recovery failed", cameraId, err);
+      }
       if (placeholder.isConnected) placeholder.replaceWith(camFrame(cam));
       return;
     }
@@ -519,7 +526,8 @@ export async function freezeWatchdog() {
       // the browser and an independent FFmpeg both got no frame although video_packets increased).
       // Therefore a confirmed visible freeze must recycle the local HD transcode as well as the
       // consumer. The base RTSP producer and recorder remain shared and untouched.
-      void refreshPlayer(mac, null, true);
+      const camera = state.cameras.find((candidate) => candidate.mac === mac);
+      if (camera) void refreshPlayer(camera.id, null, true);
     });
   } finally {
     _watchdogBusy = false;

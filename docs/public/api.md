@@ -43,10 +43,10 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 | GET | `/api/cameras` | — | List configured cameras (see the camera object below). |
 | GET | `/api/cameras/status` | — | Lightweight runtime status for polling (`mac`, `online`, and `recording`). |
 | POST | `/api/cameras` | `CameraIn` | Add **or update** a camera (keyed by MAC). Validates RTSP creds and probes capabilities on add; a wrong password returns **422**. |
-| DELETE | `/api/cameras/{mac}` | — | Remove a camera and stop its streams. |
-| POST | `/api/cameras/{mac}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
-| POST | `/api/cameras/{mac}/ptz` | `PtzIn` | Pan/tilt. See PTZ below. |
-| POST | `/api/cameras/{mac}/reboot` | — | Reboot the camera (driver-dependent; `501` if unsupported). |
+| DELETE | `/api/cameras/{camera_id}` | — | Remove a camera and stop its streams. |
+| POST | `/api/cameras/{camera_id}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
+| POST | `/api/cameras/{camera_id}/ptz` | `PtzIn` | Pan/tilt. See PTZ below. |
+| POST | `/api/cameras/{camera_id}/reboot` | — | Reboot the camera (driver-dependent; `501` if unsupported). |
 
 **`CameraIn`** (fields other than `mac` are optional; omitted fields are left unchanged on update):
 
@@ -68,6 +68,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 
 ```json
 {
+  "id": "cam_0123456789abcdef01234567",
   "mac": "aa:bb:cc:dd:ee:ff",
   "name": "Garagem",
   "username": "admin",
@@ -93,8 +94,10 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 }
 ```
 
-`id` is the stable, opaque application identity. New cross-driver APIs use it and resolve to each
+`id` is the stable, opaque application identity. Camera operations use it and resolve to each
 driver's private identity server-side; clients must not derive it or substitute a MAC/vendor ID.
+An exact MAC remains temporarily accepted in these route parameters for compatibility with clients
+older than the opaque-ID migration, but it is deprecated and is not used by the bundled dashboard.
 The password is **never** returned — only `has_password`. Stream IDs are go2rtc stream names (see
 Media). `online` means that video packets in the camera's shared base stream are currently advancing;
 `recording` is whether the recorder process is currently running for the camera. The dashboard polls
@@ -110,7 +113,7 @@ Media). `online` means that video packets in the camera's shared base stream are
 - `action:"step"` (default) nudges once. `501` if the camera has no PTZ; `400` for an unknown direction.
 
 ```bash
-curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/aa:bb:cc:dd:ee:ff/ptz \
+curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/cam_0123456789abcdef01234567/ptz \
      -H 'Content-Type: application/json' -d '{"direction":"left","action":"start"}'
 ```
 
@@ -249,7 +252,7 @@ scanning is available, so this remains a capability-based fallback rather than t
 | GET | `/api/media/activity` | Per-stream `{video_packets, consumers}` — liveness for a client freeze watchdog (a watched stream whose video packets stop advancing is frozen upstream). |
 | POST | `/api/media/client-event` | Bounded live-player transition snapshot for diagnostics (details below). |
 | GET | `/api/media/client-events` | Last 200 browser transition snapshots from this server process. |
-| POST | `/api/media/recover/{mac}` | Cycle one camera's local preloaded H.264 producer after a confirmed stall. The shared camera RTSP/recording producer is not restarted. |
+| POST | `/api/media/recover/{camera_id}` | Cycle one camera's local preloaded H.264 producer after a confirmed stall. The shared camera RTSP/recording producer is not restarted. |
 | POST | `/api/media/restart` | Regenerate go2rtc config and restart it (after registry changes). |
 
 `GET /api/media/streams` returns:
@@ -278,13 +281,15 @@ is authenticated and intended for the bundled player, not as a periodic metrics 
 ```json
 {
   "event": "live_edge_jump",
-  "mac": "aa:bb:cc:dd:ee:ff",
+  "camera_id": "cam_0123456789abcdef01234567",
   "stream": "cam_aabbccddeeff_hd",
   "metrics": {"transport": "mse", "bufferedGap": 2.4, "discardedSeconds": 2.15}
 }
 ```
 
-Allowed events are `waiting`, `stalled`, `playing`, `live_edge_jump`, `catchup_start`, `catchup_end`,
+The `camera_id` must identify a configured camera. The deprecated `mac` input remains accepted from
+older cached clients, but the server resolves and stores the camera's canonical opaque ID. Allowed
+events are `waiting`, `stalled`, `playing`, `live_edge_jump`, `catchup_start`, `catchup_end`,
 `mse_failure`, and `watchdog_recovery`. The catch-up pair remains accepted for older cached clients;
 current clients discard stale live media instead of accelerating it. `GET /api/media/client-events`
 returns the last 200 events from the current server process, oldest first. Each event includes a UTC

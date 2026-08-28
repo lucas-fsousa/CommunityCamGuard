@@ -48,7 +48,7 @@ fixed at the source.
 - Freeze recovery is end-to-end: the dashboard correlates go2rtc producer packet progress,
   WebRTC decoder frames and `requestVideoFrameCallback().mediaTime`. A client-only stall rebuilds
   only its PeerConnection. A confirmed producer stall first disposes that player, then cycles the
-  `_hd` preload through `POST /api/media/recover/{mac}`. This restarts only the local decoder/
+  `_hd` preload through `POST /api/media/recover/{camera_id}`. This restarts only the local decoder/
   encoder; the base RTSP producer and recording continue uninterrupted. The MSE fallback uses a
   bounded queue and reconnects on overflow or `SourceBuffer` failure.
 - The preloaded producer absorbs the camera's slow first IDR once at service startup. Browser

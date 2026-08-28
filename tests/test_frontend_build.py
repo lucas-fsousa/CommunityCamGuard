@@ -49,13 +49,13 @@ def test_live_restart_cycles_producer_and_mse_discards_stale_video():
     player = (frontend / "player.js").read_text()
     video_rtc = (frontend / "video-rtc.js").read_text()
 
-    assert "refreshPlayer(cam.mac, reload, true)" in live
+    assert "refreshPlayer(cam.id, reload, true)" in live
     assert 'this.mode = "mse"' in player
     assert "const START_BUFFER_SECONDS = 3" in video_rtc
     assert "const CRITICAL_PLAYBACK_RATE = 0.85" in video_rtc
     assert "const LOW_PLAYBACK_RATE = 0.92" in video_rtc
     assert "const CATCHUP_PLAYBACK_RATE = 1.05" in video_rtc
-    assert "void refreshPlayer(mac, null, true)" in live
+    assert "void refreshPlayer(camera.id, null, true)" in live
     assert "event: 'live_edge_jump'" in video_rtc
     assert "this.video.currentTime = liveTarget" in video_rtc
     assert "Math.min(1.25, gap)" not in video_rtc
@@ -72,6 +72,20 @@ def test_vendor_controls_use_opaque_camera_id_and_explicit_target_states():
     assert '"white-light", (value) => ({ enabled: value === "on" })' in live
     assert '"orientation", (orientation) => ({ orientation })' in live
     assert "Nothing is read automatically" in live
+
+
+def test_camera_operations_address_api_by_opaque_id():
+    live = (
+        Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js"
+    ).read_text()
+
+    for endpoint in ("ptz", "probe"):
+        assert f"encodeURIComponent(cam.mac)}}/{endpoint}" not in live
+    assert "`/cameras/${encodeURIComponent(cam.id)}/ptz`" in live
+    assert "`/cameras/${encodeURIComponent(cam.id)}/probe`" in live
+    assert '"/cameras/" + encodeURIComponent(cam.id)' in live
+    assert "`/media/recover/${encodeURIComponent(cameraId)}`" in live
+    assert "camera_id: cam.id" in live
 
 
 def test_frontend_entrypoint_only_orchestrates_semantic_modules():
