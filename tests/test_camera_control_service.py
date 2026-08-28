@@ -77,3 +77,17 @@ def test_generic_driver_never_inherits_controls_from_vendor_enrollment(monkeypat
     assert camera_controls.control_catalog(camera) == {}
     with pytest.raises(Unsupported):
         camera_controls.write_control(CAMERA_ID, "white_light", True)
+
+
+def test_operation_must_be_advertised_with_matching_permission(monkeypatch):
+    class WriteOnlyDriver(FakeControlDriver):
+        def control_catalog(self, camera):
+            return (ControlDescriptor("orientation", "choice", False, True),)
+
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: WriteOnlyDriver())
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+
+    with pytest.raises(Unsupported):
+        camera_controls.read_control(CAMERA_ID, "orientation")
+    with pytest.raises(Unsupported):
+        camera_controls.write_control(CAMERA_ID, "hidden_native_path", True)

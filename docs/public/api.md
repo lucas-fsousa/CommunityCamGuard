@@ -120,18 +120,21 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/cam_0123456789abcdef01
      -H 'Content-Type: application/json' -d '{"direction":"left","action":"start"}'
 ```
 
-### Typed vendor controls (authenticated trusted LAN only)
+### Typed camera controls (authenticated trusted LAN only)
 
-These endpoints use the durable P2P enrollment created during native onboarding. They accept the
-opaque `camera.id` returned by the camera API and never accept a MAC, vendor device ID, raw
-thing-model path or passthrough JSON payload.
+The canonical endpoints accept the opaque `camera.id`, a semantic key advertised in the camera's
+`controls` catalog and one scalar value. They never accept a MAC, vendor device ID, opcode, raw
+thing-model path or passthrough JSON payload. The application rejects a key unless the selected
+driver explicitly advertises the requested read/write operation.
 Like provisioning, they reject public/proxied origins even when the dashboard session is valid.
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| GET | `/api/vendor-controls/{camera_id}/white-light` | — | Reads the physical white-floodlight state through the proven penetrate type 12 contract. |
-| PUT | `/api/vendor-controls/{camera_id}/white-light` | `{"enabled": true|false}` | Typed type 11 ON/OFF. Performs an exact-device state preflight, skips an idempotent write, never retries actuation and requires fresh readback. |
-| PUT | `/api/vendor-controls/{camera_id}/orientation` | `{"orientation":"normal"|"inverted"}` | Fixed-path normal/180° operation with state preflight, correlated response and fresh readback. |
+| GET | `/api/cameras/{camera_id}/controls/{control_key}` | — | Reads a control only when its catalog descriptor has `readable: true`. |
+| PUT | `/api/cameras/{camera_id}/controls/{control_key}` | `{"value": true|42|"choice"}` | Writes a strict boolean, integer or string only when its descriptor has `writable: true`; the driver validates the exact semantic value. |
+
+The previous white-light/orientation-specific `/api/vendor-controls/...` routes remain available
+as a deprecated compatibility surface while older dashboard builds are phased out.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
 selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous

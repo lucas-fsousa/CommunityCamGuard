@@ -30,11 +30,22 @@ def control_catalog(camera: Camera) -> dict[str, dict[str, object]]:
     return {descriptor.key: descriptor.public() for descriptor in descriptors}
 
 
+def _operation(camera: Camera, key: str, permission: str):
+    driver = drivers.for_camera(camera)
+    descriptor = next(
+        (item for item in driver.control_catalog(camera) if item.key == key),
+        None,
+    )
+    if descriptor is None or not getattr(descriptor, permission):
+        raise drivers.Unsupported(key)
+    return driver
+
+
 def read_control(camera_id: str, key: str) -> ControlResult:
     camera = _camera(camera_id)
-    return drivers.for_camera(camera).read_control(camera, key)
+    return _operation(camera, key, "readable").read_control(camera, key)
 
 
 def write_control(camera_id: str, key: str, value: ControlValue) -> ControlResult:
     camera = _camera(camera_id)
-    return drivers.for_camera(camera).write_control(camera, key, value)
+    return _operation(camera, key, "writable").write_control(camera, key, value)

@@ -30,6 +30,10 @@ string alone must never grant another driver's controls.
   manufacturer-specific repository as a generic `db` module.
 - The driver-generated control catalog is authoritative for API/UI gating. The old
   `vendor_controls` response is a temporary compatibility projection of that catalog.
+- The canonical HTTP boundary is `/api/cameras/{camera_id}/controls/{control_key}`. It accepts only
+  a scalar semantic value and the application service rejects keys or operations absent from that
+  camera driver's catalog before transport dispatch. The older `/api/vendor-controls/...` routes
+  remain temporarily for client compatibility.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
