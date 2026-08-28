@@ -941,8 +941,8 @@ def test_privileged_property_read_does_not_inherit_remote_ble_tunnel_exception()
     )
     dependencies = {dependency.call for dependency in route.dependant.dependencies}
 
-    assert routes.require_local_request in dependencies
-    assert routes.require_local_or_remote_ble_request not in dependencies
+    assert require_local_request in dependencies
+    assert require_local_or_remote_ble_request not in dependencies
 
 
 def test_vendor_bind_wire_contract_includes_proof_without_returning_secrets(monkeypatch, tmp_path):
