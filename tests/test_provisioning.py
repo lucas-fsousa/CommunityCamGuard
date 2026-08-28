@@ -10,10 +10,10 @@ from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from backend.app.api import provisioning as routes
 from backend.app.api import provisioning_account as account_routes
 from backend.app.api import provisioning_ble as ble_routes
 from backend.app.api import provisioning_network as network_routes
+from backend.app.api import provisioning_privileged as privileged_routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
@@ -753,9 +753,9 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
         called.append((item.device_id, item.confirm_key, time_area, time_zone))
         return VendorBindResult(True, 0, "", SUBSCRIPTION_TOKEN)
 
-    monkeypatch.setattr(routes, "bind_vendor_device", fake_bind)
-    response = routes.provisioning_privileged_bind(
-        routes.ProvisioningPrivilegedBindIn(
+    monkeypatch.setattr(privileged_routes, "bind_vendor_device", fake_bind)
+    response = privileged_routes.provisioning_privileged_bind(
+        privileged_routes.ProvisioningPrivilegedBindIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             mac="AA-BB-CC-DD-EE-03",
             time_area="America/Sao_Paulo",
@@ -785,8 +785,8 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
 
 def test_privileged_binding_without_fresh_handoff_fails_closed():
     with pytest.raises(HTTPException) as caught:
-        routes.provisioning_privileged_bind(
-            routes.ProvisioningPrivilegedBindIn(
+        privileged_routes.provisioning_privileged_bind(
+            privileged_routes.ProvisioningPrivilegedBindIn(
                 label="http://yoosee.co/?D=0-7443576841-8034",
             ),
             Response(),
@@ -817,8 +817,8 @@ def test_privileged_p2p_probe_returns_only_sanitized_inventory(monkeypatch):
         ),
     )
 
-    result = routes.provisioning_privileged_p2p_probe(
-        routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+    result = privileged_routes.provisioning_privileged_p2p_probe(
+        privileged_routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
         Response(),
     )
 
@@ -838,8 +838,8 @@ def test_privileged_p2p_probe_returns_only_sanitized_inventory(monkeypatch):
 
 def test_privileged_p2p_probe_requires_durable_material():
     with pytest.raises(HTTPException) as caught:
-        routes.provisioning_privileged_p2p_probe(
-            routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+        privileged_routes.provisioning_privileged_p2p_probe(
+            privileged_routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
             Response(),
         )
     assert caught.value.status_code == 409
@@ -870,8 +870,8 @@ def test_privileged_p2p_route_probe_returns_no_peer_or_session_secrets(monkeypat
         ),
     )
 
-    result = routes.provisioning_privileged_p2p_route_probe(
-        routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
+    result = privileged_routes.provisioning_privileged_p2p_route_probe(
+        privileged_routes.ProvisioningLabelIn(label="http://yoosee.co/?D=0-7443576841-8034"),
         Response(),
     )
 
@@ -905,8 +905,8 @@ def test_privileged_property_read_returns_only_allowlisted_read_result(monkeypat
         ),
     )
 
-    result = routes.provisioning_privileged_p2p_property_read(
-        routes.ProvisioningP2PPropertyReadIn(
+    result = privileged_routes.provisioning_privileged_p2p_property_read(
+        privileged_routes.ProvisioningP2PPropertyReadIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             property_path="ProWritable.videoParm",
         ),
@@ -927,8 +927,8 @@ def test_privileged_property_read_rejects_unknown_path_before_transport(monkeypa
 
     monkeypatch.setattr(yoosee_onboarding, "read_camera_property", unexpected_read)
     with pytest.raises(HTTPException) as caught:
-        routes.provisioning_privileged_p2p_property_read(
-            routes.ProvisioningP2PPropertyReadIn(
+        privileged_routes.provisioning_privileged_p2p_property_read(
+            privileged_routes.ProvisioningP2PPropertyReadIn(
                 label="http://yoosee.co/?D=0-7443576841-8034",
                 property_path="ProWritable.notRecoveredFromApk",
             ),
@@ -941,7 +941,7 @@ def test_privileged_property_read_rejects_unknown_path_before_transport(monkeypa
 def test_privileged_property_read_does_not_inherit_remote_ble_tunnel_exception():
     route = next(
         candidate
-        for candidate in routes.router.routes
+        for candidate in privileged_routes.router.routes
         if candidate.path == "/api/provisioning/privileged/p2p-property-read"
     )
     dependencies = {dependency.call for dependency in route.dependant.dependencies}
@@ -1091,12 +1091,12 @@ def test_online_status_route_retains_null_proof_for_explicit_bind(monkeypatch, t
     material_path.chmod(0o600)
     attempt_id = _start_ble_attempt(material_path)
     monkeypatch.setattr(
-        routes,
+        privileged_routes,
         "query_vendor_device_online",
         lambda _material: VendorOnlineResult(True, 0, "", True, False, "7443576841"),
     )
-    result = routes.provisioning_privileged_online_status(
-        routes.ProvisioningOnlineStatusIn(
+    result = privileged_routes.provisioning_privileged_online_status(
+        privileged_routes.ProvisioningOnlineStatusIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             attempt_id=attempt_id,
         ),

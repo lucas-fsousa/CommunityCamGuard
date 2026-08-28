@@ -28,6 +28,7 @@ from .api.provisioning import router as provisioning_router
 from .api.provisioning_account import router as provisioning_account_router
 from .api.provisioning_ble import router as provisioning_ble_router
 from .api.provisioning_network import router as provisioning_network_router
+from .api.provisioning_privileged import router as provisioning_privileged_router
 from .api.recordings import router as recordings_router
 from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
@@ -124,6 +125,7 @@ app.include_router(provisioning_router)
 app.include_router(provisioning_account_router)
 app.include_router(provisioning_ble_router)
 app.include_router(provisioning_network_router)
+app.include_router(provisioning_privileged_router)
 app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)
