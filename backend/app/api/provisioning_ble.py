@@ -11,18 +11,17 @@ import time
 from fastapi import APIRouter, HTTPException, Response
 
 from ..config import get_settings
-from ..drivers.onboarding import OnboardingAccountError
+from ..drivers.onboarding import (
+    OnboardingAccountError,
+    OnboardingInputError,
+    OnboardingTransportError,
+)
 from ..provisioning import (
     BleCodecError,
     PrivilegedEnrollmentError,
-    VendorProvisioningCloudError,
     WifiSelectionError,
-    begin_ble_provisioning_attempt,
     ble_provisioning_attempt,
-    build_ble_provisioning_frames,
-    build_wifi_payload,
     decrypt_ble_payload,
-    encryption_from_scan,
     remember_privileged_handoff,
     selected_network,
 )
@@ -55,27 +54,19 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
 
     settings = get_settings()
     try:
-        material = onboarding().ble_material(
-            identity["device_id"],
+        prepared = onboarding().prepare_ble(
+            device_id=identity["device_id"],
+            ssid=network.ssid,
+            password=body.wifi_password.get_secret_value(),
+            security=network.security,
             fallback_file=settings.provisioning_ble_material_file,
             max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
         )
-        password = body.wifi_password.get_secret_value()
-        wifi_payload = build_wifi_payload(
-            ssid=network.ssid,
-            password=password,
-            encryption=encryption_from_scan(network.security, password),
-            user_id=material.server_user_id,
-            config_token=material.config_token,
-        )
-        # The recovered client negotiates MTU 256 before initializing its native packet session.
-        stages = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=256)
-        attempt = begin_ble_provisioning_attempt(material)
     except LookupError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except (OnboardingAccountError, VendorProvisioningCloudError) as exc:
+    except (OnboardingAccountError, OnboardingTransportError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except (BleCodecError, ValueError) as exc:
+    except OnboardingInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     response.headers["Cache-Control"] = "no-store"
@@ -85,11 +76,11 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
         "transport": "bluetooth",
         "experimental": True,
         "device_id": identity["device_id"],
-        "attempt_id": attempt.attempt_id,
-        "attempt_expires_in": max(0, int(attempt.expires_at - time.time())),
+        "attempt_id": prepared.attempt_id,
+        "attempt_expires_in": max(0, int(prepared.expires_at - time.time())),
         "frames": {
             stage: [base64.b64encode(frame).decode("ascii") for frame in frames]
-            for stage, frames in stages.items()
+            for stage, frames in prepared.frames.items()
         },
         "expected_responses": {
             "challenge": 0x71,

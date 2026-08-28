@@ -15,6 +15,10 @@ class OnboardingLabelError(ValueError):
     """A printed/scanned identity is not valid for the selected camera family."""
 
 
+class OnboardingInputError(ValueError):
+    """A driver-specific provisioning input cannot be encoded safely."""
+
+
 class OnboardingTransportError(RuntimeError):
     """A driver's privileged camera transport failed."""
 
@@ -93,6 +97,13 @@ class CompletionResult:
     already_configured: bool
 
 
+@dataclass(frozen=True, slots=True)
+class BlePreparation:
+    attempt_id: str
+    expires_at: float
+    frames: dict[str, list[bytes]]
+
+
 class OnboardingPort(Protocol):
     """Driver-owned operations needed by the generic onboarding HTTP workflow."""
 
@@ -115,17 +126,20 @@ class OnboardingPort(Protocol):
 
     def build_wifi_qr(self, *, ssid: str, password: str, security: str) -> str: ...
 
+    def prepare_ble(
+        self,
+        *,
+        device_id: str,
+        ssid: str,
+        password: str,
+        security: str,
+        fallback_file: Path | None,
+        max_age_seconds: int,
+    ) -> BlePreparation: ...
+
     def login(self, request: AccountLogin) -> None: ...
 
     def refresh_account(self) -> None: ...
-
-    def ble_material(
-        self,
-        device_id: str,
-        *,
-        fallback_file: Path | None,
-        max_age_seconds: int,
-    ) -> Any: ...
 
     def probe_inventory(self, device_id: str) -> InventoryResult: ...
 

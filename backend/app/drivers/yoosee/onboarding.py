@@ -5,9 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...provisioning import (
+    BleCodecError,
     LabelError,
     PrivilegedEnrollmentError,
+    VendorProvisioningCloudError,
+    begin_ble_provisioning_attempt,
     bound_privileged_enrollment,
+    build_ble_provisioning_frames,
     build_wifi_payload,
     complete_camera_onboarding,
     encryption_from_scan,
@@ -20,11 +24,13 @@ from ...provisioning import (
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ..onboarding import (
     AccountLogin,
+    BlePreparation,
     CompletionMediaProof,
     CompletionResult,
     InventoryResult,
     OnboardingAccountError,
     OnboardingCompletionError,
+    OnboardingInputError,
     OnboardingLabelError,
     OnboardingStateError,
     OnboardingTransportError,
@@ -131,6 +137,41 @@ class YooseeOnboarding:
         except VendorAccountError as exc:
             raise OnboardingAccountError(str(exc)) from exc
         raise LookupError("BLE handshake material is unavailable; configure the vendor account")
+
+    def prepare_ble(
+        self,
+        *,
+        device_id: str,
+        ssid: str,
+        password: str,
+        security: str,
+        fallback_file: Path | None,
+        max_age_seconds: int,
+    ) -> BlePreparation:
+        try:
+            material = self.ble_material(
+                device_id,
+                fallback_file=fallback_file,
+                max_age_seconds=max_age_seconds,
+            )
+            wifi_payload = build_wifi_payload(
+                ssid=ssid,
+                password=password,
+                encryption=encryption_from_scan(security, password),
+                user_id=material.server_user_id,
+                config_token=material.config_token,
+            )
+            frames = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=256)
+            attempt = begin_ble_provisioning_attempt(material)
+        except (BleCodecError, ValueError) as exc:
+            raise OnboardingInputError(str(exc)) from exc
+        except VendorProvisioningCloudError as exc:
+            raise OnboardingTransportError(str(exc)) from exc
+        return BlePreparation(
+            attempt_id=attempt.attempt_id,
+            expires_at=attempt.expires_at,
+            frames=frames,
+        )
 
     def probe_inventory(self, device_id: str) -> InventoryResult:
         enrollment = bound_privileged_enrollment(device_id)
