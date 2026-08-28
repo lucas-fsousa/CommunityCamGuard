@@ -1,8 +1,6 @@
 """Tests for rtsp.RtspSession (backend/app/discovery/rtsp.py) — the tiny RTSP client. The socket
 is faked, so request building and response reading are tested offline (the parse helpers have
 their own tests in test_rtsp.py)."""
-import pytest
-
 from backend.app.discovery import rtsp
 
 

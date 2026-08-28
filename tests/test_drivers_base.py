@@ -4,9 +4,9 @@ capability probe, and the default-unsupported controls. The RTSP session + parsi
 """
 import pytest
 
+from backend.app.db.registry import Camera
 from backend.app.drivers import base
 from backend.app.drivers.base import CameraDriver, DetectContext, Unsupported
-from backend.app.db.registry import Camera
 
 
 class FakeSession:

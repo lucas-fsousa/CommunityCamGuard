@@ -1,9 +1,11 @@
 """Tests for the Yoosee driver (backend/app/drivers/yoosee.py). The ONVIF toolboxes (ptz/device/
 media) are stubbed, so detection, the control probe and PTZ routing run offline.
 """
+import pytest
+
 from backend.app.control import device, media, ptz
 from backend.app.db.registry import Camera
-from backend.app.drivers.base import Capabilities, DetectContext
+from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
 from backend.app.drivers.yoosee import YooseeDriver
 
 
@@ -73,7 +75,5 @@ def test_ptz_routes_to_the_right_helper(monkeypatch):
 
 
 def test_reboot_is_unsupported():
-    from backend.app.drivers.base import Unsupported
-    import pytest
     with pytest.raises(Unsupported):
         _drv().reboot(Camera(mac="aa:bb:cc:dd:ee:01"))

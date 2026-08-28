@@ -3,13 +3,10 @@ the ARP file, the RTSP session and the driver path list are stubbed, so these ru
 """
 from unittest.mock import mock_open
 
-import pytest
-
 from backend.app import drivers
 from backend.app.control import device, media
 from backend.app.discovery import active_scan
 from backend.app.discovery.active_scan import RtspStream, ScannedHost
-
 
 # --- ScannedHost properties ---------------------------------------------------------
 

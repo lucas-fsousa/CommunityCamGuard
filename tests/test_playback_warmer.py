@@ -1,7 +1,6 @@
 """Cover the playback Warmer's thread lifecycle + a couple of transcoded_path edges the main
 test_playback.py leaves out."""
 import threading
-from pathlib import Path
 
 from backend.app.recording import playback
 from backend.app.recording.playback import Warmer
