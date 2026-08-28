@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from .. import drivers
 from ..config import get_settings
@@ -20,7 +20,12 @@ _onboarding = onboarding
 def provisioning_status(driver: str | None = None) -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
-    provider = _onboarding(driver) if driver else _onboarding()
+    available = drivers.onboarding_providers()
+    if not available:
+        raise HTTPException(status_code=503, detail="no factory-onboarding driver is registered")
+    # Status is discovery, not an onboarding operation. It may present the first provider so the
+    # UI can render a selector; identity and mutation routes still reject ambiguous omission.
+    provider = _onboarding(driver) if driver else available[0][1]
     native_account = provider.account_configured()
     ble_status = (
         "handshake-ready"
@@ -36,9 +41,9 @@ def provisioning_status(driver: str | None = None) -> dict:
         "vendor_cloud_required": True,
         "vendor_account_configured": native_account,
         "driver": provider.driver_key,
+        "driver_required": len(available) > 1,
         "providers": [
-            {"driver": key, "provider": candidate.provider}
-            for key, candidate in drivers.onboarding_providers()
+            {"driver": key, "provider": candidate.provider} for key, candidate in available
         ],
         "ble_material_source": (
             "native-account"

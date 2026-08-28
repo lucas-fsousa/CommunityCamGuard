@@ -113,6 +113,16 @@ function configuredCard(cam) {
 function openProvisioningModal() {
   if (!browserCanProvision() || (state.provisioning && state.provisioning.blocked)) return;
 
+  const providers = state.provisioning?.providers || [];
+  const driver = el("select", {
+    hidden: providers.length <= 1,
+    title: t("provision.driver"),
+  });
+  providers.forEach((item) => driver.append(el("option", {
+    value: item.driver,
+    textContent: `${item.driver} · ${item.provider}`,
+    selected: item.driver === state.provisioning?.driver,
+  })));
   const label = el("input", { placeholder: t("provision.label"), autocomplete: "off" });
   const deviceId = el("input", { placeholder: t("provision.deviceId"), inputMode: "numeric", autocomplete: "off" });
   const capability = el("input", { placeholder: t("provision.capability"), autocomplete: "off" });
@@ -135,7 +145,7 @@ function openProvisioningModal() {
   const readiness = el("small", { className: "provision-readiness muted" });
   const qrBox = el("div", { className: "provision-qr-box hidden" });
   const refreshNetworks = el("button", { textContent: t("provision.refreshNetworks") });
-  const transportReady = Boolean(state.provisioning && state.provisioning.transport_ready);
+  let transportReady = Boolean(state.provisioning && state.provisioning.transport_ready);
   let bleHandshakeReady = state.provisioning?.transports?.bluetooth === "handshake-ready";
   const remoteBle = !browserIsLoopback() && Boolean(state.provisioning?.remote_ble_enabled);
   const start = el("button", { className: "btn-primary", textContent: t("provision.start"), disabled: true });
@@ -228,6 +238,7 @@ function openProvisioningModal() {
   };
 
   const identityPayload = () => ({
+    driver: driver.value || undefined,
     label: label.value.trim(), device_id: deviceId.value.trim(),
     capability_code: capability.value.trim(), firmware_version: firmware.value.trim(), mac: mac.value.trim(),
   });
@@ -298,6 +309,7 @@ function openProvisioningModal() {
       await api("/provisioning/vendor-account/login", {
         method: "POST",
         body: JSON.stringify({
+          driver: driver.value || undefined,
           account_type: vendorAccountType.value, account: identity, password: secret,
           mobile_area: vendorAccountType.value === "mobile" ? mobileArea : "0",
         }),
@@ -319,6 +331,22 @@ function openProvisioningModal() {
   });
   vendorAccountType.addEventListener("change", () => {
     vendorMobileArea.hidden = vendorAccountType.value !== "mobile";
+  });
+  driver.addEventListener("change", async () => {
+    identityValid = false;
+    clearQr();
+    try {
+      const selected = await api(`/provisioning/status?driver=${encodeURIComponent(driver.value)}`);
+      state.provisioning = selected;
+      transportReady = Boolean(selected.transport_ready);
+      bleHandshakeReady = selected.transports?.bluetooth === "handshake-ready";
+      vendorAccountPanel.hidden = Boolean(selected.vendor_account_configured);
+      vendorAccountPanel.open = !selected.vendor_account_configured;
+      scheduleIdentityInspection(true);
+    } catch (err) {
+      error.textContent = err.message;
+      updateStart();
+    }
   });
 
   async function scanNetworks() {
@@ -777,6 +805,7 @@ function openProvisioningModal() {
     el("div", { className: "modal-head" }, el("h2", { textContent: t("provision.title") }), close),
     el("p", { className: "muted compact", textContent: t("provision.description") }),
     remoteBle ? el("small", { className: "provision-remote-warning", textContent: t("provision.remoteBle") }) : "",
+    driver,
     vendorAccountPanel,
     label,
     el("div", { className: "provision-inline" }, photo),

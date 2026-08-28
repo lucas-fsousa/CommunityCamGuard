@@ -1,4 +1,5 @@
 """Automatic, conflict-free application build identity and frontend bootstrap wiring."""
+
 from __future__ import annotations
 
 import json
@@ -62,9 +63,7 @@ def test_live_restart_cycles_producer_and_mse_discards_stale_video():
 
 
 def test_camera_controls_use_driver_catalog_and_semantic_api():
-    live = (
-        Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js"
-    ).read_text()
+    live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
 
     assert "encodeURIComponent(cam.id)" in live
     assert "cam.controls || cam.vendor_controls" not in live
@@ -79,9 +78,7 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
 
 
 def test_camera_operations_address_api_by_opaque_id():
-    live = (
-        Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js"
-    ).read_text()
+    live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
 
     for endpoint in ("ptz", "probe"):
         assert f"encodeURIComponent(cam.mac)}}/{endpoint}" not in live
@@ -112,7 +109,9 @@ def test_frontend_entrypoint_only_orchestrates_semantic_modules():
 
 
 def test_provisioning_modal_is_explicit_and_validates_identity_in_background():
-    cameras = (Path(__file__).parents[1] / "frontend" / "modules" / "camera-management.js").read_text()
+    cameras = (
+        Path(__file__).parents[1] / "frontend" / "modules" / "camera-management.js"
+    ).read_text()
 
     assert 'close.addEventListener("click", dismiss)' in cameras
     assert 'overlay.addEventListener("click"' not in cameras
@@ -122,6 +121,9 @@ def test_provisioning_modal_is_explicit_and_validates_identity_in_background():
     assert "field.readOnly = locked" in cameras
     assert 'textContent: t("provision.inspect")' not in cameras
     assert 'password.addEventListener("input"' in cameras
+    assert "const providers = state.provisioning?.providers || []" in cameras
+    assert "driver: driver.value || undefined" in cameras
+    assert "/provisioning/status?driver=" in cameras
     assert 'readiness.textContent = reason || t("provision.ready")' in cameras
     assert "response.manual_entry_allowed" in cameras
     assert 'api("/provisioning/networks/manual"' in cameras
@@ -153,7 +155,7 @@ def test_ble_provisioning_transport_uses_recovered_gatt_contract():
     assert "navigator.bluetooth.requestDevice" in ble
     assert "navigator.bluetooth.getDevices" in ble
     assert "candidate.name === expectedName" in ble
-    assert 'filters: [{ name: expectedName }]' in ble
+    assert "filters: [{ name: expectedName }]" in ble
     assert "export function createBleMessageAssembler()" in ble
     assert "export async function writeBleFrames(session, frames)" in ble
     assert "[notify, writeWithoutResponse, indicate]" in ble
@@ -161,10 +163,14 @@ def test_ble_provisioning_transport_uses_recovered_gatt_contract():
     assert "response channel rejected" in ble
     assert "writeValueWithResponse" in ble
     assert "setTimeout(resolve, 35)" in ble
-    assert 'api("/provisioning/ble/prepare"' in (frontend / "modules" / "camera-management.js").read_text()
-    assert "prepared.frames.challenge, prepared.expected_responses.challenge" in (
-        frontend / "modules" / "camera-management.js"
-    ).read_text()
+    assert (
+        'api("/provisioning/ble/prepare"'
+        in (frontend / "modules" / "camera-management.js").read_text()
+    )
+    assert (
+        "prepared.frames.challenge, prepared.expected_responses.challenge"
+        in (frontend / "modules" / "camera-management.js").read_text()
+    )
     cameras = (frontend / "modules" / "camera-management.js").read_text()
     # Factory onboarding stops at Wi-Fi. LAN discovery and privileged/RTSP onboarding have
     # separate user-visible stages instead of being hidden inside the BLE transaction.
@@ -173,7 +179,7 @@ def test_ble_provisioning_transport_uses_recovered_gatt_contract():
     assert "writeFrames(encodedFrames(finishFrames))" not in cameras
     assert 'api("/provisioning/ble/decode-response"' in cameras
     assert "if (challengeReply.valid !== true)" in cameras
-    assert 'if (!wifiReply.json)' in cameras
+    assert "if (!wifiReply.json)" in cameras
     assert "configReply.binding" not in cameras
     assert "connectionReply?.wifi_connection?.connected" in cameras
     assert "bleFinishFrames = prepared.frames.finish || []" in cameras
@@ -186,7 +192,7 @@ def test_recording_rows_offer_download_without_triggering_playback_selection():
     index = (frontend / "index.html").read_text()
 
     assert 'href: "/api/recordings/download?path="' in recordings
-    assert 'event.stopPropagation()' in recordings
+    assert "event.stopPropagation()" in recordings
     assert 'svgIcon("i-download")' in recordings
     assert 'id="i-download"' in index
     assert "s.camera_name || nameOf[s.camera_id]" in recordings
@@ -212,7 +218,7 @@ def test_recording_first_view_polls_until_seekable_cache_is_ready():
     assert "/recordings/playback-status?path=" in recordings
     assert "status.transcoding" in recordings
     assert "status.cached" in recordings
-    assert "player.removeAttribute(\"src\")" in recordings
+    assert 'player.removeAttribute("src")' in recordings
     assert "function playSeekable" in recordings
     assert 'player.src = fileUrl + "&ready=" + Date.now()' in recordings
     assert "player.src = fileUrl;" not in recordings

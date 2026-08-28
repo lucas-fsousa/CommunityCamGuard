@@ -10,6 +10,7 @@ from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
+from backend.app.api import provisioning as provisioning_routes
 from backend.app.api import provisioning_account as account_routes
 from backend.app.api import provisioning_ble as ble_routes
 from backend.app.api import provisioning_network as network_routes
@@ -1196,6 +1197,29 @@ def test_provisioning_api_accepts_authenticated_private_lan_client():
         assert status.json()["lan_only"] is True
         assert status.json()["driver"] == "yoosee"
         assert status.json()["providers"] == [{"driver": "yoosee", "provider": "yoosee-gwell"}]
+
+
+def test_status_can_present_multiple_providers_without_silent_operation_selection(monkeypatch):
+    first = SimpleNamespace(
+        driver_key="first",
+        provider="First Cameras",
+        account_configured=lambda: False,
+    )
+    second = SimpleNamespace(driver_key="second", provider="Second Cameras")
+    monkeypatch.setattr(
+        provisioning_routes.drivers,
+        "onboarding_providers",
+        lambda: (("first", first), ("second", second)),
+    )
+
+    result = provisioning_routes.provisioning_status()
+
+    assert result["driver"] == "first"
+    assert result["driver_required"] is True
+    assert result["providers"] == [
+        {"driver": "first", "provider": "First Cameras"},
+        {"driver": "second", "provider": "Second Cameras"},
+    ]
 
 
 def test_provisioning_inspection_selects_driver_explicitly():

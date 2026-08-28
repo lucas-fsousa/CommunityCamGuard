@@ -37,6 +37,10 @@ generic API and startup code even when its implementation already fit the camera
   inspection returns the resolved key, and the status endpoint lists registered providers. This
   makes the explicit-selection rule usable before a second family lands, without breaking the
   current one-provider dashboard.
+- The dashboard hides the provider selector when only one onboarding driver exists and propagates
+  the selected key through account, label, BLE, privileged and completion requests. Status may
+  present the first provider for selector bootstrap; actual onboarding operations never silently
+  resolve an ambiguous registry.
 
 ## Consequences
 
