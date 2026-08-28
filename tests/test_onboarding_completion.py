@@ -36,23 +36,21 @@ def _enrollment(camera_id=None):
 
 
 def _located():
-    return rtsp_completion.LocatedCamera(
-        "192.168.1.30", MAC, (5000,), "Yoosee", "IPC", "40.1.14"
-    )
+    return rtsp_completion.LocatedCamera("192.168.1.30", MAC, (5000,), "Yoosee", "IPC", "40.1.14")
 
 
 def _proof():
-    return rtsp_completion.RtspMediaProof(
-        "/onvif1", "udp", True, True, "h264", "pcm_alaw", 42
-    )
+    return rtsp_completion.RtspMediaProof("/onvif1", "udp", True, True, "h264", "pcm_alaw", 42)
 
 
 def test_media_proof_requires_received_video_packets():
     valid = json.dumps(
-        {"streams": [
-            {"codec_type": "video", "codec_name": "h264", "nb_read_packets": "12"},
-            {"codec_type": "audio", "codec_name": "pcm_alaw", "nb_read_packets": "4"},
-        ]}
+        {
+            "streams": [
+                {"codec_type": "video", "codec_name": "h264", "nb_read_packets": "12"},
+                {"codec_type": "audio", "codec_name": "pcm_alaw", "nb_read_packets": "4"},
+            ]
+        }
     ).encode()
     no_packets = json.dumps(
         {"streams": [{"codec_type": "video", "codec_name": "h264", "nb_read_packets": "0"}]}
@@ -71,17 +69,13 @@ def test_prove_rtsp_media_prefers_udp_and_never_returns_credential(monkeypatch):
     def fake_run(arguments, timeout):
         calls.append((arguments, timeout))
         payload = json.dumps(
-            {"streams": [{
-                "codec_type": "video", "codec_name": "h264", "nb_read_packets": "3"
-            }]}
+            {"streams": [{"codec_type": "video", "codec_name": "h264", "nb_read_packets": "3"}]}
         ).encode()
         return subprocess.CompletedProcess(arguments, 0, payload, b"")
 
     monkeypatch.setattr(rtsp_completion, "_run_ffprobe", fake_run)
 
-    proof = rtsp_completion.prove_rtsp_media(
-        "192.168.1.30", "admin", "SafePass123", attempts=1
-    )
+    proof = rtsp_completion.prove_rtsp_media("192.168.1.30", "admin", "SafePass123", attempts=1)
 
     assert proof.transport == "udp" and proof.path == "/onvif1"
     assert calls[0][0][calls[0][0].index("-rtsp_transport") + 1] == "udp"
@@ -116,9 +110,7 @@ def test_completion_persists_only_after_media_proof(monkeypatch):
     monkeypatch.setattr(
         rtsp_completion,
         "prepare_camera_rtsp",
-        lambda _enrollment, _password: P2PRtspPreparation(
-            DEVICE, False, True, True, False
-        ),
+        lambda _enrollment, _password: P2PRtspPreparation(DEVICE, False, True, True, False),
     )
     monkeypatch.setattr(rtsp_completion, "prove_rtsp_media", lambda *_args, **_kwargs: _proof())
 
@@ -144,9 +136,7 @@ def test_failed_media_proof_rolls_back_enable_and_does_not_register(monkeypatch)
     monkeypatch.setattr(
         rtsp_completion,
         "prepare_camera_rtsp",
-        lambda _enrollment, _password: P2PRtspPreparation(
-            DEVICE, False, True, True, False
-        ),
+        lambda _enrollment, _password: P2PRtspPreparation(DEVICE, False, True, True, False),
     )
     monkeypatch.setattr(
         rtsp_completion,
@@ -162,9 +152,7 @@ def test_failed_media_proof_rolls_back_enable_and_does_not_register(monkeypatch)
     )
 
     with pytest.raises(rtsp_completion.OnboardingCompletionError, match="no packets"):
-        rtsp_completion.complete_camera_onboarding(
-            enrollment, _located(), device_id=DEVICE
-        )
+        rtsp_completion.complete_camera_onboarding(enrollment, _located(), device_id=DEVICE)
 
     assert rollback == [False]
     assert registry.get_camera(MAC) is None
@@ -187,9 +175,7 @@ def test_existing_verified_camera_is_idempotent_and_never_rotates_password(monke
         lambda *_args: (_ for _ in ()).throw(AssertionError("credential rotated")),
     )
 
-    result = rtsp_completion.complete_camera_onboarding(
-        enrollment, _located(), device_id=DEVICE
-    )
+    result = rtsp_completion.complete_camera_onboarding(enrollment, _located(), device_id=DEVICE)
 
     assert result.already_configured is True
     assert registry.get_camera(MAC).password == "Existing123"
@@ -204,7 +190,7 @@ def test_completion_api_returns_public_result_without_credentials_or_native_id(m
         stream_path="/onvif1",
         last_ip="192.168.1.30",
     )
-    enrollment = _enrollment(camera.camera_id)
+    _enrollment(camera.camera_id)
     completed = rtsp_completion.CompletedCamera(
         camera,
         _proof(),
@@ -213,17 +199,17 @@ def test_completion_api_returns_public_result_without_credentials_or_native_id(m
     )
     monkeypatch.setattr(
         onboarding,
-        "inspect_label",
-        lambda **_kwargs: {
+        "inspect_provisioning_label",
+        lambda _body: {
             "device_id": DEVICE,
             "mac": MAC,
             "firmware_version": "40.1.14",
         },
     )
-    monkeypatch.setattr(onboarding, "bound_privileged_enrollment", lambda _device: enrollment)
-    monkeypatch.setattr(onboarding, "locate_camera_by_mac", lambda _mac: _located())
     monkeypatch.setattr(
-        onboarding, "complete_camera_onboarding", lambda *_args, **_kwargs: completed
+        onboarding,
+        "onboarding",
+        lambda: SimpleNamespace(complete=lambda **_kwargs: completed),
     )
     media = SimpleNamespace(restart=lambda: None, wait_healthy=lambda timeout: True)
     recorder = SimpleNamespace(start=lambda: None)
@@ -254,13 +240,15 @@ def test_completion_api_returns_public_result_without_credentials_or_native_id(m
 def test_completion_api_requires_printed_mac_before_p2p(monkeypatch):
     monkeypatch.setattr(
         onboarding,
-        "inspect_label",
-        lambda **_kwargs: {"device_id": DEVICE, "mac": "", "firmware_version": ""},
+        "inspect_provisioning_label",
+        lambda _body: {"device_id": DEVICE, "mac": "", "firmware_version": ""},
     )
     monkeypatch.setattr(
         onboarding,
-        "bound_privileged_enrollment",
-        lambda _device: (_ for _ in ()).throw(AssertionError("P2P opened")),
+        "onboarding",
+        lambda: SimpleNamespace(
+            complete=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("P2P opened"))
+        ),
     )
     request = Request(
         {"type": "http", "app": SimpleNamespace(state=SimpleNamespace(media=None, rec=None))}

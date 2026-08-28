@@ -4,15 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ...provisioning import (
+    PrivilegedEnrollmentError,
     bound_privileged_enrollment,
+    complete_camera_onboarding,
     fetch_native_ble_material,
     load_ble_provisioning_material,
+    locate_camera_by_mac,
 )
 from ..onboarding import (
     AccountLogin,
+    CompletionMediaProof,
+    CompletionResult,
     InventoryResult,
     OnboardingAccountError,
+    OnboardingCompletionError,
+    OnboardingStateError,
     OnboardingTransportError,
     PropertyReadResult,
     RouteResult,
@@ -137,6 +145,42 @@ class YooseeOnboarding:
             transport_acknowledged=result.transport_acknowledged,
             error_code=result.error_code,
             value=result.value,
+        )
+
+    def complete(
+        self,
+        *,
+        device_id: str,
+        mac: str,
+        name: str,
+        firmware_hint: str,
+    ) -> CompletionResult:
+        try:
+            enrollment = bound_privileged_enrollment(device_id)
+            located = locate_camera_by_mac(mac)
+            completed = complete_camera_onboarding(
+                enrollment,
+                located,
+                device_id=device_id,
+                name=name,
+                firmware_hint=firmware_hint,
+            )
+        except PrivilegedEnrollmentError as exc:
+            raise OnboardingStateError(str(exc)) from exc
+        except NativeCompletionError as exc:
+            raise OnboardingCompletionError(exc.stage, str(exc)) from exc
+        proof = completed.proof
+        return CompletionResult(
+            camera=completed.camera,
+            proof=CompletionMediaProof(
+                transport=proof.transport,
+                has_video=proof.has_video,
+                has_audio=proof.has_audio,
+                video_codec=proof.video_codec,
+                audio_codec=proof.audio_codec,
+            ),
+            stages=tuple(completed.stages),
+            already_configured=completed.already_configured,
         )
 
 

@@ -15,6 +15,18 @@ class OnboardingTransportError(RuntimeError):
     """A driver's privileged camera transport failed."""
 
 
+class OnboardingStateError(RuntimeError):
+    """Required durable or ephemeral onboarding state is unavailable."""
+
+
+class OnboardingCompletionError(RuntimeError):
+    """A stage-aware failure while completing a camera into the generic registry."""
+
+    def __init__(self, stage: str, message: str):
+        self.stage = stage
+        super().__init__(message)
+
+
 @dataclass(frozen=True, slots=True)
 class AccountLogin:
     account_type: str
@@ -60,6 +72,23 @@ class PropertyReadResult:
     value: object
 
 
+@dataclass(frozen=True, slots=True)
+class CompletionMediaProof:
+    transport: str
+    has_video: bool
+    has_audio: bool
+    video_codec: str
+    audio_codec: str
+
+
+@dataclass(frozen=True, slots=True)
+class CompletionResult:
+    camera: Any
+    proof: CompletionMediaProof
+    stages: tuple[str, ...]
+    already_configured: bool
+
+
 class OnboardingPort(Protocol):
     """Driver-owned operations needed by the generic onboarding HTTP workflow."""
 
@@ -87,3 +116,12 @@ class OnboardingPort(Protocol):
     def probe_route(self, device_id: str) -> RouteResult: ...
 
     def read_property(self, device_id: str, property_path: str) -> PropertyReadResult: ...
+
+    def complete(
+        self,
+        *,
+        device_id: str,
+        mac: str,
+        name: str,
+        firmware_hint: str,
+    ) -> CompletionResult: ...
