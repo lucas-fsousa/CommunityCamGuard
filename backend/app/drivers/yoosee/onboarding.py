@@ -8,11 +8,14 @@ from ...provisioning import (
     LabelError,
     PrivilegedEnrollmentError,
     bound_privileged_enrollment,
+    build_wifi_payload,
     complete_camera_onboarding,
+    encryption_from_scan,
     fetch_native_ble_material,
     inspect_label,
     load_ble_provisioning_material,
     locate_camera_by_mac,
+    render_svg_base64,
 )
 from ...provisioning import OnboardingCompletionError as NativeCompletionError
 from ..onboarding import (
@@ -71,6 +74,14 @@ class YooseeOnboarding:
             )
         except LabelError as exc:
             raise OnboardingLabelError(str(exc)) from exc
+
+    def build_wifi_qr(self, *, ssid: str, password: str, security: str) -> str:
+        payload = build_wifi_payload(
+            ssid=ssid,
+            password=password,
+            encryption=encryption_from_scan(security, password),
+        )
+        return render_svg_base64(payload)
 
     def login(self, request: AccountLogin) -> None:
         try:

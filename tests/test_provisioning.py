@@ -357,19 +357,17 @@ def test_qr_is_rendered_as_an_in_memory_svg():
 
 def test_qr_uses_the_same_high_error_correction_as_the_apk(monkeypatch):
     captured = {}
-    real_qr = network_routes.render_svg_base64.__globals__["qrcode"].QRCode
+    real_qr = render_svg_base64.__globals__["qrcode"].QRCode
 
     def recording_qr(*args, **kwargs):
         captured.update(kwargs)
         return real_qr(*args, **kwargs)
 
-    monkeypatch.setattr(
-        network_routes.render_svg_base64.__globals__["qrcode"], "QRCode", recording_qr
-    )
+    monkeypatch.setattr(render_svg_base64.__globals__["qrcode"], "QRCode", recording_qr)
     render_svg_base64(build_wifi_payload(ssid="Home", password="secret"))
     assert (
         captured["error_correction"]
-        == network_routes.render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
+        == render_svg_base64.__globals__["qrcode"].constants.ERROR_CORRECT_H
     )
 
 

@@ -6,10 +6,7 @@ from fastapi import APIRouter, HTTPException, Response
 
 from ..provisioning import (
     WifiSelectionError,
-    build_wifi_payload,
-    encryption_from_scan,
     manual_network,
-    render_svg_base64,
     scan_wifi_networks,
     selected_network,
 )
@@ -20,6 +17,7 @@ from .provisioning_common import (
     ProvisioningManualNetworkIn,
     ProvisioningStartIn,
     inspect_provisioning_label,
+    onboarding,
 )
 
 router = APIRouter(prefix="/api/provisioning", tags=["provisioning"])
@@ -80,12 +78,11 @@ def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     password = body.wifi_password.get_secret_value()
     try:
-        payload = build_wifi_payload(
+        qr_data = onboarding().build_wifi_qr(
             ssid=network.ssid,
             password=password,
-            encryption=encryption_from_scan(network.security, password),
+            security=network.security,
         )
-        qr_data = render_svg_base64(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
