@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from backend.app import config
+from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
 from backend.app.camera_identity import stable_camera_id
 from backend.app.db import connect, registry
@@ -20,7 +21,10 @@ def _raw(*, hd: bool, has_audio: bool = True) -> str:
     so these wiring tests stay correct if the quality bitrates are ever retuned."""
     s = config.get_settings()
     return quality.encode_raw_args(
-        s.live_quality, s.live_fps, hd=hd, repair_audio_clock=has_audio,
+        s.live_quality,
+        s.live_fps,
+        hd=hd,
+        repair_audio_clock=has_audio,
     )
 
 
@@ -68,7 +72,10 @@ def test_query_filters_by_opaque_camera_id():
     camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
     _seed(3, camera_id=camera_id)
     assert recorder.query_segments(camera_id=camera_id)["total"] == 3
-    assert recorder.query_segments(camera_id=stable_camera_id("mac", "aa:bb:cc:dd:ee:02"))["total"] == 0
+    assert (
+        recorder.query_segments(camera_id=stable_camera_id("mac", "aa:bb:cc:dd:ee:02"))["total"]
+        == 0
+    )
 
 
 def test_recordings_endpoint_includes_retention_days(monkeypatch):
@@ -76,11 +83,11 @@ def test_recordings_endpoint_includes_retention_days(monkeypatch):
     _seed(3)
     monkeypatch.setenv("RECORDING_RETENTION_DAYS", "7")
     config.get_settings.cache_clear()
-    res = routes.recordings()                       # route fn is callable directly (FastAPI)
-    assert res["total"] == 3 and res["retention_days"] == 7    # page context for the UI banner
+    res = recording_routes.recordings()  # route fn is callable directly (FastAPI)
+    assert res["total"] == 3 and res["retention_days"] == 7  # page context for the UI banner
     monkeypatch.setenv("RECORDING_RETENTION_DAYS", "0")
     config.get_settings.cache_clear()
-    assert routes.recordings()["retention_days"] == 0          # 0 = kept forever
+    assert recording_routes.recordings()["retention_days"] == 0  # 0 = kept forever
 
 
 def test_recordings_endpoint_resolves_safe_mac_to_friendly_camera_name():
@@ -88,7 +95,7 @@ def test_recordings_endpoint_resolves_safe_mac_to_friendly_camera_name():
     camera = registry.upsert_camera("aa:bb:cc:dd:ee:01", name="Front door")
     _seed(1, mac="aabbccddee01", camera_id=camera.camera_id)
 
-    item = routes.recordings()["items"][0]
+    item = recording_routes.recordings()["items"][0]
 
     assert item["mac"] == "aabbccddee01"
     assert item["camera_id"] == camera.camera_id
@@ -120,8 +127,16 @@ def test_recording_schema_migrates_a_pre_camera_id_database():
             "INSERT INTO recordings "
             "(mac,path,started_at,day,hour,size_bytes,duration_s,indexed_at) "
             "VALUES (?,?,?,?,?,?,?,?)",
-            ("aabbccddee01", "/legacy.mp4", "2026-08-01T12:00:00+00:00",
-             "2026-08-01", 12, 100, 60, "x"),
+            (
+                "aabbccddee01",
+                "/legacy.mp4",
+                "2026-08-01T12:00:00+00:00",
+                "2026-08-01",
+                12,
+                100,
+                60,
+                "x",
+            ),
         )
 
     recorder.init_db()
@@ -134,13 +149,14 @@ def test_recording_schema_migrates_a_pre_camera_id_database():
 
 def test_recordings_endpoint_rejects_invalid_camera_id():
     registry.init_db()
-    with pytest.raises(routes.HTTPException) as error:
-        routes.recordings(camera_id="aa:bb:cc:dd:ee:01")
+    with pytest.raises(recording_routes.HTTPException) as error:
+        recording_routes.recordings(camera_id="aa:bb:cc:dd:ee:01")
     assert error.value.status_code == 422
 
 
 def test_media_streams_reports_quality(monkeypatch):
     from types import SimpleNamespace
+
     # media_streams reads request.app.state.media; None -> not healthy, no hardware needed.
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=None)))
     monkeypatch.setenv("LIVE_QUALITY", "high")
@@ -153,12 +169,19 @@ def test_media_streams_reports_quality(monkeypatch):
 
 
 def _add_body(**kw):
-    return routes.CameraIn(mac="aa:bb:cc:dd:ee:ff", name="Cam", username="admin",
-                           password="x", stream_path="/onvif1", **kw)
+    return routes.CameraIn(
+        mac="aa:bb:cc:dd:ee:ff",
+        name="Cam",
+        username="admin",
+        password="x",
+        stream_path="/onvif1",
+        **kw,
+    )
 
 
 def _fake_request():
     from types import SimpleNamespace
+
     return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=None, rec=None)))
 
 
@@ -166,61 +189,83 @@ def test_add_camera_auto_probes_capabilities(monkeypatch):
     from backend.app import drivers
     from backend.app.db import registry
     from backend.app.discovery import active_scan
+
     registry.init_db()
     monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "ok")
     ports_seen = {}
+
     class _Caps:
-        def to_dict(self): return {"driver": "yoosee", "ptz": True, "has_audio": True}
-    monkeypatch.setattr(active_scan, "enumerate_ports", lambda ip: ports_seen.setdefault("ip", ip) or [554, 5000])
+        def to_dict(self):
+            return {"driver": "yoosee", "ptz": True, "has_audio": True}
+
+    monkeypatch.setattr(
+        active_scan, "enumerate_ports", lambda ip: ports_seen.setdefault("ip", ip) or [554, 5000]
+    )
     monkeypatch.setattr(drivers, "probe", lambda cam, ports: _Caps())
     out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
-    assert out["capabilities"]["ptz"] is True          # probed + stored during add
-    assert ports_seen["ip"] == "192.168.1.50"          # probed the camera's IP
+    assert out["capabilities"]["ptz"] is True  # probed + stored during add
+    assert ports_seen["ip"] == "192.168.1.50"  # probed the camera's IP
 
 
 def test_add_camera_without_ip_skips_probe(monkeypatch):
     from backend.app import drivers
     from backend.app.db import registry
+
     registry.init_db()
-    monkeypatch.setattr(drivers, "probe", lambda *a, **k: (_ for _ in ()).throw(AssertionError("probed")))
+    monkeypatch.setattr(
+        drivers, "probe", lambda *a, **k: (_ for _ in ()).throw(AssertionError("probed"))
+    )
     out = routes.upsert_camera(_add_body(last_ip=None), _fake_request())
-    assert out["capabilities"] == {}                   # no IP → no credential check, no probe, still added
+    assert out["capabilities"] == {}  # no IP → no credential check, no probe, still added
 
 
 def test_add_camera_probe_failure_is_swallowed(monkeypatch):
     from backend.app import drivers
     from backend.app.db import registry
     from backend.app.discovery import active_scan
+
     registry.init_db()
     monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "ok")
     monkeypatch.setattr(active_scan, "enumerate_ports", lambda ip: [554])
-    monkeypatch.setattr(drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
-    assert out["mac"] == "aa:bb:cc:dd:ee:ff"           # camera still added despite probe failure
+    assert out["mac"] == "aa:bb:cc:dd:ee:ff"  # camera still added despite probe failure
 
 
 def test_add_camera_rejects_wrong_credentials(monkeypatch):
     import pytest
 
     from backend.app.db import registry
+
     registry.init_db()
-    monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "auth")   # camera rejects creds
+    monkeypatch.setattr(
+        routes.rtsp, "check_credentials", lambda *a, **k: "auth"
+    )  # camera rejects creds
     with pytest.raises(routes.HTTPException) as ei:
         routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
-    assert ei.value.status_code == 422    # 422 (validation), NOT 401 — 401 would bounce the UI to login
-    assert registry.get_camera("aa:bb:cc:dd:ee:ff") is None    # rejected → not saved
+    assert (
+        ei.value.status_code == 422
+    )  # 422 (validation), NOT 401 — 401 would bounce the UI to login
+    assert registry.get_camera("aa:bb:cc:dd:ee:ff") is None  # rejected → not saved
 
 
 def test_add_camera_unreachable_is_allowed(monkeypatch):
     from backend.app import drivers
     from backend.app.db import registry
     from backend.app.discovery import active_scan
+
     registry.init_db()
-    monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "unreachable")  # offline, ambiguous
+    monkeypatch.setattr(
+        routes.rtsp, "check_credentials", lambda *a, **k: "unreachable"
+    )  # offline, ambiguous
     monkeypatch.setattr(active_scan, "enumerate_ports", lambda ip: [554])
-    monkeypatch.setattr(drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("offline")))
+    monkeypatch.setattr(
+        drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("offline"))
+    )
     out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
-    assert out["mac"] == "aa:bb:cc:dd:ee:ff"           # unreachable ≠ wrong password → still added
+    assert out["mac"] == "aa:bb:cc:dd:ee:ff"  # unreachable ≠ wrong password → still added
 
 
 def test_go2rtc_restart_managed_reexecs_binary(monkeypatch):
@@ -230,48 +275,65 @@ def test_go2rtc_restart_managed_reexecs_binary(monkeypatch):
     monkeypatch.setattr(g, "start", lambda cams=None: calls.append("start"))
     monkeypatch.setattr(g, "reload_external", lambda: calls.append("reload"))
     g.restart()
-    assert calls == ["stop", "start"]              # owns the binary → re-exec, no API reload
+    assert calls == ["stop", "start"]  # owns the binary → re-exec, no API reload
 
 
 def test_go2rtc_restart_external_reloads_never_spawns(monkeypatch, tmp_path):
     from backend.app.db import registry
-    registry.init_db()                             # write_config reads the (empty) cameras table
+
+    registry.init_db()  # write_config reads the (empty) cameras table
     g = go2rtc.Go2rtc(manage=False, config_path=tmp_path / "g.yaml")
     calls = []
-    monkeypatch.setattr(g, "start", lambda cams=None: calls.append("start"))   # must NOT be called
+    monkeypatch.setattr(g, "start", lambda cams=None: calls.append("start"))  # must NOT be called
     monkeypatch.setattr(g, "reload_external", lambda: calls.append("reload") or True)
     g.restart()
-    assert calls == ["reload"]                     # external → config reload, never spawns a binary
-    assert (tmp_path / "g.yaml").exists()          # config regenerated for the external go2rtc
+    assert calls == ["reload"]  # external → config reload, never spawns a binary
+    assert (tmp_path / "g.yaml").exists()  # config regenerated for the external go2rtc
 
 
 def test_reload_external_posts_restart(monkeypatch):
     seen = {}
+
     class _R:
         status = 200
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
     def fake_urlopen(req, timeout=None):
-        seen["url"] = req.full_url; seen["method"] = req.get_method()
+        seen["url"] = req.full_url
+        seen["method"] = req.get_method()
         return _R()
+
     monkeypatch.setattr(go2rtc.urllib.request, "urlopen", fake_urlopen)
     assert go2rtc.Go2rtc(manage=False).reload_external() is True
     assert seen["url"].endswith("/api/restart") and seen["method"] == "POST"
 
 
 def test_reload_external_false_on_transport_error(monkeypatch):
-    monkeypatch.setattr(go2rtc.urllib.request, "urlopen",
-                        lambda req, timeout=None: (_ for _ in ()).throw(OSError("down")))
+    monkeypatch.setattr(
+        go2rtc.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: (_ for _ in ()).throw(OSError("down")),
+    )
     assert go2rtc.Go2rtc(manage=False).reload_external() is False
 
 
 def test_resync_is_best_effort_on_media_error():
     from types import SimpleNamespace
+
     class _Media:
-        def restart(self): raise RuntimeError("boom")
-        def wait_healthy(self, timeout): return False
+        def restart(self):
+            raise RuntimeError("boom")
+
+        def wait_healthy(self, timeout):
+            return False
+
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=_Media(), rec=None)))
-    routes._resync(req)                            # must not raise — CRUD op stays successful
+    routes._resync(req)  # must not raise — CRUD op stays successful
 
 
 def test_go2rtc_config_binds_loopback():
@@ -305,7 +367,9 @@ def test_media_helpers_reject_driver_native_identifiers():
 def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track():
     silent = _camera("aa:bb:cc:00:00:01", stream_path="/onvif1", last_ip="10.0.0.1")
     audible = _camera(
-        "aa:bb:cc:00:00:02", stream_path="/onvif1", last_ip="10.0.0.2",
+        "aa:bb:cc:00:00:02",
+        stream_path="/onvif1",
+        last_ip="10.0.0.2",
         capabilities={"has_audio": True},
     )
     streams = go2rtc.build_config(cameras=[silent, audible])["streams"]
@@ -317,28 +381,31 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     main_raw = _raw(hd=True)
     sub_raw = _raw(hd=False)
     silent_id, audible_id = silent.camera_id, audible.camera_id
-    assert streams[silent_id] == "rtsp://admin@10.0.0.1:554/onvif1"      # recording
-    assert streams[f"{silent_id}_hd"] == (
-        f"ffmpeg:{silent_id}#async#video=h264{silent_main_raw}")
-    assert streams[f"{silent_id}_web"] == (
-        f"ffmpeg:{silent_id}_hd#video=h264_sd{silent_sub_raw}")
+    assert streams[silent_id] == "rtsp://admin@10.0.0.1:554/onvif1"  # recording
+    assert streams[f"{silent_id}_hd"] == (f"ffmpeg:{silent_id}#async#video=h264{silent_main_raw}")
+    assert streams[f"{silent_id}_web"] == (f"ffmpeg:{silent_id}_hd#video=h264_sd{silent_sub_raw}")
     assert streams[f"{audible_id}_hd"] == (
-        f"ffmpeg:{audible_id}#async#video=h264#audio=aac#audio=opus{main_raw}")
-    assert (streams[f"{audible_id}_web"]
-            == f"ffmpeg:{audible_id}_hd"
-               f"#video=h264_sd#audio=aac#audio=opus{sub_raw}")
+        f"ffmpeg:{audible_id}#async#video=h264#audio=aac#audio=opus{main_raw}"
+    )
+    assert (
+        streams[f"{audible_id}_web"] == f"ffmpeg:{audible_id}_hd"
+        f"#video=h264_sd#audio=aac#audio=opus{sub_raw}"
+    )
 
 
 def test_go2rtc_variants_never_open_the_camera_substream():
     """Recording/live/SD share one camera RTSP producer even when `/onvif2` is advertised."""
     cam = _camera(
-        "aa:bb:cc:00:00:03", stream_path="/onvif1", last_ip="10.0.0.3",
-        username="admin", password="pw",
+        "aa:bb:cc:00:00:03",
+        stream_path="/onvif1",
+        last_ip="10.0.0.3",
+        username="admin",
+        password="pw",
         capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
     )
     streams = go2rtc.build_config(cameras=[cam])["streams"]
     sid = cam.camera_id
-    assert streams[sid] == "rtsp://admin:pw@10.0.0.3:554/onvif1"   # recording
+    assert streams[sid] == "rtsp://admin:pw@10.0.0.3:554/onvif1"  # recording
     assert f"{sid}_sub" not in streams
     assert "onvif2" not in repr(streams)
     assert streams[f"{sid}_hd"].startswith(f"ffmpeg:{sid}#async#video=h264")
@@ -347,7 +414,9 @@ def test_go2rtc_variants_never_open_the_camera_substream():
 
 def test_substream_url_none_when_camera_has_one_path():
     cam = _camera(
-        "aa:bb:cc:00:00:04", stream_path="/onvif1", last_ip="10.0.0.4",
+        "aa:bb:cc:00:00:04",
+        stream_path="/onvif1",
+        last_ip="10.0.0.4",
         capabilities={"stream_paths": ["/onvif1"]},
     )
     assert cam.substream_url is None
@@ -355,15 +424,17 @@ def test_substream_url_none_when_camera_has_one_path():
 
 def test_segment_seconds_clamped_to_minimum(monkeypatch):
     from backend.app import config
+
     monkeypatch.setenv("SEGMENT_SECONDS", "10")
     config.get_settings.cache_clear()
-    assert config.get_settings().segment_seconds == 60      # clamped up to the minimum
+    assert config.get_settings().segment_seconds == 60  # clamped up to the minimum
     monkeypatch.setenv("SEGMENT_SECONDS", "300")
     config.get_settings.cache_clear()
-    assert config.get_settings().segment_seconds == 300     # honoured when >= 60
+    assert config.get_settings().segment_seconds == 300  # honoured when >= 60
 
 
 # --- re-keying a camera's recordings (docs/DECISIONS.md §23 follow-up) ---------------
+
 
 def _seed_on_disk(mac_safe, day="2026-07-27"):
     """Seed one segment both on disk and in the index, the way the recorder writes it."""
@@ -386,7 +457,7 @@ def test_rekey_segments_updates_compatibility_mac_without_moving_history():
     root, seg = _seed_on_disk("aabbccddeeff")
     moved = recorder.rekey_segments("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:01")
     assert moved == 1
-    assert seg.exists()                                       # archive paths are never rewritten
+    assert seg.exists()  # archive paths are never rewritten
     assert not (root / "aabbccddee01").exists()
     # Cached clients may still filter by the corrected MAC; canonical clients use camera_id.
     assert recorder.query_segments(mac="aa:bb:cc:dd:ee:01")["total"] == 1
@@ -428,18 +499,23 @@ def test_reindexing_legacy_directory_preserves_owner_after_native_rekey():
 def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():
     """A single shared H.264 producer is hot before browsers connect, for all cameras."""
     dual = _camera(
-        "aa:bb:cc:00:00:05", stream_path="/onvif1", last_ip="10.0.0.5",
+        "aa:bb:cc:00:00:05",
+        stream_path="/onvif1",
+        last_ip="10.0.0.5",
         capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
     )
     single = _camera(
-        "aa:bb:cc:00:00:06", stream_path="/onvif1", last_ip="10.0.0.6",
+        "aa:bb:cc:00:00:06",
+        stream_path="/onvif1",
+        last_ip="10.0.0.6",
         capabilities={"has_audio": True, "stream_paths": ["/onvif1"]},
     )
     cfg = go2rtc.build_config(cameras=[dual, single])
     streams = cfg["streams"]
-    assert (streams[f"{dual.camera_id}_hd"]
-            == f"ffmpeg:{dual.camera_id}#async"
-               f"#video=h264#audio=aac#audio=opus{_raw(hd=True)}")
+    assert (
+        streams[f"{dual.camera_id}_hd"] == f"ffmpeg:{dual.camera_id}#async"
+        f"#video=h264#audio=aac#audio=opus{_raw(hd=True)}"
+    )
     assert f"{single.camera_id}_hd" in streams
     assert cfg["preload"] == {
         f"{dual.camera_id}_hd": "video&audio",
@@ -457,7 +533,9 @@ def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(mon
     monkeypatch.setenv("LIVE_FPS", "12")
     config.get_settings.cache_clear()
     cam = _camera(
-        "aa:bb:cc:00:00:07", stream_path="/onvif1", last_ip="10.0.0.7",
+        "aa:bb:cc:00:00:07",
+        stream_path="/onvif1",
+        last_ip="10.0.0.7",
         capabilities={"has_audio": True, "stream_paths": ["/onvif1", "/onvif2"]},
     )
     cfg = go2rtc.build_config(cameras=[cam])

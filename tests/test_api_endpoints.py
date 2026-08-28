@@ -2,10 +2,12 @@
 media/storage, and recordings/file. Route functions are called directly (FastAPI allows it) with
 a stub Request; drivers and the network are monkeypatched, so these are fast and offline.
 """
+
 from types import SimpleNamespace
 
 import pytest
 
+from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
 from backend.app.db import registry
 
@@ -39,6 +41,7 @@ class FakeDriver:
 
 # --- delete -------------------------------------------------------------------------
 
+
 def test_delete_camera_removes_it():
     camera = _seed_camera()
     out = routes.delete_camera(camera.camera_id, _req(media=None, rec=None))
@@ -47,6 +50,7 @@ def test_delete_camera_removes_it():
 
 
 # --- probe --------------------------------------------------------------------------
+
 
 def test_probe_unknown_camera_is_404():
     registry.init_db()
@@ -72,6 +76,7 @@ def test_probe_camera_success(monkeypatch):
 
 # --- ptz ----------------------------------------------------------------------------
 
+
 def test_ptz_unknown_camera_is_404():
     registry.init_db()
     with pytest.raises(routes.HTTPException) as ei:
@@ -88,8 +93,11 @@ def test_ptz_success(monkeypatch):
 
 def test_ptz_unsupported_is_501(monkeypatch):
     camera = _seed_camera()
-    monkeypatch.setattr(routes.drivers, "for_camera",
-                        lambda cam: FakeDriver(raises=routes.drivers.Unsupported("ptz")))
+    monkeypatch.setattr(
+        routes.drivers,
+        "for_camera",
+        lambda cam: FakeDriver(raises=routes.drivers.Unsupported("ptz")),
+    )
     with pytest.raises(routes.HTTPException) as ei:
         routes.ptz_move(camera.camera_id, routes.PtzIn(direction="left", action="start"))
     assert ei.value.status_code == 501
@@ -97,8 +105,9 @@ def test_ptz_unsupported_is_501(monkeypatch):
 
 def test_ptz_bad_direction_is_400(monkeypatch):
     camera = _seed_camera()
-    monkeypatch.setattr(routes.drivers, "for_camera",
-                        lambda cam: FakeDriver(raises=ValueError("unknown direction")))
+    monkeypatch.setattr(
+        routes.drivers, "for_camera", lambda cam: FakeDriver(raises=ValueError("unknown direction"))
+    )
     with pytest.raises(routes.HTTPException) as ei:
         routes.ptz_move(camera.camera_id, routes.PtzIn(direction="sideways", action="step"))
     assert ei.value.status_code == 400
@@ -114,6 +123,7 @@ def test_ptz_rejected_is_502(monkeypatch):
 
 # --- reboot -------------------------------------------------------------------------
 
+
 def test_reboot_success(monkeypatch):
     camera = _seed_camera()
     monkeypatch.setattr(routes.drivers, "for_camera", lambda cam: FakeDriver(reboot_result=True))
@@ -122,8 +132,11 @@ def test_reboot_success(monkeypatch):
 
 def test_reboot_unsupported_is_501(monkeypatch):
     camera = _seed_camera()
-    monkeypatch.setattr(routes.drivers, "for_camera",
-                        lambda cam: FakeDriver(raises=routes.drivers.Unsupported("reboot")))
+    monkeypatch.setattr(
+        routes.drivers,
+        "for_camera",
+        lambda cam: FakeDriver(raises=routes.drivers.Unsupported("reboot")),
+    )
     with pytest.raises(routes.HTTPException) as ei:
         routes.reboot_camera(camera.camera_id)
     assert ei.value.status_code == 501
@@ -145,6 +158,7 @@ def test_legacy_mac_reference_remains_temporarily_accepted(monkeypatch):
 
 # --- discovery ----------------------------------------------------------------------
 
+
 def test_discovery_scan_returns_configured_and_candidates(monkeypatch):
     registry.init_db()
     monkeypatch.setattr(routes.active_scan, "scan", lambda **k: [])
@@ -154,6 +168,7 @@ def test_discovery_scan_returns_configured_and_candidates(monkeypatch):
 
 
 # --- media / storage ----------------------------------------------------------------
+
 
 def test_media_restart_ok():
     out = routes.media_restart(_req(media=None, rec=None))
@@ -176,7 +191,8 @@ def test_storage_status_returns_monitor_state():
 
 # --- recordings/file ----------------------------------------------------------------
 
+
 def test_recording_file_rejects_path_outside_root():
-    with pytest.raises(routes.HTTPException) as ei:
-        routes.recording_file(path="/etc/passwd")
+    with pytest.raises(recording_routes.HTTPException) as ei:
+        recording_routes.recording_file(path="/etc/passwd")
     assert ei.value.status_code == 404

@@ -1,8 +1,10 @@
 """A few remaining route/config branches to round out coverage."""
+
 from pathlib import Path
 from types import SimpleNamespace
 
 from backend.app import config
+from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
 from backend.app.config import get_settings
 from backend.app.db import registry
@@ -20,12 +22,8 @@ def test_list_cameras_marks_the_recording_flag():
 
 def test_camera_status_uses_base_stream_packet_liveness():
     registry.init_db()
-    cam = registry.upsert_camera(
-        "aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1"
-    )
-    media = SimpleNamespace(
-        stream_online=lambda: {routes.go2rtc.stream_id(cam.camera_id): True}
-    )
+    cam = registry.upsert_camera("aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1")
+    media = SimpleNamespace(stream_online=lambda: {routes.go2rtc.stream_id(cam.camera_id): True})
     rec = SimpleNamespace(is_recording=lambda _mac: True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media, rec=rec)))
 
@@ -39,10 +37,10 @@ def test_recording_file_serves_an_existing_segment(monkeypatch):
     seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
     seg.parent.mkdir(parents=True, exist_ok=True)
     seg.write_bytes(b"x" * 10)
-    monkeypatch.setattr(routes.playback, "cached_path", lambda t: None)
-    monkeypatch.setattr(routes.playback, "needs_transcode", lambda t: False)  # H.264 -> as-is
-    resp = routes.recording_file(path=str(seg))
-    assert resp.status_code == 200                     # a FileResponse for the segment
+    monkeypatch.setattr(recording_routes.playback, "cached_path", lambda t: None)
+    monkeypatch.setattr(recording_routes.playback, "needs_transcode", lambda t: False)
+    resp = recording_routes.recording_file(path=str(seg))
+    assert resp.status_code == 200  # a FileResponse for the segment
 
 
 def test_recording_file_refuses_partial_hevc_and_starts_preparation(monkeypatch):
@@ -50,14 +48,16 @@ def test_recording_file_refuses_partial_hevc_and_starts_preparation(monkeypatch)
     seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
     seg.parent.mkdir(parents=True, exist_ok=True)
     seg.write_bytes(b"hevc")
-    monkeypatch.setattr(routes.playback, "cached_path", lambda t: None)
-    monkeypatch.setattr(routes.playback, "needs_transcode", lambda t: True)
+    monkeypatch.setattr(recording_routes.playback, "cached_path", lambda t: None)
+    monkeypatch.setattr(recording_routes.playback, "needs_transcode", lambda t: True)
     started = []
-    monkeypatch.setattr(routes.playback, "prepare_transcode", lambda t: started.append(t) or True)
+    monkeypatch.setattr(
+        recording_routes.playback, "prepare_transcode", lambda t: started.append(t) or True
+    )
 
     try:
-        routes.recording_file(path=str(seg))
-    except routes.HTTPException as exc:
+        recording_routes.recording_file(path=str(seg))
+    except recording_routes.HTTPException as exc:
         assert exc.status_code == 409
     else:
         raise AssertionError("uncached HEVC was served before it became seekable")
@@ -70,18 +70,22 @@ def test_prepare_recording_starts_shared_job_and_reports_progress(monkeypatch):
     seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
     seg.parent.mkdir(parents=True, exist_ok=True)
     seg.write_bytes(b"hevc")
-    monkeypatch.setattr(routes.playback, "cached_path", lambda t: None)
-    monkeypatch.setattr(routes.playback, "needs_transcode", lambda t: True)
+    monkeypatch.setattr(recording_routes.playback, "cached_path", lambda t: None)
+    monkeypatch.setattr(recording_routes.playback, "needs_transcode", lambda t: True)
     running = {"value": False}
-    monkeypatch.setattr(routes.playback, "transcode_in_progress", lambda t: running["value"])
     monkeypatch.setattr(
-        routes.playback,
+        recording_routes.playback, "transcode_in_progress", lambda t: running["value"]
+    )
+    monkeypatch.setattr(
+        recording_routes.playback,
         "prepare_transcode",
         lambda t: running.update(value=True) or True,
     )
 
-    assert routes.prepare_recording_playback(path=str(seg)) == {
-        "ready": False, "cached": False, "transcoding": True,
+    assert recording_routes.prepare_recording_playback(path=str(seg)) == {
+        "ready": False,
+        "cached": False,
+        "transcoding": True,
     }
 
 
@@ -92,10 +96,12 @@ def test_recording_playback_status_reports_seekable_cache(monkeypatch):
     seg.parent.mkdir(parents=True, exist_ok=True)
     seg.write_bytes(b"hevc")
     cache.write_bytes(b"h264")
-    monkeypatch.setattr(routes.playback, "cached_path", lambda t: cache)
+    monkeypatch.setattr(recording_routes.playback, "cached_path", lambda t: cache)
 
-    assert routes.recording_playback_status(path=str(seg)) == {
-        "ready": True, "cached": True, "transcoding": False,
+    assert recording_routes.recording_playback_status(path=str(seg)) == {
+        "ready": True,
+        "cached": True,
+        "transcoding": False,
     }
 
 
@@ -107,7 +113,7 @@ def test_recording_download_uses_camera_name_and_original_timestamp():
     registry.init_db()
     registry.upsert_camera("aa:bb:cc:dd:ee:01", name="Garagem / Sul")
 
-    resp = routes.recording_download(path=str(seg))
+    resp = recording_routes.recording_download(path=str(seg))
 
     assert resp.status_code == 200
     assert Path(resp.path) == seg.resolve()
@@ -117,8 +123,8 @@ def test_recording_download_uses_camera_name_and_original_timestamp():
 
 def test_recording_download_rejects_path_outside_recordings_root():
     try:
-        routes.recording_download(path="/etc/passwd")
-    except routes.HTTPException as exc:
+        recording_routes.recording_download(path="/etc/passwd")
+    except recording_routes.HTTPException as exc:
         assert exc.status_code == 404
     else:
         raise AssertionError("outside recording path was accepted")

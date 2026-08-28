@@ -8,6 +8,7 @@ API still serves so cameras can be managed.
 
 Run with: ``uvicorn backend.app.main:app`` (host/port from ``.env``).
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -18,6 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.onboarding import router as onboarding_router
+from .api.recordings import router as recordings_router
 from .api.routes import router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
@@ -53,14 +55,14 @@ async def lifespan(app: FastAPI):
     if settings.autostart_services:
         try:
             if settings.manage_go2rtc:
-                media.start()            # spawn + own the go2rtc binary (host mode)
+                media.start()  # spawn + own the go2rtc binary (host mode)
             else:
-                media.write_config()     # go2rtc runs elsewhere (container); just feed it
+                media.write_config()  # go2rtc runs elsewhere (container); just feed it
             if media.wait_healthy(timeout=15):
                 rec.start()
             storage.start()
-            retention.start()            # sporadic cleanup of footage past the retention window
-            warmer.start()               # opt-in: pre-transcode recent segments for instant playback
+            retention.start()  # sporadic cleanup of footage past the retention window
+            warmer.start()  # opt-in: pre-transcode recent segments for instant playback
         except Exception as exc:  # missing binary, etc. — keep the API usable
             app.state.startup_error = str(exc)
 
@@ -87,7 +89,7 @@ endpoints — see `docs/public/api.md` for the full reference with examples.
 app = FastAPI(
     title="Community Cam Guard",
     description=API_DESCRIPTION,
-    version="0.1.0",   # keep in sync with pyproject.toml
+    version="0.1.0",  # keep in sync with pyproject.toml
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -96,8 +98,14 @@ app = FastAPI(
         {"name": "auth", "description": "Log in/out and check the current session."},
         {"name": "cameras", "description": "List, add, remove, probe and control cameras."},
         {"name": "discovery", "description": "Scan the network for cameras."},
-        {"name": "provisioning", "description": "Factory-new setup; authenticated trusted LAN only."},
-        {"name": "vendor controls", "description": "Typed proprietary controls; authenticated trusted LAN only."},
+        {
+            "name": "provisioning",
+            "description": "Factory-new setup; authenticated trusted LAN only.",
+        },
+        {
+            "name": "vendor controls",
+            "description": "Typed proprietary controls; authenticated trusted LAN only.",
+        },
         {"name": "media", "description": "Live-stream info and media-engine control."},
         {"name": "storage", "description": "Recording storage status."},
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
@@ -106,6 +114,7 @@ app = FastAPI(
 app.include_router(router)
 app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
+app.include_router(recordings_router)
 
 
 @app.middleware("http")
