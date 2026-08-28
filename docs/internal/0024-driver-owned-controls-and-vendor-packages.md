@@ -25,6 +25,9 @@ string alone must never grant another driver's controls.
   operations live under `drivers/yoosee/p2p`; there is no application-global `vendor_p2p` package.
   Generic services may depend on driver contracts, while Yoosee-specific onboarding adapters import
   this vertical implementation explicitly.
+- Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
+  the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
+  manufacturer-specific repository as a generic `db` module.
 - The driver-generated control catalog is authoritative for API/UI gating. The old
   `vendor_controls` response is a temporary compatibility projection of that catalog.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
@@ -42,5 +45,5 @@ string alone must never grant another driver's controls.
 - New semantic control kinds still require an intentional contract/UI addition; this is preferable
   to an unsafe generic command tunnel.
 - ADRs 0025–0027 subsequently remove MAC from media, recording and registry identity. The proprietary
-  P2P implementation is now inside the Yoosee driver. Factory provisioning orchestration and vendor
-  account storage still need narrower driver-owned ports instead of imports from the generic router.
+  P2P implementation and account persistence are now inside the Yoosee driver. Factory provisioning
+  orchestration still needs narrower driver-owned ports instead of imports from the generic router.

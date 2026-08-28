@@ -1,4 +1,4 @@
-"""Encrypted persistence for the native vendor account and renewable session."""
+"""Encrypted persistence for the Yoosee account and renewable session."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from ..drivers.yoosee.p2p.account import AccountCredentials, AccountSession
-from . import connect
-from .registry import _decrypt, _encrypt
+from ...db import connect
+from ...db.registry import _decrypt, _encrypt
+from .p2p.account import AccountCredentials, AccountSession
 
 log = logging.getLogger(__name__)
 

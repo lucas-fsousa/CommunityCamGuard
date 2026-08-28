@@ -40,8 +40,9 @@ from ..auth import (
 )
 from ..camera_identity import stable_camera_id, valid_camera_id
 from ..config import get_settings
-from ..db import registry, vendor_account
+from ..db import registry
 from ..discovery import active_scan, rtsp
+from ..drivers.yoosee import account_store
 from ..drivers.yoosee.p2p import (
     MODEL_READ_PATHS,
     AccountCredentials,
@@ -496,7 +497,7 @@ def _inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
 def provisioning_status() -> dict:
     """Describe the local onboarding surface without probing or changing any camera."""
     material_path = get_settings().provisioning_ble_material_file
-    native_account = vendor_account.get_account() is not None
+    native_account = account_store.get_account() is not None
     ble_status = (
         "handshake-ready"
         if native_account or (material_path and material_path.is_file())
@@ -534,10 +535,10 @@ def provisioning_status() -> dict:
 def provisioning_vendor_account_status(response: Response) -> dict:
     """Report enrollment state without disclosing an account identity or token."""
 
-    configured = vendor_account.get_account() is not None
+    configured = account_store.get_account() is not None
     response.headers["Cache-Control"] = "no-store"
     return {
-        "provider": vendor_account.PROVIDER,
+        "provider": account_store.PROVIDER,
         "configured": configured,
         "renewable_session": configured,
         "vendor_cloud_required": True,
@@ -566,7 +567,7 @@ def provisioning_vendor_account_login(
             area=body.area,
         )
         session = login_account(credentials)
-        vendor_account.save_account(credentials, session)
+        account_store.save_account(credentials, session)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except VendorAccountError as exc:
@@ -574,7 +575,7 @@ def provisioning_vendor_account_login(
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
-        "provider": vendor_account.PROVIDER,
+        "provider": account_store.PROVIDER,
         "configured": True,
         "renewable_session": True,
     }
@@ -588,17 +589,17 @@ def provisioning_vendor_account_login(
 def provisioning_vendor_account_refresh(response: Response) -> dict:
     """Renew the encrypted native session without returning any credential material."""
 
-    stored = vendor_account.get_account()
+    stored = account_store.get_account()
     if stored is None:
         raise HTTPException(status_code=409, detail="vendor account is not configured")
     try:
         refreshed = refresh_account_session(stored.session)
-        vendor_account.update_session(refreshed)
+        account_store.update_session(refreshed)
     except VendorAccountError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return {
-        "provider": vendor_account.PROVIDER,
+        "provider": account_store.PROVIDER,
         "configured": True,
         "renewable_session": True,
         "refreshed": True,
@@ -697,10 +698,10 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
 
     settings = get_settings()
     try:
-        stored = vendor_account.get_account()
+        stored = account_store.get_account()
         if stored is not None:
             refreshed = refresh_account_session(stored.session)
-            vendor_account.update_session(refreshed)
+            account_store.update_session(refreshed)
             material = fetch_native_ble_material(
                 refreshed,
                 device_id=identity["device_id"],

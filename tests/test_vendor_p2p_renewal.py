@@ -42,13 +42,13 @@ def test_stale_access_is_refreshed_and_operation_retried_once(monkeypatch):
 
     monkeypatch.setattr(renewal.p2p, "get_enrollment", lambda _device_id: old)
     monkeypatch.setattr(
-        renewal.vendor_account,
+        renewal.account_store,
         "get_account",
         lambda: SimpleNamespace(session=_session(old.access_token)),
     )
     monkeypatch.setattr(renewal, "refresh_account_session", lambda _current: _session(new_token))
     monkeypatch.setattr(
-        renewal.vendor_account,
+        renewal.account_store,
         "update_session",
         lambda session: calls.append(("account", session.access_token)),
     )
@@ -84,7 +84,7 @@ def test_concurrent_refresh_result_is_reused_without_second_cloud_request(monkey
 
     monkeypatch.setattr(renewal.p2p, "get_enrollment", lambda _device_id: current)
     monkeypatch.setattr(
-        renewal.vendor_account,
+        renewal.account_store,
         "get_account",
         lambda: (_ for _ in ()).throw(AssertionError("duplicate refresh")),
     )
@@ -96,7 +96,7 @@ def test_concurrent_refresh_result_is_reused_without_second_cloud_request(monkey
 def test_non_stale_rejection_is_not_refreshed(monkeypatch):
     old = _enrollment(bytes(range(64)))
     monkeypatch.setattr(
-        renewal.vendor_account,
+        renewal.account_store,
         "get_account",
         lambda: (_ for _ in ()).throw(AssertionError("refresh attempted")),
     )

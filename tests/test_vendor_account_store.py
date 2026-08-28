@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from backend.app.config import get_settings
-from backend.app.db import vendor_account
+from backend.app.drivers.yoosee import account_store
 from backend.app.drivers.yoosee.p2p.account import AccountCredentials, AccountSession
 
 
@@ -32,16 +32,16 @@ def _session(token: bytes = bytes(range(64))) -> AccountSession:
 def test_vendor_account_round_trip_is_encrypted_at_rest():
     credentials = _credentials()
     session = _session()
-    saved = vendor_account.save_account(credentials, session)
-    loaded = vendor_account.get_account()
+    saved = account_store.save_account(credentials, session)
+    loaded = account_store.get_account()
 
     assert loaded == saved
-    assert vendor_account.has_account() is True
+    assert account_store.has_account() is True
     with sqlite3.connect(get_settings().db_path) as conn:
         encrypted = bytes(
             conn.execute(
                 "SELECT secret_enc FROM vendor_accounts WHERE provider = ?",
-                (vendor_account.PROVIDER,),
+                (account_store.PROVIDER,),
             ).fetchone()[0]
         )
     assert credentials.account.encode() not in encrypted
@@ -52,8 +52,8 @@ def test_vendor_account_round_trip_is_encrypted_at_rest():
 
 def test_session_refresh_rotates_token_without_replacing_account_credentials():
     credentials = _credentials()
-    first = vendor_account.save_account(credentials, _session())
-    second = vendor_account.update_session(_session(bytes(reversed(range(64)))))
+    first = account_store.save_account(credentials, _session())
+    second = account_store.update_session(_session(bytes(reversed(range(64)))))
 
     assert second.credentials == credentials
     assert second.session.access_token == bytes(reversed(range(64)))
@@ -61,8 +61,8 @@ def test_session_refresh_rotates_token_without_replacing_account_credentials():
 
 
 def test_delete_account_removes_only_vendor_account_record():
-    vendor_account.save_account(_credentials(), _session())
-    vendor_account.delete_account()
+    account_store.save_account(_credentials(), _session())
+    account_store.delete_account()
 
-    assert vendor_account.has_account() is False
-    assert vendor_account.get_account() is None
+    assert account_store.has_account() is False
+    assert account_store.get_account() is None

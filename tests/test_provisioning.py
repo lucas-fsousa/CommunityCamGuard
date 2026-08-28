@@ -471,12 +471,12 @@ def test_ble_prepare_prefers_native_account_over_research_file(monkeypatch):
     )
     calls = []
     monkeypatch.setattr(
-        routes.vendor_account,
+        routes.account_store,
         "get_account",
         lambda: SimpleNamespace(session=session),
     )
     monkeypatch.setattr(
-        routes.vendor_account,
+        routes.account_store,
         "update_session",
         lambda refreshed: calls.append(("stored", refreshed)),
     )
@@ -1223,7 +1223,7 @@ def test_native_vendor_account_login_returns_no_identity_or_secret(monkeypatch):
     assert "person@example.invalid" not in serialized
     assert "account-password" not in serialized
     assert token.hex() not in serialized
-    assert routes.vendor_account.get_account() is not None
+    assert routes.account_store.get_account() is not None
 
 
 def test_vendor_account_routes_reject_public_client_before_login_call(monkeypatch):

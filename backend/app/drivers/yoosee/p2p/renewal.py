@@ -6,8 +6,9 @@ import threading
 from collections.abc import Callable
 from typing import TypeVar
 
-from ....db import p2p, vendor_account
+from ....db import p2p
 from ....db.p2p import P2PEnrollment
+from .. import account_store
 from .account import VendorAccountError, refresh_account_session
 from .client import InitInfoRejectedError, P2PProbeError
 
@@ -32,14 +33,14 @@ def run_with_fresh_access(
         if current is None:
             raise P2PProbeError("P2P enrollment disappeared during session renewal")
         if current.access_id == enrollment.access_id and current.access_token == enrollment.access_token:
-            stored = vendor_account.get_account()
+            stored = account_store.get_account()
             if stored is None:
                 raise P2PProbeError(
                     "P2P session expired and no renewable vendor account is configured"
                 )
             try:
                 session = refresh_account_session(stored.session)
-                vendor_account.update_session(session)
+                account_store.update_session(session)
                 current = p2p.upsert_enrollment(
                     current.device_id,
                     access_id=session.p2p_access_id,
