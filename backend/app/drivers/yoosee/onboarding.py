@@ -4,11 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...provisioning import OnboardingCompletionError as NativeCompletionError
-from ...provisioning import (
-    complete_camera_onboarding,
-    locate_camera_by_mac,
-)
 from ..onboarding import (
     AccountLogin,
     BleDecodeResult,
@@ -58,6 +53,10 @@ from .privileged import (
     remember_privileged_handoff,
 )
 from .qr import build_wifi_payload, encryption_from_scan, render_svg_base64
+from .rtsp_completion import (
+    OnboardingCompletionError as NativeCompletionError,
+)
+from .rtsp_completion import complete_camera_onboarding, locate_camera_by_mac
 from .vendor_cloud import VendorProvisioningCloudError, fetch_native_ble_material
 
 

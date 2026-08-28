@@ -13,12 +13,12 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from ..camera_identity import normalize_identity, stable_camera_id
-from ..db import p2p, registry
-from ..db.p2p import P2PEnrollment
-from ..discovery import active_scan
-from ..drivers.base import Capabilities, classify_ports
-from ..drivers.yoosee.p2p import (
+from ...camera_identity import normalize_identity, stable_camera_id
+from ...db import p2p, registry
+from ...db.p2p import P2PEnrollment
+from ...discovery import active_scan
+from ..base import Capabilities, classify_ports
+from .p2p import (
     P2PProbeError,
     generate_rtsp_password,
     prepare_camera_rtsp,
@@ -174,7 +174,9 @@ def prove_rtsp_media(
     except ValueError as exc:
         raise OnboardingCompletionError("media_proof", "camera LAN address is invalid") from exc
     if not (address.is_private or address.is_loopback):
-        raise OnboardingCompletionError("media_proof", "camera address is outside the local network")
+        raise OnboardingCompletionError(
+            "media_proof", "camera address is outside the local network"
+        )
     if attempts < 1:
         raise ValueError("RTSP proof attempts must be positive")
     deadline = time.monotonic() + max(5.0, min(float(total_timeout), 90.0))

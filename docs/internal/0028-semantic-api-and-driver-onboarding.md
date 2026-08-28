@@ -51,8 +51,11 @@ generic API and startup code even when its implementation already fit the camera
 - Vendor-cloud BLE material acquisition and post-Wi-Fi privileged binding are contained in the
   same driver. Their cloud dependency is explicit and can later be replaced without changing the
   generic onboarding API.
+- LAN location, privileged RTSP activation, authenticated media proof and final registry commit are
+  likewise a Yoosee onboarding transaction behind the port. The historical `app/provisioning`
+  package now contains only reusable Wi-Fi discovery and signed selection.
 - The driver registry remains explicit and auditable; onboarding is not discovered by arbitrary
   filesystem imports.
-- Recovered Yoosee RTSP completion is the final manufacturer implementation still under the
-  historical top-level `provisioning` package. Moving it under the Yoosee package must preserve the
-  driver port and must not reintroduce vendor imports into generic HTTP code.
+- No recovered manufacturer protocol remains in the top-level `provisioning` package. New camera
+  families should add their own onboarding adapter and codecs under their driver rather than
+  extending that generic Wi-Fi utility package.

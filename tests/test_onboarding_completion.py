@@ -12,8 +12,8 @@ from backend.app.api import onboarding
 from backend.app.api.local_only import require_local_request
 from backend.app.db import p2p, registry
 from backend.app.discovery.active_scan import ScannedHost
+from backend.app.drivers.yoosee import rtsp_completion
 from backend.app.drivers.yoosee.p2p.rtsp_setup import P2PRtspPreparation
-from backend.app.provisioning import rtsp_completion
 
 MAC = "aa:bb:cc:dd:ee:03"
 DEVICE = "7000000003"
