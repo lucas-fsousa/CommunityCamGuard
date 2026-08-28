@@ -36,7 +36,23 @@ DRIVERS: tuple[CameraDriver, ...] = (
     XiongmaiDriver(),
     GenericDriver(),
 )
-_BY_KEY: dict[str, CameraDriver] = {d.key: d for d in DRIVERS}
+
+
+def _index_drivers(registered: tuple[CameraDriver, ...]) -> dict[str, CameraDriver]:
+    """Validate deterministic registry invariants before exposing any camera routing."""
+
+    if not registered or registered[-1].key != "generic":
+        raise RuntimeError("the generic camera driver must be registered exactly once and last")
+    keys = [driver.key for driver in registered]
+    if keys.count("generic") != 1:
+        raise RuntimeError("the generic camera driver must be registered exactly once and last")
+    if len(keys) != len(set(keys)):
+        duplicates = sorted({key for key in keys if keys.count(key) > 1})
+        raise RuntimeError(f"duplicate camera driver key(s): {', '.join(duplicates)}")
+    return {driver.key: driver for driver in registered}
+
+
+_BY_KEY = _index_drivers(DRIVERS)
 GENERIC: CameraDriver = _BY_KEY["generic"]
 
 __all__ = [
@@ -93,12 +109,13 @@ def for_camera(camera: Camera) -> CameraDriver:
 def onboarding_provider(driver_key: str | None = None):
     """Resolve a driver-owned onboarding port without importing a vendor package upstream."""
 
+    entries = _onboarding_entries()
     if driver_key is not None:
-        provider = get(driver_key).onboarding()
+        provider = dict(entries).get(driver_key)
         if provider is None:
             raise LookupError(f"driver {driver_key!r} does not support factory onboarding")
         return provider
-    providers = [provider for driver in DRIVERS if (provider := driver.onboarding()) is not None]
+    providers = [provider for _key, provider in entries]
     if len(providers) != 1:
         raise LookupError("an explicit onboarding driver is required")
     return providers[0]
@@ -107,20 +124,30 @@ def onboarding_provider(driver_key: str | None = None):
 def onboarding_providers() -> tuple[tuple[str, OnboardingPort], ...]:
     """List explicitly registered factory-onboarding providers by stable driver key."""
 
-    return tuple(
-        (driver.key, provider)
-        for driver in DRIVERS
-        if (provider := driver.onboarding()) is not None
-    )
+    return _onboarding_entries()
+
+
+def _onboarding_entries() -> tuple[tuple[str, OnboardingPort], ...]:
+    entries: list[tuple[str, OnboardingPort]] = []
+    for driver in DRIVERS:
+        provider = driver.onboarding()
+        if provider is None:
+            continue
+        if provider.driver_key != driver.key:
+            raise RuntimeError(
+                f"onboarding provider {provider.provider!r} declares driver key "
+                f"{provider.driver_key!r}, expected {driver.key!r}"
+            )
+        entries.append((driver.key, provider))
+    return tuple(entries)
 
 
 def init_onboarding() -> None:
     """Initialize durable stores owned by registered onboarding providers."""
 
     seen: set[int] = set()
-    for driver in DRIVERS:
-        provider = driver.onboarding()
-        if provider is not None and id(provider) not in seen:
+    for _driver_key, provider in _onboarding_entries():
+        if id(provider) not in seen:
             provider.init()
             seen.add(id(provider))
 

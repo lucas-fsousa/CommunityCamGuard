@@ -1,7 +1,12 @@
 """Driver registry: discovery paths, detection, and per-family control gating."""
 
+from types import SimpleNamespace
+
+import pytest
+
 from backend.app import drivers
 from backend.app.db.registry import Camera
+from backend.app.drivers.generic import GenericDriver
 
 # --- RTSP discovery paths (union across drivers) -----------------------------------
 
@@ -98,10 +103,35 @@ def test_onboarding_is_resolved_through_the_selected_driver():
 
 
 def test_driver_without_onboarding_rejects_factory_enrollment():
-    import pytest
-
     with pytest.raises(LookupError, match="does not support"):
         drivers.onboarding_provider("generic")
+
+
+def test_registry_rejects_duplicate_keys_and_misplaced_generic_fallback():
+    duplicate = (GenericDriver(), GenericDriver())
+    with pytest.raises(RuntimeError, match="generic camera driver"):
+        drivers._index_drivers(duplicate)
+
+    first = GenericDriver()
+    second = GenericDriver()
+    first.key = "same"
+    second.key = "same"
+    fallback = GenericDriver()
+    with pytest.raises(RuntimeError, match=r"duplicate camera driver key.*same"):
+        drivers._index_drivers((first, second, fallback))
+
+
+def test_registry_rejects_onboarding_owned_by_another_driver(monkeypatch):
+    camera_driver = GenericDriver()
+    camera_driver.key = "camera-family"
+    camera_driver.onboarding = lambda: SimpleNamespace(
+        driver_key="different-family",
+        provider="Broken provider",
+    )
+    monkeypatch.setattr(drivers, "DRIVERS", (camera_driver, GenericDriver()))
+
+    with pytest.raises(RuntimeError, match="expected 'camera-family'"):
+        drivers.onboarding_providers()
 
 
 # --- per-family control gating -----------------------------------------------------
@@ -109,8 +139,6 @@ def test_driver_without_onboarding_rejects_factory_enrollment():
 
 def test_generic_driver_has_no_controls():
     cam = Camera(mac="aa:bb", last_ip="1.2.3.4")
-    import pytest
-
     with pytest.raises(drivers.Unsupported):
         drivers.GENERIC.ptz(cam, "left")
     with pytest.raises(drivers.Unsupported):

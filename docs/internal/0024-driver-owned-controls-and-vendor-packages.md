@@ -39,6 +39,9 @@ string alone must never grant another driver's controls.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
+- Registry construction fails fast on duplicate keys, a missing/misplaced generic fallback, or an
+  onboarding adapter whose declared `driver_key` differs from its owning driver. A bad plugin can
+  no longer silently replace routing entries in the key index.
 - A family driver may contain model/firmware profiles. We do not create one application-level
   driver instance per physical camera, nor assume every model of a brand shares one wire contract.
 

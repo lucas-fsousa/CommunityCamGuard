@@ -94,7 +94,8 @@ import its codecs, account store or P2P implementation.
 ### 4. Register it
 
 Add your driver to `DRIVERS` in `backend/app/drivers/__init__.py` (most-specific first; the
-generic fallback stays last).
+generic fallback stays last). Driver keys must be unique, and an onboarding adapter's `driver_key`
+must match its registered owner; startup and CI fail fast when these invariants are violated.
 
 **Finding your camera's paths:** [iSpyConnect](https://www.ispyconnect.com/cameras) is a great
 per-model database; confirm with `ffprobe -rtsp_transport udp "rtsp://user:pass@IP:554/<path>"`.
