@@ -19,7 +19,6 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, SecretStr
 
-from .. import drivers
 from ..auth import (
     COOKIE_NAME,
     MAX_AGE,
@@ -30,8 +29,6 @@ from ..auth import (
 )
 from ..camera_identity import stable_camera_id
 from ..config import get_settings
-from ..db import registry
-from ..discovery import active_scan, rtsp
 from ..drivers.yoosee import account_store
 from ..drivers.yoosee.p2p import (
     MODEL_READ_PATHS,
@@ -44,7 +41,6 @@ from ..drivers.yoosee.p2p import (
     read_camera_property,
     refresh_account_session,
 )
-from ..media import go2rtc
 from ..provisioning import (
     BleCodecError,
     LabelError,
@@ -72,9 +68,6 @@ from ..provisioning import (
     scan_wifi_networks,
     selected_network,
 )
-from ..recording import recorder
-from ..services import control_catalog
-from ..services.camera_runtime import resolve_camera, resync_services
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 router = APIRouter(prefix="/api")
@@ -86,17 +79,6 @@ log = logging.getLogger(__name__)
 
 class LoginIn(BaseModel):
     key: str
-
-
-class CameraIn(BaseModel):
-    mac: str
-    name: str | None = None
-    username: str | None = None
-    password: str | None = None
-    stream_path: str | None = None
-    rtsp_port: int | None = None
-    last_ip: str | None = None
-    vendor: str | None = None
 
 
 class ProvisioningLabelIn(BaseModel):
@@ -165,74 +147,6 @@ class ProvisioningVendorAccountLoginIn(BaseModel):
     area: str = Field(default="us", max_length=16)
 
 
-class PtzIn(BaseModel):
-    direction: str | None = None  # up | down | left | right (not needed for stop)
-    action: str = "step"  # "start" (hold) | "stop" (release) | "step" (one nudge)
-
-
-def _camera_out(cam: registry.Camera) -> dict:
-    """Registry camera as JSON, without leaking the stored password."""
-    controls = control_catalog(cam)
-    return {
-        "id": cam.camera_id,
-        "mac": cam.mac,
-        "name": cam.name,
-        "username": cam.username,
-        "has_password": bool(cam.password),
-        "stream_path": cam.stream_path,
-        "rtsp_port": cam.rtsp_port,
-        "last_ip": cam.last_ip,
-        "vendor": cam.vendor,
-        "capabilities": cam.capabilities,
-        "has_audio": bool(cam.capabilities.get("has_audio")),
-        "stream_id": go2rtc.stream_id(cam.camera_id),
-        "web_stream_id": go2rtc.web_stream_id(cam.camera_id),
-        "hd_stream_id": go2rtc.hd_stream_id(cam.camera_id),
-        "has_substream": cam.substream_url is not None,
-        # HD and SD are now server-local variants for every camera. This is separate from the
-        # vendor camera advertising `/onvif2`, which we intentionally do not open concurrently.
-        "has_quality_variants": True,
-        "controls": controls,
-        # Compatibility alias for older dashboard/API consumers. The driver catalog above is the
-        # authoritative source; remove this after clients have migrated to ``controls``.
-        "vendor_controls": {key: True for key in controls},
-        "webrtc_url": go2rtc.webrtc_page_url(cam.camera_id),
-        "recording": False,  # live flag filled in by list_cameras()
-        "online": False,  # live RTSP packet progress filled in by list_cameras()
-    }
-
-
-def _camera_runtime_statuses(request: Request, cameras: list[registry.Camera]) -> list[dict]:
-    """Read media activity once and map it to the configured camera identities."""
-
-    media = getattr(request.app.state, "media", None)
-    rec = getattr(request.app.state, "rec", None)
-    try:
-        online_probe = getattr(media, "stream_online", None)
-        online_streams = online_probe() if callable(online_probe) else {}
-    except (OSError, ValueError):
-        online_streams = {}
-    return [
-        {
-            "id": cam.camera_id,
-            "mac": cam.mac,
-            "online": bool(online_streams.get(go2rtc.stream_id(cam.camera_id), False)),
-            "recording": bool(rec and rec.is_recording(cam.camera_id)),
-        }
-        for cam in cameras
-    ]
-
-
-def _resync(request: Request) -> None:
-    """Apply registry changes to the running services (go2rtc + recorder).
-
-    Best-effort: the registry write has already succeeded by the time we get here, so a hiccup
-    reconfiguring the live services must not fail the API call (it used to 500 the whole add/
-    delete). We log and move on; the next scan/restart reconciles.
-    """
-    resync_services(request)
-
-
 # --- auth ---------------------------------------------------------------------------
 
 
@@ -253,192 +167,6 @@ def logout(response: Response) -> dict:
 @router.get("/me")
 def me(request: Request) -> dict:
     return {"authenticated": is_authenticated(request)}
-
-
-# --- cameras ------------------------------------------------------------------------
-
-
-@router.get("/cameras", dependencies=[Depends(require_auth)])
-def list_cameras(request: Request) -> list[dict]:
-    cameras = registry.list_cameras()
-    statuses = {item["id"]: item for item in _camera_runtime_statuses(request, cameras)}
-    out = []
-    for cam in cameras:
-        d = _camera_out(cam)
-        d.update(statuses[cam.camera_id])
-        out.append(d)
-    return out
-
-
-@router.get("/cameras/status", dependencies=[Depends(require_auth)])
-def camera_statuses(request: Request) -> list[dict]:
-    """Small polling surface for online/recording indicators; contains no credentials."""
-
-    return _camera_runtime_statuses(request, registry.list_cameras())
-
-
-def _probe_and_store(cam: registry.Camera) -> registry.Camera:
-    """Detect the driver, probe live capabilities (PTZ, audio/video, ports) and persist them."""
-    caps = drivers.probe(cam, active_scan.enumerate_ports(cam.last_ip))
-    return registry.upsert_camera(cam.mac, camera_id=cam.camera_id, capabilities=caps.to_dict())
-
-
-def _camera_from_reference(camera_id: str) -> registry.Camera | None:
-    """Resolve the public ID, retaining a bounded MAC fallback for pre-0.1 API clients."""
-
-    return resolve_camera(camera_id)
-
-
-@router.post("/cameras", dependencies=[Depends(require_auth)])
-def upsert_camera(body: CameraIn, request: Request) -> dict:
-    # Validate the RTSP credentials before saving: a camera that authenticates now streams later.
-    # Reject a wrong password up front instead of storing a camera that can never load (the
-    # best-effort capability probe below would otherwise swallow the 401). Only a definitive auth
-    # rejection blocks the add — an offline/unreachable camera stays addable and retries later.
-    if body.last_ip:
-        result = rtsp.check_credentials(
-            body.last_ip,
-            body.rtsp_port or registry.DEFAULT_RTSP_PORT,
-            body.stream_path or "/onvif1",
-            body.username or "",
-            body.password or "",
-        )
-        if result == "auth":
-            # 422, NOT 401: 401 is reserved for *dashboard session* auth (the frontend redirects to
-            # login on any 401). This is a bad *camera* password — a validation error on the body.
-            raise HTTPException(
-                status_code=422,
-                detail="camera rejected these credentials (wrong username or password)",
-            )
-    cam = registry.upsert_camera(
-        body.mac,
-        name=body.name,
-        username=body.username,
-        password=body.password,
-        stream_path=body.stream_path,
-        rtsp_port=body.rtsp_port,
-        last_ip=body.last_ip,
-        vendor=body.vendor,
-    )
-    # Probe capabilities as part of configuring the camera, so device controls (PTZ, audio, ...)
-    # light up immediately without a separate manual "probe" step. Best-effort: a slow/failed
-    # probe must not fail the add — the camera is already saved and can be re-probed by hand.
-    if cam.last_ip:
-        try:
-            cam = _probe_and_store(cam)
-        except Exception as exc:
-            log.warning("capability probe on add failed for %s: %s", cam.mac, exc)
-    _resync(request)
-    return _camera_out(cam)
-
-
-@router.delete("/cameras/{camera_id}", dependencies=[Depends(require_auth)])
-def delete_camera(camera_id: str, request: Request) -> dict:
-    camera = _camera_from_reference(camera_id)
-    if camera is None:
-        raise HTTPException(status_code=404, detail="camera not found")
-    registry.delete_camera_by_id(camera.camera_id)
-    _resync(request)
-    return {"ok": True}
-
-
-# --- device control / capability probe (routed through the camera's driver) --------
-
-
-@router.post("/cameras/{camera_id}/probe", dependencies=[Depends(require_auth)])
-def probe_camera(camera_id: str) -> dict:
-    """Detect the camera's driver and probe its live capabilities (PTZ, audio/video, ports)."""
-    cam = _camera_from_reference(camera_id)
-    if cam is None:
-        raise HTTPException(status_code=404, detail="camera not found")
-    if not cam.last_ip:
-        raise HTTPException(status_code=409, detail="camera has no known IP; run a scan first")
-    return _camera_out(_probe_and_store(cam))
-
-
-@router.post("/cameras/{camera_id}/ptz", dependencies=[Depends(require_auth)])
-def ptz_move(camera_id: str, body: PtzIn) -> dict:
-    """Pan/tilt the camera. ``action``: ``start``/``stop`` for press-and-hold, ``step`` for a nudge."""
-    cam = _camera_from_reference(camera_id)
-    if cam is None:
-        raise HTTPException(status_code=404, detail="camera not found")
-    try:
-        ok = drivers.for_camera(cam).ptz(cam, body.direction, (body.action or "step").lower())
-    except drivers.Unsupported as exc:
-        raise HTTPException(status_code=501, detail="this camera doesn't support PTZ") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if not ok:
-        raise HTTPException(status_code=502, detail="camera did not accept the PTZ command")
-    return {
-        "ok": True,
-        "action": (body.action or "step").lower(),
-        "direction": (body.direction or "").lower(),
-    }
-
-
-@router.post("/cameras/{camera_id}/reboot", dependencies=[Depends(require_auth)])
-def reboot_camera(camera_id: str) -> dict:
-    """Reboot the camera in software, if its driver supports it (e.g. ONVIF SystemReboot)."""
-    cam = _camera_from_reference(camera_id)
-    if cam is None:
-        raise HTTPException(status_code=404, detail="camera not found")
-    try:
-        ok = drivers.for_camera(cam).reboot(cam)
-    except drivers.Unsupported as exc:
-        raise HTTPException(
-            status_code=501, detail="this camera doesn't support software reboot"
-        ) from exc
-    if not ok:
-        raise HTTPException(status_code=502, detail="camera did not accept the reboot command")
-    return {"ok": True, "rebooting": True}
-
-
-# --- discovery ----------------------------------------------------------------------
-
-
-@router.post("/discovery/scan", dependencies=[Depends(require_auth)])
-def discovery_scan(request: Request, username: str = "", password: str = "") -> dict:
-    """Gentle subnet scan. Returns known cameras (IP refreshed) and new candidates."""
-    hosts = active_scan.scan(username=username, password=password)
-
-    def on_rekey(old: str, new: str) -> None:
-        # Only the deprecated recording-index MAC projection follows a corrected native value.
-        # Opaque media/process/archive identities remain stable, so no service restart is needed.
-        try:
-            recorder.rekey_segments(old, new)
-        except Exception as exc:  # never fail a scan over a housekeeping move
-            log.warning("could not migrate recordings %s -> %s: %s", old, new, exc)
-
-    configured, candidates = registry.reconcile(hosts, on_rekey=on_rekey)
-    # Cameras added before the probe-on-add change carry no capabilities, so their controls (PTZ,
-    # audio) stay dark until someone clicks "probe" by hand. A scan is the natural moment to fill
-    # that in: the camera just answered, and this is already the slow, user-initiated path. Best-
-    # effort per camera — these cheap cams are probed gently and a failure must not fail the scan.
-    for i, cam in enumerate(configured):
-        if cam.capabilities or not cam.last_ip:
-            continue
-        try:
-            configured[i] = _probe_and_store(cam)
-        except Exception as exc:
-            log.warning("backfill capability probe failed for %s: %s", cam.mac, exc)
-    return {
-        "configured": [_camera_out(c) for c in configured],
-        "candidates": [
-            {
-                "mac": c.mac,
-                "ip": c.ip,
-                "open_ports": c.open_ports,
-                "suggested_path": c.suggested_path,
-                "suggested_username": c.suggested_username,
-                "vendor": c.vendor,
-                "model": c.model,
-                "firmware": c.firmware,
-                "driver": c.driver,
-            }
-            for c in candidates
-        ],
-    }
 
 
 # --- factory-new provisioning (strictly localhost-only) -----------------------------

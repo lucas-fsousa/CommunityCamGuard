@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from backend.app import config
+from backend.app.api import cameras as camera_routes
 from backend.app.api import media as media_routes
 from backend.app.api import recordings as recording_routes
 from backend.app.api import routes
@@ -170,7 +171,7 @@ def test_media_streams_reports_quality(monkeypatch):
 
 
 def _add_body(**kw):
-    return routes.CameraIn(
+    return camera_routes.CameraIn(
         mac="aa:bb:cc:dd:ee:ff",
         name="Cam",
         username="admin",
@@ -192,7 +193,7 @@ def test_add_camera_auto_probes_capabilities(monkeypatch):
     from backend.app.discovery import active_scan
 
     registry.init_db()
-    monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "ok")
+    monkeypatch.setattr(camera_routes.rtsp, "check_credentials", lambda *a, **k: "ok")
     ports_seen = {}
 
     class _Caps:
@@ -203,7 +204,7 @@ def test_add_camera_auto_probes_capabilities(monkeypatch):
         active_scan, "enumerate_ports", lambda ip: ports_seen.setdefault("ip", ip) or [554, 5000]
     )
     monkeypatch.setattr(drivers, "probe", lambda cam, ports: _Caps())
-    out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
+    out = camera_routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
     assert out["capabilities"]["ptz"] is True  # probed + stored during add
     assert ports_seen["ip"] == "192.168.1.50"  # probed the camera's IP
 
@@ -216,7 +217,7 @@ def test_add_camera_without_ip_skips_probe(monkeypatch):
     monkeypatch.setattr(
         drivers, "probe", lambda *a, **k: (_ for _ in ()).throw(AssertionError("probed"))
     )
-    out = routes.upsert_camera(_add_body(last_ip=None), _fake_request())
+    out = camera_routes.upsert_camera(_add_body(last_ip=None), _fake_request())
     assert out["capabilities"] == {}  # no IP → no credential check, no probe, still added
 
 
@@ -226,12 +227,12 @@ def test_add_camera_probe_failure_is_swallowed(monkeypatch):
     from backend.app.discovery import active_scan
 
     registry.init_db()
-    monkeypatch.setattr(routes.rtsp, "check_credentials", lambda *a, **k: "ok")
+    monkeypatch.setattr(camera_routes.rtsp, "check_credentials", lambda *a, **k: "ok")
     monkeypatch.setattr(active_scan, "enumerate_ports", lambda ip: [554])
     monkeypatch.setattr(
         drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("boom"))
     )
-    out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
+    out = camera_routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
     assert out["mac"] == "aa:bb:cc:dd:ee:ff"  # camera still added despite probe failure
 
 
@@ -242,10 +243,10 @@ def test_add_camera_rejects_wrong_credentials(monkeypatch):
 
     registry.init_db()
     monkeypatch.setattr(
-        routes.rtsp, "check_credentials", lambda *a, **k: "auth"
+        camera_routes.rtsp, "check_credentials", lambda *a, **k: "auth"
     )  # camera rejects creds
     with pytest.raises(routes.HTTPException) as ei:
-        routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
+        camera_routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
     assert (
         ei.value.status_code == 422
     )  # 422 (validation), NOT 401 — 401 would bounce the UI to login
@@ -259,13 +260,13 @@ def test_add_camera_unreachable_is_allowed(monkeypatch):
 
     registry.init_db()
     monkeypatch.setattr(
-        routes.rtsp, "check_credentials", lambda *a, **k: "unreachable"
+        camera_routes.rtsp, "check_credentials", lambda *a, **k: "unreachable"
     )  # offline, ambiguous
     monkeypatch.setattr(active_scan, "enumerate_ports", lambda ip: [554])
     monkeypatch.setattr(
         drivers, "probe", lambda cam, ports: (_ for _ in ()).throw(RuntimeError("offline"))
     )
-    out = routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
+    out = camera_routes.upsert_camera(_add_body(last_ip="192.168.1.50"), _fake_request())
     assert out["mac"] == "aa:bb:cc:dd:ee:ff"  # unreachable ≠ wrong password → still added
 
 
@@ -334,7 +335,7 @@ def test_resync_is_best_effort_on_media_error():
             return False
 
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=_Media(), rec=None)))
-    routes._resync(req)  # must not raise — CRUD op stays successful
+    camera_routes.resync_services(req)  # must not raise — CRUD op stays successful
 
 
 def test_go2rtc_config_binds_loopback():

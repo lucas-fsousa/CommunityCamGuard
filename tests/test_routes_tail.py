@@ -4,10 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from backend.app import config
+from backend.app.api import cameras as camera_routes
 from backend.app.api import recordings as recording_routes
-from backend.app.api import routes
 from backend.app.config import get_settings
 from backend.app.db import registry
+from backend.app.media import go2rtc
 
 
 def test_list_cameras_marks_the_recording_flag():
@@ -15,7 +16,7 @@ def test_list_cameras_marks_the_recording_flag():
     registry.upsert_camera("aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1")
     rec = SimpleNamespace(is_recording=lambda mac: True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=rec)))
-    out = routes.list_cameras(req)
+    out = camera_routes.list_cameras(req)
     assert len(out) == 1 and out[0]["recording"] is True
     assert out[0]["online"] is False
 
@@ -23,11 +24,11 @@ def test_list_cameras_marks_the_recording_flag():
 def test_camera_status_uses_base_stream_packet_liveness():
     registry.init_db()
     cam = registry.upsert_camera("aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1")
-    media = SimpleNamespace(stream_online=lambda: {routes.go2rtc.stream_id(cam.camera_id): True})
+    media = SimpleNamespace(stream_online=lambda: {go2rtc.stream_id(cam.camera_id): True})
     rec = SimpleNamespace(is_recording=lambda _mac: True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media, rec=rec)))
 
-    assert routes.camera_statuses(req) == [
+    assert camera_routes.camera_statuses(req) == [
         {"id": cam.camera_id, "mac": cam.mac, "online": True, "recording": True}
     ]
 

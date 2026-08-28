@@ -18,6 +18,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api.cameras import router as cameras_router
+from .api.discovery import router as discovery_router
 from .api.media import router as media_router
 from .api.onboarding import router as onboarding_router
 from .api.recordings import router as recordings_router
@@ -117,6 +119,8 @@ app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)
 app.include_router(media_router)
+app.include_router(cameras_router)
+app.include_router(discovery_router)
 
 
 @app.middleware("http")
