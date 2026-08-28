@@ -191,6 +191,7 @@ function openProvisioningModal() {
   let bleStage = "";
   let bleFinishFrames = [];
   let wifiConfigured = false;
+  let privilegedBound = false;
 
   const clearQr = () => {
     if (qrUrl) URL.revokeObjectURL(qrUrl);
@@ -200,6 +201,9 @@ function openProvisioningModal() {
   };
 
   const privilegedStatus = el("small", { className: "muted" });
+  const cameraName = el("input", {
+    placeholder: t("provision.cameraName"), maxLength: 80,
+  });
   const finishWifiOnly = el("button", { textContent: t("provision.finishWifiOnly"), disabled: true });
   const bindPrivileged = el("button", {
     className: "btn-primary", textContent: t("provision.bindPrivileged"), disabled: true,
@@ -208,6 +212,8 @@ function openProvisioningModal() {
   const privilegedPanel = el("section", { className: "provision-privileged" },
     el("strong", { textContent: t("provision.privilegedTitle") }),
     el("small", { className: "muted", textContent: t("provision.privilegedDescription") }),
+    cameraName,
+    el("small", { className: "muted", textContent: t("provision.cameraNameHint") }),
     privilegedStatus,
     el("div", { className: "provision-actions" }, finishWifiOnly, bindPrivileged));
 
@@ -355,8 +361,30 @@ function openProvisioningModal() {
       deviceId.value = info.device_id; capability.value = info.capability_code;
       if (info.firmware_version) firmware.value = info.firmware_version;
       if (info.mac) mac.value = info.mac;
+      else if (!mac.value.trim()) {
+        // The vendor QR encodes device ID + capability bits, but not the MAC printed elsewhere
+        // on the same label. Keep only this field editable so final LAN matching can be exact.
+        mac.readOnly = false;
+        mac.classList.remove("provision-locked");
+      }
       identityValid = true;
       result.textContent = t("provision.valid", { id: info.device_id, modes: info.setup_modes.join(", ") });
+      try {
+        const status = await api("/provisioning/privileged/status", {
+          method: "POST", body: JSON.stringify(identityPayload()),
+        });
+        if (version !== validationVersion) return null;
+        if (status?.bound && status?.p2p_access_ready) {
+          privilegedBound = true;
+          wifiConfigured = true;
+          start.hidden = true; findBluetooth.hidden = true;
+          finishWifiOnly.disabled = true;
+          bindPrivileged.disabled = !info.mac;
+          bindPrivileged.textContent = t("provision.completeRetry");
+          privilegedPanel.classList.remove("hidden");
+          privilegedStatus.textContent = t("provision.boundResume");
+        }
+      } catch { /* a fresh, not-yet-bound label has no resumable privileged state */ }
       return info;
     } catch (err) {
       if (version === validationVersion) {
@@ -520,17 +548,22 @@ function openProvisioningModal() {
   });
   bindPrivileged.addEventListener("click", async () => {
     finishWifiOnly.disabled = true; bindPrivileged.disabled = true; error.textContent = "";
-    privilegedStatus.textContent = t("provision.bindingPrivileged");
+    privilegedStatus.textContent = t(privilegedBound
+      ? "provision.confirmingPrivileged" : "provision.bindingPrivileged");
     try {
-      const response = await api("/provisioning/privileged/bind", {
-        method: "POST",
-        body: JSON.stringify({
-          ...identityPayload(),
-          time_area: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          time_zone: -new Date().getTimezoneOffset() * 60,
-        }),
-      });
-      if (response.p2p_binding !== "bound") throw new Error(t("provision.privilegedBindInvalid"));
+      if (!privilegedBound) {
+        const response = await api("/provisioning/privileged/bind", {
+          method: "POST",
+          body: JSON.stringify({
+            ...identityPayload(),
+            time_area: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+            time_zone: -new Date().getTimezoneOffset() * 60,
+          }),
+        });
+        if (response.p2p_binding !== "bound") throw new Error(t("provision.privilegedBindInvalid"));
+        privilegedBound = true;
+        bindPrivileged.textContent = t("provision.completeRetry");
+      }
       let p2pProbe = null;
       let p2pRouteProbe = null;
       let p2pProbeError = null;
@@ -548,32 +581,43 @@ function openProvisioningModal() {
         // bind button or encourage the user to submit the one-time enrollment twice.
         p2pProbeError = probeError;
       }
-      try {
-        await finishBluetooth();
-        if (p2pRouteProbe?.direct_handshake) {
-          result.textContent = t("provision.privilegedBoundP2pConfirmed", {
-            count: p2pProbe.device_count,
-          });
-        } else if (p2pProbe) {
-          result.textContent = t("provision.privilegedBoundP2pPending");
-        } else {
-          result.textContent = t("provision.privilegedBoundP2pProbeFailed", {
-            message: p2pProbeError?.message || t("provision.privilegedProbeUnknown"),
-          });
-        }
-      } catch (finishError) {
-        // The account link has already succeeded. A failed optional 0x88 write must not invite a
-        // duplicate bind; disconnect the browser transport and continue with P2P confirmation.
-        bleSession?.disconnect(); bleSession = null; bleFinishFrames = [];
-        privilegedPanel.classList.add("hidden");
-        result.textContent = t("provision.privilegedBoundFinishFailed", {
-          message: finishError.message,
+      if (p2pRouteProbe?.direct_handshake) {
+        privilegedStatus.textContent = t("provision.completingCamera");
+        const completed = await api("/provisioning/privileged/complete", {
+          method: "POST",
+          body: JSON.stringify({ ...identityPayload(), name: cameraName.value.trim() }),
         });
+        if (completed?.status !== "configured") {
+          throw new Error(t("provision.completionInvalid"));
+        }
+        try {
+          await finishBluetooth();
+        } catch {
+          bleSession?.disconnect(); bleSession = null; bleFinishFrames = [];
+          privilegedPanel.classList.add("hidden");
+        }
+        result.textContent = t(completed.already_configured
+          ? "provision.cameraAlreadyConfigured" : "provision.cameraConfigured", {
+          name: completed.camera?.name || cameraName.value || t("provision.cameraDefaultName"),
+        });
+        await loadCameras();
+      } else if (p2pProbe) {
+        result.textContent = t("provision.privilegedBoundP2pPending");
+        privilegedStatus.textContent = t("provision.retryP2p");
+        bindPrivileged.disabled = false;
+      } else {
+        result.textContent = t("provision.privilegedBoundP2pProbeFailed", {
+          message: p2pProbeError?.message || t("provision.privilegedProbeUnknown"),
+        });
+        privilegedStatus.textContent = t("provision.retryP2p");
+        bindPrivileged.disabled = false;
       }
     } catch (err) {
-      privilegedStatus.textContent = "";
+      privilegedStatus.textContent = privilegedBound
+        ? t("provision.completionRetryHint") : "";
       error.textContent = err.message;
-      finishWifiOnly.disabled = false; bindPrivileged.disabled = false;
+      finishWifiOnly.disabled = privilegedBound;
+      bindPrivileged.disabled = false;
     }
   });
   start.addEventListener("click", async () => {

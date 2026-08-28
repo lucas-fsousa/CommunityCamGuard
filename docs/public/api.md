@@ -162,11 +162,13 @@ subset may additionally use an explicitly enabled, same-origin HTTPS tunnel.
 | POST | `/api/provisioning/privileged/p2p-probe` | `ProvisioningLabelIn` | Uses encrypted post-bind material to authenticate to the P2P access node, inspect aggregate account/target visibility, heartbeat and resolve the selected target's TermDNS route. It does not CALL or send any command to the camera. |
 | POST | `/api/provisioning/privileged/p2p-route-probe` | `ProvisioningLabelIn` | Performs a bounded brokered CALLING and direct CA/CB NAT handshake for the selected camera. It exposes no peer address/session secret and opens neither media nor a control channel. |
 | POST | `/api/provisioning/privileged/p2p-property-read` | `ProvisioningP2PPropertyReadIn` | Trusted-LAN only. Opens the selected camera route and sends one allowlisted B7 thing-model read. Unknown paths are rejected before network I/O. There is no arbitrary write/action API. |
+| POST | `/api/provisioning/privileged/complete` | `{label/device_id, capability_code, mac, firmware_version?, name?}` | Strict trusted-LAN only. Locates the exact MAC, resumes its durable P2P enrollment, enables RTSP through the fixed property, installs a generated HA1, requires authenticated media packets and only then stores the clear credential encrypted in the registry. |
 
 `ProvisioningLabelIn` accepts `label` (for example the complete printed QR URL), `device_id`,
 `capability_code`, `firmware_version` and `mac`. A scanned label may supply the ID and capability
-code by itself. `ProvisioningStartIn` adds the selected `wifi_network_id` returned by the scan,
-`wifi_password` and optional `name`. Arbitrary SSID text is not accepted. The signed network choice
+code by itself. `ProvisioningStartIn` adds the selected `wifi_network_id` returned by the scan and
+`wifi_password`. `CompleteOnboardingIn` requires the printed `mac` and accepts an optional friendly
+`name`. Arbitrary SSID text is not accepted. The signed network choice
 expires after five minutes. The Wi-Fi password is request-local and is never persisted, logged or
 returned as plain text. The QR response is marked `Cache-Control: no-store`; its SVG necessarily
 encodes the selected SSID and password and the browser revokes its temporary object URL when the
@@ -196,13 +198,13 @@ and waits for the camera to confirm its Wi-Fi association. This is physically va
 the dashboard, and Web Bluetooth requires a secure context (`localhost` or trusted HTTPS).
 
 After Wi-Fi confirmation the modal exposes two explicit choices. **Finish Wi-Fi only** sends the
-Bluetooth finish command without binding anything. **Link P2P access** consumes the short-lived
-handoff through `/provisioning/privileged/bind`; receiving `0x83` alone never contacts the vendor
-binding service. The handoff and returned subscription token stay in memory, expire with the setup
-session and are never returned. A successful bind reports RTSP as `pending`: the separately
-homologated post-bind sequence still has to initialize P2P, enable `onvifEn`, install the camera's
-HA1 password value, verify real RTSP media and insert the encrypted clear credential in the
-registry. See
+Bluetooth finish command without binding anything. **Link P2P and finish setup** consumes the
+short-lived handoff through `/provisioning/privileged/bind`; receiving `0x83` alone never contacts
+the vendor binding service. The returned subscription material is persisted encrypted and never
+returned. After exact-target inventory and route proof, the strict-LAN `/complete` transaction
+locates the printed MAC, enables `onvifEn`, installs a generated HA1, requires real authenticated
+RTSP packets and inserts the encrypted clear credential in the registry. An interrupted durable
+bind is resumed without binding or rotating an already verified credential again. See
 [Bluetooth onboarding](bluetooth-onboarding.md#post-wi-fi-p2p-and-rtsp-stage) for the exact contract.
 The successful bind persists the 64-byte terminal access token and 128-hex device subscription
 token together as one Fernet-encrypted SQLite value. They never cross back into the browser.
@@ -217,6 +219,12 @@ the capability roots recovered from the APK and compiled into the backend allowl
 `Action.*` roots are queried with B7 and are never executed with AC. The response contains the
 camera-owned JSON value, transport acknowledgement and device error code. Unlike the temporary
 Web-Bluetooth subset, this route never accepts the remote HTTPS-tunnel exception.
+
+`/complete` also never accepts the temporary public HTTPS-tunnel exception. When a phone supplies
+Bluetooth through such a tunnel, finish the BLE/bind stage, close the tunnel and reopen the label
+from a literal trusted-LAN dashboard address. The modal detects the durable enrollment and offers
+**Resume camera setup**. The printed MAC is mandatory because the vendor QR URL contains only the
+device ID and capability mask; it is the exact LAN matching key for this driver.
 
 The orientation endpoint delegates to an internal typed D2 operation. It accepts only normal/180°,
 uses a fixed property path and requires a successful B7 preflight, correlated D3 and fresh B7

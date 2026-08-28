@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api.onboarding import router as onboarding_router
 from .api.routes import router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
@@ -102,6 +103,7 @@ app = FastAPI(
     ],
 )
 app.include_router(router)
+app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
 
 

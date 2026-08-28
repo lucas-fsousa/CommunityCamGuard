@@ -19,6 +19,14 @@ from .client import (
 )
 from .orientation import ORIENTATION_VALUES, P2POrientationWrite, set_camera_orientation
 from .renewal import run_with_fresh_access
+from .rtsp_setup import (
+    P2PRtspEnableWrite,
+    P2PRtspPreparation,
+    generate_rtsp_password,
+    prepare_camera_rtsp,
+    rtsp_password_digest,
+    set_camera_rtsp_enabled,
+)
 from .white_light import (
     P2PWhiteLightState,
     P2PWhiteLightWrite,
@@ -36,16 +44,22 @@ __all__ = [
     "P2PProbeError",
     "P2PPropertyRead",
     "P2PRouteProbe",
+    "P2PRtspEnableWrite",
+    "P2PRtspPreparation",
     "P2PWhiteLightState",
     "P2PWhiteLightWrite",
     "VendorAccountError",
+    "generate_rtsp_password",
     "login_account",
+    "prepare_camera_rtsp",
     "probe_account_inventory",
     "probe_camera_route",
     "read_camera_property",
     "read_camera_white_light",
     "refresh_account_session",
+    "rtsp_password_digest",
     "run_with_fresh_access",
     "set_camera_orientation",
+    "set_camera_rtsp_enabled",
     "set_camera_white_light",
 ]

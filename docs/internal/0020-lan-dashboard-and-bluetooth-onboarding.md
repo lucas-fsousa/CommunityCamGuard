@@ -60,11 +60,11 @@ application as a runtime gateway:
    the registry; go2rtc exposes one shared camera producer to the recorder and browser transcodes.
 6. The H.264 1920x1080 browser variant and the first UTC recording segment were both verified.
 
-This validates the wire contract, not yet a single-click product flow. The production modal still
-ends after bind and reports RTSP as pending. The next implementation stage is a bounded backend
-P2P client that executes `bind -> session -> onvifEn -> HA1 -> media proof -> registry` as an
-explicit, observable transaction. No ACK alone may advance it, and no clear credential may be
-persisted before media proof.
+The production modal now executes the homologated continuation as a bounded transaction:
+`bind -> session -> onvifEn -> HA1 -> media-packet proof -> registry`. No ACK alone advances the
+registry and no clear credential is persisted before media proof. A durable interrupted bind can
+be resumed without rebinding, and an already verified camera is not assigned another password.
+This implementation checkpoint still needs a fresh-camera live validation.
 
 ### Production P2P extraction addendum
 
@@ -88,14 +88,14 @@ without touching camera state:
   2026-08-24 validation authenticated three devices and completed the selected camera's direct
   handshake with no broker error.
 
-The next read-only slice adds `/provisioning/privileged/p2p-property-read`. It accepts only the
+The read-only slice `/provisioning/privileged/p2p-property-read` accepts only the
 fixed B7 allowlist recovered from the APK, selects the durable enrollment's exact device ID and
 requires a direct handshake before issuing one property read. No arbitrary D2 writer or AC action
 constructor is exposed. Live validation against the designated test camera returned
 `ProWritable.videoParm` with transport ACK/error zero and did not contact the two monitoring
 cameras. The production driver now has one separate, fixed-path D2 orientation operation accepting
 only normal/180°, with a mandatory B7 preflight, matching D3 response and fresh B7 readback. It is
-not yet exposed through HTTP or the dashboard. This endpoint uses the strict trusted-LAN guard, not
+exposed through the typed vendor-control HTTP/UI surface. This endpoint uses the strict trusted-LAN guard, not
 the opt-in remote HTTPS exception reserved for the Web-Bluetooth onboarding subset.
 
 An enrollment completed by an older running container remains memory-only; it must be bound once

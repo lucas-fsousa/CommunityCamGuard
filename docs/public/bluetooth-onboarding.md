@@ -63,13 +63,16 @@ account again.
 6. After `0x83` acknowledges delivery, the dashboard follows the APK and waits for either the
    asynchronous BLE result `0x85` or the read-only cloud `devresult` confirmation for that exact
    `configToken`. Only then does the P2P section become actionable. Choose between **Finish Wi-Fi
-   only** or **Link P2P access**. Neither choice enables RTSP.
-7. Close the modal and run the main **Scan Network** action. This is the sole LAN discovery step.
+   only** or **Link P2P and finish setup**.
+7. For the full path, provide the MAC printed separately on the label and an optional friendly
+   name. The server proves the exact P2P route, locates that MAC on the LAN, configures RTSP and
+   adds it automatically only after authenticated media packets arrive.
 
-Choosing **Finish Wi-Fi only** ends onboarding without binding the camera. **Link P2P access** is a
-separate, explicit action that binds it to the vendor account, but still does not enable RTSP,
-choose RTSP credentials or add a stream to Community Cam Guard. Those later stages must never be
-reported as consequences of Wi-Fi success.
+Choosing **Finish Wi-Fi only** ends onboarding without binding the camera. The full action keeps
+Wi-Fi success, account binding and playable media as separately verified stages. If a temporary
+public HTTPS tunnel supplied Bluetooth, the strict-LAN completion request is rejected: close the
+tunnel, reopen the modal from the local dashboard and enter the same label/MAC. The durable bind is
+detected and **Resume camera setup** continues without rebinding.
 
 ## Post-Wi-Fi P2P and RTSP stage
 
@@ -97,9 +100,11 @@ For this validated model, `/onvif1` is HEVC 1920x1080 plus G.711 A-law mono at 1
 transport mismatch, so verification must try UDP rather than declaring a valid credential broken.
 No real password, device token or account token belongs in documentation, logs or source control.
 
-The low-level P2P/RTSP stage is homologated but not yet exposed as one automatic dashboard action.
-Until that integration lands, a successful **Link P2P access** still reports RTSP as pending rather
-than claiming that the stream was configured.
+The low-level P2P/RTSP stage is now exposed as a bounded automatic dashboard continuation. Its
+implementation is idempotent for an already verified registry camera, uses UDP before TCP for this
+firmware, requires at least one received video packet and commits no clear credential before that
+proof. The production path still needs one fresh-camera live validation before being called fully
+homologated through the UI.
 
 New binds now preserve the terminal access identity and device subscription token as a single
 encrypted database record. This closes the earlier restart gap where successful enrollment existed
