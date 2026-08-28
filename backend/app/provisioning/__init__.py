@@ -1,21 +1,5 @@
 """Factory-new camera onboarding primitives."""
 
-from .ble import (
-    BleCodecError,
-    BleFrame,
-    BleMessage,
-    BleMessageAssembler,
-    BleProvisioningAttempt,
-    BleProvisioningMaterial,
-    begin_ble_provisioning_attempt,
-    ble_provisioning_attempt,
-    build_ble_provisioning_frames,
-    decrypt_ble_payload,
-    encrypt_ble_payload,
-    fragment_ble_message,
-    load_ble_provisioning_material,
-    parse_ble_frame,
-)
 from .privileged import (
     PrivilegedEnrollmentError,
     bind_vendor_device,
@@ -40,12 +24,6 @@ from .vendor_cloud import VendorProvisioningCloudError, fetch_native_ble_materia
 from .wifi import WifiSelectionError, manual_network, scan_wifi_networks, selected_network
 
 __all__ = [
-    "BleCodecError",
-    "BleFrame",
-    "BleMessage",
-    "BleMessageAssembler",
-    "BleProvisioningAttempt",
-    "BleProvisioningMaterial",
     "CompletedCamera",
     "LocatedCamera",
     "OnboardingCompletionError",
@@ -53,22 +31,14 @@ __all__ = [
     "RtspMediaProof",
     "VendorProvisioningCloudError",
     "WifiSelectionError",
-    "begin_ble_provisioning_attempt",
     "bind_vendor_device",
-    "ble_provisioning_attempt",
     "bound_privileged_enrollment",
     "bound_privileged_enrollment_for_camera",
-    "build_ble_provisioning_frames",
     "complete_camera_onboarding",
-    "decrypt_ble_payload",
-    "encrypt_ble_payload",
     "fetch_native_ble_material",
-    "fragment_ble_message",
-    "load_ble_provisioning_material",
     "locate_camera_by_mac",
     "manual_network",
     "mark_privileged_enrollment_bound",
-    "parse_ble_frame",
     "pending_privileged_enrollment",
     "privileged_enrollment_status",
     "prove_rtsp_media",

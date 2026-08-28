@@ -154,7 +154,9 @@ def load_ble_provisioning_material(
                 raise TypeError("cloudAuth must be an object")
             cloud_access_token = bytes.fromhex(str(cloud_auth["accessToken"]))
             cloud_common = {str(key): str(value) for key, value in cloud_auth["common"].items()}
-            cloud_headers = {str(key).lower(): str(value) for key, value in cloud_auth["headers"].items()}
+            cloud_headers = {
+                str(key).lower(): str(value) for key, value in cloud_auth["headers"].items()
+            }
             if len(cloud_access_token) != 64:
                 raise ValueError("cloud access token must contain 64 bytes")
         material = BleProvisioningMaterial(

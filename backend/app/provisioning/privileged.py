@@ -21,7 +21,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ..db import p2p
-from .ble import BleProvisioningMaterial
+from ..drivers.yoosee.ble import BleProvisioningMaterial
 
 _HOST = "openapi-iot.cloudlinks.cn"
 _BIND_PATH = "/openapi/app/user/device/bind"
@@ -211,19 +211,21 @@ def _bind_body(
     for name in _INTEGER_BODY_NAMES:
         if name in data:
             data[name] = int(str(data[name]))
-    data.update({
-        "devId": item.device_id,
-        "tid": "",
-        "remarkName": item.device_id,
-        "permission": 3,
-        "bindToken": material.config_token,
-        "devType": 0,
-        "timeArea": time_area,
-        "timeZone": int(time_zone),
-        "latitude": "",
-        "longitude": "",
-        "linkType": 1,
-    })
+    data.update(
+        {
+            "devId": item.device_id,
+            "tid": "",
+            "remarkName": item.device_id,
+            "permission": 3,
+            "bindToken": material.config_token,
+            "devType": 0,
+            "timeArea": time_area,
+            "timeZone": int(time_zone),
+            "latitude": "",
+            "longitude": "",
+            "linkType": 1,
+        }
+    )
     # HttpServiceAdapter uses a default Gson instance. Gson omits null map values, so the APK's
     # cloud-online fallback sends no confirmKey field at all rather than JSON null or an empty value.
     if item.confirm_key is not None:
@@ -290,7 +292,9 @@ def _signed_post(
     try:
         payload = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise PrivilegedEnrollmentError("vendor enrollment service returned an invalid response") from exc
+        raise PrivilegedEnrollmentError(
+            "vendor enrollment service returned an invalid response"
+        ) from exc
     if not isinstance(payload, dict):
         raise PrivilegedEnrollmentError("vendor enrollment service returned an invalid response")
     return status, payload
@@ -311,7 +315,11 @@ def query_vendor_device_online(
         timeout=timeout,
     )
     raw_code = payload.get("code")
-    code = int(raw_code) if isinstance(raw_code, int | str) and str(raw_code).lstrip("-").isdigit() else None
+    code = (
+        int(raw_code)
+        if isinstance(raw_code, int | str) and str(raw_code).lstrip("-").isdigit()
+        else None
+    )
     raw_message = payload.get("msg")
     message = raw_message[:256] if isinstance(raw_message, str) else ""
     response_data = payload.get("data")

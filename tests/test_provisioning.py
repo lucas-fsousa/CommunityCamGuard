@@ -20,6 +20,20 @@ from backend.app.config import get_settings
 from backend.app.db import p2p
 from backend.app.drivers.yoosee import account_store
 from backend.app.drivers.yoosee import onboarding as yoosee_onboarding
+from backend.app.drivers.yoosee.ble import (
+    BleCodecError,
+    BleMessageAssembler,
+    BleProvisioningMaterial,
+    _clear_ble_provisioning_attempts_for_tests,
+    begin_ble_provisioning_attempt,
+    ble_provisioning_attempt,
+    build_ble_provisioning_frames,
+    decrypt_ble_payload,
+    encrypt_ble_payload,
+    fragment_ble_message,
+    load_ble_provisioning_material,
+    parse_ble_frame,
+)
 from backend.app.drivers.yoosee.labels import LabelError, inspect_label
 from backend.app.drivers.yoosee.p2p import (
     AccountSession,
@@ -33,23 +47,7 @@ from backend.app.drivers.yoosee.qr import (
     render_svg_base64,
 )
 from backend.app.main import app
-from backend.app.provisioning import (
-    BleCodecError,
-    BleMessageAssembler,
-    BleProvisioningMaterial,
-    begin_ble_provisioning_attempt,
-    build_ble_provisioning_frames,
-    decrypt_ble_payload,
-    encrypt_ble_payload,
-    fragment_ble_message,
-    load_ble_provisioning_material,
-    parse_ble_frame,
-)
 from backend.app.provisioning import privileged as privileged_module
-from backend.app.provisioning.ble import (
-    _clear_ble_provisioning_attempts_for_tests,
-    ble_provisioning_attempt,
-)
 from backend.app.provisioning.privileged import (
     VendorBindResult,
     VendorOnlineResult,

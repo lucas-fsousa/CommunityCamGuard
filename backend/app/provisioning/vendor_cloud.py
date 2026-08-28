@@ -11,13 +11,13 @@ import json
 import time
 from collections.abc import Mapping
 
+from ..drivers.yoosee.ble import BleProvisioningMaterial
 from ..drivers.yoosee.p2p.account import (
     INTEGER_BODY_NAMES,
     AccountSession,
     PostFunction,
     post_authenticated_json,
 )
-from .ble import BleProvisioningMaterial
 
 TANKEY_PATH = "/openapi/netcfg/app/ble/getTanKey"
 BIND_TOKEN_PATH = "/openapi/netcfg/cloud/netcfg/genbindtoken"

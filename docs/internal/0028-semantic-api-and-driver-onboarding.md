@@ -46,9 +46,11 @@ generic API and startup code even when its implementation already fit the camera
   can move more implementation files beneath its package incrementally without changing the port.
 - Label parsing and the recovered Wi-Fi QR wire format/rendering now live under
   `drivers/yoosee`; they are manufacturer behavior, not generic provisioning utilities.
+- The encrypted BLE codec, transient attempt store and recovered GATT framing also live in the
+  Yoosee driver; the generic API only handles base64 HTTP transport around port DTOs.
 - The driver registry remains explicit and auditable; onboarding is not discovered by arbitrary
   filesystem imports.
-- Recovered Yoosee BLE, privileged-cloud and completion implementation files still under the
-  historical top-level `provisioning` package are the next verticalization steps. Moving them
-  under the Yoosee package must preserve the driver port and must not reintroduce vendor imports
-  into generic HTTP code.
+- Recovered Yoosee privileged-cloud and completion implementation files still under the historical
+  top-level `provisioning` package are the next verticalization steps. Moving them under the
+  Yoosee package must preserve the driver port and must not reintroduce vendor imports into generic
+  HTTP code.
