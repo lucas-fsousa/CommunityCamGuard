@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 from backend.app.api import provisioning as routes
 from backend.app.api import provisioning_account as account_routes
+from backend.app.api import provisioning_ble as ble_routes
 from backend.app.api import provisioning_network as network_routes
 from backend.app.api.local_only import require_local_or_remote_ble_request, require_local_request
 from backend.app.camera_identity import stable_camera_id
@@ -421,20 +422,20 @@ def test_ble_prepare_returns_only_encrypted_wire_frames(monkeypatch, tmp_path):
     )
     material_path.chmod(0o600)
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=material_path,
             provisioning_ble_material_max_age_seconds=1800,
         ),
     )
-    body = routes.ProvisioningStartIn(
+    body = ble_routes.ProvisioningStartIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         wifi_network_id=sign_network("Home Wi-Fi", "WPA2"),
         wifi_password="not-returned",
     )
     response = Response()
-    result = routes.provisioning_ble_prepare(body, response)
+    result = ble_routes.provisioning_ble_prepare(body, response)
     serialized = json.dumps(result)
     assert result["status"] == "ready_for_explicit_browser_send"
     assert result["expected_responses"] == {
@@ -493,7 +494,7 @@ def test_ble_prepare_prefers_native_account_over_research_file(monkeypatch):
         lambda current, *, device_id: calls.append(("material", current, device_id)) or material,
     )
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=None,
@@ -501,8 +502,8 @@ def test_ble_prepare_prefers_native_account_over_research_file(monkeypatch):
         ),
     )
 
-    result = routes.provisioning_ble_prepare(
-        routes.ProvisioningStartIn(
+    result = ble_routes.provisioning_ble_prepare(
+        ble_routes.ProvisioningStartIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             wifi_network_id=sign_network("Home Wi-Fi", "WPA2"),
             wifi_password="not-returned",
@@ -563,7 +564,7 @@ def test_ble_response_decoder_uses_server_key_without_returning_it(monkeypatch, 
     )
     material_path.chmod(0o600)
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=material_path,
@@ -571,14 +572,14 @@ def test_ble_response_decoder_uses_server_key_without_returning_it(monkeypatch, 
         ),
     )
     source = b'{"wifiList":[{"ssid":"Camera-visible 2G","level":80}]}'
-    body = routes.ProvisioningBleResponseIn(
+    body = ble_routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         attempt_id=_start_ble_attempt(material_path),
         command=0x81,
         encrypted=True,
         data_base64=base64.b64encode(encrypt_ble_payload(source, key)).decode(),
     )
-    result = routes.provisioning_ble_decode_response(body, Response())
+    result = ble_routes.provisioning_ble_decode_response(body, Response())
     assert result["json"]["wifiList"][0]["ssid"] == "Camera-visible 2G"
     assert key not in json.dumps(result)
     assert "bind-secret" not in json.dumps(result)
@@ -601,21 +602,21 @@ def test_ble_response_decoder_validates_short_random_challenge_echo(monkeypatch,
     )
     material_path.chmod(0o600)
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=material_path,
             provisioning_ble_material_max_age_seconds=300,
         ),
     )
-    body = routes.ProvisioningBleResponseIn(
+    body = ble_routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         attempt_id=_start_ble_attempt(material_path),
         command=0x71,
         encrypted=True,
         data_base64=base64.b64encode(b"2B6F2EF737FF9").decode(),
     )
-    result = routes.provisioning_ble_decode_response(body, Response())
+    result = ble_routes.provisioning_ble_decode_response(body, Response())
     assert result["valid"] is True
     assert result["text"] == ""
     assert result["hex"] == ""
@@ -639,8 +640,8 @@ def test_ble_wifi_ack_never_returns_decrypted_wifi_credentials(monkeypatch, tmp_
     )
     material_path.chmod(0o600)
     source = b"005Home Wi-Fi10fsuper-secret-password2013088123456740185020bind-secret"
-    result = routes.provisioning_ble_decode_response(
-        routes.ProvisioningBleResponseIn(
+    result = ble_routes.provisioning_ble_decode_response(
+        ble_routes.ProvisioningBleResponseIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             attempt_id=_start_ble_attempt(material_path),
             command=0x83,
@@ -674,14 +675,14 @@ def test_ble_wifi_confirmation_does_not_bind_or_expose_privileged_proof(monkeypa
     )
     material_path.chmod(0o600)
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=material_path,
             provisioning_ble_material_max_age_seconds=300,
         ),
     )
-    body = routes.ProvisioningBleResponseIn(
+    body = ble_routes.ProvisioningBleResponseIn(
         label="http://yoosee.co/?D=0-7443576841-8034",
         attempt_id=_start_ble_attempt(material_path),
         command=0x85,
@@ -689,7 +690,7 @@ def test_ble_wifi_confirmation_does_not_bind_or_expose_privileged_proof(monkeypa
         data_base64=base64.b64encode(b'{"confirmKey":"one-time-proof","connectStatus":0}').decode(),
     )
 
-    result = routes.provisioning_ble_decode_response(body, Response())
+    result = ble_routes.provisioning_ble_decode_response(body, Response())
 
     assert result["wifi_connection"] == {
         "connected": True,
@@ -726,15 +727,15 @@ def test_privileged_binding_is_a_separate_explicit_action(monkeypatch, tmp_path)
     )
     material_path.chmod(0o600)
     monkeypatch.setattr(
-        routes,
+        ble_routes,
         "get_settings",
         lambda: SimpleNamespace(
             provisioning_ble_material_file=material_path,
             provisioning_ble_material_max_age_seconds=300,
         ),
     )
-    decoded = routes.provisioning_ble_decode_response(
-        routes.ProvisioningBleResponseIn(
+    decoded = ble_routes.provisioning_ble_decode_response(
+        ble_routes.ProvisioningBleResponseIn(
             label="http://yoosee.co/?D=0-7443576841-8034",
             attempt_id=_start_ble_attempt(material_path),
             command=0x85,

@@ -26,6 +26,7 @@ from .api.media import router as media_router
 from .api.onboarding import router as onboarding_router
 from .api.provisioning import router as provisioning_router
 from .api.provisioning_account import router as provisioning_account_router
+from .api.provisioning_ble import router as provisioning_ble_router
 from .api.provisioning_network import router as provisioning_network_router
 from .api.recordings import router as recordings_router
 from .api.storage import router as storage_router
@@ -121,6 +122,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(provisioning_router)
 app.include_router(provisioning_account_router)
+app.include_router(provisioning_ble_router)
 app.include_router(provisioning_network_router)
 app.include_router(onboarding_router)
 app.include_router(vendor_controls_router)
