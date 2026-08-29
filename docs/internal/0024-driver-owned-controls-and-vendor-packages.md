@@ -34,6 +34,8 @@ string alone must never grant another driver's controls.
   `p2p/model_protocol.py`; JSON/path parsing no longer shares a module with UDP rendezvous loops.
 - Direct rendezvous packet construction (`A4`, `CA`, `CB`) and `A3` peer parsing live in
   `p2p/rendezvous_protocol.py`, separate from the code that owns sockets and retry budgets.
+- Access-node discovery, certification, initialization, TermDNS and heartbeat frame codecs live in
+  `p2p/access_protocol.py`; `p2p/client.py` owns their UDP I/O, timeout and retry orchestration.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.
