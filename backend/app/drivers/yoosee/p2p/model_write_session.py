@@ -30,6 +30,31 @@ def exchange_model_write(
         raise ValueError("model-write retries must be positive")
     message_id = secrets.randbits(31)
     request = build_model_write(node, device.device_id, path, value, sequence, message_id)
+    return exchange_model_write_request(
+        sock,
+        node,
+        request,
+        message_id,
+        timeout,
+        retries=retries,
+        deadline=deadline,
+    )
+
+
+def exchange_model_write_request(
+    sock: socket.socket,
+    node: CertifiedNode,
+    request: bytes,
+    message_id: int,
+    timeout: float,
+    *,
+    retries: int = 3,
+    deadline: float | None = None,
+) -> ModelWriteResult:
+    """Exchange a prebuilt typed D2 request and correlate its D3 response."""
+
+    if retries < 1:
+        raise ValueError("model-write retries must be positive")
     transport_acknowledged = False
     error_code = None
     for _attempt in range(retries):

@@ -83,6 +83,7 @@ def test_yoosee_feature_modules_do_not_depend_on_compatibility_client():
         "rtsp_setup.py",
         "siren.py",
         "smart_protection.py",
+        "smart_protection_schedule.py",
         "volume.py",
         "white_light.py",
     )
