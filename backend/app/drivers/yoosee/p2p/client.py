@@ -11,7 +11,6 @@ laboratory.  Secrets are accepted as decoded values and never logged or included
 
 from __future__ import annotations
 
-import json
 import secrets
 import socket
 import struct
@@ -43,6 +42,9 @@ from .crypto import (
     gute_mode1_xor_checksum,
     gute_mode2_decrypt,
 )
+from .model_protocol import build_model_read as build_model_read
+from .model_protocol import parse_model_read_response as parse_model_read_response
+from .model_protocol import parse_model_report as parse_model_report
 from .wire import finish_mode1 as _finish_mode1
 from .wire import finish_mode2 as _finish_mode2
 from .wire import hash_string as hash_string
@@ -246,80 +248,6 @@ def parse_term_dns(wire: bytes, node: CertifiedNode, expected_term: str) -> tupl
     if domain != expected_term:
         raise ValueError("TermDNS response does not match the requested term")
     return frame[0x1C:0x20], struct.unpack_from("<I", frame, 0x20)[0]
-
-
-def build_model_read(
-    node: CertifiedNode,
-    device_id: int,
-    path: str,
-    sequence: int,
-    message_id: int,
-) -> bytes:
-    """Build one allowlisted, read-only GDM B7 property request."""
-    if path not in MODEL_READ_PATHS:
-        raise ValueError("thing-model path is not in the read-only allowlist")
-    encoded_path = path.encode("utf-8")
-    frame = _new_header(
-        0xB7,
-        0x26 + len(encoded_path) + 1,
-        node.session_id,
-        sequence,
-        _randomized_flags(mode=2, proc=3),
-    )
-    frame[0] = 0x7E
-    struct.pack_into("<Q", frame, 0x18, device_id)
-    struct.pack_into("<I", frame, 0x20, message_id & 0x7FFFFFFF)
-    struct.pack_into("<H", frame, 0x24, len(encoded_path))
-    frame[0x26 : 0x26 + len(encoded_path)] = encoded_path
-    return _finish_mode2(frame, node.session_key)
-
-
-def parse_model_read_response(frame: bytes, device_id: int) -> tuple[int, object | None] | None:
-    """Parse direct B8 or access-node cached AA GDM responses."""
-    if len(frame) < 0x26 or frame[1] not in (0xAA, 0xB8):
-        return None
-    if struct.unpack_from("<Q", frame, 0x18)[0] != device_id:
-        return None
-    error_code = struct.unpack_from("<H", frame, 0x24)[0]
-    if not (frame[0x20] & 1):
-        return error_code, None
-    if len(frame) < 0x28:
-        return None
-    json_length = struct.unpack_from("<H", frame, 0x26)[0]
-    if 0x28 + json_length > len(frame):
-        return None
-    try:
-        value = json.loads(frame[0x28 : 0x28 + json_length].decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    return error_code, value
-
-
-def parse_model_report(frame: bytes) -> tuple[int | None, str, object] | None:
-    """Parse a brokered AA property report without accepting an action response."""
-    if len(frame) < 0x22 or frame[1] != 0xAA:
-        return None
-    options = struct.unpack_from("<H", frame, 0x1C)[0]
-    path_length = frame[0x1F] + 1
-    json_length = struct.unpack_from("<H", frame, 0x20)[0] + 1
-    cursor = 0x22
-    destination = None
-    if options & 1:
-        if cursor + 8 > len(frame):
-            return None
-        destination = struct.unpack_from("<Q", frame, cursor)[0]
-        cursor += 8
-    if cursor + path_length + json_length > len(frame):
-        return None
-    encoded_path = frame[cursor : cursor + path_length].rstrip(b"\x00")
-    cursor += path_length
-    encoded_json = frame[cursor : cursor + json_length].rstrip(b"\x00")
-    try:
-        path = encoded_path.decode("utf-8")
-        value = json.loads(encoded_json.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    return (destination, path, value) if path else None
 
 
 def build_mode2_response_ack(node: CertifiedNode, response: bytes) -> bytes:
