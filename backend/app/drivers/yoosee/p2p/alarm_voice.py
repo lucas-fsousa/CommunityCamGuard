@@ -56,6 +56,14 @@ class AlarmVoiceResource:
     logical_number: int
     resource_id: str = field(repr=False)
 
+    def __post_init__(self) -> None:
+        if parse_alarm_voice_option_key(self.key) != (self.system, self.logical_number):
+            raise ValueError("alarm-voice option key does not match its resource identity")
+        if alarm_voice_logical_number(self.resource_id) != self.logical_number:
+            raise ValueError("alarm-voice resource id does not match its logical identity")
+        if not self.name or self.audio_format != "AMR":
+            raise ValueError("alarm-voice resource metadata is invalid")
+
     def public(self) -> dict[str, object]:
         return {
             "key": self.key,

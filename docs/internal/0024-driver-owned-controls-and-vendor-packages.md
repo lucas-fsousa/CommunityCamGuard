@@ -91,6 +91,10 @@ string alone must never grant another driver's controls.
   extra fields/resource types and implements bounded C0/C1 framing plus checksummed fragment
   reassembly/ACK. Compressed responses remain fail-closed until the APK-compatible QuickLZ decoder
   is available as a portable production component.
+- The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
+  performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
+  logical-number readback. It remains unregistered until the fresh-catalogue orchestration is
+  complete, so the dashboard cannot invoke this write prematurely.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
