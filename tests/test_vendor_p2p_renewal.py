@@ -7,7 +7,7 @@ import pytest
 from backend.app.db.p2p import P2PEnrollment
 from backend.app.drivers.yoosee.p2p import renewal
 from backend.app.drivers.yoosee.p2p.account import AccountSession
-from backend.app.drivers.yoosee.p2p.client import InitInfoRejectedError
+from backend.app.drivers.yoosee.p2p.contracts import InitInfoRejectedError
 
 
 def _enrollment(token: bytes) -> P2PEnrollment:

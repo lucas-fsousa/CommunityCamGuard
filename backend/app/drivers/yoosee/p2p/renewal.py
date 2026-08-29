@@ -10,7 +10,7 @@ from ....db import p2p
 from ....db.p2p import P2PEnrollment
 from .. import account_store
 from .account import VendorAccountError, refresh_account_session
-from .client import InitInfoRejectedError, P2PProbeError
+from .contracts import InitInfoRejectedError, P2PProbeError
 
 ResultT = TypeVar("ResultT")
 _refresh_lock = threading.Lock()

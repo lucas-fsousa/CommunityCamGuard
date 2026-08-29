@@ -25,6 +25,9 @@ string alone must never grant another driver's controls.
   operations live under `drivers/yoosee/p2p`; there is no application-global `vendor_p2p` package.
   Generic services may depend on driver contracts, while Yoosee-specific onboarding adapters import
   this vertical implementation explicitly.
+- P2P errors, allowlists and typed results live in `p2p/contracts.py`, independent from UDP session
+  orchestration. `p2p/client.py` retains compatibility reexports while feature adapters migrate to
+  the stable contracts module.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.
