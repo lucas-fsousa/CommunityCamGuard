@@ -85,7 +85,7 @@ string alone must never grant another driver's controls.
   `guardParm.plan`; the dashboard reads it only when its dedicated modal is explicitly opened.
 - Alarm-voice catalogue decoding is socket-free and driver-owned. Only validated type-4 AMR
   resources survive parsing; signed URLs/tokens are discarded, full vendor `resId` values are
-  private non-repr fields, and the future UI selector will use semantic `system-N`/`custom-N` keys
+  private non-repr fields, and the UI selector uses semantic `system-N`/`custom-N` keys
   resolved against a fresh catalogue rather than accepting a resource id from HTTP.
 - Its resource-service codec fixes the only allowed request to POST `resfile/queryres`, rejects
   extra fields/resource types and implements bounded C0/C1 framing plus checksummed fragment
@@ -97,7 +97,7 @@ string alone must never grant another driver's controls.
   retries/deadlines, acknowledges each validated fragment and exposes compression as an explicit
   decoder seam. The bounded decoder is the internal default; callers can explicitly disable it,
   and any decode failure or wrong output length keeps the response away from the JSON parser.
-- A private alarm-catalogue orchestrator opens the exact enrolled camera session, queries system and
+- The alarm-catalogue orchestrator opens the exact enrolled camera session, queries system and
   custom sources separately and returns only sanitized option metadata. It was validated read-only
   against camera 3 with four Portuguese system resources and an empty custom catalogue.
 - Runtime choices use the vendor-neutral `ControlOption` contract and are available only when a
@@ -107,8 +107,9 @@ string alone must never grant another driver's controls.
   native identifier.
 - The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
   performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
-  logical-number readback. It remains unregistered until the fresh-catalogue orchestration is
-  complete, so the dashboard cannot invoke this write prematurely.
+  logical-number readback. The driver registers it only behind the dynamic option lookup: every PUT
+  re-queries the catalogue and resolves the semantic key before the private resource reaches the
+  codec. Camera 3 live validation of its already-active key returned idempotently without a write.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.

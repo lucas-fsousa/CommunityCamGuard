@@ -222,6 +222,7 @@ header {
   font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
 .schedule-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .schedule-actions .camera-control-status { flex: 1; }
+.dynamic-choice-modal > .camera-control-select { width: 100%; margin: 10px 0 18px; }
 
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }

@@ -169,6 +169,81 @@ function camBar(cam) {
 // skips the write when the camera is already in that state.
 const PROTECTION_WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
+async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
+  trigger.disabled = true;
+  status.classList.remove("error");
+  status.textContent = strings.loading;
+  try {
+    const response = await api(
+      `/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}/options`,
+    );
+    const options = Array.isArray(response.options) ? response.options : [];
+    if (!options.length) throw new Error(strings.empty);
+    const select = el("select", { className: "camera-control-select", required: true });
+    select.append(el("option", {
+      value: "", textContent: strings.placeholder, disabled: true, selected: true,
+    }));
+    const groups = new Map();
+    for (const option of options) {
+      const parent = option.group
+        ? groups.get(option.group) || (() => {
+          const group = el("optgroup", { label: t(`control.optionGroup.${option.group}`) });
+          groups.set(option.group, group);
+          select.append(group);
+          return group;
+        })()
+        : select;
+      parent.append(el("option", {
+        value: option.value,
+        textContent: option.detail ? `${option.label} · ${option.detail}` : option.label,
+      }));
+    }
+    const modalStatus = el("small", { className: "camera-control-status" });
+    const apply = el("button", { className: "btn-primary", textContent: strings.apply });
+    const close = el("button", {
+      className: "icon-btn", textContent: "×", title: t("scan.close"), type: "button",
+    });
+    const card = el("div", { className: "card modal-card dynamic-choice-modal" },
+      el("div", { className: "modal-head" },
+        el("h2", { textContent: strings.title }), close),
+      el("p", { className: "muted compact", textContent: strings.hint }),
+      select,
+      el("div", { className: "schedule-actions" }, modalStatus, apply));
+    const overlay = el("div", { className: "modal" }, card);
+    close.addEventListener("click", () => overlay.remove());
+    apply.addEventListener("click", async () => {
+      if (!select.value) {
+        modalStatus.classList.add("error");
+        modalStatus.textContent = strings.required;
+        return;
+      }
+      apply.disabled = true;
+      modalStatus.classList.remove("error");
+      modalStatus.textContent = t("control.applying");
+      try {
+        await api(
+          `/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`,
+          { method: "PUT", body: JSON.stringify({ value: select.value }) },
+        );
+        status.textContent = t("control.applied");
+        overlay.remove();
+      } catch (error) {
+        modalStatus.classList.add("error");
+        modalStatus.textContent = t("control.failed", { msg: error.message });
+      } finally {
+        apply.disabled = false;
+      }
+    });
+    document.body.append(overlay);
+    status.textContent = "";
+  } catch (error) {
+    status.classList.add("error");
+    status.textContent = t("control.failed", { msg: error.message });
+  } finally {
+    trigger.disabled = false;
+  }
+}
+
 async function openProtectionSchedule(cam, status, trigger) {
   trigger.disabled = true;
   status.classList.remove("error");
@@ -320,6 +395,26 @@ function cameraControls(cam) {
       (seconds) => window.confirm(t("control.sirenConfirm", { seconds })),
       t("control.sirenComplete"),
     ));
+  }
+  if (available.alarm_voice?.writable && available.alarm_voice?.dynamic_options) {
+    const alarmVoice = el("button", {
+      className: "camera-control-schedule-btn",
+      textContent: t("control.alarmVoiceOpen"),
+      type: "button",
+    });
+    alarmVoice.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void openDynamicChoice(cam, "alarm_voice", status, alarmVoice, {
+        loading: t("control.alarmVoiceLoading"),
+        empty: t("control.alarmVoiceEmpty"),
+        placeholder: t("control.alarmVoicePlaceholder"),
+        title: t("control.alarmVoiceTitle", { name: cam.name || cam.mac }),
+        hint: t("control.alarmVoiceHint"),
+        apply: t("control.alarmVoiceApply"),
+        required: t("control.alarmVoiceRequired"),
+      });
+    });
+    menu.append(alarmVoice);
   }
   if (available.speaker_volume?.writable) {
     menu.append(actionSelect(t("control.speakerVolume"), [
