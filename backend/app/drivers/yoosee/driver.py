@@ -26,7 +26,7 @@ class YooseeDriver(CameraDriver):
     label = "Yoosee / generic HiSilicon (ONVIF port 5000)"
     rtsp_paths = ("/onvif1", "/onvif2", "/11", "/12", "/live.sdp", "/0", "/1")
     transport = "udp"
-    features = frozenset({"ptz", "audio_in", "led"})
+    features = frozenset({"ptz", "audio_in", "led", "siren"})
 
     def onboarding(self) -> OnboardingPort:
         from .onboarding import ONBOARDING

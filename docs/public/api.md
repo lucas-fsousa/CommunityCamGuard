@@ -80,7 +80,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   "capabilities": { "video_codec": "h265", "has_audio": true, "ptz": true, "stream_paths": ["/onvif1", "/onvif2"] },
   "controls": {
     "white_light": { "kind": "boolean", "readable": true, "writable": true, "options": [] },
-    "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] }
+    "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] },
+    "siren_pulse": { "kind": "action", "readable": false, "writable": true, "options": ["2", "5", "10"] }
   },
   "has_audio": true,
   "stream_id": "cam_0123456789abcdef01234567",
@@ -144,6 +145,11 @@ contain state/acknowledgement booleans but no access token, route, session key o
 If the access node returns the explicit stale-session code, the backend renews the encrypted native
 vendor-account session and retries exactly once. Without a vendor account configured in the
 dashboard, it fails closed instead of reading Frida captures or accepting expired material.
+
+`siren_pulse` accepts only integer durations `2`, `5` or `10`. The driver requires an OFF
+preflight, sends ON once, always performs an explicit OFF cleanup and returns `verified=true` only
+when the final OFF state was read back. The API does not expose arbitrary action paths or a
+persistent siren-ON state.
 
 ### Discovery
 

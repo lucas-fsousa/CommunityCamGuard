@@ -29,6 +29,7 @@ from .rtsp_setup import (
     rtsp_password_digest,
     set_camera_rtsp_enabled,
 )
+from .siren import P2PSirenPulse, pulse_camera_siren
 from .white_light import (
     P2PWhiteLightState,
     P2PWhiteLightWrite,
@@ -48,6 +49,7 @@ __all__ = [
     "P2PRouteProbe",
     "P2PRtspEnableWrite",
     "P2PRtspPreparation",
+    "P2PSirenPulse",
     "P2PWhiteLightState",
     "P2PWhiteLightWrite",
     "VendorAccountError",
@@ -56,6 +58,7 @@ __all__ = [
     "prepare_camera_rtsp",
     "probe_account_inventory",
     "probe_camera_route",
+    "pulse_camera_siren",
     "read_camera_property",
     "read_camera_white_light",
     "refresh_account_session",

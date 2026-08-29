@@ -20,6 +20,7 @@ from ..contracts import (
 )
 from .p2p import (
     P2PProbeError,
+    pulse_camera_siren,
     read_camera_white_light,
     run_with_fresh_access,
     set_camera_orientation,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 WHITE_LIGHT = "white_light"
 ORIENTATION = "orientation"
+SIREN_PULSE = "siren_pulse"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -40,6 +42,12 @@ _DESCRIPTORS = (
         "choice",
         writable=True,
         options=("normal", "inverted"),
+    ),
+    ControlDescriptor(
+        SIREN_PULSE,
+        "action",
+        writable=True,
+        options=("2", "5", "10"),
     ),
 )
 
@@ -115,6 +123,31 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 native_previous_value=orientation_result.previous_value,
                 native_requested_value=orientation_result.requested_value,
             )
-    except P2PProbeError as exc:
+        if key == SIREN_PULSE:
+            if type(value) is not int or value not in {2, 5, 10}:
+                raise ValueError("siren pulse must be 2, 5 or 10 seconds")
+            pulse_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: pulse_camera_siren(selected, value),
+            )
+            return ControlResult(
+                key=key,
+                value=pulse_result.duration_seconds,
+                changed=True,
+                verified=pulse_result.final_off_confirmed,
+                transport_acknowledged=(
+                    pulse_result.enable_transport_acknowledged
+                    and pulse_result.disable_transport_acknowledged
+                ),
+                application_acknowledged=(
+                    pulse_result.enable_error_code == 0 and pulse_result.disable_error_code == 0
+                ),
+                error_code=(
+                    pulse_result.disable_error_code
+                    if pulse_result.disable_error_code is not None
+                    else pulse_result.enable_error_code
+                ),
+            )
+    except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc
     raise Unsupported(key)

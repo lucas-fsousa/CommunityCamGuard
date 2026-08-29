@@ -1,6 +1,7 @@
 """Tests for the Yoosee driver package. The ONVIF toolboxes (ptz/device/
 media) are stubbed, so detection, the control probe and PTZ routing run offline.
 """
+
 import pytest
 
 from backend.app.control import device, media, ptz
@@ -9,7 +10,7 @@ from backend.app.db.registry import Camera
 from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
-from backend.app.drivers.yoosee.p2p import P2PWhiteLightWrite
+from backend.app.drivers.yoosee.p2p import P2PSirenPulse, P2PWhiteLightWrite
 
 
 def _drv():
@@ -17,6 +18,7 @@ def _drv():
 
 
 # --- matches ------------------------------------------------------------------------
+
 
 def test_matches_by_vendor_string():
     d = _drv()
@@ -34,6 +36,7 @@ def test_matches_false_for_unrelated():
 
 # --- _probe_controls ----------------------------------------------------------------
 
+
 def test_probe_controls_fills_ptz_model_and_paths(monkeypatch):
     monkeypatch.setattr(ptz, "supports_ptz", lambda ip, **k: True)
     monkeypatch.setattr(device, "info", lambda ip, **k: {"model": "IPC", "firmware": "1.0"})
@@ -48,6 +51,7 @@ def test_probe_controls_fills_ptz_model_and_paths(monkeypatch):
 def test_probe_controls_without_ip_does_nothing(monkeypatch):
     def boom(*a, **k):
         raise AssertionError("touched the network")
+
     monkeypatch.setattr(ptz, "supports_ptz", boom)
     caps = Capabilities(driver="yoosee")
     _drv()._probe_controls(Camera(mac="aa:bb:cc:dd:ee:01", last_ip=""), caps)
@@ -64,6 +68,7 @@ def test_probe_controls_no_ptz_when_probe_says_no(monkeypatch):
 
 
 # --- ptz routing --------------------------------------------------------------------
+
 
 def test_ptz_routes_to_the_right_helper(monkeypatch):
     calls = []
@@ -84,6 +89,7 @@ def test_reboot_is_unsupported():
 
 # --- proprietary controls stay behind the driver -----------------------------------
 
+
 def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     camera = Camera(
         mac="aa:bb:cc:dd:ee:01",
@@ -97,9 +103,11 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
 
     catalog = {item.key: item for item in _drv().control_catalog(camera)}
 
-    assert set(catalog) == {"white_light", "orientation"}
+    assert set(catalog) == {"white_light", "orientation", "siren_pulse"}
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
+    assert catalog["siren_pulse"].kind == "action"
+    assert catalog["siren_pulse"].options == ("2", "5", "10")
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -135,3 +143,57 @@ def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
     assert result.value is True
     assert result.previous_value is False
     assert result.verified is True
+
+
+def test_siren_write_maps_only_bounded_duration_to_yoosee_adapter(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    observed = []
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda camera_id: enrollment if camera_id == camera.camera_id else None,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+
+    def fake_pulse(selected, duration_seconds):
+        observed.append((selected.device_id, duration_seconds))
+        return P2PSirenPulse(selected.device_id, duration_seconds, True, 0, True, 0, True)
+
+    monkeypatch.setattr(yoosee_controls, "pulse_camera_siren", fake_pulse)
+
+    result = _drv().write_control(camera, "siren_pulse", 5)
+
+    assert observed == [("7000000001", 5)]
+    assert result.value == 5
+    assert result.changed is True
+    assert result.verified is True
+    assert result.application_acknowledged is True
+
+
+@pytest.mark.parametrize("value", [True, 1, 3, 11, "5"])
+def test_siren_write_rejects_duration_outside_advertised_choices(monkeypatch, value):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+
+    with pytest.raises(yoosee_controls.ControlOperationError, match="2, 5 or 10"):
+        _drv().write_control(camera, "siren_pulse", value)

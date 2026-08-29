@@ -172,7 +172,9 @@ function cameraControls(cam) {
   const status = el("small", { className: "camera-control-status" });
   const menu = el("div", { className: "camera-control-menu" });
 
-  const actionSelect = (placeholder, options, controlKey, valueFor) => {
+  const actionSelect = (
+    placeholder, options, controlKey, valueFor, confirmFor = null, success = null,
+  ) => {
     const select = el("select", { className: "camera-control-select", title: placeholder });
     select.append(el("option", { value: "", textContent: placeholder, disabled: true, selected: true }));
     for (const [value, label] of options) {
@@ -183,6 +185,10 @@ function cameraControls(cam) {
       event.stopPropagation();
       if (!select.value) return;
       const selected = select.value;
+      if (confirmFor && !confirmFor(selected)) {
+        select.selectedIndex = 0;
+        return;
+      }
       select.disabled = true;
       status.classList.remove("error");
       status.textContent = t("control.applying");
@@ -191,7 +197,7 @@ function cameraControls(cam) {
           method: "PUT",
           body: JSON.stringify({ value: valueFor(selected) }),
         });
-        status.textContent = t("control.applied");
+        status.textContent = success || t("control.applied");
       } catch (error) {
         status.classList.add("error");
         status.textContent = t("control.failed", { msg: error.message });
@@ -214,6 +220,16 @@ function cameraControls(cam) {
       ["normal", t("control.orientationNormal")],
       ["inverted", t("control.orientationInverted")],
     ], "orientation", (orientation) => orientation));
+  }
+  if (available.siren_pulse?.writable) {
+    menu.append(actionSelect(t("control.siren"), [
+      ["2", t("control.sirenSeconds", { seconds: 2 })],
+      ["5", t("control.sirenSeconds", { seconds: 5 })],
+      ["10", t("control.sirenSeconds", { seconds: 10 })],
+    ], "siren_pulse", (seconds) => Number(seconds),
+      (seconds) => window.confirm(t("control.sirenConfirm", { seconds })),
+      t("control.sirenComplete"),
+    ));
   }
   menu.append(status);
 

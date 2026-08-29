@@ -50,7 +50,7 @@ or wait on hardware/a human eye.
 | P1 | Driver-independent public camera identity — deterministic opaque `camera_id`, existing-row backfill, stable across MAC re-key, and backend mapping to MAC/P2P/vendor identities; new vendor-control APIs and UI use only this ID. Legacy MAC-addressed APIs remain for incremental migration | done |
 | P1 | Dependency injection for services — **already in place**: created in the lifespan, injected via `app.state`, no global service singletons; clean layer direction (registry never imports recording) | done |
 | P2 | Per-vendor conditionals isolated — **already done**: audit found **zero** vendor `if`-branches outside `drivers/`; all family logic lives in drivers | done |
-| P2 | Split large files / avoid God classes — frontend split is done; backend grew with provisioning/P2P. Feature-specific P2P code now starts in dedicated modules (`white_light.py`), while the legacy transport client and API routes still need a conservative split without protocol churn | wip |
+| P2 | Split large files / avoid God classes — frontend is split into semantic modules; the Yoosee P2P client was reduced to a compatibility facade while contracts, codecs, sessions and typed feature operations live in bounded modules protected by executable architecture tests | done |
 
 ## Milestone M3 — Documentation & cross-platform (Feature 3)
 
@@ -74,10 +74,10 @@ above.
 
 | Priority | Item | Status |
 |---|---|---|
-| P1 | Siren/deterrent ON/OFF over P2P, with bounded activation and guaranteed OFF | done |
+| P1 | Siren/deterrent ON/OFF over P2P — physically proven in the RE harness; production now exposes only 2/5/10-second pulses with OFF preflight, single-shot ON, unconditional explicit OFF and final OFF readback. Fresh camera-3 validation through the dashboard remains | wip |
 | P1 | Map and expose the camera's **selectable siren sound/effect**; the garage unit currently plays a dog-bark effect, proving this is separate from siren ON/OFF | todo |
 | P1 | Complete browser microphone → AMR-NB mode 7/8 kHz → camera speaker two-way audio; legacy P2P transport and codec now reproduce the native app, physical intelligibility confirmation pending | wip |
-| P1 | Integrate proven P2P controls into reusable backend/Docker drivers — reflector and orientation are isolated in their own feature modules and have typed LAN-only API/UI surfaces addressed by opaque `camera_id`. Explicit stale-session renewal is bounded to one retry and uses only the encrypted native account. Camera-3 production validation awaits native account configuration | wip |
+| P1 | Integrate proven P2P controls into reusable backend/Docker drivers — reflector, orientation and bounded siren pulse are isolated feature modules with typed LAN-only API/UI surfaces addressed by opaque `camera_id`. Explicit stale-session renewal is bounded to one retry and uses only the encrypted native account. Camera-3 production validation remains | wip |
 | P1 | Production P2P bootstrap, direct route proof and allowlisted thing-model reads — encrypted enrollment, list/certification, inventory, heartbeat, A4/A3, CA/CB and B7 | done |
 | P1 | Typed image-orientation driver operation — fixed D2 path, normal/180° values only, mandatory B7 preflight and fresh readback; production API/UI implemented, explicit camera-3 validation pending | wip |
 | P0 | Keep provisioned cameras operational and controllable without WAN (LAN-only) | todo |

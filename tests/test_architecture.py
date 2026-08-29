@@ -77,7 +77,7 @@ def test_yoosee_protocol_layers_do_not_depend_on_compatibility_client():
 
 
 def test_yoosee_feature_modules_do_not_depend_on_compatibility_client():
-    feature_modules = ("orientation.py", "rtsp_setup.py", "white_light.py")
+    feature_modules = ("orientation.py", "rtsp_setup.py", "siren.py", "white_light.py")
     violations = []
     for name in feature_modules:
         path = YOOSEE_P2P / name
