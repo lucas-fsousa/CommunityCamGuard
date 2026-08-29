@@ -32,6 +32,8 @@ string alone must never grant another driver's controls.
   live in `p2p/wire.py`, giving protocol codecs a socket-free dependency base.
 - The allowlisted GDM property-read codec (`B7`, `B8` and brokered `AA`) lives in
   `p2p/model_protocol.py`; JSON/path parsing no longer shares a module with UDP rendezvous loops.
+- Direct rendezvous packet construction (`A4`, `CA`, `CB`) and `A3` peer parsing live in
+  `p2p/rendezvous_protocol.py`, separate from the code that owns sockets and retry budgets.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.

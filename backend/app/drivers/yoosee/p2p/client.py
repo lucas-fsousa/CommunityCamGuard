@@ -36,7 +36,6 @@ from .contracts import ModelWriteResult as ModelWriteResult
 from .crypto import (
     RC5,
     gute_mode0_decrypt,
-    gute_mode0_encrypt,
     gute_mode1_decrypt,
     gute_mode1_encrypt,
     gute_mode1_xor_checksum,
@@ -45,6 +44,10 @@ from .crypto import (
 from .model_protocol import build_model_read as build_model_read
 from .model_protocol import parse_model_read_response as parse_model_read_response
 from .model_protocol import parse_model_report as parse_model_report
+from .rendezvous_protocol import build_calling_request as build_calling_request
+from .rendezvous_protocol import build_nat_online as build_nat_online
+from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
+from .rendezvous_protocol import parse_mtp_peer_endpoint as parse_mtp_peer_endpoint
 from .wire import finish_mode1 as _finish_mode1
 from .wire import finish_mode2 as _finish_mode2
 from .wire import hash_string as hash_string
@@ -164,73 +167,6 @@ def build_term_dns(node: CertifiedNode, term: str) -> bytes:
     struct.pack_into("<H", frame, 0x18, len(encoded))
     frame[0x1C : 0x1C + len(encoded)] = encoded
     return _finish_mode2(frame, node.session_key)
-
-
-def build_calling_request(
-    node: CertifiedNode,
-    access_id: int,
-    device: OnlineDevice,
-    local_ip: str,
-    local_port: int,
-    attempt: CallingAttempt,
-    sequence: int,
-) -> bytes:
-    """Build the broker-facing A4 request without any control/media payload."""
-    if len(attempt.cookie) != 8:
-        raise ValueError("calling cookie must be eight bytes")
-    if not 0 < attempt.link_id <= 0xFFFFFF:
-        raise ValueError("calling link id must be a non-zero 24-bit value")
-    frame = _new_header(
-        0xA4,
-        177,
-        node.session_id,
-        sequence,
-        _randomized_flags(mode=2, proc=1),
-    )
-    frame[0] = 0x7E
-    struct.pack_into("<H", frame, 0x18, 0x0581)
-    struct.pack_into("<H", frame, 0x1A, local_port)
-    struct.pack_into("<I", frame, 0x1C, attempt.link_id)
-    struct.pack_into("<Q", frame, 0x20, access_id)
-    struct.pack_into("<Q", frame, 0x28, device.device_id)
-    frame[0x32] |= 1
-    struct.pack_into("<H", frame, 0x36, local_port)
-    frame[0x40:0x44] = socket.inet_aton(local_ip)
-    frame[0x78:0x80] = attempt.cookie
-    struct.pack_into("<I", frame, 0x84, attempt.call_id)
-    struct.pack_into("<I", frame, 0x8C, 1)
-    return _finish_mode2(frame, node.session_key)
-
-
-def build_nat_online(access_id: int, device_id: int, link_id: int) -> bytes:
-    """Build the clear-payload CA NAT-presence frame."""
-    frame = _new_header(0xCA, 52, access_id, 0, 0)
-    struct.pack_into("<Q", frame, 0x1C, device_id)
-    struct.pack_into("<I", frame, 0x24, link_id)
-    frame[0x29] = 3
-    struct.pack_into("<I", frame, 0x10, gute_mode1_xor_checksum(frame))
-    return gute_mode0_encrypt(bytes(frame))
-
-
-def build_nat_online_ack(access_id: int, link_id: int) -> bytes:
-    """Build the mode-1 CB acknowledgement for a matching CA."""
-    frame = _new_header(0xCB, 36, access_id, 0, 1 << 16)
-    struct.pack_into("<I", frame, 0x18, 4)
-    struct.pack_into("<I", frame, 0x20, link_id)
-    return _finish_mode1(frame)
-
-
-def parse_mtp_peer_endpoint(response: bytes, link_id: int) -> tuple[str, int] | None:
-    """Extract the camera's public endpoint from the broker A3 response."""
-    if len(response) < 0x64 or response[1] != 0xA3:
-        return None
-    if struct.unpack_from("<I", response, 0x1C)[0] != link_id:
-        return None
-    port = struct.unpack_from(">H", response, 0x58)[0]
-    address = response[0x60:0x64]
-    if not port or address == b"\x00\x00\x00\x00":
-        return None
-    return socket.inet_ntoa(address), port
 
 
 def parse_term_dns(wire: bytes, node: CertifiedNode, expected_term: str) -> tuple[bytes, int]:
