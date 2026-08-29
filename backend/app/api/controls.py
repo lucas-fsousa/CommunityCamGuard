@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..auth import require_auth
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
-from ..drivers.contracts import ControlResult, ControlValue
+from ..drivers.contracts import (
+    ControlResult,
+    ControlValue,
+    Weekday,
+    WeeklySchedule,
+    public_control_value,
+)
 from ..services import CameraNotFound, read_control, write_control
 from .local_only import require_local_request
 
@@ -21,10 +27,31 @@ CameraId = str
 ControlKey = str
 
 
+class WeeklyScheduleIn(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    start: str = Field(pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+    end: str = Field(pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+    weekdays: list[Weekday] = Field(min_length=1, max_length=7)
+
+    @field_validator("weekdays")
+    @classmethod
+    def unique_weekdays(cls, weekdays: list[Weekday]) -> list[Weekday]:
+        if len(set(weekdays)) != len(weekdays):
+            raise ValueError("weekdays must be unique")
+        return weekdays
+
+    def contract(self) -> WeeklySchedule:
+        return WeeklySchedule(self.start, self.end, tuple(self.weekdays))
+
+
 class ControlWriteIn(BaseModel):
     model_config = ConfigDict(strict=True)
 
-    value: ControlValue
+    value: bool | int | str | WeeklyScheduleIn
+
+    def contract_value(self) -> ControlValue:
+        return self.value.contract() if isinstance(self.value, WeeklyScheduleIn) else self.value
 
 
 def _failure(exc: Exception) -> HTTPException:
@@ -43,8 +70,8 @@ def _public(camera_id: str, result: ControlResult) -> dict[str, object]:
     return {
         "id": camera_id,
         "control": result.key,
-        "value": result.value,
-        "previous_value": result.previous_value,
+        "value": public_control_value(result.value),
+        "previous_value": public_control_value(result.previous_value),
         "changed": result.changed,
         "verified": result.verified,
         "authenticated": result.authenticated,
@@ -82,7 +109,7 @@ def write_camera_control(
     """Write one bounded semantic value explicitly advertised by the selected driver."""
 
     try:
-        result = write_control(camera_id, control_key, body.value)
+        result = write_control(camera_id, control_key, body.contract_value())
     except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
         raise _failure(exc) from exc
     response.headers["Cache-Control"] = "no-store"

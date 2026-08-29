@@ -6,11 +6,37 @@ vendor P2P transport.  The API never receives opcodes, thing-model paths or raw 
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
-ControlValue = bool | int | str
-ControlKind = Literal["boolean", "choice", "action", "number"]
+Weekday = Literal["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+_WEEKDAYS: tuple[Weekday, ...] = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
+_CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+
+
+@dataclass(frozen=True, slots=True)
+class WeeklySchedule:
+    """Vendor-neutral recurring local-time window used by camera automation controls."""
+
+    start: str
+    end: str
+    weekdays: tuple[Weekday, ...]
+
+    def __post_init__(self) -> None:
+        if not _CLOCK.fullmatch(self.start) or not _CLOCK.fullmatch(self.end):
+            raise ValueError("weekly-schedule times must use 24-hour HH:MM")
+        if not self.weekdays or len(set(self.weekdays)) != len(self.weekdays):
+            raise ValueError("weekly schedule must contain unique active weekdays")
+        if any(day not in _WEEKDAYS for day in self.weekdays):
+            raise ValueError("weekly schedule contains an unknown weekday")
+
+    def public(self) -> dict[str, object]:
+        return {"start": self.start, "end": self.end, "weekdays": list(self.weekdays)}
+
+
+ControlValue = bool | int | str | WeeklySchedule
+ControlKind = Literal["boolean", "choice", "action", "number", "weekly_schedule"]
 
 
 class ControlNotReady(RuntimeError):
@@ -56,3 +82,9 @@ class ControlResult:
     error_code: int | None = None
     native_previous_value: int | None = None
     native_requested_value: int | None = None
+
+
+def public_control_value(value: ControlValue | None) -> object:
+    """Project a domain control value into JSON-compatible semantic data."""
+
+    return value.public() if isinstance(value, WeeklySchedule) else value

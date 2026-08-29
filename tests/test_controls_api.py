@@ -7,6 +7,7 @@ from backend.app.api import controls
 from backend.app.api.local_only import require_local_request
 from backend.app.camera_identity import stable_camera_id
 from backend.app.drivers import ControlNotReady, ControlResult, Unsupported
+from backend.app.drivers.contracts import WeeklySchedule
 
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:03")
 
@@ -40,6 +41,56 @@ def test_generic_write_passes_only_semantic_key_and_value(monkeypatch):
     assert result["verified"] is True
     assert "native_previous_value" not in result
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_weekly_schedule_is_strictly_parsed_before_driver_dispatch(monkeypatch):
+    observed = []
+    schedule = controls.ControlWriteIn.model_validate(
+        {
+            "value": {
+                "start": "22:30",
+                "end": "06:15",
+                "weekdays": ["mon", "wed", "fri"],
+            }
+        }
+    )
+
+    def fake_write(camera_id, key, value):
+        observed.append((camera_id, key, value))
+        return ControlResult(key, value, previous_value=value, verified=True)
+
+    monkeypatch.setattr(controls, "write_control", fake_write)
+    result = controls.write_camera_control(
+        schedule, Response(), CAMERA_ID, "smart_protection_schedule"
+    )
+
+    assert observed == [
+        (
+            CAMERA_ID,
+            "smart_protection_schedule",
+            WeeklySchedule("22:30", "06:15", ("mon", "wed", "fri")),
+        )
+    ]
+    assert result["value"] == {
+        "start": "22:30",
+        "end": "06:15",
+        "weekdays": ["mon", "wed", "fri"],
+    }
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"start": "24:00", "end": "06:00", "weekdays": ["mon"]},
+        {"start": "22:00", "end": "6:00", "weekdays": ["mon"]},
+        {"start": "22:00", "end": "06:00", "weekdays": []},
+        {"start": "22:00", "end": "06:00", "weekdays": ["mon", "mon"]},
+        {"start": "22:00", "end": "06:00", "weekdays": ["holiday"]},
+    ],
+)
+def test_weekly_schedule_rejects_invalid_shape(value):
+    with pytest.raises(ValueError):
+        controls.ControlWriteIn.model_validate({"value": value})
 
 
 def test_generic_read_returns_secret_free_projection(monkeypatch):

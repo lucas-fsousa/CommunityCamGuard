@@ -17,6 +17,8 @@ from .contracts import (
     ControlOperationError,
     ControlResult,
     ControlValue,
+    Weekday,
+    WeeklySchedule,
 )
 from .dahua import DahuaDriver
 from .generic import GenericDriver
@@ -67,6 +69,8 @@ __all__ = [
     "ControlValue",
     "DetectContext",
     "Unsupported",
+    "Weekday",
+    "WeeklySchedule",
     "classify_ports",
     "detect",
     "for_camera",
