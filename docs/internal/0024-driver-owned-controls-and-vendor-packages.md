@@ -48,6 +48,9 @@ string alone must never grant another driver's controls.
 - Durable enrollment selection and the authenticated access-node-to-camera handshake live in
   `p2p/camera_session.py`. Feature modules call this explicit boundary instead of a private helper
   on the compatibility client.
+- `p2p/client.py` is retained as a compatibility facade for the three read/probe operations and
+  historical protocol reexports. Executable architecture tests prevent protocol/session layers
+  from importing that facade or accumulating new operation implementations in it.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.
