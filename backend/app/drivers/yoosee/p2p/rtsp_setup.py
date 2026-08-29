@@ -20,6 +20,8 @@ from ....db.p2p import P2PEnrollment
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
 from .model_session import exchange_model_read
+from .model_write_protocol import build_model_write, parse_model_write_response
+from .model_write_session import exchange_model_write
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
@@ -109,38 +111,18 @@ def build_onvif_enable_write(
 
     if type(enabled) is not bool:
         raise ValueError("RTSP enabled state must be a boolean")
-    encoded_path = ONVIF_WRITE_PATH.encode()
-    encoded_json = str(int(enabled)).encode()
-    length = 0x2A + 8 + len(encoded_path) + 1 + len(encoded_json) + 1
-    frame = new_header(
-        0xD2,
-        length,
-        node.session_id,
+    return build_model_write(
+        node,
+        device_id,
+        ONVIF_WRITE_PATH,
+        int(enabled),
         sequence,
-        randomized_flags(mode=2, proc=3),
+        message_id,
     )
-    frame[0] = 0x7E
-    frame[0x18] = 2
-    struct.pack_into("<I", frame, 0x20, message_id & 0x7FFFFFFF)
-    struct.pack_into("<H", frame, 0x24, 1)
-    frame[0x26] = 7
-    frame[0x27] = len(encoded_path)
-    struct.pack_into("<H", frame, 0x28, len(encoded_json))
-    cursor = 0x2A
-    struct.pack_into("<Q", frame, cursor, device_id)
-    cursor += 8
-    frame[cursor : cursor + len(encoded_path)] = encoded_path
-    cursor += len(encoded_path) + 1
-    frame[cursor : cursor + len(encoded_json)] = encoded_json
-    return finish_mode2(frame, node.session_key)
 
 
 def _parse_onvif_write_response(frame: bytes, message_id: int) -> int | None:
-    if len(frame) < 0x36 or frame[1] != 0xD3:
-        return None
-    if struct.unpack_from("<I", frame, 0x30)[0] != message_id:
-        return None
-    return struct.unpack_from("<H", frame, 0x34)[0]
+    return parse_model_write_response(frame, message_id)
 
 
 def _exchange_onvif_write(
@@ -155,29 +137,17 @@ def _exchange_onvif_write(
 ) -> ModelWriteResult:
     """Send one non-retried ONVIF state write and await its correlated D3."""
 
-    message_id = secrets.randbits(31)
-    request = build_onvif_enable_write(node, device.device_id, enabled, sequence, message_id)
-    transport_acknowledged = False
-    error_code = None
-    sock.sendto(request, node.address)
-    receive_until = min(time.monotonic() + timeout, deadline)
-    for wire, peer in receive_datagrams(sock, receive_until):
-        if peer != node.address:
-            continue
-        plain = decrypt_node_frame(wire, node)
-        if plain is None:
-            continue
-        flags = struct.unpack_from("<I", plain, 0x14)[0]
-        if flags & (1 << 20):
-            if plain[1] == 0xD2:
-                transport_acknowledged = True
-            continue
-        candidate = _parse_onvif_write_response(plain, message_id)
-        acknowledge_reliable_node_frame(sock, node, plain)
-        if candidate is not None:
-            error_code = candidate
-            break
-    return ModelWriteResult(transport_acknowledged, error_code)
+    return exchange_model_write(
+        sock,
+        node,
+        device,
+        ONVIF_WRITE_PATH,
+        int(enabled),
+        sequence,
+        timeout,
+        retries=1,
+        deadline=deadline,
+    )
 
 
 def _wait_onvif_state(

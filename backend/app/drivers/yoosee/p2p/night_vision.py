@@ -6,9 +6,7 @@ V2 bitfield is intentionally not accepted here because these cameras do not adve
 
 from __future__ import annotations
 
-import secrets
 import socket
-import struct
 import time
 from dataclasses import dataclass
 
@@ -16,8 +14,8 @@ from ....db.p2p import P2PEnrollment
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
 from .model_session import exchange_model_read
-from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
-from .wire import finish_mode2, new_header, randomized_flags
+from .model_write_protocol import build_model_write, parse_model_write_response
+from .model_write_session import exchange_model_write
 
 NIGHT_VISION_READ_PATH = "ProWritable.videoParm"
 NIGHT_VISION_WRITE_PATH = "ProWritable.videoParm.setVal.nightViewMode"
@@ -47,40 +45,20 @@ def build_night_vision_write(
 
     if mode not in NIGHT_VISION_VALUES:
         raise ValueError("night-vision mode must be automatic, daytime or night")
-    encoded_path = NIGHT_VISION_WRITE_PATH.encode("utf-8")
-    encoded_json = str(NIGHT_VISION_VALUES[mode]).encode("ascii")
-    length = 0x2A + 8 + len(encoded_path) + 1 + len(encoded_json) + 1
-    frame = new_header(
-        0xD2,
-        length,
-        node.session_id,
+    return build_model_write(
+        node,
+        device_id,
+        NIGHT_VISION_WRITE_PATH,
+        NIGHT_VISION_VALUES[mode],
         sequence,
-        randomized_flags(mode=2, proc=3),
+        message_id,
     )
-    frame[0] = 0x7E
-    frame[0x18] = 2
-    struct.pack_into("<I", frame, 0x20, message_id & 0x7FFFFFFF)
-    struct.pack_into("<H", frame, 0x24, 1)
-    frame[0x26] = 7
-    frame[0x27] = len(encoded_path)
-    struct.pack_into("<H", frame, 0x28, len(encoded_json))
-    cursor = 0x2A
-    struct.pack_into("<Q", frame, cursor, device_id)
-    cursor += 8
-    frame[cursor : cursor + len(encoded_path)] = encoded_path
-    cursor += len(encoded_path) + 1
-    frame[cursor : cursor + len(encoded_json)] = encoded_json
-    return finish_mode2(frame, node.session_key)
 
 
 def parse_night_vision_write_response(frame: bytes, message_id: int) -> int | None:
     """Return the D3 error code only for the matching application request."""
 
-    if len(frame) < 0x36 or frame[1] != 0xD3:
-        return None
-    if struct.unpack_from("<I", frame, 0x30)[0] != message_id:
-        return None
-    return struct.unpack_from("<H", frame, 0x34)[0]
+    return parse_model_write_response(frame, message_id)
 
 
 def extract_night_vision_mode(value: object) -> int | None:
@@ -119,36 +97,17 @@ def exchange_night_vision_write(
         raise ValueError("night-vision mode must be automatic, daytime or night")
     if retries < 1:
         raise ValueError("night-vision-write retries must be positive")
-    message_id = secrets.randbits(31)
-    request = build_night_vision_write(node, device.device_id, mode, sequence, message_id)
-    transport_acknowledged = False
-    error_code = None
-    for _attempt in range(retries):
-        if deadline is not None and time.monotonic() >= deadline:
-            break
-        sock.sendto(request, node.address)
-        receive_until = time.monotonic() + timeout
-        if deadline is not None:
-            receive_until = min(receive_until, deadline)
-        for wire, peer in receive_datagrams(sock, receive_until):
-            if peer != node.address:
-                continue
-            plain = decrypt_node_frame(wire, node)
-            if plain is None:
-                continue
-            flags = struct.unpack_from("<I", plain, 0x14)[0]
-            if flags & (1 << 20):
-                if plain[1] == 0xD2:
-                    transport_acknowledged = True
-                continue
-            candidate = parse_night_vision_write_response(plain, message_id)
-            acknowledge_reliable_node_frame(sock, node, plain)
-            if candidate is not None:
-                error_code = candidate
-                break
-        if error_code is not None:
-            break
-    return ModelWriteResult(transport_acknowledged, error_code)
+    return exchange_model_write(
+        sock,
+        node,
+        device,
+        NIGHT_VISION_WRITE_PATH,
+        NIGHT_VISION_VALUES[mode],
+        sequence,
+        timeout,
+        retries=retries,
+        deadline=deadline,
+    )
 
 
 def set_camera_night_vision(
