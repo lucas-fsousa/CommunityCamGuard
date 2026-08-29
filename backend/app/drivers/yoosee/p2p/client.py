@@ -56,57 +56,15 @@ from .rendezvous_protocol import build_calling_request as build_calling_request
 from .rendezvous_protocol import build_nat_online as build_nat_online
 from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
 from .rendezvous_protocol import parse_mtp_peer_endpoint as parse_mtp_peer_endpoint
-from .wire import hash_string as hash_string
+from .session_io import (
+    acknowledge_reliable_node_frame,
+    decrypt_node_frame,
+    local_route_ip,
+    receive_datagrams,
+)
 
 LIST_HOST = "list.iotvideo.tencentcs.com"
 LIST_PORT = 51701
-
-
-def local_route_ip(peer: tuple[str, int]) -> str:
-    route = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        route.connect(peer)
-        return route.getsockname()[0]
-    finally:
-        route.close()
-
-
-def _decrypt_node_frame(wire: bytes, node: CertifiedNode) -> bytes | None:
-    if len(wire) < 0x20 or wire[0] not in (0x7E, 0x7F):
-        return None
-    mode = wire[0x16] & 3
-    try:
-        if mode == 2:
-            return gute_mode2_decrypt(wire, node.session_key)
-        if mode == 1:
-            return gute_mode1_decrypt(wire)
-    except ValueError:
-        return None
-    return bytes(wire) if mode == 0 else None
-
-
-def acknowledge_reliable_node_frame(sock: socket.socket, node: CertifiedNode, frame: bytes) -> bool:
-    flags = struct.unpack_from("<I", frame, 0x14)[0]
-    if flags & (1 << 20) or ((flags >> 18) & 3) == 0:
-        return False
-    mode = (flags >> 16) & 3
-    if mode == 2:
-        ack = build_mode2_response_ack(node, frame)
-    elif mode == 1:
-        ack = build_mode1_response_ack(node, frame)
-    else:
-        return False
-    sock.sendto(ack, node.address)
-    return True
-
-
-def _receive(sock: socket.socket, deadline: float):
-    while time.monotonic() < deadline:
-        sock.settimeout(max(0.05, deadline - time.monotonic()))
-        try:
-            yield sock.recvfrom(4096)
-        except TimeoutError:
-            return
 
 
 def obtain_list(sock: socket.socket, access_id: int, timeout: float) -> list[tuple[str, int]]:
@@ -120,7 +78,7 @@ def obtain_list(sock: socket.socket, access_id: int, timeout: float) -> list[tup
     query = build_list_query(access_id)
     for host in hosts:
         sock.sendto(query, (host, LIST_PORT))
-    for wire, _peer in _receive(sock, time.monotonic() + timeout):
+    for wire, _peer in receive_datagrams(sock, time.monotonic() + timeout):
         if len(wire) >= 0x20 and wire[:2] == b"\x7f\x16":
             try:
                 return parse_list_reply(wire)
@@ -145,7 +103,7 @@ def certify_node(
         receive_until = time.monotonic() + min(0.35, timeout)
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in _receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer == endpoint and wire[:2] == b"\x7f\x02":
                 break
         sequence = (sequence + 1) & 0xFFFFFFFF
@@ -155,7 +113,7 @@ def certify_node(
         receive_until = time.monotonic() + timeout
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in _receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != endpoint or len(wire) < 0x20 or wire[0] != 0x7F:
                 continue
             if (wire[0x16] & 3) != 1:
@@ -196,7 +154,7 @@ def initialize_node(
         receive_until = time.monotonic() + timeout
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in _receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != node.address or len(wire) < 0x1C or wire[0] != 0x7E:
                 continue
             if (wire[0x16] & 3) != 2:
@@ -221,10 +179,10 @@ def initialize_node(
     drain_until = time.monotonic() + min(timeout, 0.8)
     if deadline is not None:
         drain_until = min(drain_until, deadline)
-    for wire, peer in _receive(sock, drain_until):
+    for wire, peer in receive_datagrams(sock, drain_until):
         if peer != node.address:
             continue
-        trailing = _decrypt_node_frame(wire, node)
+        trailing = decrypt_node_frame(wire, node)
         if trailing is not None:
             acknowledge_reliable_node_frame(sock, node, trailing)
     return (
@@ -268,7 +226,7 @@ def heartbeat_node(sock: socket.socket, node: CertifiedNode, timeout: float) -> 
     local_ip = local_route_ip(node.address)
     local_port = sock.getsockname()[1]
     sock.sendto(build_heartbeat(node, local_ip, local_port), node.address)
-    for wire, peer in _receive(sock, time.monotonic() + timeout):
+    for wire, peer in receive_datagrams(sock, time.monotonic() + timeout):
         if peer != node.address or len(wire) < 0x20 or wire[0] != 0x7E:
             continue
         if (wire[0x16] & 3) != 2:
@@ -296,14 +254,14 @@ def resolve_term(
 ) -> bool:
     """Resolve one device term through the broker without opening a direct camera session."""
     sock.sendto(build_term_dns(node, term), node.address)
-    for wire, peer in _receive(sock, time.monotonic() + timeout):
+    for wire, peer in receive_datagrams(sock, time.monotonic() + timeout):
         if peer != node.address or len(wire) < 0x24 or wire[1] != 0xDC:
             continue
         try:
             _address, port = parse_term_dns(wire, node, term)
         except ValueError:
             continue
-        plain = _decrypt_node_frame(wire, node)
+        plain = decrypt_node_frame(wire, node)
         if plain is not None:
             acknowledge_reliable_node_frame(sock, node, plain)
         return bool(port)
@@ -362,7 +320,7 @@ def call_device(
         receive_until = time.monotonic() + wait
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in _receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != node.address:
                 direct_datagrams += 1
                 if len(wire) >= 0x20 and wire[:2] == b"\x7f\xca":
@@ -378,7 +336,7 @@ def call_device(
                         sock.sendto(nat_online, peer)
                         sock.sendto(nat_ack, peer)
                 continue
-            plain = _decrypt_node_frame(wire, node)
+            plain = decrypt_node_frame(wire, node)
             if plain is None:
                 continue
             acknowledge_reliable_node_frame(sock, node, plain)
@@ -431,10 +389,10 @@ def exchange_model_read(
         receive_until = time.monotonic() + timeout
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in _receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != node.address:
                 continue
-            plain = _decrypt_node_frame(wire, node)
+            plain = decrypt_node_frame(wire, node)
             if plain is None:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode2, new_header, randomized_flags
 
 ORIENTATION_PATH = "ProWritable.videoParm.setVal.multiFlip"
@@ -126,10 +127,10 @@ def exchange_orientation_write(
         receive_until = time.monotonic() + timeout
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in transport._receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != node.address:
                 continue
-            plain = transport._decrypt_node_frame(wire, node)
+            plain = decrypt_node_frame(wire, node)
             if plain is None:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
@@ -138,7 +139,7 @@ def exchange_orientation_write(
                     transport_acknowledged = True
                 continue
             candidate = parse_orientation_write_response(plain, message_id)
-            transport.acknowledge_reliable_node_frame(sock, node, plain)
+            acknowledge_reliable_node_frame(sock, node, plain)
             if candidate is not None:
                 error_code = candidate
                 break

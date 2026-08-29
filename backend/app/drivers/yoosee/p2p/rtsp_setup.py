@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
 ONVIF_READ_PATH = "ProWritable.onvifEn"
@@ -158,10 +159,10 @@ def _exchange_onvif_write(
     error_code = None
     sock.sendto(request, node.address)
     receive_until = min(time.monotonic() + timeout, deadline)
-    for wire, peer in transport._receive(sock, receive_until):
+    for wire, peer in receive_datagrams(sock, receive_until):
         if peer != node.address:
             continue
-        plain = transport._decrypt_node_frame(wire, node)
+        plain = decrypt_node_frame(wire, node)
         if plain is None:
             continue
         flags = struct.unpack_from("<I", plain, 0x14)[0]
@@ -170,7 +171,7 @@ def _exchange_onvif_write(
                 transport_acknowledged = True
             continue
         candidate = _parse_onvif_write_response(plain, message_id)
-        transport.acknowledge_reliable_node_frame(sock, node, plain)
+        acknowledge_reliable_node_frame(sock, node, plain)
         if candidate is not None:
             error_code = candidate
             break
@@ -337,10 +338,10 @@ def _exchange_password(
     application_acknowledged = False
     response_value = None
     sock.sendto(request, node.address)
-    for wire, peer in transport._receive(sock, min(time.monotonic() + timeout, deadline)):
+    for wire, peer in receive_datagrams(sock, min(time.monotonic() + timeout, deadline)):
         if peer != node.address:
             continue
-        plain = transport._decrypt_node_frame(wire, node)
+        plain = decrypt_node_frame(wire, node)
         if plain is None:
             continue
         flags = struct.unpack_from("<I", plain, 0x14)[0]
@@ -353,12 +354,12 @@ def _exchange_password(
         if plain[1] == 0xBA and len(plain) >= 0x34:
             if struct.unpack_from("<I", plain, 0x2C)[0] == message_id:
                 application_acknowledged = True
-                transport.acknowledge_reliable_node_frame(sock, node, plain)
+                acknowledge_reliable_node_frame(sock, node, plain)
             continue
         parsed = _parse_password_response(plain)
         if parsed is None:
             continue
-        transport.acknowledge_reliable_node_frame(sock, node, plain)
+        acknowledge_reliable_node_frame(sock, node, plain)
         sock.sendto(
             _build_password_receipt(node, plain, (sequence + 1) & 0xFFFFFFFF),
             node.address,

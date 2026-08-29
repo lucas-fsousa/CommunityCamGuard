@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
 
@@ -190,10 +191,10 @@ def exchange_white_light(
         receive_until = time.monotonic() + timeout
         if deadline is not None:
             receive_until = min(receive_until, deadline)
-        for wire, peer in transport._receive(sock, receive_until):
+        for wire, peer in receive_datagrams(sock, receive_until):
             if peer != node.address:
                 continue
-            plain = transport._decrypt_node_frame(wire, node)
+            plain = decrypt_node_frame(wire, node)
             if plain is None:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
@@ -206,12 +207,12 @@ def exchange_white_light(
             if plain[1] == 0xBA and len(plain) >= 0x34:
                 if struct.unpack_from("<I", plain, 0x2C)[0] == message_id:
                     application_acknowledged = True
-                    transport.acknowledge_reliable_node_frame(sock, node, plain)
+                    acknowledge_reliable_node_frame(sock, node, plain)
                 continue
             parsed = parse_white_light_response(plain, expected_type)
             if parsed is None:
                 continue
-            transport.acknowledge_reliable_node_frame(sock, node, plain)
+            acknowledge_reliable_node_frame(sock, node, plain)
             sock.sendto(
                 build_white_light_receipt(
                     node,
