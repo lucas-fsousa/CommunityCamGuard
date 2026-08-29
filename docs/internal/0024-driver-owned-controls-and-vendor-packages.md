@@ -35,7 +35,8 @@ string alone must never grant another driver's controls.
 - Direct rendezvous packet construction (`A4`, `CA`, `CB`) and `A3` peer parsing live in
   `p2p/rendezvous_protocol.py`, separate from the code that owns sockets and retry budgets.
 - Access-node discovery, certification, initialization, TermDNS and heartbeat frame codecs live in
-  `p2p/access_protocol.py`; `p2p/client.py` owns their UDP I/O, timeout and retry orchestration.
+  `p2p/access_protocol.py`; their UDP lifecycle, timeout and retry orchestration live in
+  `p2p/access_session.py`.
 - Shared UDP deadline handling, access-node frame decryption and reliable acknowledgements live in
   `p2p/session_io.py`. Feature modules consume that boundary directly instead of private client
   helpers.
