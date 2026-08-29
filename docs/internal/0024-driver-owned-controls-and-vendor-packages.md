@@ -91,6 +91,10 @@ string alone must never grant another driver's controls.
   extra fields/resource types and implements bounded C0/C1 framing plus checksummed fragment
   reassembly/ACK. Compressed responses remain fail-closed until the APK-compatible QuickLZ decoder
   is available as a portable production component.
+- The corresponding resource-service session permits one fixed request in flight, applies bounded
+  retries/deadlines, acknowledges each validated fragment and exposes compression as an explicit
+  decoder seam. Without a compatible decoder—or when its output length is wrong—the response is
+  never passed to the JSON catalogue parser.
 - The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
   performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
   logical-number readback. It remains unregistered until the fresh-catalogue orchestration is
