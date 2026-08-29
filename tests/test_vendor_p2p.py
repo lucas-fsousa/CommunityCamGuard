@@ -17,6 +17,7 @@ from backend.app.drivers.yoosee.p2p.crypto import (
     gute_mode2_decrypt,
     gute_mode2_encrypt,
 )
+from backend.app.drivers.yoosee.p2p.wire import new_header
 
 
 def test_connection_auth_round_trip_matches_its_signatures():
@@ -38,14 +39,14 @@ def test_connection_auth_round_trip_matches_its_signatures():
 
 
 def test_mode1_and_mode2_crypto_round_trip():
-    mode1 = client._new_header(0x15, 40, 123, 456, 1 << 16)
+    mode1 = new_header(0x15, 40, 123, 456, 1 << 16)
     struct.pack_into("<I", mode1, 0x18, 1)
     struct.pack_into("<I", mode1, 0x10, gute_mode1_xor_checksum(mode1))
     wire1 = gute_mode1_encrypt(bytes(mode1))
     assert gute_mode1_decrypt(wire1) == bytes(mode1)
 
     key = bytes(range(32))
-    mode2 = client._new_header(0xA0, 48, 789, 12, 2 << 16)
+    mode2 = new_header(0xA0, 48, 789, 12, 2 << 16)
     mode2[0] = 0x7E
     struct.pack_into("<I", mode2, 0x10, gute_mode1_xor_checksum(mode2))
     wire2 = gute_mode2_encrypt(bytes(mode2), key)
@@ -457,9 +458,7 @@ def test_orientation_change_is_idempotent_and_never_writes_when_already_set(monk
     monkeypatch.setattr(
         client,
         "exchange_model_read",
-        lambda *_args, **_kwargs: client.ModelReadResult(
-            True, 0, {"setVal": {"multiFlip": 1}}
-        ),
+        lambda *_args, **_kwargs: client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}}),
     )
     monkeypatch.setattr(
         orientation,

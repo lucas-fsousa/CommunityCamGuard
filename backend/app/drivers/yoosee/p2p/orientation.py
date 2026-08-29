@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .wire import finish_mode2, new_header, randomized_flags
 
 ORIENTATION_PATH = "ProWritable.videoParm.setVal.multiFlip"
 ORIENTATION_READ_PATH = "ProWritable.videoParm"
@@ -47,12 +48,12 @@ def build_orientation_write(
     encoded_path = ORIENTATION_PATH.encode("utf-8")
     encoded_json = str(ORIENTATION_VALUES[orientation]).encode("ascii")
     length = 0x2A + 8 + len(encoded_path) + 1 + len(encoded_json) + 1
-    frame = transport._new_header(
+    frame = new_header(
         0xD2,
         length,
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=2, proc=3),
+        randomized_flags(mode=2, proc=3),
     )
     frame[0] = 0x7E
     frame[0x18] = 2  # native target type 7 minus 5
@@ -67,7 +68,7 @@ def build_orientation_write(
     frame[cursor : cursor + len(encoded_path)] = encoded_path
     cursor += len(encoded_path) + 1
     frame[cursor : cursor + len(encoded_json)] = encoded_json
-    return transport._finish_mode2(frame, node.session_key)
+    return finish_mode2(frame, node.session_key)
 
 
 def parse_orientation_write_response(frame: bytes, message_id: int) -> int | None:

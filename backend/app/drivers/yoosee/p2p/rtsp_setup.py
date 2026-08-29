@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
 ONVIF_READ_PATH = "ProWritable.onvifEn"
 ONVIF_WRITE_PATH = "ProWritable.onvifEn.setVal"
@@ -69,11 +70,7 @@ def generate_rtsp_password(length: int = 16) -> str:
 def rtsp_password_digest(password: str) -> str:
     """Return the exact lowercase HA1 expected by the camera's ``type=3`` command."""
 
-    if (
-        not isinstance(password, str)
-        or not 8 <= len(password) <= 30
-        or not password.isalnum()
-    ):
+    if not isinstance(password, str) or not 8 <= len(password) <= 30 or not password.isalnum():
         raise ValueError("RTSP password must contain 8 to 30 alphanumeric characters")
     clear = f"admin:HIipCamera:{password}".encode()
     return hashlib.md5(clear, usedforsecurity=False).hexdigest()
@@ -112,12 +109,12 @@ def build_onvif_enable_write(
     encoded_path = ONVIF_WRITE_PATH.encode()
     encoded_json = str(int(enabled)).encode()
     length = 0x2A + 8 + len(encoded_path) + 1 + len(encoded_json) + 1
-    frame = transport._new_header(
+    frame = new_header(
         0xD2,
         length,
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=2, proc=3),
+        randomized_flags(mode=2, proc=3),
     )
     frame[0] = 0x7E
     frame[0x18] = 2
@@ -132,7 +129,7 @@ def build_onvif_enable_write(
     frame[cursor : cursor + len(encoded_path)] = encoded_path
     cursor += len(encoded_path) + 1
     frame[cursor : cursor + len(encoded_json)] = encoded_json
-    return transport._finish_mode2(frame, node.session_key)
+    return finish_mode2(frame, node.session_key)
 
 
 def _parse_onvif_write_response(frame: bytes, message_id: int) -> int | None:
@@ -259,12 +256,12 @@ def _build_password_request(
     message = {"type": 3, "data": {"password": digest.lower()}}
     encoded = json.dumps(message, separators=(",", ":")).encode()
     payload = b"\x01\xff\x00\x00" + struct.pack("<I", request_id) + encoded
-    frame = transport._new_header(
+    frame = new_header(
         0xB9,
         0x34 + len(payload),
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=2, proc=1),
+        randomized_flags(mode=2, proc=1),
     )
     frame[0] = 0x7E
     struct.pack_into("<I", frame, 0x18, 2)
@@ -273,7 +270,7 @@ def _build_password_request(
     struct.pack_into("<I", frame, 0x2C, message_id & 0x7FFFFFFF)
     struct.pack_into("<H", frame, 0x30, len(payload))
     frame[0x34:] = payload
-    return transport._finish_mode2(frame, node.session_key)
+    return finish_mode2(frame, node.session_key)
 
 
 def _parse_password_response(frame: bytes) -> dict[str, object] | None:
@@ -292,27 +289,25 @@ def _parse_password_response(frame: bytes) -> dict[str, object] | None:
     return value if isinstance(value, dict) and value.get("type") == 3 else None
 
 
-def _build_password_receipt(
-    node: transport.CertifiedNode, response: bytes, sequence: int
-) -> bytes:
+def _build_password_receipt(node: transport.CertifiedNode, response: bytes, sequence: int) -> bytes:
     response_flags = struct.unpack_from("<I", response, 0x14)[0]
     mode = (response_flags >> 16) & 3
     extra = response_flags & (1 << 25) if mode == 1 else 0
-    frame = transport._new_header(
+    frame = new_header(
         0xBA,
         0x34,
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=mode, proc=1, extra=extra),
+        randomized_flags(mode=mode, proc=1, extra=extra),
     )
     frame[0] = 0x7E
     struct.pack_into("<Q", frame, 0x1C, struct.unpack_from("<Q", response, 0x24)[0])
     struct.pack_into("<Q", frame, 0x24, struct.unpack_from("<Q", response, 0x1C)[0])
     struct.pack_into("<I", frame, 0x2C, struct.unpack_from("<I", response, 0x2C)[0])
     if mode == 2:
-        return transport._finish_mode2(frame, node.session_key)
+        return finish_mode2(frame, node.session_key)
     if mode == 1:
-        return transport._finish_mode1(frame)
+        return finish_mode1(frame)
     raise ValueError("RTSP password receipt requires an encrypted response")
 
 
@@ -370,9 +365,7 @@ def _exchange_password(
         )
         response_value = parsed
         break
-    return _PasswordExchange(
-        transport_acknowledged, application_acknowledged, response_value
-    )
+    return _PasswordExchange(transport_acknowledged, application_acknowledged, response_value)
 
 
 def set_camera_rtsp_enabled(

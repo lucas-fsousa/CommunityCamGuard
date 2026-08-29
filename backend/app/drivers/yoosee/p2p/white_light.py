@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,12 +70,12 @@ def build_white_light_request(
         }
     encoded = json.dumps(message, separators=(",", ":")).encode("utf-8")
     payload = b"\x01\xff\x00\x00" + struct.pack("<I", request_id) + encoded
-    frame = transport._new_header(
+    frame = new_header(
         0xB9,
         0x34 + len(payload),
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=2, proc=1),
+        randomized_flags(mode=2, proc=1),
     )
     frame[0] = 0x7E
     struct.pack_into("<I", frame, 0x18, 2)
@@ -83,7 +84,7 @@ def build_white_light_request(
     struct.pack_into("<I", frame, 0x2C, message_id & 0x7FFFFFFF)
     struct.pack_into("<H", frame, 0x30, len(payload))
     frame[0x34:] = payload
-    return transport._finish_mode2(frame, node.session_key)
+    return finish_mode2(frame, node.session_key)
 
 
 def parse_white_light_response(
@@ -132,21 +133,21 @@ def build_white_light_receipt(
     response_flags = struct.unpack_from("<I", response, 0x14)[0]
     mode = (response_flags >> 16) & 3
     extra = response_flags & (1 << 25) if mode == 1 else 0
-    frame = transport._new_header(
+    frame = new_header(
         0xBA,
         0x34,
         node.session_id,
         sequence,
-        transport._randomized_flags(mode=mode, proc=1, extra=extra),
+        randomized_flags(mode=mode, proc=1, extra=extra),
     )
     frame[0] = 0x7E
     struct.pack_into("<Q", frame, 0x1C, struct.unpack_from("<Q", response, 0x24)[0])
     struct.pack_into("<Q", frame, 0x24, struct.unpack_from("<Q", response, 0x1C)[0])
     struct.pack_into("<I", frame, 0x2C, struct.unpack_from("<I", response, 0x2C)[0])
     if mode == 2:
-        return transport._finish_mode2(frame, node.session_key)
+        return finish_mode2(frame, node.session_key)
     if mode == 1:
-        return transport._finish_mode1(frame)
+        return finish_mode1(frame)
     raise ValueError("white-light receipt requires an encrypted response")
 
 

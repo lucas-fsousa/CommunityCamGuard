@@ -56,11 +56,7 @@ from .rendezvous_protocol import build_calling_request as build_calling_request
 from .rendezvous_protocol import build_nat_online as build_nat_online
 from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
 from .rendezvous_protocol import parse_mtp_peer_endpoint as parse_mtp_peer_endpoint
-from .wire import finish_mode1 as _finish_mode1  # noqa: F401 - compatibility export
-from .wire import finish_mode2 as _finish_mode2  # noqa: F401 - compatibility export
 from .wire import hash_string as hash_string
-from .wire import new_header as _new_header  # noqa: F401 - compatibility export
-from .wire import randomized_flags as _randomized_flags  # noqa: F401 - compatibility export
 
 LIST_HOST = "list.iotvideo.tencentcs.com"
 LIST_PORT = 51701
