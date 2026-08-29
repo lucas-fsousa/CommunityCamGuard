@@ -42,6 +42,8 @@ string alone must never grant another driver's controls.
 - Direct camera NAT rendezvous and handshake retry orchestration live in
   `p2p/rendezvous_session.py`; packet construction remains isolated in
   `p2p/rendezvous_protocol.py`.
+- Allowlisted thing-model read retries, correlation and report handling live in
+  `p2p/model_session.py`; JSON and frame parsing remain socket-free in `p2p/model_protocol.py`.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.

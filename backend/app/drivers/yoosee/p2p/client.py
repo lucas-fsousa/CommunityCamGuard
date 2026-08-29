@@ -34,7 +34,6 @@ from .contracts import (
     CertifiedNode,
     InitInfoRejectedError,
     LoginMaterial,
-    ModelReadResult,
     OnlineDevice,
     P2PInventory,
     P2PProbeError,
@@ -43,11 +42,13 @@ from .contracts import (
 )
 from .contracts import CallingAttempt as CallingAttempt
 from .contracts import CallingResult as CallingResult
+from .contracts import ModelReadResult as ModelReadResult
 from .contracts import ModelWriteResult as ModelWriteResult
 from .crypto import gute_mode1_decrypt, gute_mode2_decrypt
 from .model_protocol import build_model_read as build_model_read
 from .model_protocol import parse_model_read_response as parse_model_read_response
 from .model_protocol import parse_model_report as parse_model_report
+from .model_session import exchange_model_read as exchange_model_read
 from .rendezvous_protocol import build_calling_request as build_calling_request
 from .rendezvous_protocol import build_nat_online as build_nat_online
 from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
@@ -263,66 +264,6 @@ def resolve_term(
             acknowledge_reliable_node_frame(sock, node, plain)
         return bool(port)
     return False
-
-
-def exchange_model_read(
-    sock: socket.socket,
-    node: CertifiedNode,
-    device: OnlineDevice,
-    path: str,
-    sequence: int,
-    timeout: float,
-    *,
-    retries: int = 3,
-    deadline: float | None = None,
-) -> ModelReadResult:
-    """Read one allowlisted property; this function cannot construct writes or actions."""
-    if retries < 1:
-        raise ValueError("model-read retries must be positive")
-    request = build_model_read(node, device.device_id, path, sequence, secrets.randbits(31))
-    transport_acknowledged = False
-    error_code = None
-    value = None
-    for _retry in range(retries):
-        if deadline is not None and time.monotonic() >= deadline:
-            break
-        sock.sendto(request, node.address)
-        receive_until = time.monotonic() + timeout
-        if deadline is not None:
-            receive_until = min(receive_until, deadline)
-        for wire, peer in receive_datagrams(sock, receive_until):
-            if peer != node.address:
-                continue
-            plain = decrypt_node_frame(wire, node)
-            if plain is None:
-                continue
-            flags = struct.unpack_from("<I", plain, 0x14)[0]
-            if flags & (1 << 20):
-                if plain[1] == 0xB7:
-                    transport_acknowledged = True
-                continue
-            report = parse_model_report(plain)
-            if report is not None:
-                destination, report_path, report_value = report
-                acknowledge_reliable_node_frame(sock, node, plain)
-                if destination is not None and destination != device.device_id:
-                    continue
-                if (
-                    report_path == path
-                    or report_path.startswith(path + ".")
-                    or path.startswith(report_path + ".")
-                ):
-                    error_code, value = 0, report_value
-                    break
-                continue
-            parsed = parse_model_read_response(plain, device.device_id)
-            acknowledge_reliable_node_frame(sock, node, plain)
-            if parsed is not None:
-                error_code, value = parsed
-                break
-        if error_code is not None:
-            break
-    return ModelReadResult(transport_acknowledged, error_code, value)
 
 
 def _camera_session(
