@@ -17,8 +17,9 @@ import time
 from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
-from . import client as transport
 from .camera_session import open_camera_session
+from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
+from .model_session import exchange_model_read
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
@@ -98,7 +99,7 @@ def extract_onvif_enabled(value: object) -> bool | None:
 
 
 def build_onvif_enable_write(
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     device_id: int,
     enabled: bool,
     sequence: int,
@@ -144,14 +145,14 @@ def _parse_onvif_write_response(frame: bytes, message_id: int) -> int | None:
 
 def _exchange_onvif_write(
     sock: socket.socket,
-    node: transport.CertifiedNode,
-    device: transport.OnlineDevice,
+    node: CertifiedNode,
+    device: OnlineDevice,
     enabled: bool,
     sequence: int,
     timeout: float,
     *,
     deadline: float,
-) -> transport.ModelWriteResult:
+) -> ModelWriteResult:
     """Send one non-retried ONVIF state write and await its correlated D3."""
 
     message_id = secrets.randbits(31)
@@ -176,13 +177,13 @@ def _exchange_onvif_write(
         if candidate is not None:
             error_code = candidate
             break
-    return transport.ModelWriteResult(transport_acknowledged, error_code)
+    return ModelWriteResult(transport_acknowledged, error_code)
 
 
 def _wait_onvif_state(
     sock: socket.socket,
-    node: transport.CertifiedNode,
-    device: transport.OnlineDevice,
+    node: CertifiedNode,
+    device: OnlineDevice,
     expected: bool,
     sequence: int,
     timeout: float,
@@ -194,7 +195,7 @@ def _wait_onvif_state(
             if remaining <= 0:
                 break
             time.sleep(min(0.5, remaining))
-        result = transport.exchange_model_read(
+        result = exchange_model_read(
             sock,
             node,
             device,
@@ -211,19 +212,19 @@ def _wait_onvif_state(
 
 def _set_onvif_in_session(
     sock: socket.socket,
-    node: transport.CertifiedNode,
-    device: transport.OnlineDevice,
+    node: CertifiedNode,
+    device: OnlineDevice,
     enabled: bool,
     sequence: int,
     timeout: float,
     deadline: float,
-) -> tuple[bool, transport.ModelWriteResult | None]:
-    preflight = transport.exchange_model_read(
+) -> tuple[bool, ModelWriteResult | None]:
+    preflight = exchange_model_read(
         sock, node, device, ONVIF_READ_PATH, sequence, timeout, deadline=deadline
     )
     previous = extract_onvif_enabled(preflight.value)
     if preflight.error_code != 0 or previous is None:
-        raise transport.P2PProbeError("RTSP activation preflight returned no supported state")
+        raise P2PProbeError("RTSP activation preflight returned no supported state")
     if previous is enabled:
         return previous, None
     write = _exchange_onvif_write(
@@ -236,16 +237,16 @@ def _set_onvif_in_session(
         deadline=deadline,
     )
     if write.error_code != 0:
-        raise transport.P2PProbeError("camera rejected the RTSP activation change")
+        raise P2PProbeError("camera rejected the RTSP activation change")
     if not _wait_onvif_state(
         sock, node, device, enabled, (sequence + 2) & 0xFFFFFFFF, timeout, deadline
     ):
-        raise transport.P2PProbeError("camera did not confirm the RTSP activation state")
+        raise P2PProbeError("camera did not confirm the RTSP activation state")
     return previous, write
 
 
 def _build_password_request(
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     access_id: int,
     device_id: int,
     digest: str,
@@ -291,7 +292,7 @@ def _parse_password_response(frame: bytes) -> dict[str, object] | None:
     return value if isinstance(value, dict) and value.get("type") == 3 else None
 
 
-def _build_password_receipt(node: transport.CertifiedNode, response: bytes, sequence: int) -> bytes:
+def _build_password_receipt(node: CertifiedNode, response: bytes, sequence: int) -> bytes:
     response_flags = struct.unpack_from("<I", response, 0x14)[0]
     mode = (response_flags >> 16) & 3
     extra = response_flags & (1 << 25) if mode == 1 else 0
@@ -315,9 +316,9 @@ def _build_password_receipt(node: transport.CertifiedNode, response: bytes, sequ
 
 def _exchange_password(
     sock: socket.socket,
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     enrollment: P2PEnrollment,
-    device: transport.OnlineDevice,
+    device: OnlineDevice,
     password: str,
     sequence: int,
     timeout: float,
@@ -390,10 +391,10 @@ def set_camera_rtsp_enabled(
         previous, write = _set_onvif_in_session(
             sock, node, target, enabled, sequence, bounded_timeout, deadline
         )
-    except transport.P2PProbeError:
+    except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise transport.P2PProbeError("P2P RTSP activation failed") from exc
+        raise P2PProbeError("P2P RTSP activation failed") from exc
     finally:
         sock.close()
     return P2PRtspEnableWrite(
@@ -449,18 +450,18 @@ def prepare_camera_rtsp(
                         bounded_timeout,
                         deadline,
                     )
-                except transport.P2PProbeError:
+                except P2PProbeError:
                     pass
-            raise transport.P2PProbeError("RTSP credential delivery was not acknowledged")
+            raise P2PProbeError("RTSP credential delivery was not acknowledged")
         accepted = bool(
             exchange.response is not None
             and exchange.response.get("type") == 3
             and exchange.response.get("err", 0) == 0
         )
-    except transport.P2PProbeError:
+    except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise transport.P2PProbeError("P2P RTSP credential setup failed") from exc
+        raise P2PProbeError("P2P RTSP credential setup failed") from exc
     finally:
         sock.close()
     return P2PRtspPreparation(

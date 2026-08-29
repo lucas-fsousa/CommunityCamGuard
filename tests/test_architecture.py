@@ -76,11 +76,18 @@ def test_yoosee_protocol_layers_do_not_depend_on_compatibility_client():
     assert violations == []
 
 
-def test_yoosee_feature_modules_do_not_access_private_client_helpers():
+def test_yoosee_feature_modules_do_not_depend_on_compatibility_client():
     feature_modules = ("orientation.py", "rtsp_setup.py", "white_light.py")
-    violations = [
-        name for name in feature_modules if "transport._" in (YOOSEE_P2P / name).read_text()
-    ]
+    violations = []
+    for name in feature_modules:
+        path = YOOSEE_P2P / name
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            names = {alias.name for alias in node.names}
+            if node.module == "client" or (node.module is None and "client" in names):
+                violations.append(name)
 
     assert violations == []
 

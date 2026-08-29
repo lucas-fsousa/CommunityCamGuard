@@ -402,7 +402,7 @@ def test_orientation_change_requires_preflight_d3_and_fresh_readback(monkeypatch
         calls.append(("write", device.device_id, orientation, sequence))
         return client.ModelWriteResult(True, 0)
 
-    monkeypatch.setattr(client, "exchange_model_read", fake_read)
+    monkeypatch.setattr(orientation, "exchange_model_read", fake_read)
     monkeypatch.setattr(orientation, "exchange_orientation_write", fake_write)
     monkeypatch.setattr(orientation.time, "sleep", lambda _seconds: None)
 
@@ -446,7 +446,7 @@ def test_orientation_change_is_idempotent_and_never_writes_when_already_set(monk
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
     monkeypatch.setattr(orientation, "open_camera_session", lambda *_args: (node, target, 8))
     monkeypatch.setattr(
-        client,
+        orientation,
         "exchange_model_read",
         lambda *_args, **_kwargs: client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}}),
     )

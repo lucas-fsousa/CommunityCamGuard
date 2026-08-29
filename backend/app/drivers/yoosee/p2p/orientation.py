@@ -14,8 +14,9 @@ import time
 from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
-from . import client as transport
 from .camera_session import open_camera_session
+from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
+from .model_session import exchange_model_read
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode2, new_header, randomized_flags
 
@@ -37,7 +38,7 @@ class P2POrientationWrite:
 
 
 def build_orientation_write(
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     device_id: int,
     orientation: str,
     sequence: int,
@@ -102,15 +103,15 @@ def extract_orientation(value: object) -> int | None:
 
 def exchange_orientation_write(
     sock: socket.socket,
-    node: transport.CertifiedNode,
-    device: transport.OnlineDevice,
+    node: CertifiedNode,
+    device: OnlineDevice,
     orientation: str,
     sequence: int,
     timeout: float,
     *,
     retries: int = 3,
     deadline: float | None = None,
-) -> transport.ModelWriteResult:
+) -> ModelWriteResult:
     """Send one typed D2 orientation write and wait for its matching D3 response."""
 
     if orientation not in ORIENTATION_VALUES:
@@ -146,7 +147,7 @@ def exchange_orientation_write(
                 break
         if error_code is not None:
             break
-    return transport.ModelWriteResult(transport_acknowledged, error_code)
+    return ModelWriteResult(transport_acknowledged, error_code)
 
 
 def set_camera_orientation(
@@ -167,7 +168,7 @@ def set_camera_orientation(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
-        preflight = transport.exchange_model_read(
+        preflight = exchange_model_read(
             sock,
             node,
             target,
@@ -178,9 +179,7 @@ def set_camera_orientation(
         )
         previous = extract_orientation(preflight.value)
         if preflight.error_code != 0 or previous is None:
-            raise transport.P2PProbeError(
-                "camera orientation preflight returned no supported state"
-            )
+            raise P2PProbeError("camera orientation preflight returned no supported state")
         if previous == requested:
             return P2POrientationWrite(
                 enrollment.device_id, orientation, previous, requested, False, False, 0, True
@@ -196,7 +195,7 @@ def set_camera_orientation(
             deadline=deadline,
         )
         if write.error_code != 0:
-            raise transport.P2PProbeError("camera rejected the orientation change")
+            raise P2PProbeError("camera rejected the orientation change")
 
         verified = False
         for attempt in range(5):
@@ -205,7 +204,7 @@ def set_camera_orientation(
                 if remaining <= 0:
                     break
                 time.sleep(min(0.4, remaining))
-            readback = transport.exchange_model_read(
+            readback = exchange_model_read(
                 sock,
                 node,
                 target,
@@ -219,11 +218,11 @@ def set_camera_orientation(
                 verified = True
                 break
         if not verified:
-            raise transport.P2PProbeError("camera did not confirm the orientation change")
-    except transport.P2PProbeError:
+            raise P2PProbeError("camera did not confirm the orientation change")
+    except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise transport.P2PProbeError("P2P orientation change failed") from exc
+        raise P2PProbeError("P2P orientation change failed") from exc
     finally:
         sock.close()
     return P2POrientationWrite(

@@ -14,8 +14,8 @@ import time
 from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
-from . import client as transport
 from .camera_session import open_camera_session
+from .contracts import CertifiedNode, OnlineDevice, P2PProbeError
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
@@ -49,7 +49,7 @@ class P2PWhiteLightWrite:
 
 
 def build_white_light_request(
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     access_id: int,
     device_id: int,
     enabled: bool | None,
@@ -125,9 +125,7 @@ def extract_white_light_state(response: dict[str, object] | None) -> bool | None
     return bool(state)
 
 
-def build_white_light_receipt(
-    node: transport.CertifiedNode, response: bytes, sequence: int
-) -> bytes:
+def build_white_light_receipt(node: CertifiedNode, response: bytes, sequence: int) -> bytes:
     """Build the full BA application receipt required by a white-light B9 response."""
 
     if len(response) < 0x34 or response[1] != 0xB9:
@@ -155,9 +153,9 @@ def build_white_light_receipt(
 
 def exchange_white_light(
     sock: socket.socket,
-    node: transport.CertifiedNode,
+    node: CertifiedNode,
     access_id: int,
-    device: transport.OnlineDevice,
+    device: OnlineDevice,
     enabled: bool | None,
     sequence: int,
     timeout: float,
@@ -259,11 +257,11 @@ def read_camera_white_light(
         )
         enabled = extract_white_light_state(result.response)
         if enabled is None:
-            raise transport.P2PProbeError("camera returned no supported white-light state")
-    except transport.P2PProbeError:
+            raise P2PProbeError("camera returned no supported white-light state")
+    except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise transport.P2PProbeError("P2P white-light state read failed") from exc
+        raise P2PProbeError("P2P white-light state read failed") from exc
     finally:
         sock.close()
     return P2PWhiteLightState(
@@ -305,9 +303,7 @@ def set_camera_white_light(
         )
         previous = extract_white_light_state(preflight.response)
         if previous is None:
-            raise transport.P2PProbeError(
-                "camera white-light preflight returned no supported state"
-            )
+            raise P2PProbeError("camera white-light preflight returned no supported state")
         if previous is enabled:
             return P2PWhiteLightWrite(
                 enrollment.device_id,
@@ -333,7 +329,7 @@ def set_camera_white_light(
         )
         error = write.response.get("err") if write.response is not None else None
         if type(error) is not int or error != 0:
-            raise transport.P2PProbeError("camera rejected the white-light change")
+            raise P2PProbeError("camera rejected the white-light change")
 
         verified = False
         for attempt in range(5):
@@ -357,11 +353,11 @@ def set_camera_white_light(
                 verified = True
                 break
         if not verified:
-            raise transport.P2PProbeError("camera did not confirm the white-light change")
-    except transport.P2PProbeError:
+            raise P2PProbeError("camera did not confirm the white-light change")
+    except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise transport.P2PProbeError("P2P white-light change failed") from exc
+        raise P2PProbeError("P2P white-light change failed") from exc
     finally:
         sock.close()
     return P2PWhiteLightWrite(
