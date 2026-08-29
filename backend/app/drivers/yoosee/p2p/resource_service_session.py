@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .contracts import CertifiedNode
+from .quicklz import decompress_level2
 from .resource_service_protocol import (
     FragmentReassembler,
     build_alarm_voice_catalog_request,
@@ -71,7 +72,7 @@ def exchange_alarm_voice_catalog(
     *,
     retries: int = 3,
     deadline: float | None = None,
-    decompressor: PayloadDecompressor | None = None,
+    decompressor: PayloadDecompressor | None = decompress_level2,
 ) -> AlarmVoiceCatalogResult:
     """Execute only the fixed read-only catalogue request against one authenticated node."""
 

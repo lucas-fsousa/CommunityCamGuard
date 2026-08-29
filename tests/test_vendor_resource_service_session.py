@@ -145,6 +145,7 @@ def test_catalog_session_requires_explicit_compatible_decompressor(monkeypatch):
         8,
         0.1,
         retries=1,
+        decompressor=None,
     )
 
     assert blocked.compression_required is True
@@ -166,6 +167,38 @@ def test_catalog_session_requires_explicit_compatible_decompressor(monkeypatch):
     assert completed.compression_required is False
     assert completed.status_code == 0
     assert completed.payload == b'{"code":0}'
+
+
+def test_catalog_session_uses_the_bounded_level2_decoder_by_default(monkeypatch):
+    sock = FakeSocket()
+    encoded = bytes.fromhex("791912000000800100000000000a007b22636f6465223a307d")
+    expected = 18
+    compressed = bytearray(0x18 + len(encoded))
+    compressed[:2] = b"\x7e\xc1"
+    struct.pack_into("<H", compressed, 2, len(compressed))
+    struct.pack_into("<I", compressed, 0x14, 1 | (expected << 1))
+    compressed[0x18:] = encoded
+    monkeypatch.setattr(resource_service_session, "build_alarm_voice_catalog_request", lambda *_: b"request")
+    monkeypatch.setattr(
+        resource_service_session,
+        "receive_datagrams",
+        lambda *_: iter(((b"compressed", NODE.address),)),
+    )
+    monkeypatch.setattr(resource_service_session, "decrypt_node_frame", lambda *_: bytes(compressed))
+    monkeypatch.setattr(resource_service_session, "acknowledge_reliable_node_frame", lambda *_: True)
+
+    result = resource_service_session.exchange_alarm_voice_catalog(
+        sock,  # type: ignore[arg-type]
+        NODE,
+        QUERY,
+        8,
+        0.1,
+        retries=1,
+    )
+
+    assert result.compression_required is False
+    assert result.status_code == 0
+    assert result.payload == b'{"code":0}'
 
 
 def test_catalog_session_validates_bounds_before_sending():

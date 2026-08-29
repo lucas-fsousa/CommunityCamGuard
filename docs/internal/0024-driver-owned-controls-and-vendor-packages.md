@@ -89,12 +89,14 @@ string alone must never grant another driver's controls.
   resolved against a fresh catalogue rather than accepting a resource id from HTTP.
 - Its resource-service codec fixes the only allowed request to POST `resfile/queryres`, rejects
   extra fields/resource types and implements bounded C0/C1 framing plus checksummed fragment
-  reassembly/ACK. Compressed responses remain fail-closed until the APK-compatible QuickLZ decoder
-  is available as a portable production component.
+  reassembly/ACK. A narrow memory-safe decoder implements only the APK's QuickLZ 1.5 level-2
+  profile, caps output to the gute protocol limit and rejects unsupported levels and malformed
+  lengths/references. It is an independent implementation: production neither links nor copies the
+  GPL laboratory oracle.
 - The corresponding resource-service session permits one fixed request in flight, applies bounded
   retries/deadlines, acknowledges each validated fragment and exposes compression as an explicit
-  decoder seam. Without a compatible decoder—or when its output length is wrong—the response is
-  never passed to the JSON catalogue parser.
+  decoder seam. The bounded decoder is the internal default; callers can explicitly disable it,
+  and any decode failure or wrong output length keeps the response away from the JSON parser.
 - The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
   performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
   logical-number readback. It remains unregistered until the fresh-catalogue orchestration is
