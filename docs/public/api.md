@@ -81,7 +81,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   "controls": {
     "white_light": { "kind": "boolean", "readable": true, "writable": true, "options": [] },
     "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] },
-    "siren_pulse": { "kind": "action", "readable": false, "writable": true, "options": ["2", "5", "10"] }
+    "siren_pulse": { "kind": "action", "readable": false, "writable": true, "options": ["2", "5", "10"] },
+    "speaker_volume": { "kind": "choice", "readable": true, "writable": true, "options": ["0", "25", "50", "75", "100"] }
   },
   "has_audio": true,
   "stream_id": "cam_0123456789abcdef01234567",
@@ -150,6 +151,9 @@ dashboard, it fails closed instead of reading Frida captures or accepting expire
 preflight, sends ON once, always performs an explicit OFF cleanup and returns `verified=true` only
 when the final OFF state was read back. The API does not expose arbitrary action paths or a
 persistent siren-ON state.
+
+`speaker_volume` accepts integer percentages `0`, `25`, `50`, `75` or `100`. Firmware values in
+the native 0..10 range are normalized to those five positions and never exposed by the HTTP API.
 
 ### Discovery
 

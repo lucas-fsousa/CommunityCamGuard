@@ -37,6 +37,17 @@ class P2PSpeakerVolumeWrite:
     verified: bool
 
 
+@dataclass(frozen=True, slots=True)
+class P2PSpeakerVolumeState:
+    device_id: str
+    volume_percent: int
+    raw_value: int
+    authenticated: bool
+    direct_handshake: bool
+    transport_acknowledged: bool
+    error_code: int | None
+
+
 def build_volume_write(
     node: CertifiedNode,
     device_id: int,
@@ -161,6 +172,49 @@ def exchange_volume_write(
         if error_code is not None:
             break
     return ModelWriteResult(transport_acknowledged, error_code)
+
+
+def read_camera_speaker_volume(
+    enrollment: P2PEnrollment,
+    *,
+    timeout: float = 1.5,
+    total_timeout: float = 25.0,
+) -> P2PSpeakerVolumeState:
+    """Read the selected camera's speaker-volume position on explicit request."""
+
+    bounded_timeout = max(0.5, min(float(timeout), 5.0))
+    deadline = time.monotonic() + max(8.0, min(float(total_timeout), 35.0))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("", 0))
+    try:
+        node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        result = exchange_model_read(
+            sock,
+            node,
+            target,
+            VOLUME_READ_PATH,
+            sequence,
+            min(5.0, max(0.5, deadline - time.monotonic())),
+            deadline=deadline,
+        )
+        raw = extract_volume_raw(result.value)
+        if result.error_code != 0 or raw is None:
+            raise P2PProbeError("camera returned no supported speaker-volume state")
+    except P2PProbeError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise P2PProbeError("P2P speaker-volume read failed") from exc
+    finally:
+        sock.close()
+    return P2PSpeakerVolumeState(
+        enrollment.device_id,
+        volume_percent(raw),
+        raw,
+        True,
+        True,
+        result.transport_acknowledged,
+        result.error_code,
+    )
 
 
 def set_camera_speaker_volume(

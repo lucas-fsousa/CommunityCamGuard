@@ -21,9 +21,11 @@ from ..contracts import (
 from .p2p import (
     P2PProbeError,
     pulse_camera_siren,
+    read_camera_speaker_volume,
     read_camera_white_light,
     run_with_fresh_access,
     set_camera_orientation,
+    set_camera_speaker_volume,
     set_camera_white_light,
 )
 
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 WHITE_LIGHT = "white_light"
 ORIENTATION = "orientation"
 SIREN_PULSE = "siren_pulse"
+SPEAKER_VOLUME = "speaker_volume"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -48,6 +51,13 @@ _DESCRIPTORS = (
         "action",
         writable=True,
         options=("2", "5", "10"),
+    ),
+    ControlDescriptor(
+        SPEAKER_VOLUME,
+        "choice",
+        readable=True,
+        writable=True,
+        options=("0", "25", "50", "75", "100"),
     ),
 )
 
@@ -70,21 +80,34 @@ def _enrollment(camera: Camera) -> P2PEnrollment:
 
 
 def read(camera: Camera, key: str) -> ControlResult:
-    if key != WHITE_LIGHT:
+    if key not in {WHITE_LIGHT, SPEAKER_VOLUME}:
         raise Unsupported(key)
     try:
-        result = run_with_fresh_access(_enrollment(camera), read_camera_white_light)
+        enrollment = _enrollment(camera)
+        if key == WHITE_LIGHT:
+            result = run_with_fresh_access(enrollment, read_camera_white_light)
+            return ControlResult(
+                key=key,
+                value=result.enabled,
+                verified=result.application_acknowledged,
+                authenticated=result.authenticated,
+                direct_connection=result.direct_handshake,
+                transport_acknowledged=result.transport_acknowledged,
+                application_acknowledged=result.application_acknowledged,
+            )
+        volume_result = run_with_fresh_access(enrollment, read_camera_speaker_volume)
+        return ControlResult(
+            key=key,
+            value=volume_result.volume_percent,
+            verified=volume_result.error_code == 0,
+            authenticated=volume_result.authenticated,
+            direct_connection=volume_result.direct_handshake,
+            transport_acknowledged=volume_result.transport_acknowledged,
+            error_code=volume_result.error_code,
+            native_previous_value=volume_result.raw_value,
+        )
     except P2PProbeError as exc:
         raise ControlOperationError(str(exc)) from exc
-    return ControlResult(
-        key=key,
-        value=result.enabled,
-        verified=result.application_acknowledged,
-        authenticated=result.authenticated,
-        direct_connection=result.direct_handshake,
-        transport_acknowledged=result.transport_acknowledged,
-        application_acknowledged=result.application_acknowledged,
-    )
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
@@ -147,6 +170,24 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                     if pulse_result.disable_error_code is not None
                     else pulse_result.enable_error_code
                 ),
+            )
+        if key == SPEAKER_VOLUME:
+            if type(value) is not int or value not in {0, 25, 50, 75, 100}:
+                raise ValueError("speaker volume must be 0, 25, 50, 75 or 100 percent")
+            volume_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: set_camera_speaker_volume(selected, value),
+            )
+            return ControlResult(
+                key=key,
+                value=volume_result.volume_percent,
+                previous_value=volume_result.previous_percent,
+                changed=volume_result.changed,
+                verified=volume_result.verified,
+                transport_acknowledged=volume_result.transport_acknowledged,
+                error_code=volume_result.error_code,
+                native_previous_value=volume_result.previous_raw,
+                native_requested_value=volume_result.requested_raw,
             )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc

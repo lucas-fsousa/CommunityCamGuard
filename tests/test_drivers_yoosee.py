@@ -10,7 +10,12 @@ from backend.app.db.registry import Camera
 from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
-from backend.app.drivers.yoosee.p2p import P2PSirenPulse, P2PWhiteLightWrite
+from backend.app.drivers.yoosee.p2p import (
+    P2PSirenPulse,
+    P2PSpeakerVolumeState,
+    P2PSpeakerVolumeWrite,
+    P2PWhiteLightWrite,
+)
 
 
 def _drv():
@@ -103,11 +108,18 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
 
     catalog = {item.key: item for item in _drv().control_catalog(camera)}
 
-    assert set(catalog) == {"white_light", "orientation", "siren_pulse"}
+    assert set(catalog) == {
+        "white_light",
+        "orientation",
+        "siren_pulse",
+        "speaker_volume",
+    }
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
     assert catalog["siren_pulse"].kind == "action"
     assert catalog["siren_pulse"].options == ("2", "5", "10")
+    assert catalog["speaker_volume"].readable is True
+    assert catalog["speaker_volume"].options == ("0", "25", "50", "75", "100")
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -197,3 +209,45 @@ def test_siren_write_rejects_duration_outside_advertised_choices(monkeypatch, va
 
     with pytest.raises(yoosee_controls.ControlOperationError, match="2, 5 or 10"):
         _drv().write_control(camera, "siren_pulse", value)
+
+
+def test_speaker_volume_read_and_write_use_normalized_percent(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    observed = []
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "read_camera_speaker_volume",
+        lambda selected: P2PSpeakerVolumeState(selected.device_id, 75, 6, True, True, True, 0),
+    )
+
+    def fake_write(selected, percent):
+        observed.append((selected.device_id, percent))
+        return P2PSpeakerVolumeWrite(selected.device_id, percent, 75, 6, 10, True, True, 0, True)
+
+    monkeypatch.setattr(yoosee_controls, "set_camera_speaker_volume", fake_write)
+
+    read = _drv().read_control(camera, "speaker_volume")
+    written = _drv().write_control(camera, "speaker_volume", 100)
+
+    assert read.value == 75
+    assert read.verified is True
+    assert observed == [("7000000001", 100)]
+    assert written.value == 100
+    assert written.previous_value == 75
+    assert written.verified is True

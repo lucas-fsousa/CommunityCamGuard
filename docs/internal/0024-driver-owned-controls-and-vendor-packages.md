@@ -66,6 +66,9 @@ string alone must never grant another driver's controls.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
+- Speaker volume is exposed as the APK's semantic 0/25/50/75/100% positions. The driver keeps the
+  raw 0..10 representation private, normalizes reads using the APK buckets and requires exact raw
+  readback after a change.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.

@@ -74,6 +74,8 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
     assert "available.siren_pulse?.writable" in live
     assert '"siren_pulse", (seconds) => Number(seconds)' in live
     assert 'window.confirm(t("control.sirenConfirm"' in live
+    assert "available.speaker_volume?.writable" in live
+    assert '"speaker_volume", (percent) => Number(percent)' in live
     assert "/controls/${encodeURIComponent(controlKey)}`" in live
     assert "JSON.stringify({ value: valueFor(selected) })" in live
     assert "/vendor-controls/" not in live

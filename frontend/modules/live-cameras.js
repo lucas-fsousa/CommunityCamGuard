@@ -231,6 +231,15 @@ function cameraControls(cam) {
       t("control.sirenComplete"),
     ));
   }
+  if (available.speaker_volume?.writable) {
+    menu.append(actionSelect(t("control.speakerVolume"), [
+      ["0", t("control.volumePercent", { percent: 0 })],
+      ["25", t("control.volumePercent", { percent: 25 })],
+      ["50", t("control.volumePercent", { percent: 50 })],
+      ["75", t("control.volumePercent", { percent: 75 })],
+      ["100", t("control.volumePercent", { percent: 100 })],
+    ], "speaker_volume", (percent) => Number(percent)));
+  }
   menu.append(status);
 
   const details = el("details", { className: "camera-controls" },

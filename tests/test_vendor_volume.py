@@ -95,6 +95,34 @@ def test_volume_change_requires_preflight_d3_and_exact_readback(monkeypatch):
     assert result.verified is True
 
 
+def test_volume_read_returns_normalized_percent_and_preserves_raw_value(monkeypatch):
+    enrollment = _enrollment()
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
+    target = OnlineDevice(7000000002, 1, False, 1, bytes(16))
+
+    class FakeSocket:
+        def bind(self, _address):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(volume.socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(volume, "open_camera_session", lambda *_args: (node, target, 40))
+    monkeypatch.setattr(
+        volume,
+        "exchange_model_read",
+        lambda *_args, **_kwargs: ModelReadResult(True, 0, {"setVal": 6}),
+    )
+
+    result = volume.read_camera_speaker_volume(enrollment)
+
+    assert result.volume_percent == 75
+    assert result.raw_value == 6
+    assert result.authenticated is True
+    assert result.direct_handshake is True
+
+
 def test_volume_is_idempotent_within_the_same_apk_bucket(monkeypatch):
     enrollment = _enrollment()
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
