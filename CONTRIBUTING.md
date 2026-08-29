@@ -76,6 +76,9 @@ For an existing semantic control, implement `control_catalog`, `read_control` an
 the vendor protocol only inside the family package. Do not expose a generic JSON/opcode sender.
 Structured controls must use an explicit shared domain type. For recurring automation, reuse
 `WeeklySchedule`/`weekly_schedule`; a driver must not advertise a free-form object control.
+Runtime choices use `ControlOption` and a `choice` descriptor with `dynamic_options=True`. Return
+only semantic values and display metadata; keep native IDs/tokens private and resolve the selected
+semantic value again from fresh driver-owned metadata before writing.
 
 ### 3. Add factory onboarding (optional)
 

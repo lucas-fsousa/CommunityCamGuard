@@ -99,8 +99,12 @@ string alone must never grant another driver's controls.
   and any decode failure or wrong output length keeps the response away from the JSON parser.
 - A private alarm-catalogue orchestrator opens the exact enrolled camera session, queries system and
   custom sources separately and returns only sanitized option metadata. It was validated read-only
-  against camera 3 with four Portuguese system resources and an empty custom catalogue; it remains
-  outside the driver/API until the dynamic-option contract is added.
+  against camera 3 with four Portuguese system resources and an empty custom catalogue.
+- Runtime choices use the vendor-neutral `ControlOption` contract and are available only when a
+  driver advertises a `choice` descriptor with `dynamic_options`. The LAN-only, authenticated,
+  no-store options endpoint exposes semantic value/label/group/detail fields; a later write must
+  resolve the semantic value against a fresh catalogue before the driver can access its private
+  native identifier.
 - The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
   performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
   logical-number readback. It remains unregistered until the fresh-catalogue orchestration is

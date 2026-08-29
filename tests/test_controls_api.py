@@ -6,7 +6,7 @@ from fastapi import HTTPException, Response
 from backend.app.api import controls
 from backend.app.api.local_only import require_local_request
 from backend.app.camera_identity import stable_camera_id
-from backend.app.drivers import ControlNotReady, ControlResult, Unsupported
+from backend.app.drivers import ControlNotReady, ControlOption, ControlResult, Unsupported
 from backend.app.drivers.contracts import WeeklySchedule
 
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:03")
@@ -120,6 +120,26 @@ def test_generic_control_routes_are_authenticated_and_lan_only():
         dependencies = {dependency.call for dependency in route.dependant.dependencies}
         assert controls.require_auth in dependencies
         assert require_local_request in dependencies
+
+
+def test_dynamic_options_return_only_the_generic_public_contract(monkeypatch):
+    monkeypatch.setattr(
+        controls,
+        "control_options",
+        lambda camera_id, key: (ControlOption("system-1", "Tone", "system", "1 s"),),
+    )
+    response = Response()
+
+    result = controls.read_camera_control_options(response, CAMERA_ID, "alarm_voice")
+
+    assert result == {
+        "id": CAMERA_ID,
+        "control": "alarm_voice",
+        "options": [
+            {"value": "system-1", "label": "Tone", "group": "system", "detail": "1 s"}
+        ],
+    }
+    assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.parametrize(

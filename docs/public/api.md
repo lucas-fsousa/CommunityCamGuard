@@ -136,7 +136,13 @@ Like provisioning, they reject public/proxied origins even when the dashboard se
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/cameras/{camera_id}/controls/{control_key}` | — | Reads a control only when its catalog descriptor has `readable: true`. |
+| GET | `/api/cameras/{camera_id}/controls/{control_key}/options` | — | Reads sanitized runtime choices only for a `choice` descriptor with `dynamic_options: true`; response is `no-store`. |
 | PUT | `/api/cameras/{camera_id}/controls/{control_key}` | `{"value": true|42|"choice"|WeeklySchedule}` | Writes a strict scalar or the shared weekly-schedule DTO only when its descriptor has `writable: true`; the driver validates the exact semantic value. |
+
+Static choice descriptors carry `options` in the camera catalogue. Dynamic choices expose an empty
+static list plus `dynamic_options: true`; their options endpoint returns bounded
+`{value,label,group,detail}` objects. `value` is a driver-issued semantic key, not a vendor resource
+ID. A write must resolve it again against fresh driver metadata before using any native value.
 
 The previous white-light/orientation-specific `/api/vendor-controls/...` routes remain available
 as a deprecated compatibility surface while older dashboard builds are phased out.

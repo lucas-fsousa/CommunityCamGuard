@@ -7,6 +7,8 @@ from .account import (
     login_account,
     refresh_account_session,
 )
+from .alarm_voice_catalog import P2PAlarmVoiceCatalog, read_camera_alarm_voice_catalog
+from .alarm_voice_selection import P2PAlarmVoiceWrite, set_camera_alarm_voice_resource
 from .client import (
     probe_account_inventory,
     probe_camera_route,
@@ -66,6 +68,8 @@ __all__ = [
     "ORIENTATION_VALUES",
     "AccountCredentials",
     "AccountSession",
+    "P2PAlarmVoiceCatalog",
+    "P2PAlarmVoiceWrite",
     "P2PInventory",
     "P2PNightVisionWrite",
     "P2POrientationWrite",
@@ -90,6 +94,7 @@ __all__ = [
     "probe_account_inventory",
     "probe_camera_route",
     "pulse_camera_siren",
+    "read_camera_alarm_voice_catalog",
     "read_camera_property",
     "read_camera_smart_protection",
     "read_camera_smart_protection_schedule",
@@ -98,6 +103,7 @@ __all__ = [
     "refresh_account_session",
     "rtsp_password_digest",
     "run_with_fresh_access",
+    "set_camera_alarm_voice_resource",
     "set_camera_night_vision",
     "set_camera_orientation",
     "set_camera_rtsp_enabled",

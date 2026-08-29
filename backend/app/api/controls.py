@@ -14,7 +14,7 @@ from ..drivers.contracts import (
     WeeklySchedule,
     public_control_value,
 )
-from ..services import CameraNotFound, read_control, write_control
+from ..services import CameraNotFound, control_options, read_control, write_control
 from .local_only import require_local_request
 
 router = APIRouter(
@@ -79,6 +79,27 @@ def _public(camera_id: str, result: ControlResult) -> dict[str, object]:
         "transport_acknowledged": result.transport_acknowledged,
         "application_acknowledged": result.application_acknowledged,
         "error_code": result.error_code,
+    }
+
+
+@router.get("/{control_key}/options")
+def read_camera_control_options(
+    response: Response,
+    camera_id: CameraId = Path(pattern=r"^cam_[0-9a-f]{24}$"),
+    control_key: ControlKey = Path(pattern=r"^[a-z][a-z0-9_]{0,63}$"),
+) -> dict[str, object]:
+    """Read sanitized options for one explicitly advertised dynamic choice."""
+
+    try:
+        options = control_options(camera_id, control_key)
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+        raise _failure(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return {
+        "id": camera_id,
+        "control": control_key,
+        "options": [option.public() for option in options],
     }
 
 

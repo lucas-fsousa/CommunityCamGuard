@@ -13,6 +13,7 @@ from typing import Literal
 Weekday = Literal["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 _WEEKDAYS: tuple[Weekday, ...] = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
 _CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+_OPTION_VALUE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +57,11 @@ class ControlDescriptor:
     readable: bool = False
     writable: bool = False
     options: tuple[str, ...] = ()
+    dynamic_options: bool = False
+
+    def __post_init__(self) -> None:
+        if self.dynamic_options and (self.kind != "choice" or self.options):
+            raise ValueError("dynamic control options require a choice without static options")
 
     def public(self) -> dict[str, object]:
         return {
@@ -63,6 +69,35 @@ class ControlDescriptor:
             "readable": self.readable,
             "writable": self.writable,
             "options": list(self.options),
+            "dynamic_options": self.dynamic_options,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ControlOption:
+    """One safe runtime option returned by a camera-family driver."""
+
+    value: str
+    label: str
+    group: str | None = None
+    detail: str | None = None
+
+    def __post_init__(self) -> None:
+        if _OPTION_VALUE.fullmatch(self.value) is None:
+            raise ValueError("control option value is invalid")
+        if not self.label.strip() or len(self.label) > 120:
+            raise ValueError("control option label is invalid")
+        if self.group is not None and _OPTION_VALUE.fullmatch(self.group) is None:
+            raise ValueError("control option group is invalid")
+        if self.detail is not None and len(self.detail) > 120:
+            raise ValueError("control option detail is too long")
+
+    def public(self) -> dict[str, object]:
+        return {
+            "value": self.value,
+            "label": self.label,
+            "group": self.group,
+            "detail": self.detail,
         }
 
 

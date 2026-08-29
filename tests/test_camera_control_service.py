@@ -6,7 +6,7 @@ from backend.app import drivers
 from backend.app.camera_identity import stable_camera_id
 from backend.app.db import registry
 from backend.app.drivers.base import CameraDriver, Unsupported
-from backend.app.drivers.contracts import ControlDescriptor, ControlResult
+from backend.app.drivers.contracts import ControlDescriptor, ControlOption, ControlResult
 from backend.app.services import camera_controls
 
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:03")
@@ -48,6 +48,7 @@ def test_catalog_and_operations_are_dispatched_to_selected_driver(monkeypatch):
             "readable": True,
             "writable": True,
             "options": [],
+            "dynamic_options": False,
         }
     }
     assert read.value is True and read.verified is True
@@ -91,3 +92,21 @@ def test_operation_must_be_advertised_with_matching_permission(monkeypatch):
         camera_controls.read_control(CAMERA_ID, "orientation")
     with pytest.raises(Unsupported):
         camera_controls.write_control(CAMERA_ID, "hidden_native_path", True)
+
+
+def test_dynamic_options_require_an_explicit_choice_descriptor(monkeypatch):
+    class DynamicDriver(FakeControlDriver):
+        def control_catalog(self, camera):
+            return (ControlDescriptor("alarm_voice", "choice", writable=True, dynamic_options=True),)
+
+        def control_options(self, camera, key):
+            return (ControlOption("system-1", "Tone", "system", "1 s"),)
+
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: DynamicDriver())
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+
+    assert camera_controls.control_options(CAMERA_ID, "alarm_voice") == (
+        ControlOption("system-1", "Tone", "system", "1 s"),
+    )
+    with pytest.raises(Unsupported):
+        camera_controls.control_options(CAMERA_ID, "white_light")

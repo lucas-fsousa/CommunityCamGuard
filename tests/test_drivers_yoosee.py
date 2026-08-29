@@ -2,6 +2,9 @@
 media) are stubbed, so detection, the control probe and PTZ routing run offline.
 """
 
+import base64
+import struct
+
 import pytest
 
 from backend.app.control import device, media, ptz
@@ -12,6 +15,8 @@ from backend.app.drivers.contracts import WeeklySchedule
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
 from backend.app.drivers.yoosee.p2p import (
+    P2PAlarmVoiceCatalog,
+    P2PAlarmVoiceWrite,
     P2PNightVisionWrite,
     P2PSirenPulse,
     P2PSmartProtectionScheduleState,
@@ -22,6 +27,7 @@ from backend.app.drivers.yoosee.p2p import (
     P2PSpeakerVolumeWrite,
     P2PWhiteLightWrite,
 )
+from backend.app.drivers.yoosee.p2p.alarm_voice import AlarmVoiceResource
 
 
 def _drv():
@@ -122,6 +128,7 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
         "night_vision",
         "smart_protection",
         "smart_protection_schedule",
+        "alarm_voice",
     }
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
@@ -134,6 +141,9 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     assert catalog["smart_protection"].writable is True
     assert catalog["smart_protection_schedule"].kind == "weekly_schedule"
     assert catalog["smart_protection_schedule"].readable is True
+    assert catalog["alarm_voice"].kind == "choice"
+    assert catalog["alarm_voice"].dynamic_options is True
+    assert catalog["alarm_voice"].options == ()
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -408,3 +418,54 @@ def test_smart_protection_schedule_stays_typed_across_driver_boundary(monkeypatc
     assert written.value == requested
     assert written.previous_value == previous
     assert written.verified is True
+
+
+def test_alarm_voice_options_and_write_resolve_only_a_fresh_catalog_resource(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    resource_id = base64.b64encode(struct.pack("<II16s", 4, 7270, bytes(16))).decode()
+    resource = AlarmVoiceResource(
+        "system-7270", "Zumbido 1", 4500, "AMR", True, 7270, resource_id
+    )
+    catalog = P2PAlarmVoiceCatalog(enrollment.device_id, 1, 0, True, (resource,))
+    selected: list[AlarmVoiceResource] = []
+    monkeypatch.setattr(yoosee_controls.p2p, "get_enrollment_for_camera", lambda _id: enrollment)
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected_enrollment, operation: operation(selected_enrollment),
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "read_camera_alarm_voice_catalog",
+        lambda _enrollment: catalog,
+    )
+
+    def fake_select(_enrollment, chosen):
+        selected.append(chosen)
+        return P2PAlarmVoiceWrite(
+            enrollment.device_id, chosen.key, 2886, chosen.logical_number, True, True, 0, True
+        )
+
+    monkeypatch.setattr(yoosee_controls, "set_camera_alarm_voice_resource", fake_select)
+
+    options = _drv().control_options(camera, "alarm_voice")
+    written = _drv().write_control(camera, "alarm_voice", "system-7270")
+
+    assert options[0].public() == {
+        "value": "system-7270",
+        "label": "Zumbido 1",
+        "group": "system",
+        "detail": "4.5 s",
+    }
+    assert selected == [resource]
+    assert written.value == "system-7270"
+    assert written.verified is True
+
+    with pytest.raises(yoosee_controls.ControlOperationError, match="fresh camera catalogue"):
+        _drv().write_control(camera, "alarm_voice", "system-9999")

@@ -15,6 +15,7 @@ from ..contracts import (
     ControlDescriptor,
     ControlNotReady,
     ControlOperationError,
+    ControlOption,
     ControlResult,
     ControlValue,
     WeeklySchedule,
@@ -23,11 +24,13 @@ from .p2p import (
     NIGHT_VISION_VALUES,
     P2PProbeError,
     pulse_camera_siren,
+    read_camera_alarm_voice_catalog,
     read_camera_smart_protection,
     read_camera_smart_protection_schedule,
     read_camera_speaker_volume,
     read_camera_white_light,
     run_with_fresh_access,
+    set_camera_alarm_voice_resource,
     set_camera_night_vision,
     set_camera_orientation,
     set_camera_smart_protection,
@@ -47,6 +50,7 @@ SPEAKER_VOLUME = "speaker_volume"
 NIGHT_VISION = "night_vision"
 SMART_PROTECTION = "smart_protection"
 SMART_PROTECTION_SCHEDULE = "smart_protection_schedule"
+ALARM_VOICE = "alarm_voice"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -81,6 +85,12 @@ _DESCRIPTORS = (
         "weekly_schedule",
         readable=True,
         writable=True,
+    ),
+    ControlDescriptor(
+        ALARM_VOICE,
+        "choice",
+        writable=True,
+        dynamic_options=True,
     ),
 )
 
@@ -159,6 +169,27 @@ def read(camera: Camera, key: str) -> ControlResult:
             native_previous_value=volume_result.raw_value,
         )
     except P2PProbeError as exc:
+        raise ControlOperationError(str(exc)) from exc
+
+
+def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
+    if key != ALARM_VOICE:
+        raise Unsupported(key)
+    try:
+        catalog_result = run_with_fresh_access(
+            _enrollment(camera),
+            read_camera_alarm_voice_catalog,
+        )
+        return tuple(
+            ControlOption(
+                resource.key,
+                resource.name,
+                "system" if resource.system else "custom",
+                f"{resource.duration_ms / 1000:g} s" if resource.duration_ms is not None else None,
+            )
+            for resource in catalog_result.resources
+        )
+    except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc
 
 
@@ -289,6 +320,30 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 verified=schedule_result.verified,
                 transport_acknowledged=schedule_result.transport_acknowledged,
                 error_code=schedule_result.error_code,
+            )
+        if key == ALARM_VOICE:
+            if not isinstance(value, str):
+                raise ValueError("alarm voice must be a semantic option key")
+            catalog_result = run_with_fresh_access(
+                enrollment,
+                read_camera_alarm_voice_catalog,
+            )
+            resource = catalog_result.find(value)
+            if resource is None:
+                raise ValueError("alarm voice is not present in the fresh camera catalogue")
+            voice_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: set_camera_alarm_voice_resource(selected, resource),
+            )
+            return ControlResult(
+                key=key,
+                value=voice_result.option_key,
+                changed=voice_result.changed,
+                verified=voice_result.verified,
+                transport_acknowledged=voice_result.transport_acknowledged,
+                error_code=voice_result.error_code,
+                native_previous_value=voice_result.previous_logical_number,
+                native_requested_value=voice_result.requested_logical_number,
             )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc

@@ -31,6 +31,9 @@ class P2PAlarmVoiceCatalog:
     def public_options(self) -> tuple[dict[str, object], ...]:
         return tuple(resource.public() for resource in self.resources)
 
+    def find(self, option_key: str) -> AlarmVoiceResource | None:
+        return next((resource for resource in self.resources if resource.key == option_key), None)
+
 
 def _decode_response(
     payload: bytes | None,

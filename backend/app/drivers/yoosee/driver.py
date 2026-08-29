@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from ...control import device, media, ptz
 from ..base import CameraDriver, Capabilities, DetectContext
-from ..contracts import ControlDescriptor, ControlResult, ControlValue
+from ..contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
 from . import controls
 
 if TYPE_CHECKING:
@@ -72,6 +72,9 @@ class YooseeDriver(CameraDriver):
 
     def read_control(self, camera: Camera, key: str) -> ControlResult:
         return controls.read(camera, key)
+
+    def control_options(self, camera: Camera, key: str) -> tuple[ControlOption, ...]:
+        return controls.options(camera, key)
 
     def write_control(self, camera: Camera, key: str, value: ControlValue) -> ControlResult:
         return controls.write(camera, key, value)

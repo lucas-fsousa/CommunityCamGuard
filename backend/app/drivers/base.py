@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ..discovery import rtsp
-from .contracts import ControlDescriptor, ControlResult, ControlValue
+from .contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
@@ -182,6 +182,11 @@ class CameraDriver:
 
     def read_control(self, camera: Camera, key: str) -> ControlResult:
         """Read one allowlisted semantic control; family drivers opt in explicitly."""
+
+        raise Unsupported(key)
+
+    def control_options(self, camera: Camera, key: str) -> tuple[ControlOption, ...]:
+        """Read runtime options for one explicitly advertised dynamic choice."""
 
         raise Unsupported(key)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from .. import drivers
 from ..db import registry
 from ..db.registry import Camera
-from ..drivers.contracts import ControlDescriptor, ControlResult, ControlValue
+from ..drivers.contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
 
 
 class CameraNotFound(LookupError):
@@ -44,6 +44,18 @@ def _operation(camera: Camera, key: str, permission: str):
 def read_control(camera_id: str, key: str) -> ControlResult:
     camera = _camera(camera_id)
     return _operation(camera, key, "readable").read_control(camera, key)
+
+
+def control_options(camera_id: str, key: str) -> tuple[ControlOption, ...]:
+    camera = _camera(camera_id)
+    driver = drivers.for_camera(camera)
+    descriptor = next(
+        (item for item in driver.control_catalog(camera) if item.key == key),
+        None,
+    )
+    if descriptor is None or descriptor.kind != "choice" or not descriptor.dynamic_options:
+        raise drivers.Unsupported(key)
+    return driver.control_options(camera, key)
 
 
 def write_control(camera_id: str, key: str, value: ControlValue) -> ControlResult:
