@@ -87,6 +87,10 @@ string alone must never grant another driver's controls.
   resources survive parsing; signed URLs/tokens are discarded, full vendor `resId` values are
   private non-repr fields, and the future UI selector will use semantic `system-N`/`custom-N` keys
   resolved against a fresh catalogue rather than accepting a resource id from HTTP.
+- Its resource-service codec fixes the only allowed request to POST `resfile/queryres`, rejects
+  extra fields/resource types and implements bounded C0/C1 framing plus checksummed fragment
+  reassembly/ACK. Compressed responses remain fail-closed until the APK-compatible QuickLZ decoder
+  is available as a portable production component.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
