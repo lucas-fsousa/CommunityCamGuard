@@ -27,6 +27,9 @@ def _catalog_payload(*entries: dict[str, object]) -> bytes:
 def test_alarm_voice_query_is_read_only_localized_and_uses_signed_access_id():
     assert alarm_voice_language_keyword("pt-BR") == "language_8"
     assert alarm_voice_language_keyword("zh_CN") == "language_2"
+    assert alarm_voice_language_keyword("th-TH") == "language_3"
+    assert alarm_voice_language_keyword("de-DE") == "language_5"
+    assert alarm_voice_language_keyword("es-ES") == "language_12"
     assert build_alarm_voice_query(
         system=True,
         language="pt-BR",
