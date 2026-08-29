@@ -83,7 +83,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
     "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] },
     "siren_pulse": { "kind": "action", "readable": false, "writable": true, "options": ["2", "5", "10"] },
     "speaker_volume": { "kind": "choice", "readable": true, "writable": true, "options": ["0", "25", "50", "75", "100"] },
-    "night_vision": { "kind": "choice", "readable": false, "writable": true, "options": ["automatic", "daytime", "night"] }
+    "night_vision": { "kind": "choice", "readable": false, "writable": true, "options": ["automatic", "daytime", "night"] },
+    "smart_protection": { "kind": "boolean", "readable": true, "writable": true, "options": [] }
   },
   "has_audio": true,
   "stream_id": "cam_0123456789abcdef01234567",
@@ -159,6 +160,10 @@ the native 0..10 range are normalized to those five positions and never exposed 
 `night_vision` accepts only `automatic`, `daytime` (forced color/day mode) or `night` (forced
 infrared/night mode). The Yoosee implementation uses the selected model's proven legacy scalar,
 requires preflight and exact readback, and deliberately does not expose the unsupported V2 bitfield.
+
+`smart_protection` accepts only a JSON boolean. It changes only the guard master switch and
+preserves the camera's detection types, sensitivity, reactions and weekly schedule. Schedule
+configuration is a separate typed feature and is not accepted as an arbitrary object here.
 
 ### Discovery
 

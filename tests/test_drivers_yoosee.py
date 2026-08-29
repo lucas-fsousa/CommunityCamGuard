@@ -13,6 +13,8 @@ from backend.app.drivers.yoosee import controls as yoosee_controls
 from backend.app.drivers.yoosee.p2p import (
     P2PNightVisionWrite,
     P2PSirenPulse,
+    P2PSmartProtectionState,
+    P2PSmartProtectionWrite,
     P2PSpeakerVolumeState,
     P2PSpeakerVolumeWrite,
     P2PWhiteLightWrite,
@@ -115,6 +117,7 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
         "siren_pulse",
         "speaker_volume",
         "night_vision",
+        "smart_protection",
     }
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
@@ -123,6 +126,8 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     assert catalog["speaker_volume"].readable is True
     assert catalog["speaker_volume"].options == ("0", "25", "50", "75", "100")
     assert catalog["night_vision"].options == ("automatic", "daytime", "night")
+    assert catalog["smart_protection"].readable is True
+    assert catalog["smart_protection"].writable is True
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -308,3 +313,45 @@ def test_night_vision_rejects_values_outside_advertised_choices(monkeypatch, val
 
     with pytest.raises(yoosee_controls.ControlOperationError, match="automatic, daytime or night"):
         _drv().write_control(camera, "night_vision", value)
+
+
+def test_smart_protection_read_and_write_use_semantic_booleans(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    observed = []
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "read_camera_smart_protection",
+        lambda selected: P2PSmartProtectionState(selected.device_id, True, True, True, True, 0),
+    )
+
+    def fake_write(selected, enabled):
+        observed.append((selected.device_id, enabled))
+        return P2PSmartProtectionWrite(selected.device_id, enabled, True, True, True, 0, True)
+
+    monkeypatch.setattr(yoosee_controls, "set_camera_smart_protection", fake_write)
+
+    read = _drv().read_control(camera, "smart_protection")
+    written = _drv().write_control(camera, "smart_protection", False)
+
+    assert read.value is True
+    assert read.authenticated is True
+    assert observed == [("7000000001", False)]
+    assert written.value is False
+    assert written.previous_value is True
+    assert written.verified is True

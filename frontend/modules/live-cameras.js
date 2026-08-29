@@ -221,6 +221,12 @@ function cameraControls(cam) {
       ["inverted", t("control.orientationInverted")],
     ], "orientation", (orientation) => orientation));
   }
+  if (available.smart_protection?.writable) {
+    menu.append(actionSelect(t("control.smartProtection"), [
+      ["on", t("control.smartProtectionOn")],
+      ["off", t("control.smartProtectionOff")],
+    ], "smart_protection", (value) => value === "on"));
+  }
   if (available.siren_pulse?.writable) {
     menu.append(actionSelect(t("control.siren"), [
       ["2", t("control.sirenSeconds", { seconds: 2 })],

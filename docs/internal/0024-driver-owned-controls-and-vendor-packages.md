@@ -76,6 +76,9 @@ string alone must never grant another driver's controls.
 - Night vision is exposed as the semantic automatic/daytime/night choice. The current Yoosee
   profile maps only to its physically proven legacy 0/1/2 scalar with preflight and exact readback;
   the unadvertised V2 support/selection bitfield is not accepted through the production boundary.
+- Smart protection exposes only its boolean guard master switch. Reads and writes address the
+  proven leaf, so toggling protection cannot overwrite sensitivity, detector flags, automatic
+  reactions or the weekly schedule stored alongside it in `guardParm`.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.

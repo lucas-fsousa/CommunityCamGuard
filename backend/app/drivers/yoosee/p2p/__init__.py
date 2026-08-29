@@ -35,6 +35,12 @@ from .rtsp_setup import (
     set_camera_rtsp_enabled,
 )
 from .siren import P2PSirenPulse, pulse_camera_siren
+from .smart_protection import (
+    P2PSmartProtectionState,
+    P2PSmartProtectionWrite,
+    read_camera_smart_protection,
+    set_camera_smart_protection,
+)
 from .volume import (
     P2PSpeakerVolumeState,
     P2PSpeakerVolumeWrite,
@@ -63,6 +69,8 @@ __all__ = [
     "P2PRtspEnableWrite",
     "P2PRtspPreparation",
     "P2PSirenPulse",
+    "P2PSmartProtectionState",
+    "P2PSmartProtectionWrite",
     "P2PSpeakerVolumeState",
     "P2PSpeakerVolumeWrite",
     "P2PWhiteLightState",
@@ -75,6 +83,7 @@ __all__ = [
     "probe_camera_route",
     "pulse_camera_siren",
     "read_camera_property",
+    "read_camera_smart_protection",
     "read_camera_speaker_volume",
     "read_camera_white_light",
     "refresh_account_session",
@@ -83,6 +92,7 @@ __all__ = [
     "set_camera_night_vision",
     "set_camera_orientation",
     "set_camera_rtsp_enabled",
+    "set_camera_smart_protection",
     "set_camera_speaker_volume",
     "set_camera_white_light",
 ]

@@ -22,11 +22,13 @@ from .p2p import (
     NIGHT_VISION_VALUES,
     P2PProbeError,
     pulse_camera_siren,
+    read_camera_smart_protection,
     read_camera_speaker_volume,
     read_camera_white_light,
     run_with_fresh_access,
     set_camera_night_vision,
     set_camera_orientation,
+    set_camera_smart_protection,
     set_camera_speaker_volume,
     set_camera_white_light,
 )
@@ -40,6 +42,7 @@ ORIENTATION = "orientation"
 SIREN_PULSE = "siren_pulse"
 SPEAKER_VOLUME = "speaker_volume"
 NIGHT_VISION = "night_vision"
+SMART_PROTECTION = "smart_protection"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -68,6 +71,7 @@ _DESCRIPTORS = (
         writable=True,
         options=tuple(NIGHT_VISION_VALUES),
     ),
+    ControlDescriptor(SMART_PROTECTION, "boolean", readable=True, writable=True),
 )
 
 
@@ -89,7 +93,7 @@ def _enrollment(camera: Camera) -> P2PEnrollment:
 
 
 def read(camera: Camera, key: str) -> ControlResult:
-    if key not in {WHITE_LIGHT, SPEAKER_VOLUME}:
+    if key not in {WHITE_LIGHT, SPEAKER_VOLUME, SMART_PROTECTION}:
         raise Unsupported(key)
     try:
         enrollment = _enrollment(camera)
@@ -103,6 +107,17 @@ def read(camera: Camera, key: str) -> ControlResult:
                 direct_connection=result.direct_handshake,
                 transport_acknowledged=result.transport_acknowledged,
                 application_acknowledged=result.application_acknowledged,
+            )
+        if key == SMART_PROTECTION:
+            protection_result = run_with_fresh_access(enrollment, read_camera_smart_protection)
+            return ControlResult(
+                key=key,
+                value=protection_result.enabled,
+                verified=protection_result.error_code == 0,
+                authenticated=protection_result.authenticated,
+                direct_connection=protection_result.direct_handshake,
+                transport_acknowledged=protection_result.transport_acknowledged,
+                error_code=protection_result.error_code,
             )
         volume_result = run_with_fresh_access(enrollment, read_camera_speaker_volume)
         return ControlResult(
@@ -214,6 +229,22 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 error_code=night_result.error_code,
                 native_previous_value=night_result.previous_value,
                 native_requested_value=night_result.requested_value,
+            )
+        if key == SMART_PROTECTION:
+            if type(value) is not bool:
+                raise ValueError("smart-protection state must be a boolean")
+            protection_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: set_camera_smart_protection(selected, value),
+            )
+            return ControlResult(
+                key=key,
+                value=protection_result.enabled,
+                previous_value=protection_result.previous_enabled,
+                changed=protection_result.changed,
+                verified=protection_result.verified,
+                transport_acknowledged=protection_result.transport_acknowledged,
+                error_code=protection_result.error_code,
             )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc
