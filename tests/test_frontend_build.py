@@ -80,6 +80,9 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
     assert '"night_vision", (mode) => mode' in live
     assert "available.smart_protection?.writable" in live
     assert '"smart_protection", (value) => value === "on"' in live
+    assert "available.smart_protection_schedule?.writable" in live
+    assert "controls/smart_protection_schedule`" in live
+    assert "openProtectionSchedule(cam, status, schedule)" in live
     assert "/controls/${encodeURIComponent(controlKey)}`" in live
     assert "JSON.stringify({ value: valueFor(selected) })" in live
     assert "/vendor-controls/" not in live

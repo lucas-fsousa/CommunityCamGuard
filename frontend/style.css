@@ -204,8 +204,24 @@ header {
   border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 .camera-control-select { width: 100%; font-size: 12px; padding: 6px 8px; color: var(--text);
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.camera-control-schedule-btn { width: 100%; font-size: 12px; padding: 7px 8px; text-align: left;
+  color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  cursor: pointer; }
+.camera-control-schedule-btn:hover { border-color: var(--accent); }
 .camera-control-status { min-height: 1.1em; color: var(--ok); line-height: 1.3; }
 .camera-control-status.error { color: var(--full); }
+.protection-schedule-modal { width: min(520px, 92vw); display: grid; gap: 14px; }
+.protection-schedule-modal .compact { margin: 0; }
+.schedule-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.schedule-times label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.schedule-times input { color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px; color-scheme: dark; }
+.schedule-days-title { font-size: 13px; }
+.schedule-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.schedule-day { display: grid; justify-items: center; gap: 5px; padding: 7px 3px;
+  font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.schedule-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.schedule-actions .camera-control-status { flex: 1; }
 
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }

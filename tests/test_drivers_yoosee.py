@@ -8,11 +8,14 @@ from backend.app.control import device, media, ptz
 from backend.app.db.p2p import P2PEnrollment
 from backend.app.db.registry import Camera
 from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
+from backend.app.drivers.contracts import WeeklySchedule
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
 from backend.app.drivers.yoosee.p2p import (
     P2PNightVisionWrite,
     P2PSirenPulse,
+    P2PSmartProtectionScheduleState,
+    P2PSmartProtectionScheduleWrite,
     P2PSmartProtectionState,
     P2PSmartProtectionWrite,
     P2PSpeakerVolumeState,
@@ -118,6 +121,7 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
         "speaker_volume",
         "night_vision",
         "smart_protection",
+        "smart_protection_schedule",
     }
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
@@ -128,6 +132,8 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     assert catalog["night_vision"].options == ("automatic", "daytime", "night")
     assert catalog["smart_protection"].readable is True
     assert catalog["smart_protection"].writable is True
+    assert catalog["smart_protection_schedule"].kind == "weekly_schedule"
+    assert catalog["smart_protection_schedule"].readable is True
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -354,4 +360,51 @@ def test_smart_protection_read_and_write_use_semantic_booleans(monkeypatch):
     assert observed == [("7000000001", False)]
     assert written.value is False
     assert written.previous_value is True
+    assert written.verified is True
+
+
+def test_smart_protection_schedule_stays_typed_across_driver_boundary(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    previous = WeeklySchedule("00:00", "00:00", ("sun", "mon", "tue", "wed", "thu", "fri", "sat"))
+    requested = WeeklySchedule("22:30", "06:15", ("mon", "wed", "fri"))
+    observed = []
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "read_camera_smart_protection_schedule",
+        lambda selected: P2PSmartProtectionScheduleState(
+            selected.device_id, previous, True, True, True, 0
+        ),
+    )
+
+    def fake_write(selected, schedule):
+        observed.append((selected.device_id, schedule))
+        return P2PSmartProtectionScheduleWrite(
+            selected.device_id, schedule, previous, True, True, 0, True
+        )
+
+    monkeypatch.setattr(yoosee_controls, "set_camera_smart_protection_schedule", fake_write)
+
+    read = _drv().read_control(camera, "smart_protection_schedule")
+    written = _drv().write_control(camera, "smart_protection_schedule", requested)
+
+    assert read.value == previous
+    assert observed == [("7000000001", requested)]
+    assert written.value == requested
+    assert written.previous_value == previous
     assert written.verified is True

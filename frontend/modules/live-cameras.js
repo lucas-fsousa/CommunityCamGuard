@@ -167,6 +167,78 @@ function camBar(cam) {
 // tile renders: opening the dashboard must not create extra P2P sessions on resource-limited
 // cameras. Each option is an explicit target state; the backend performs its own preflight and
 // skips the write when the camera is already in that state.
+const PROTECTION_WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+async function openProtectionSchedule(cam, status, trigger) {
+  trigger.disabled = true;
+  status.classList.remove("error");
+  status.textContent = t("control.scheduleLoading");
+  try {
+    const current = await api(
+      `/cameras/${encodeURIComponent(cam.id)}/controls/smart_protection_schedule`,
+    );
+    const value = current.value || {};
+    const start = el("input", { type: "time", required: true, value: value.start || "00:00" });
+    const end = el("input", { type: "time", required: true, value: value.end || "00:00" });
+    const selected = new Set(value.weekdays || []);
+    const dayInputs = PROTECTION_WEEKDAYS.map((day) => {
+      const input = el("input", { type: "checkbox", checked: selected.has(day) });
+      return { day, input, label: el("label", { className: "schedule-day" }, input,
+        el("span", { textContent: t(`weekday.${day}`) })) };
+    });
+    const modalStatus = el("small", { className: "camera-control-status" });
+    const save = el("button", { className: "btn-primary", textContent: t("control.scheduleSave") });
+    const close = el("button", {
+      className: "icon-btn", textContent: "×", title: t("scan.close"), type: "button",
+    });
+    const card = el("div", { className: "card modal-card protection-schedule-modal" },
+      el("div", { className: "modal-head" },
+        el("h2", { textContent: t("control.scheduleTitle", { name: cam.name || cam.mac }) }), close),
+      el("p", { className: "muted compact", textContent: t("control.scheduleHint") }),
+      el("div", { className: "schedule-times" },
+        el("label", {}, el("span", { textContent: t("control.scheduleStart") }), start),
+        el("label", {}, el("span", { textContent: t("control.scheduleEnd") }), end)),
+      el("strong", { className: "schedule-days-title", textContent: t("control.scheduleDays") }),
+      el("div", { className: "schedule-days" }, ...dayInputs.map((item) => item.label)),
+      el("div", { className: "schedule-actions" }, modalStatus, save));
+    const overlay = el("div", { className: "modal" }, card);
+    close.addEventListener("click", () => overlay.remove());
+    save.addEventListener("click", async () => {
+      const weekdays = dayInputs.filter((item) => item.input.checked).map((item) => item.day);
+      if (!start.value || !end.value || !weekdays.length) {
+        modalStatus.classList.add("error");
+        modalStatus.textContent = t("control.scheduleInvalid");
+        return;
+      }
+      save.disabled = true;
+      modalStatus.classList.remove("error");
+      modalStatus.textContent = t("control.applying");
+      try {
+        await api(
+          `/cameras/${encodeURIComponent(cam.id)}/controls/smart_protection_schedule`,
+          { method: "PUT", body: JSON.stringify({ value: {
+            start: start.value, end: end.value, weekdays,
+          } }) },
+        );
+        status.textContent = t("control.applied");
+        overlay.remove();
+      } catch (error) {
+        modalStatus.classList.add("error");
+        modalStatus.textContent = t("control.failed", { msg: error.message });
+      } finally {
+        save.disabled = false;
+      }
+    });
+    document.body.append(overlay);
+    status.textContent = "";
+  } catch (error) {
+    status.classList.add("error");
+    status.textContent = t("control.failed", { msg: error.message });
+  } finally {
+    trigger.disabled = false;
+  }
+}
+
 function cameraControls(cam) {
   const available = cam.controls || {};
   const status = el("small", { className: "camera-control-status" });
@@ -226,6 +298,18 @@ function cameraControls(cam) {
       ["on", t("control.smartProtectionOn")],
       ["off", t("control.smartProtectionOff")],
     ], "smart_protection", (value) => value === "on"));
+  }
+  if (available.smart_protection_schedule?.writable) {
+    const schedule = el("button", {
+      className: "camera-control-schedule-btn",
+      textContent: t("control.scheduleOpen"),
+      type: "button",
+    });
+    schedule.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void openProtectionSchedule(cam, status, schedule);
+    });
+    menu.append(schedule);
   }
   if (available.siren_pulse?.writable) {
     menu.append(actionSelect(t("control.siren"), [

@@ -84,7 +84,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
     "siren_pulse": { "kind": "action", "readable": false, "writable": true, "options": ["2", "5", "10"] },
     "speaker_volume": { "kind": "choice", "readable": true, "writable": true, "options": ["0", "25", "50", "75", "100"] },
     "night_vision": { "kind": "choice", "readable": false, "writable": true, "options": ["automatic", "daytime", "night"] },
-    "smart_protection": { "kind": "boolean", "readable": true, "writable": true, "options": [] }
+    "smart_protection": { "kind": "boolean", "readable": true, "writable": true, "options": [] },
+    "smart_protection_schedule": { "kind": "weekly_schedule", "readable": true, "writable": true, "options": [] }
   },
   "has_audio": true,
   "stream_id": "cam_0123456789abcdef01234567",
@@ -127,7 +128,7 @@ curl -b jar.txt -X POST http://127.0.0.1:3200/api/cameras/cam_0123456789abcdef01
 ### Typed camera controls (authenticated trusted LAN only)
 
 The canonical endpoints accept the opaque `camera.id`, a semantic key advertised in the camera's
-`controls` catalog and one scalar value. They never accept a MAC, vendor device ID, opcode, raw
+`controls` catalog and one bounded semantic value. They never accept a MAC, vendor device ID, opcode, raw
 thing-model path or passthrough JSON payload. The application rejects a key unless the selected
 driver explicitly advertises the requested read/write operation.
 Like provisioning, they reject public/proxied origins even when the dashboard session is valid.
@@ -135,7 +136,7 @@ Like provisioning, they reject public/proxied origins even when the dashboard se
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/cameras/{camera_id}/controls/{control_key}` | — | Reads a control only when its catalog descriptor has `readable: true`. |
-| PUT | `/api/cameras/{camera_id}/controls/{control_key}` | `{"value": true|42|"choice"}` | Writes a strict boolean, integer or string only when its descriptor has `writable: true`; the driver validates the exact semantic value. |
+| PUT | `/api/cameras/{camera_id}/controls/{control_key}` | `{"value": true|42|"choice"|WeeklySchedule}` | Writes a strict scalar or the shared weekly-schedule DTO only when its descriptor has `writable: true`; the driver validates the exact semantic value. |
 
 The previous white-light/orientation-specific `/api/vendor-controls/...` routes remain available
 as a deprecated compatibility surface while older dashboard builds are phased out.
@@ -164,6 +165,21 @@ requires preflight and exact readback, and deliberately does not expose the unsu
 `smart_protection` accepts only a JSON boolean. It changes only the guard master switch and
 preserves the camera's detection types, sensitivity, reactions and weekly schedule. Schedule
 configuration is a separate typed feature and is not accepted as an arbitrary object here.
+
+`smart_protection_schedule` uses the shared weekly-schedule shape below. Times are strict local
+24-hour `HH:MM`; weekday names are Sunday-first identifiers and must be unique. At least one day is
+required. An end time equal to or before the start follows the camera firmware's overnight/all-day
+semantics. The Yoosee driver maps the complete value to `guardParm.plan` and requires exact readback.
+
+```json
+{
+  "value": {
+    "start": "22:30",
+    "end": "06:15",
+    "weekdays": ["mon", "tue", "wed", "thu", "fri"]
+  }
+}
+```
 
 ### Discovery
 

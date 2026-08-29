@@ -17,18 +17,21 @@ from ..contracts import (
     ControlOperationError,
     ControlResult,
     ControlValue,
+    WeeklySchedule,
 )
 from .p2p import (
     NIGHT_VISION_VALUES,
     P2PProbeError,
     pulse_camera_siren,
     read_camera_smart_protection,
+    read_camera_smart_protection_schedule,
     read_camera_speaker_volume,
     read_camera_white_light,
     run_with_fresh_access,
     set_camera_night_vision,
     set_camera_orientation,
     set_camera_smart_protection,
+    set_camera_smart_protection_schedule,
     set_camera_speaker_volume,
     set_camera_white_light,
 )
@@ -43,6 +46,7 @@ SIREN_PULSE = "siren_pulse"
 SPEAKER_VOLUME = "speaker_volume"
 NIGHT_VISION = "night_vision"
 SMART_PROTECTION = "smart_protection"
+SMART_PROTECTION_SCHEDULE = "smart_protection_schedule"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -72,6 +76,12 @@ _DESCRIPTORS = (
         options=tuple(NIGHT_VISION_VALUES),
     ),
     ControlDescriptor(SMART_PROTECTION, "boolean", readable=True, writable=True),
+    ControlDescriptor(
+        SMART_PROTECTION_SCHEDULE,
+        "weekly_schedule",
+        readable=True,
+        writable=True,
+    ),
 )
 
 
@@ -93,7 +103,12 @@ def _enrollment(camera: Camera) -> P2PEnrollment:
 
 
 def read(camera: Camera, key: str) -> ControlResult:
-    if key not in {WHITE_LIGHT, SPEAKER_VOLUME, SMART_PROTECTION}:
+    if key not in {
+        WHITE_LIGHT,
+        SPEAKER_VOLUME,
+        SMART_PROTECTION,
+        SMART_PROTECTION_SCHEDULE,
+    }:
         raise Unsupported(key)
     try:
         enrollment = _enrollment(camera)
@@ -118,6 +133,19 @@ def read(camera: Camera, key: str) -> ControlResult:
                 direct_connection=protection_result.direct_handshake,
                 transport_acknowledged=protection_result.transport_acknowledged,
                 error_code=protection_result.error_code,
+            )
+        if key == SMART_PROTECTION_SCHEDULE:
+            schedule_result = run_with_fresh_access(
+                enrollment, read_camera_smart_protection_schedule
+            )
+            return ControlResult(
+                key=key,
+                value=schedule_result.schedule,
+                verified=schedule_result.error_code == 0,
+                authenticated=schedule_result.authenticated,
+                direct_connection=schedule_result.direct_handshake,
+                transport_acknowledged=schedule_result.transport_acknowledged,
+                error_code=schedule_result.error_code,
             )
         volume_result = run_with_fresh_access(enrollment, read_camera_speaker_volume)
         return ControlResult(
@@ -245,6 +273,22 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 verified=protection_result.verified,
                 transport_acknowledged=protection_result.transport_acknowledged,
                 error_code=protection_result.error_code,
+            )
+        if key == SMART_PROTECTION_SCHEDULE:
+            if not isinstance(value, WeeklySchedule):
+                raise ValueError("smart-protection schedule must be a weekly schedule")
+            schedule_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: set_camera_smart_protection_schedule(selected, value),
+            )
+            return ControlResult(
+                key=key,
+                value=schedule_result.schedule,
+                previous_value=schedule_result.previous_schedule,
+                changed=schedule_result.changed,
+                verified=schedule_result.verified,
+                transport_acknowledged=schedule_result.transport_acknowledged,
+                error_code=schedule_result.error_code,
             )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc

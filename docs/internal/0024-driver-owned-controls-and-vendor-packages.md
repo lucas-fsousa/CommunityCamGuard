@@ -79,6 +79,10 @@ string alone must never grant another driver's controls.
 - Smart protection exposes only its boolean guard master switch. Reads and writes address the
   proven leaf, so toggling protection cannot overwrite sensitivity, detector flags, automatic
   reactions or the weekly schedule stored alongside it in `guardParm`.
+- Weekly automation uses a shared immutable `WeeklySchedule` domain value and a
+  `weekly_schedule` descriptor kind. The HTTP boundary validates `HH:MM`, known unique weekdays
+  and a non-empty day set before dispatch. Yoosee maps that type to the complete Sunday-first
+  `guardParm.plan`; the dashboard reads it only when its dedicated modal is explicitly opened.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.

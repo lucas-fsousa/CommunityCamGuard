@@ -74,6 +74,8 @@ is fine and honest.
 For an existing semantic control, implement `control_catalog`, `read_control` and/or
 `write_control`. Return the neutral descriptors/results from `drivers/contracts.py`; translate to
 the vendor protocol only inside the family package. Do not expose a generic JSON/opcode sender.
+Structured controls must use an explicit shared domain type. For recurring automation, reuse
+`WeeklySchedule`/`weekly_schedule`; a driver must not advertise a free-form object control.
 
 ### 3. Add factory onboarding (optional)
 

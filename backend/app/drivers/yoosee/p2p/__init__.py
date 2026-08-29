@@ -41,6 +41,12 @@ from .smart_protection import (
     read_camera_smart_protection,
     set_camera_smart_protection,
 )
+from .smart_protection_schedule import (
+    P2PSmartProtectionScheduleState,
+    P2PSmartProtectionScheduleWrite,
+    read_camera_smart_protection_schedule,
+    set_camera_smart_protection_schedule,
+)
 from .volume import (
     P2PSpeakerVolumeState,
     P2PSpeakerVolumeWrite,
@@ -69,6 +75,8 @@ __all__ = [
     "P2PRtspEnableWrite",
     "P2PRtspPreparation",
     "P2PSirenPulse",
+    "P2PSmartProtectionScheduleState",
+    "P2PSmartProtectionScheduleWrite",
     "P2PSmartProtectionState",
     "P2PSmartProtectionWrite",
     "P2PSpeakerVolumeState",
@@ -84,6 +92,7 @@ __all__ = [
     "pulse_camera_siren",
     "read_camera_property",
     "read_camera_smart_protection",
+    "read_camera_smart_protection_schedule",
     "read_camera_speaker_volume",
     "read_camera_white_light",
     "refresh_account_session",
@@ -93,6 +102,7 @@ __all__ = [
     "set_camera_orientation",
     "set_camera_rtsp_enabled",
     "set_camera_smart_protection",
+    "set_camera_smart_protection_schedule",
     "set_camera_speaker_volume",
     "set_camera_white_light",
 ]
