@@ -28,6 +28,8 @@ string alone must never grant another driver's controls.
 - P2P errors, allowlists and typed results live in `p2p/contracts.py`, independent from UDP session
   orchestration. `p2p/client.py` retains compatibility reexports while feature adapters migrate to
   the stable contracts module.
+- Common IoTVideo frame construction, randomized flags, checksums and mode-1/mode-2 finalization
+  live in `p2p/wire.py`, giving protocol codecs a socket-free dependency base.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.
