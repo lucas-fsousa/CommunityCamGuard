@@ -324,6 +324,36 @@ def test_reload_external_false_on_transport_error(monkeypatch):
     assert go2rtc.Go2rtc(manage=False).reload_external() is False
 
 
+def test_reload_external_accepts_restart_socket_close_only_after_recovery(monkeypatch):
+    g = go2rtc.Go2rtc(manage=False)
+    monkeypatch.setattr(
+        go2rtc.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: (_ for _ in ()).throw(
+            go2rtc.http.client.RemoteDisconnected("restart closed the response")
+        ),
+    )
+    recovered = []
+    monkeypatch.setattr(g, "wait_healthy", lambda timeout: recovered.append(timeout) or True)
+
+    assert g.reload_external() is True
+    assert recovered == [10]
+
+
+def test_reload_external_rejects_restart_socket_close_when_api_stays_down(monkeypatch):
+    g = go2rtc.Go2rtc(manage=False)
+    monkeypatch.setattr(
+        go2rtc.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: (_ for _ in ()).throw(
+            go2rtc.http.client.RemoteDisconnected("restart closed the response")
+        ),
+    )
+    monkeypatch.setattr(g, "wait_healthy", lambda timeout: False)
+
+    assert g.reload_external() is False
+
+
 def test_resync_is_best_effort_on_media_error():
     from types import SimpleNamespace
 

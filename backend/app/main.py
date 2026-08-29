@@ -67,7 +67,12 @@ async def lifespan(app: FastAPI):
             if settings.manage_go2rtc:
                 media.start()  # spawn + own the go2rtc binary (host mode)
             else:
-                media.write_config()  # go2rtc runs elsewhere (container); just feed it
+                # The external container does not watch its mounted config. Writing without an
+                # explicit reload leaves old stream IDs alive after registry/identity migrations;
+                # recorders then loop forever on RTSP 404 while the API still looks healthy.
+                media.write_config()
+                if not media.reload_external():
+                    raise RuntimeError("external go2rtc did not reload its generated configuration")
             if media.wait_healthy(timeout=15):
                 rec.start()
             storage.start()

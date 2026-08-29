@@ -1404,3 +1404,18 @@ recorder keeps the current plus 24 future UTC hour directories prepared, while r
 only empty hours strictly older than the current UTC hour. A transient maintenance failure can no
 longer silently become a permanent recording outage at rollover. See ADR
 `docs/internal/0022-resilient-recording-directory-rollover.md`.
+
+## 39. External media configuration is applied before recorders start (2026-08-29)
+
+After the runtime identity migration, the generated go2rtc configuration contained the new opaque
+camera IDs while the already-running external go2rtc process still exposed the old MAC-derived
+names. Startup only rewrote the mounted file and checked whether the API was healthy. All three
+recorders consequently retried nonexistent RTSP paths with HTTP 404 even though both containers
+looked healthy.
+
+External mode now writes the configuration and explicitly restarts go2rtc before recorder startup.
+Failure to apply it becomes a visible application startup error. go2rtc 1.9 normally closes the
+restart request while replacing itself, so that transport condition is accepted only after the
+replacement API answers; unrelated transport errors still fail closed. Live repair restored all
+nine opaque base/HD/web streams and all three recorder processes. See the startup invariant added
+to ADR `docs/internal/0025-opaque-media-and-recorder-runtime-identity.md`.

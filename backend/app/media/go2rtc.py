@@ -12,6 +12,7 @@ avoid a YAML dependency plus any hand-escaping of RTSP URLs (which contain ``:@?
 """
 from __future__ import annotations
 
+import http.client
 import json
 import subprocess
 import threading
@@ -258,6 +259,11 @@ class Go2rtc:
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 return r.status in (200, 204)
+        except http.client.RemoteDisconnected:
+            # go2rtc 1.9 closes the request socket while replacing its own process.  That is
+            # indistinguishable from a failed response at the HTTP layer, so only accept it as a
+            # successful restart once the replacement API is answering again.
+            return self.wait_healthy(timeout=10)
         except (urllib.error.URLError, OSError):
             return False
 

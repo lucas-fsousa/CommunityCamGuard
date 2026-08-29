@@ -25,11 +25,16 @@ live archive safely is a separate data migration and must not be hidden inside a
   to reopen the moved legacy directory. ADR 0026 makes that restart unnecessary.
 - Return `id` in the lightweight camera-status response and correlate status in the dashboard by it.
   Keep `mac` in that response temporarily for cached-client compatibility, not as the join key.
+- On application startup in external-go2rtc mode, regenerate the mounted configuration **and
+  restart go2rtc before starting recorders**. A healthy API alone is insufficient: the external
+  process may still expose the pre-migration stream namespace. go2rtc 1.9 may close the restart
+  HTTP socket without a response; accept that case only after its replacement API is healthy.
 
 ## Consequences
 
 - Media and recording processes no longer assume a camera has a MAC or expose it in stream names.
 - A native identifier correction does not invalidate a player URL, quality variant or liveness key.
 - Existing footage remains readable without a risky bulk filesystem migration.
+- Container restarts cannot leave recorders retrying obsolete stream IDs indefinitely.
 - ADR 0026 completes the recording archive/index/filter migration. Status/API compatibility MAC
   fields remain temporarily available to older clients.
