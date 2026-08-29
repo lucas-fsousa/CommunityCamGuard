@@ -12,9 +12,7 @@ from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 
 
 def _enrollment() -> P2PEnrollment:
-    return P2PEnrollment(
-        "7000000002", 123, bytes(range(64)), None, "now", "now"
-    )
+    return P2PEnrollment("7000000002", 123, bytes(range(64)), None, "now", "now")
 
 
 class FakeSocket:
@@ -81,9 +79,7 @@ def test_prepare_rtsp_uses_preflight_and_single_password_delivery(monkeypatch):
     target = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
     calls = []
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: fake_socket)
-    monkeypatch.setattr(
-        client, "_camera_session", lambda *_args: (node, target, 40)
-    )
+    monkeypatch.setattr(rtsp_setup, "open_camera_session", lambda *_args: (node, target, 40))
     monkeypatch.setattr(
         rtsp_setup,
         "_set_onvif_in_session",
@@ -112,7 +108,7 @@ def test_unacknowledged_password_restores_initial_disabled_state(monkeypatch):
     target = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
     states = []
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: fake_socket)
-    monkeypatch.setattr(client, "_camera_session", lambda *_args: (node, target, 40))
+    monkeypatch.setattr(rtsp_setup, "open_camera_session", lambda *_args: (node, target, 40))
 
     def fake_set(*args):
         enabled = args[3]

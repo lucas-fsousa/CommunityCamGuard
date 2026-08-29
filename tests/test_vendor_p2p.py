@@ -327,10 +327,7 @@ def test_property_read_selects_only_bound_online_camera(monkeypatch):
         updated_at="now",
     )
     node = client.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
-    devices = (
-        client.OnlineDevice(7000000001, 1, False, 1, bytes(16)),
-        client.OnlineDevice(7000000002, 1, False, 1, bytes(16)),
-    )
+    target = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
     selected = []
 
     class FakeSocket:
@@ -341,23 +338,16 @@ def test_property_read_selects_only_bound_online_camera(monkeypatch):
             pass
 
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
-    monkeypatch.setattr(client, "obtain_list", lambda *_args: [("192.0.2.10", 19800)])
-    monkeypatch.setattr(
-        client,
-        "establish_initialized_node",
-        lambda *_args, **_kwargs: (node, devices, 0),
-    )
-    monkeypatch.setattr(client, "heartbeat_node", lambda *_args: node)
 
-    def fake_call(_sock, _node, _access_id, device, _timeout, **_kwargs):
-        selected.append(("call", device.device_id))
-        return client.CallingResult(True, True, 3, True, None, None, 11)
+    def fake_session(_sock, _enrollment, _timeout, _deadline):
+        selected.append(("call", target.device_id))
+        return node, target, 11
 
     def fake_read(_sock, _node, device, path, sequence, _timeout, **_kwargs):
         selected.append(("read", device.device_id, path, sequence))
         return client.ModelReadResult(True, 0, {"setVal": {"multiFlip": 1}})
 
-    monkeypatch.setattr(client, "call_device", fake_call)
+    monkeypatch.setattr(client, "_camera_session", fake_session)
     monkeypatch.setattr(client, "exchange_model_read", fake_read)
 
     result = client.read_camera_property(enrollment, "ProWritable.videoParm")
@@ -391,8 +381,8 @@ def test_orientation_change_requires_preflight_d3_and_fresh_readback(monkeypatch
 
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
     monkeypatch.setattr(
-        client,
-        "_camera_session",
+        orientation,
+        "open_camera_session",
         lambda *_args: (node, target, 40),
     )
 
@@ -454,7 +444,7 @@ def test_orientation_change_is_idempotent_and_never_writes_when_already_set(monk
             pass
 
     monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeSocket())
-    monkeypatch.setattr(client, "_camera_session", lambda *_args: (node, target, 8))
+    monkeypatch.setattr(orientation, "open_camera_session", lambda *_args: (node, target, 8))
     monkeypatch.setattr(
         client,
         "exchange_model_read",

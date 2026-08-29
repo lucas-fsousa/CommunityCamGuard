@@ -35,11 +35,10 @@ from .access_session import heartbeat_node as heartbeat_node
 from .access_session import initialize_node as initialize_node
 from .access_session import obtain_list as obtain_list
 from .access_session import resolve_term as resolve_term
+from .camera_session import open_camera_session as _camera_session
 from .contracts import (
     MODEL_READ_PATHS,
-    CertifiedNode,
     LoginMaterial,
-    OnlineDevice,
     P2PInventory,
     P2PProbeError,
     P2PPropertyRead,
@@ -47,8 +46,10 @@ from .contracts import (
 )
 from .contracts import CallingAttempt as CallingAttempt
 from .contracts import CallingResult as CallingResult
+from .contracts import CertifiedNode as CertifiedNode
 from .contracts import ModelReadResult as ModelReadResult
 from .contracts import ModelWriteResult as ModelWriteResult
+from .contracts import OnlineDevice as OnlineDevice
 from .model_protocol import build_model_read as build_model_read
 from .model_protocol import parse_model_read_response as parse_model_read_response
 from .model_protocol import parse_model_report as parse_model_report
@@ -58,47 +59,6 @@ from .rendezvous_protocol import build_nat_online as build_nat_online
 from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
 from .rendezvous_protocol import parse_mtp_peer_endpoint as parse_mtp_peer_endpoint
 from .rendezvous_session import call_device as call_device
-
-
-def _camera_session(
-    sock: socket.socket,
-    enrollment: P2PEnrollment,
-    timeout: float,
-    deadline: float,
-) -> tuple[CertifiedNode, OnlineDevice, int]:
-    """Open one initialized route to exactly the durable enrollment's camera."""
-
-    material = LoginMaterial(enrollment.access_id, enrollment.access_token)
-    endpoints = obtain_list(sock, material.access_id, timeout)
-    endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
-    node, devices, _skipped = establish_initialized_node(
-        sock,
-        material,
-        endpoints[:8],
-        timeout,
-        deadline=deadline,
-    )
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise P2PProbeError("P2P camera session exhausted its time budget")
-    node = heartbeat_node(sock, node, min(timeout, remaining))
-    target = next(
-        (device for device in devices if str(device.device_id) == enrollment.device_id),
-        None,
-    )
-    if target is None or not target.status:
-        raise P2PProbeError("selected P2P camera is not online")
-    calling = call_device(
-        sock,
-        node,
-        material.access_id,
-        target,
-        timeout,
-        deadline=deadline,
-    )
-    if not calling.direct_handshake:
-        raise P2PProbeError("selected P2P camera did not complete the direct handshake")
-    return node, target, calling.next_sequence
 
 
 def read_camera_property(
@@ -113,45 +73,16 @@ def read_camera_property(
         raise P2PProbeError("thing-model path is not in the read-only allowlist")
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
     deadline = time.monotonic() + max(8.0, min(float(total_timeout), 35.0))
-    material = LoginMaterial(enrollment.access_id, enrollment.access_token)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", 0))
     try:
-        endpoints = obtain_list(sock, material.access_id, bounded_timeout)
-        endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
-        node, devices, _skipped = establish_initialized_node(
-            sock,
-            material,
-            endpoints[:8],
-            bounded_timeout,
-            deadline=deadline,
-        )
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise P2PProbeError("P2P property read exhausted its time budget")
-        node = heartbeat_node(sock, node, min(bounded_timeout, remaining))
-        target = next(
-            (device for device in devices if str(device.device_id) == enrollment.device_id),
-            None,
-        )
-        if target is None or not target.status:
-            raise P2PProbeError("selected P2P camera is not online")
-        calling = call_device(
-            sock,
-            node,
-            material.access_id,
-            target,
-            bounded_timeout,
-            deadline=deadline,
-        )
-        if not calling.direct_handshake:
-            raise P2PProbeError("selected P2P camera did not complete the direct handshake")
+        node, target, sequence = _camera_session(sock, enrollment, bounded_timeout, deadline)
         model = exchange_model_read(
             sock,
             node,
             target,
             property_path,
-            calling.next_sequence,
+            sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
         )

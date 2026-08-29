@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from . import client as transport
+from .camera_session import open_camera_session
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
@@ -245,9 +246,7 @@ def read_camera_white_light(
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", 0))
     try:
-        node, target, sequence = transport._camera_session(
-            sock, enrollment, bounded_timeout, deadline
-        )
+        node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
         result = exchange_white_light(
             sock,
             node,
@@ -293,9 +292,7 @@ def set_camera_white_light(
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", 0))
     try:
-        node, target, sequence = transport._camera_session(
-            sock, enrollment, bounded_timeout, deadline
-        )
+        node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
         preflight = exchange_white_light(
             sock,
             node,

@@ -26,15 +26,11 @@ def test_builder_exposes_only_typed_read_and_boolean_write():
     node = transport.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
 
     read = gute_mode2_decrypt(
-        white_light.build_white_light_request(
-            node, 123, 7000000002, None, 18, 19, 20
-        ),
+        white_light.build_white_light_request(node, 123, 7000000002, None, 18, 19, 20),
         node.session_key,
     )
     write = gute_mode2_decrypt(
-        white_light.build_white_light_request(
-            node, 123, 7000000002, True, 21, 22, 23
-        ),
+        white_light.build_white_light_request(node, 123, 7000000002, True, 21, 22, 23),
         node.session_key,
     )
 
@@ -48,9 +44,7 @@ def test_builder_exposes_only_typed_read_and_boolean_write():
         "type": 11,
     }
     with pytest.raises(ValueError, match="boolean"):
-        white_light.build_white_light_request(
-            node, 123, 7000000002, 1, 18, 19, 20
-        )
+        white_light.build_white_light_request(node, 123, 7000000002, 1, 18, 19, 20)
     assert not hasattr(white_light, "build_passthrough_message")
 
 
@@ -67,10 +61,7 @@ def test_response_requires_exact_type_and_binary_state():
     assert white_light.parse_white_light_response(bytes(response), 11) is None
     assert white_light.extract_white_light_state(parsed[1]) is True
     assert (
-        white_light.extract_white_light_state(
-            {"type": 12, "data": {"whiteLightStatus": 2}}
-        )
-        is None
+        white_light.extract_white_light_state({"type": 12, "data": {"whiteLightStatus": 2}}) is None
     )
 
 
@@ -87,10 +78,8 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
         def close(self):
             calls.append(("close",))
 
-    monkeypatch.setattr(
-        white_light.socket, "socket", lambda *_args, **_kwargs: FakeSocket()
-    )
-    monkeypatch.setattr(transport, "_camera_session", lambda *_args: (node, target, 40))
+    monkeypatch.setattr(white_light.socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(white_light, "open_camera_session", lambda *_args: (node, target, 40))
     replies = iter(
         (
             white_light.WhiteLightExchange(
@@ -106,9 +95,7 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
         )
     )
 
-    def fake_exchange(
-        _sock, _node, access_id, device, enabled, sequence, _timeout, **kwargs
-    ):
+    def fake_exchange(_sock, _node, access_id, device, enabled, sequence, _timeout, **kwargs):
         calls.append(
             (
                 "exchange",
@@ -152,10 +139,8 @@ def test_change_is_idempotent_and_invalid_values_open_no_network(monkeypatch):
         def close(self):
             pass
 
-    monkeypatch.setattr(
-        white_light.socket, "socket", lambda *_args, **_kwargs: FakeSocket()
-    )
-    monkeypatch.setattr(transport, "_camera_session", lambda *_args: (node, target, 8))
+    monkeypatch.setattr(white_light.socket, "socket", lambda *_args, **_kwargs: FakeSocket())
+    monkeypatch.setattr(white_light, "open_camera_session", lambda *_args: (node, target, 8))
     monkeypatch.setattr(
         white_light,
         "exchange_white_light",
