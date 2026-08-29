@@ -78,6 +78,7 @@ def test_yoosee_protocol_layers_do_not_depend_on_compatibility_client():
 
 def test_yoosee_feature_modules_do_not_depend_on_compatibility_client():
     feature_modules = (
+        "alarm_voice.py",
         "night_vision.py",
         "orientation.py",
         "rtsp_setup.py",

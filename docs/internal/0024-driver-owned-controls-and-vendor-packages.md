@@ -83,6 +83,10 @@ string alone must never grant another driver's controls.
   `weekly_schedule` descriptor kind. The HTTP boundary validates `HH:MM`, known unique weekdays
   and a non-empty day set before dispatch. Yoosee maps that type to the complete Sunday-first
   `guardParm.plan`; the dashboard reads it only when its dedicated modal is explicitly opened.
+- Alarm-voice catalogue decoding is socket-free and driver-owned. Only validated type-4 AMR
+  resources survive parsing; signed URLs/tokens are discarded, full vendor `resId` values are
+  private non-repr fields, and the future UI selector will use semantic `system-N`/`custom-N` keys
+  resolved against a fresh catalogue rather than accepting a resource id from HTTP.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
