@@ -39,6 +39,9 @@ string alone must never grant another driver's controls.
 - Shared UDP deadline handling, access-node frame decryption and reliable acknowledgements live in
   `p2p/session_io.py`. Feature modules consume that boundary directly instead of private client
   helpers.
+- Direct camera NAT rendezvous and handshake retry orchestration live in
+  `p2p/rendezvous_session.py`; packet construction remains isolated in
+  `p2p/rendezvous_protocol.py`.
 - Encrypted Yoosee account/session persistence lives in `drivers/yoosee/account_store.py`. It keeps
   the existing `vendor_accounts` table for an in-place upgrade, but no longer presents a
   manufacturer-specific repository as a generic `db` module.
