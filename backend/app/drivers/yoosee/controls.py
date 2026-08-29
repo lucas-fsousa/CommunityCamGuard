@@ -19,11 +19,13 @@ from ..contracts import (
     ControlValue,
 )
 from .p2p import (
+    NIGHT_VISION_VALUES,
     P2PProbeError,
     pulse_camera_siren,
     read_camera_speaker_volume,
     read_camera_white_light,
     run_with_fresh_access,
+    set_camera_night_vision,
     set_camera_orientation,
     set_camera_speaker_volume,
     set_camera_white_light,
@@ -37,6 +39,7 @@ WHITE_LIGHT = "white_light"
 ORIENTATION = "orientation"
 SIREN_PULSE = "siren_pulse"
 SPEAKER_VOLUME = "speaker_volume"
+NIGHT_VISION = "night_vision"
 
 _DESCRIPTORS = (
     ControlDescriptor(WHITE_LIGHT, "boolean", readable=True, writable=True),
@@ -58,6 +61,12 @@ _DESCRIPTORS = (
         readable=True,
         writable=True,
         options=("0", "25", "50", "75", "100"),
+    ),
+    ControlDescriptor(
+        NIGHT_VISION,
+        "choice",
+        writable=True,
+        options=tuple(NIGHT_VISION_VALUES),
     ),
 )
 
@@ -188,6 +197,23 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 error_code=volume_result.error_code,
                 native_previous_value=volume_result.previous_raw,
                 native_requested_value=volume_result.requested_raw,
+            )
+        if key == NIGHT_VISION:
+            if not isinstance(value, str) or value not in NIGHT_VISION_VALUES:
+                raise ValueError("night-vision mode must be automatic, daytime or night")
+            night_result = run_with_fresh_access(
+                enrollment,
+                lambda selected: set_camera_night_vision(selected, value),
+            )
+            return ControlResult(
+                key=key,
+                value=night_result.mode,
+                changed=night_result.changed,
+                verified=night_result.verified,
+                transport_acknowledged=night_result.transport_acknowledged,
+                error_code=night_result.error_code,
+                native_previous_value=night_result.previous_value,
+                native_requested_value=night_result.requested_value,
             )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc

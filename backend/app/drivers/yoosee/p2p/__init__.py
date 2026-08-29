@@ -19,6 +19,11 @@ from .contracts import (
     P2PPropertyRead,
     P2PRouteProbe,
 )
+from .night_vision import (
+    NIGHT_VISION_VALUES,
+    P2PNightVisionWrite,
+    set_camera_night_vision,
+)
 from .orientation import ORIENTATION_VALUES, P2POrientationWrite, set_camera_orientation
 from .renewal import run_with_fresh_access
 from .rtsp_setup import (
@@ -45,10 +50,12 @@ from .white_light import (
 
 __all__ = [
     "MODEL_READ_PATHS",
+    "NIGHT_VISION_VALUES",
     "ORIENTATION_VALUES",
     "AccountCredentials",
     "AccountSession",
     "P2PInventory",
+    "P2PNightVisionWrite",
     "P2POrientationWrite",
     "P2PProbeError",
     "P2PPropertyRead",
@@ -73,6 +80,7 @@ __all__ = [
     "refresh_account_session",
     "rtsp_password_digest",
     "run_with_fresh_access",
+    "set_camera_night_vision",
     "set_camera_orientation",
     "set_camera_rtsp_enabled",
     "set_camera_speaker_volume",

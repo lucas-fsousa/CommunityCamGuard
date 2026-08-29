@@ -11,6 +11,7 @@ from backend.app.drivers.base import Capabilities, DetectContext, Unsupported
 from backend.app.drivers.yoosee import YooseeDriver
 from backend.app.drivers.yoosee import controls as yoosee_controls
 from backend.app.drivers.yoosee.p2p import (
+    P2PNightVisionWrite,
     P2PSirenPulse,
     P2PSpeakerVolumeState,
     P2PSpeakerVolumeWrite,
@@ -113,6 +114,7 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
         "orientation",
         "siren_pulse",
         "speaker_volume",
+        "night_vision",
     }
     assert catalog["white_light"].readable is True
     assert catalog["orientation"].options == ("normal", "inverted")
@@ -120,6 +122,7 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     assert catalog["siren_pulse"].options == ("2", "5", "10")
     assert catalog["speaker_volume"].readable is True
     assert catalog["speaker_volume"].options == ("0", "25", "50", "75", "100")
+    assert catalog["night_vision"].options == ("automatic", "daytime", "night")
 
 
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
@@ -251,3 +254,57 @@ def test_speaker_volume_read_and_write_use_normalized_percent(monkeypatch):
     assert written.value == 100
     assert written.previous_value == 75
     assert written.verified is True
+
+
+def test_night_vision_write_maps_only_the_legacy_semantic_mode(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    observed = []
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+
+    def fake_write(selected, mode):
+        observed.append((selected.device_id, mode))
+        return P2PNightVisionWrite(selected.device_id, mode, 0, 2, True, True, 0, True)
+
+    monkeypatch.setattr(yoosee_controls, "set_camera_night_vision", fake_write)
+
+    result = _drv().write_control(camera, "night_vision", "night")
+
+    assert observed == [("7000000001", "night")]
+    assert result.value == "night"
+    assert result.native_previous_value == 0
+    assert result.native_requested_value == 2
+    assert result.verified is True
+
+
+@pytest.mark.parametrize("value", [True, 0, "auto", "day", "ir"])
+def test_night_vision_rejects_values_outside_advertised_choices(monkeypatch, value):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+
+    with pytest.raises(yoosee_controls.ControlOperationError, match="automatic, daytime or night"):
+        _drv().write_control(camera, "night_vision", value)

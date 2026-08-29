@@ -240,6 +240,13 @@ function cameraControls(cam) {
       ["100", t("control.volumePercent", { percent: 100 })],
     ], "speaker_volume", (percent) => Number(percent)));
   }
+  if (available.night_vision?.writable) {
+    menu.append(actionSelect(t("control.nightVision"), [
+      ["automatic", t("control.nightVisionAutomatic")],
+      ["daytime", t("control.nightVisionDaytime")],
+      ["night", t("control.nightVisionNight")],
+    ], "night_vision", (mode) => mode));
+  }
   menu.append(status);
 
   const details = el("details", { className: "camera-controls" },

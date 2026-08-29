@@ -69,6 +69,9 @@ string alone must never grant another driver's controls.
 - Speaker volume is exposed as the APK's semantic 0/25/50/75/100% positions. The driver keeps the
   raw 0..10 representation private, normalizes reads using the APK buckets and requires exact raw
   readback after a change.
+- Night vision is exposed as the semantic automatic/daytime/night choice. The current Yoosee
+  profile maps only to its physically proven legacy 0/1/2 scalar with preflight and exact readback;
+  the unadvertised V2 support/selection bitfield is not accepted through the production boundary.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
