@@ -125,6 +125,12 @@ string alone must never grant another driver's controls.
   boundary as other Yoosee operations. The exact route is closed in `finally` on success, a rejected
   stage or an exception. This is still an internal proof operation: it is not advertised as a
   camera control and has no HTTP/UI surface.
+- After rebuilding the container, that production orchestrator completed live against camera 3 in
+  11.6 seconds: direct handshake, MTP meter, AV acceptance, capture header, AV START, talk ON,
+  talk OFF, AV CLOSE and B9 release all reported acknowledgement, with stream version 1. The
+  operation cannot accept audio frames, so this validation was silent by construction. The base
+  RTSP producer, H.264 restream and recorder remained active and a subsequent recording segment
+  was observed.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
