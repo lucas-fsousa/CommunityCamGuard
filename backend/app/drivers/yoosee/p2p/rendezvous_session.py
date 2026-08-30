@@ -13,6 +13,7 @@ from .rendezvous_protocol import (
     build_calling_request,
     build_nat_online,
     build_nat_online_ack,
+    build_route_hangup,
     parse_mtp_peer_endpoint,
 )
 from .session_io import (
@@ -117,4 +118,43 @@ def call_device(
         error_code=error_code,
         peer_endpoint=peer_endpoint,
         next_sequence=next_sequence,
+        route_link_id=attempt.link_id,
     )
+
+
+def close_device_route(
+    sock: socket.socket,
+    node: CertifiedNode,
+    access_id: int,
+    device: OnlineDevice,
+    link_id: int,
+    sequence: int,
+    timeout: float,
+) -> bool:
+    """Send one idempotent native hangup and report its transport acknowledgement.
+
+    The teardown itself is always emitted once. Waiting is bounded and no application action is
+    replayed if its acknowledgement is lost.
+    """
+
+    request = build_route_hangup(
+        node,
+        access_id,
+        device.device_id,
+        link_id,
+        sequence,
+    )
+    sock.sendto(request, node.address)
+    for wire, peer in receive_datagrams(sock, time.monotonic() + max(0.0, timeout)):
+        if peer != node.address:
+            continue
+        plain = decrypt_node_frame(wire, node)
+        if plain is None:
+            continue
+        flags = struct.unpack_from("<I", plain, 0x14)[0]
+        if flags & (1 << 20):
+            if plain[1] == 0xB9:
+                return True
+            continue
+        acknowledge_reliable_node_frame(sock, node, plain)
+    return False

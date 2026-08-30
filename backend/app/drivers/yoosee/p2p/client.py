@@ -59,6 +59,7 @@ from .rendezvous_protocol import build_nat_online as build_nat_online
 from .rendezvous_protocol import build_nat_online_ack as build_nat_online_ack
 from .rendezvous_protocol import parse_mtp_peer_endpoint as parse_mtp_peer_endpoint
 from .rendezvous_session import call_device as call_device
+from .rendezvous_session import close_device_route as close_device_route
 
 
 def read_camera_property(
@@ -149,6 +150,16 @@ def probe_camera_route(
             bounded_timeout,
             deadline=deadline,
         )
+        if result.direct_handshake and result.route_link_id:
+            close_device_route(
+                sock,
+                node,
+                material.access_id,
+                target,
+                result.route_link_id,
+                result.next_sequence,
+                min(0.75, max(0.0, deadline - time.monotonic())),
+            )
     except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:

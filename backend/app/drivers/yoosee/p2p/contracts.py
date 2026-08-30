@@ -114,6 +114,7 @@ class CallingResult:
     error_code: int | None
     peer_endpoint: tuple[str, int] | None
     next_sequence: int = 0
+    route_link_id: int = 0
 
 
 @dataclass(frozen=True, slots=True)

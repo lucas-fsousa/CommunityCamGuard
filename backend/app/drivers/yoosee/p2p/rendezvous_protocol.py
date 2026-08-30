@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import socket
 import struct
 
@@ -62,6 +63,44 @@ def build_nat_online_ack(access_id: int, link_id: int) -> bytes:
     struct.pack_into("<I", frame, 0x18, 4)
     struct.pack_into("<I", frame, 0x20, link_id)
     return finish_mode1(frame)
+
+
+def build_route_hangup(
+    node: CertifiedNode,
+    access_id: int,
+    device_id: int,
+    link_id: int,
+    sequence: int,
+    message_id: int | None = None,
+) -> bytes:
+    """Build the native brokered P2P-inner teardown for one exact direct link.
+
+    This is not an AV STOP/CLOSE record.  It mirrors ``giot_eif_send_hungup_msg`` and releases the
+    A4-created MTP route after media has stopped, so closing the host UDP socket does not leave a
+    camera link slot occupied until timeout.
+    """
+
+    if not 0 < link_id <= 0xFFFFFF:
+        raise ValueError("route link id must be a non-zero 24-bit value")
+    if message_id is None:
+        message_id = secrets.randbits(31)
+    frame = new_header(
+        0xB9,
+        0x4C,
+        node.session_id,
+        sequence,
+        randomized_flags(mode=2, proc=3),
+    )
+    frame[0] = 0x7E
+    struct.pack_into("<I", frame, 0x18, 1)
+    struct.pack_into("<Q", frame, 0x1C, device_id)
+    struct.pack_into("<Q", frame, 0x24, access_id)
+    struct.pack_into("<I", frame, 0x2C, message_id & 0x7FFFFFFF)
+    # p2p-inner payload: type=0 (hangup), route id, peer route id, native hangup reason.
+    struct.pack_into("<I", frame, 0x38, link_id)
+    struct.pack_into("<I", frame, 0x3C, link_id)
+    struct.pack_into("<I", frame, 0x40, 0x4E22)
+    return finish_mode2(frame, node.session_key)
 
 
 def parse_mtp_peer_endpoint(response: bytes, link_id: int) -> tuple[str, int] | None:

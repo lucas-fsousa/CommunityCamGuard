@@ -42,7 +42,8 @@ string alone must never grant another driver's controls.
   helpers.
 - Direct camera NAT rendezvous and handshake retry orchestration live in
   `p2p/rendezvous_session.py`; packet construction remains isolated in
-  `p2p/rendezvous_protocol.py`.
+  `p2p/rendezvous_protocol.py`. A completed route is closed with the SDK's distinct brokered B9
+  P2P-inner hangup; AV STOP/CLOSE and closing a local UDP socket are not route teardown.
 - Allowlisted thing-model read retries, correlation and report handling live in
   `p2p/model_session.py`; JSON and frame parsing remain socket-free in `p2p/model_protocol.py`.
 - Scalar thing-model write framing/correlation and bounded UDP exchange live in the internal
@@ -86,6 +87,12 @@ string alone must never grant another driver's controls.
   removed. After rebuilding the production container, eight fresh canonical HTTP reads completed
   consecutively with HTTP 200, verified state and `direct_connection=false` in 1.8–3.4 seconds each;
   the former fourth-route failure did not recur.
+- Native static analysis recovered the direct-link teardown exactly: B9 mode 2/proc 3, inner type
+  zero, the 24-bit MTP link ID in both route fields, and reason `0x4e22`. The receiving SDK locates
+  the MTP channel by that first route field and resets it; the sender uses the same ID stored in its
+  MTP session. Production route probes now emit this idempotent teardown once and wait only for its
+  bounded transport ACK. Four consecutive read-only camera-3 route cycles completed A4/A3/CA/CB
+  and each ACKed the hangup in 4.7–5.4 seconds, including the previously unreliable fourth route.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

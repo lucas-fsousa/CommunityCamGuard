@@ -286,6 +286,7 @@ def test_route_probe_selects_only_bound_camera_and_sanitizes_peer(monkeypatch):
         client.OnlineDevice(7000000002, 1, False, 1, bytes(16)),
     )
     selected = []
+    closed = []
 
     class FakeSocket:
         def bind(self, _address):
@@ -305,13 +306,30 @@ def test_route_probe_selects_only_bound_camera_and_sanitizes_peer(monkeypatch):
 
     def fake_call(_sock, _node, _access_id, device, _timeout, **_kwargs):
         selected.append(device.device_id)
-        return client.CallingResult(True, True, 3, True, None, ("198.51.100.9", 32100))
+        return client.CallingResult(
+            True,
+            True,
+            3,
+            True,
+            None,
+            ("198.51.100.9", 32100),
+            18,
+            0x123456,
+        )
 
     monkeypatch.setattr(client, "call_device", fake_call)
+    monkeypatch.setattr(
+        client,
+        "close_device_route",
+        lambda _sock, _node, _access_id, device, link_id, sequence, _timeout: closed.append(
+            (device.device_id, link_id, sequence)
+        ),
+    )
 
     result = client.probe_camera_route(enrollment)
 
     assert selected == [7000000002]
+    assert closed == [(7000000002, 0x123456, 18)]
     assert result.direct_handshake is True
     assert result.camera_contacted is True
     assert not hasattr(result, "peer_endpoint")
