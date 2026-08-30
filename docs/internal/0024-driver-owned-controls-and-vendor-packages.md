@@ -93,6 +93,13 @@ string alone must never grant another driver's controls.
   MTP session. Production route probes now emit this idempotent teardown once and wait only for its
   bounded transport ACK. Four consecutive read-only camera-3 route cycles completed A4/A3/CA/CB
   and each ACKed the hangup in 4.7–5.4 seconds, including the previously unreliable fourth route.
+- The rebuilt production endpoint independently completed an authenticated camera-3 direct-route
+  probe with broker acknowledgement, advertised route, six direct datagrams and a completed
+  handshake while reporting that neither media nor a command was opened. The laboratory media
+  harness can now load one exact device from the app's encrypted enrollment without copying a
+  token or using Frida. Its first silent camera-3 intercom run completed the MTP meter, KCP AV
+  ACCEPT/START, the reported 16 kHz audio/640x360 video profile, legacy microphone
+  START/STOP/CLOSE, and the final B9 teardown with ACKs throughout. It sent zero audio frames.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
