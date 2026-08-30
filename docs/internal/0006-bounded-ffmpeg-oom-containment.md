@@ -30,6 +30,11 @@ Defence in depth:
    generated config and merely checks health when unchanged; real registry/config changes and the
    explicit repair action still reload the media engine.
 
+Live validation removed the pre-existing duplicate with one controlled media-engine restart and
+then rebuilt/recreated only the app container. No second go2rtc startup occurred. The steady state
+was exactly three H.264 FFmpeg processes for three cameras and about 520 MiB, down from four
+processes/861 MiB; fresh recording segments appeared for all three cameras after reconnection.
+
 ## Consequences
 
 - A misbehaving recorder can no longer take down the host — it fails contained and the supervisor
