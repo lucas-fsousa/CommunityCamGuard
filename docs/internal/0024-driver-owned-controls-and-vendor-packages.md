@@ -100,6 +100,12 @@ string alone must never grant another driver's controls.
   token or using Frida. Its first silent camera-3 intercom run completed the MTP meter, KCP AV
   ACCEPT/START, the reported 16 kHz audio/640x360 video profile, legacy microphone
   START/STOP/CLOSE, and the final B9 teardown with ACKs throughout. It sent zero audio frames.
+- The first production-integration slice keeps media details below the driver boundary: pure,
+  socket-free `media_protocol` and `stream_protocol` modules own checksummed MTP framing,
+  coalesced KCP segments, meter/AV control records, cookie-keyed StreamPipe TLVs, the negotiated
+  v1 codec header, legacy talk state and encoded-audio records. Historical golden datagrams and
+  malformed-input tests protect these codecs before any long-lived media session or public talk
+  API is introduced.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
