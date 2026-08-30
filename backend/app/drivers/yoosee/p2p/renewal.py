@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from typing import TypeVar
 
@@ -14,13 +15,22 @@ from .contracts import InitInfoRejectedError, P2PProbeError
 
 ResultT = TypeVar("ResultT")
 _refresh_lock = threading.Lock()
+_session_locks_guard = threading.Lock()
+_session_locks: dict[str, threading.Lock] = {}
+_session_finished: dict[str, float] = {}
+_SESSION_SETTLE_SECONDS = 1.5
 
 
-def run_with_fresh_access(
+def _session_lock(device_id: str) -> threading.Lock:
+    with _session_locks_guard:
+        return _session_locks.setdefault(device_id, threading.Lock())
+
+
+def _run_with_renewal(
     enrollment: P2PEnrollment,
     operation: Callable[[P2PEnrollment], ResultT],
 ) -> ResultT:
-    """Run once, renew only on the explicit stale-session code, then retry exactly once."""
+    """Run the operation and perform at most one explicit stale-access renewal."""
 
     try:
         return operation(enrollment)
@@ -52,3 +62,22 @@ def run_with_fresh_access(
                 raise P2PProbeError("P2P session renewal failed") from refresh_error
 
     return operation(current)
+
+
+def run_with_fresh_access(
+    enrollment: P2PEnrollment,
+    operation: Callable[[P2PEnrollment], ResultT],
+) -> ResultT:
+    """Serialize one device, let its prior route settle, and renew stale access at most once."""
+
+    device_id = enrollment.device_id
+    with _session_lock(device_id):
+        last_finished = _session_finished.get(device_id)
+        if last_finished is not None:
+            remaining = _SESSION_SETTLE_SECONDS - (time.monotonic() - last_finished)
+            if remaining > 0:
+                time.sleep(remaining)
+        try:
+            return _run_with_renewal(enrollment, operation)
+        finally:
+            _session_finished[device_id] = time.monotonic()

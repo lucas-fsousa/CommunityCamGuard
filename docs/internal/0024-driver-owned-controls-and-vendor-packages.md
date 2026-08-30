@@ -70,7 +70,9 @@ string alone must never grant another driver's controls.
 - The application service admits at most one control operation per opaque camera ID. Reads,
   dynamic-option queries and writes share the same non-blocking lock; overlap returns HTTP 409
   instead of opening competing P2P sessions or racing two read-before-write transactions. Different
-  cameras remain independent.
+  cameras remain independent. The Yoosee driver additionally serializes all entry points by native
+  device ID and waits 1.5 seconds after one direct route closes before opening the next; live camera
+  3 testing showed an immediate post-session handshake can fail while an isolated request succeeds.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
