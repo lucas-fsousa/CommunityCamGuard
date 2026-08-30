@@ -84,6 +84,8 @@ string alone must never grant another driver's controls.
 - Night vision is exposed as the semantic automatic/daytime/night choice. The current Yoosee
   profile maps only to its physically proven legacy 0/1/2 scalar with preflight and exact readback;
   the unadvertised V2 support/selection bitfield is not accepted through the production boundary.
+  Camera 3 completed a canonical-API automatic→daytime→automatic cycle with verified cleanup;
+  validation deliberately did not select the IR/night state.
 - Orientation is limited to normal/180° and was validated through the canonical production API on
   camera 3 with an idempotent normal baseline, verified inverted write and verified normal cleanup.
   Frames captured from the local go2rtc restream independently matched the 180° transform and then
