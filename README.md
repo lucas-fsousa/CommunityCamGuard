@@ -11,8 +11,8 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 > credential-validated add with automatic capability probe, live streaming (go2rtc/WebRTC) with
 > listen-in audio, **PTZ** control (press-and-hold), 24/7 crash-safe recording with browser
 > playback + time-based retention, storage policy, a localized (en/pt-BR) web dashboard with a
-> dedicated **Cameras** setup tab, and a REST API. Two-way audio (talk) and camera reboot are the
-> remaining controls (they live in the vendor P2P channel — see `docs/DECISIONS.md`).
+> dedicated **Cameras** setup tab, and a REST API. The bounded two-way-audio backend is proven on
+> Yoosee; browser microphone UI/continuous talk and camera reboot remain (see `docs/DECISIONS.md`).
 
 ## Documentation
 
@@ -180,7 +180,7 @@ MAC identity after DHCP changes; future drivers may map a serial or vendor-nativ
 
 Discovery, driver-independent camera IDs, go2rtc live view, 24/7 recording + retention, storage policy,
 pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
-API are all **working**. Still open: **two-way audio (talk) and camera reboot** (they live in the
+API are all **working**. Still open: browser/continuous **two-way audio (talk)** and camera reboot (they live in the
 vendor Gwell P2P channel — see `docs/DECISIONS.md`) and optional S3 tiering.
 
 Full backlog, priorities and milestones: **[ROADMAP.md](ROADMAP.md)**.

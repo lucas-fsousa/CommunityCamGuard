@@ -146,6 +146,19 @@ def test_control_catalog_requires_exact_linked_enrollment(monkeypatch):
     assert catalog["alarm_voice"].options == ()
 
 
+def test_audio_messages_are_owned_by_the_selected_driver(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    monkeypatch.setattr(
+        "backend.app.drivers.yoosee.audio.supported",
+        lambda selected: selected.camera_id == camera.camera_id,
+    )
+
+    assert _drv().supports_audio_messages(camera) is True
+
+
 def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
     camera = Camera(
         mac="aa:bb:cc:dd:ee:01",

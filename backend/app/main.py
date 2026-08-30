@@ -23,6 +23,7 @@ from .api.auth import router as auth_router
 from .api.cameras import router as cameras_router
 from .api.controls import router as controls_router
 from .api.discovery import router as discovery_router
+from .api.intercom import router as intercom_router
 from .api.media import router as media_router
 from .api.onboarding import router as onboarding_router
 from .api.provisioning import router as provisioning_router
@@ -135,6 +136,7 @@ app.include_router(provisioning_network_router)
 app.include_router(provisioning_privileged_router)
 app.include_router(onboarding_router)
 app.include_router(controls_router)
+app.include_router(intercom_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)
 app.include_router(media_router)

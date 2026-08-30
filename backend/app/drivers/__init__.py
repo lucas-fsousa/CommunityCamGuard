@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from .base import CameraDriver, Capabilities, DetectContext, Unsupported, classify_ports
 from .contracts import (
+    AudioMessageResult,
     ControlDescriptor,
     ControlNotReady,
     ControlOperationError,
@@ -61,6 +62,7 @@ GENERIC: CameraDriver = _BY_KEY["generic"]
 __all__ = [
     "DRIVERS",
     "GENERIC",
+    "AudioMessageResult",
     "CameraDriver",
     "Capabilities",
     "ControlDescriptor",

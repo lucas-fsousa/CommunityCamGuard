@@ -6,6 +6,7 @@ from .camera_controls import (
     control_catalog,
     control_options,
     read_control,
+    send_audio_message,
     write_control,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "control_catalog",
     "control_options",
     "read_control",
+    "send_audio_message",
     "write_control",
 ]

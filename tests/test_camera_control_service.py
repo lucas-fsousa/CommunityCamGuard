@@ -6,7 +6,12 @@ from backend.app import drivers
 from backend.app.camera_identity import stable_camera_id
 from backend.app.db import registry
 from backend.app.drivers.base import CameraDriver, Unsupported
-from backend.app.drivers.contracts import ControlDescriptor, ControlOption, ControlResult
+from backend.app.drivers.contracts import (
+    AudioMessageResult,
+    ControlDescriptor,
+    ControlOption,
+    ControlResult,
+)
 from backend.app.services import camera_controls
 
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:03")
@@ -23,6 +28,12 @@ class FakeControlDriver(CameraDriver):
 
     def write_control(self, camera, key, value):
         return ControlResult(key, value, previous_value=False, changed=True, verified=True)
+
+    def supports_audio_messages(self, camera):
+        return True
+
+    def send_audio_message(self, camera, pcm16le):
+        return AudioMessageResult(len(pcm16le) // 16, 2, 2, 2, True, True, True)
 
 
 def _camera(driver="fake-control"):
@@ -55,6 +66,23 @@ def test_catalog_and_operations_are_dispatched_to_selected_driver(monkeypatch):
     assert written.value is False and written.changed is True
 
 
+def test_audio_message_is_driver_dispatched_under_the_same_camera_lock(monkeypatch):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+
+    result = camera_controls.send_audio_message(CAMERA_ID, bytes(640))
+
+    assert result.completed is True
+    lock = camera_controls._control_lock(CAMERA_ID)
+    lock.acquire()
+    try:
+        with pytest.raises(camera_controls.ControlBusy):
+            camera_controls.send_audio_message(CAMERA_ID, bytes(640))
+    finally:
+        lock.release()
+
+
 def test_unknown_camera_is_rejected_before_driver_selection(monkeypatch):
     monkeypatch.setattr(registry, "get_camera_by_id", lambda _camera_id: None)
     monkeypatch.setattr(
@@ -78,6 +106,8 @@ def test_generic_driver_never_inherits_controls_from_vendor_enrollment(monkeypat
     assert camera_controls.control_catalog(camera) == {}
     with pytest.raises(Unsupported):
         camera_controls.write_control(CAMERA_ID, "white_light", True)
+    with pytest.raises(Unsupported):
+        camera_controls.send_audio_message(CAMERA_ID, bytes(320))
 
 
 def test_operation_must_be_advertised_with_matching_permission(monkeypatch):
@@ -97,7 +127,9 @@ def test_operation_must_be_advertised_with_matching_permission(monkeypatch):
 def test_dynamic_options_require_an_explicit_choice_descriptor(monkeypatch):
     class DynamicDriver(FakeControlDriver):
         def control_catalog(self, camera):
-            return (ControlDescriptor("alarm_voice", "choice", writable=True, dynamic_options=True),)
+            return (
+                ControlDescriptor("alarm_voice", "choice", writable=True, dynamic_options=True),
+            )
 
         def control_options(self, camera, key):
             return (ControlOption("system-1", "Tone", "system", "1 s"),)

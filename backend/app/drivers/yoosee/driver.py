@@ -13,8 +13,14 @@ from typing import TYPE_CHECKING
 
 from ...control import device, media, ptz
 from ..base import CameraDriver, Capabilities, DetectContext
-from ..contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
-from . import controls
+from ..contracts import (
+    AudioMessageResult,
+    ControlDescriptor,
+    ControlOption,
+    ControlResult,
+    ControlValue,
+)
+from . import audio, controls
 
 if TYPE_CHECKING:
     from ...db.registry import Camera
@@ -78,3 +84,9 @@ class YooseeDriver(CameraDriver):
 
     def write_control(self, camera: Camera, key: str, value: ControlValue) -> ControlResult:
         return controls.write(camera, key, value)
+
+    def supports_audio_messages(self, camera: Camera) -> bool:
+        return audio.supported(camera)
+
+    def send_audio_message(self, camera: Camera, pcm16le: bytes) -> AudioMessageResult:
+        return audio.send(camera, pcm16le)

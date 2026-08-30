@@ -154,6 +154,13 @@ string alone must never grant another driver's controls.
   camera microphone returned a continuous approximately 0.65-second 740 Hz band at the matching
   instant, peaking 27.6 dB above the capture baseline. This closes server-to-speaker playback with
   acoustic loopback evidence; human speech intelligibility and browser capture remain separate work.
+- The first public audio boundary is driver-neutral recorded-message delivery, not a vendor command
+  endpoint. It accepts only complete 8 kHz/mono/s16le 20 ms frames, caps bodies at ten seconds,
+  requires the same authenticated trusted-LAN checks as camera controls, dispatches through the
+  selected driver's explicit support method and shares the per-camera operation lock. Blocking P2P
+  work runs outside the FastAPI event loop. Unsupported drivers fail closed and public results omit
+  enrollment, route, codec and peer details. Continuous push-to-talk remains a distinct future
+  session contract rather than overloading this bounded request.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

@@ -24,7 +24,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ..discovery import rtsp
-from .contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
+from .contracts import (
+    AudioMessageResult,
+    ControlDescriptor,
+    ControlOption,
+    ControlResult,
+    ControlValue,
+)
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
@@ -194,6 +200,16 @@ class CameraDriver:
         """Write one allowlisted semantic control; raw vendor payloads are never accepted."""
 
         raise Unsupported(key)
+
+    def supports_audio_messages(self, camera: Camera) -> bool:
+        """Whether this exact camera can receive bounded server-to-speaker PCM messages."""
+
+        return False
+
+    def send_audio_message(self, camera: Camera, pcm16le: bytes) -> AudioMessageResult:
+        """Send fixed-format 8 kHz/mono/s16le PCM through a driver-owned transport."""
+
+        raise Unsupported("audio_message")
 
     # --- controls (default: unsupported) -----------------------------------------------
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:

@@ -39,6 +39,9 @@ def test_default_controls_are_unsupported():
         d.ptz(cam, "left")
     with pytest.raises(Unsupported):
         d.reboot(cam)
+    assert d.supports_audio_messages(cam) is False
+    with pytest.raises(Unsupported):
+        d.send_audio_message(cam, bytes(320))
 
 
 # --- probe / _probe_rtsp ------------------------------------------------------------

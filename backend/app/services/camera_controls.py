@@ -12,7 +12,13 @@ from contextlib import contextmanager
 from .. import drivers
 from ..db import registry
 from ..db.registry import Camera
-from ..drivers.contracts import ControlDescriptor, ControlOption, ControlResult, ControlValue
+from ..drivers.contracts import (
+    AudioMessageResult,
+    ControlDescriptor,
+    ControlOption,
+    ControlResult,
+    ControlValue,
+)
 
 
 class CameraNotFound(LookupError):
@@ -91,3 +97,14 @@ def write_control(camera_id: str, key: str, value: ControlValue) -> ControlResul
     camera = _camera(camera_id)
     with _exclusive(camera_id):
         return _operation(camera, key, "writable").write_control(camera, key, value)
+
+
+def send_audio_message(camera_id: str, pcm16le: bytes) -> AudioMessageResult:
+    """Dispatch one bounded fixed-format audio message under the camera operation lock."""
+
+    camera = _camera(camera_id)
+    with _exclusive(camera_id):
+        driver = drivers.for_camera(camera)
+        if not driver.supports_audio_messages(camera):
+            raise drivers.Unsupported("audio_message")
+        return driver.send_audio_message(camera, pcm16le)

@@ -49,6 +49,49 @@ class ControlOperationError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class AudioMessageResult:
+    """Vendor-neutral result for one bounded server-to-camera voice message."""
+
+    duration_ms: int
+    requested_frames: int
+    sent_frames: int
+    acknowledged_frames: int
+    direct_connection: bool
+    session_completed: bool
+    route_released: bool
+
+    def __post_init__(self) -> None:
+        if not 20 <= self.duration_ms <= 10_000 or self.duration_ms % 20:
+            raise ValueError("audio-message duration must be complete 20 ms frames")
+        if not (0 <= self.acknowledged_frames <= self.sent_frames <= self.requested_frames <= 500):
+            raise ValueError("audio-message frame counts are inconsistent")
+
+    @property
+    def completed(self) -> bool:
+        return (
+            self.duration_ms > 0
+            and self.requested_frames > 0
+            and self.sent_frames == self.requested_frames
+            and self.acknowledged_frames == self.requested_frames
+            and self.direct_connection
+            and self.session_completed
+            and self.route_released
+        )
+
+    def public(self) -> dict[str, object]:
+        return {
+            "duration_ms": self.duration_ms,
+            "requested_frames": self.requested_frames,
+            "sent_frames": self.sent_frames,
+            "acknowledged_frames": self.acknowledged_frames,
+            "direct_connection": self.direct_connection,
+            "session_completed": self.session_completed,
+            "route_released": self.route_released,
+            "completed": self.completed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ControlDescriptor:
     """Safe public description of one semantic camera control."""
 

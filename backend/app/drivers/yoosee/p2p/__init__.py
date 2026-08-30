@@ -21,6 +21,7 @@ from .contracts import (
     P2PPropertyRead,
     P2PRouteProbe,
 )
+from .intercom import send_pcm_intercom
 from .night_vision import (
     NIGHT_VISION_VALUES,
     P2PNightVisionWrite,
@@ -103,6 +104,7 @@ __all__ = [
     "refresh_account_session",
     "rtsp_password_digest",
     "run_with_fresh_access",
+    "send_pcm_intercom",
     "set_camera_alarm_voice_resource",
     "set_camera_night_vision",
     "set_camera_orientation",

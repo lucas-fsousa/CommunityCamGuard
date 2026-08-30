@@ -47,6 +47,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 | POST | `/api/cameras/{camera_id}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
 | POST | `/api/cameras/{camera_id}/ptz` | `PtzIn` | Pan/tilt. See PTZ below. |
 | POST | `/api/cameras/{camera_id}/reboot` | — | Reboot the camera (driver-dependent; `501` if unsupported). |
+| POST | `/api/cameras/{camera_id}/intercom/messages` | raw `audio/pcm` | Play one bounded voice message through a supporting driver; authenticated trusted LAN only. |
 
 **`CameraIn`** (fields other than `mac` are optional; omitted fields are left unchanged on update):
 
@@ -88,6 +89,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
     "smart_protection_schedule": { "kind": "weekly_schedule", "readable": true, "writable": true, "options": [] }
   },
   "has_audio": true,
+  "audio_messages": true,
   "stream_id": "cam_0123456789abcdef01234567",
   "web_stream_id": "cam_0123456789abcdef01234567_web",
   "hd_stream_id": "cam_0123456789abcdef01234567_hd",
@@ -146,6 +148,20 @@ ID. A write must resolve it again against fresh driver metadata before using any
 
 The previous white-light/orientation-specific `/api/vendor-controls/...` routes remain available
 as a deprecated compatibility surface while older dashboard builds are phased out.
+
+### Bounded audio messages (authenticated trusted LAN only)
+
+`POST /api/cameras/{camera_id}/intercom/messages` accepts `Content-Type: audio/pcm` containing
+signed 16-bit little-endian, mono, 8 kHz PCM. The body must contain complete 320-byte/20 ms frames
+and may contain at most 160,000 bytes (10 seconds). The server executes the blocking camera session
+outside the HTTP event loop and serializes it with other operations on that camera. A successful
+response reports only duration, frame counts, direct-connection/session-cleanup/route-cleanup booleans and
+`completed`; it exposes no codec bytes, enrollment ID, peer address, token or protocol state.
+
+This endpoint is the generic recorded-message transport. `audio_messages` in the camera response
+indicates whether the selected driver and exact camera enrollment support it. The current endpoint
+does not claim real-time push-to-talk and deliberately rejects WAV, compressed browser blobs,
+partial samples and ambiguous content types. Browser capture/resampling is a separate client layer.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
 selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous
