@@ -149,6 +149,11 @@ string alone must never grant another driver's controls.
   audio. A production-container run against camera 3 sent 0.2 seconds of silence as ten AMR frames:
   direct handshake, meter, AV v1, header, talk ON, all 10 frame ACKs, talk OFF, AV CLOSE and B9 release
   completed. All three RTSP transcoders and recorders continued without replacement or interruption.
+- A second camera-3 run sent 30 acknowledged frames containing a low-level 740 Hz/0.6-second tone
+  while FFmpeg consumed the already-preloaded local restream (not another camera connection). The
+  camera microphone returned a continuous approximately 0.65-second 740 Hz band at the matching
+  instant, peaking 27.6 dB above the capture baseline. This closes server-to-speaker playback with
+  acoustic loopback evidence; human speech intelligibility and browser capture remain separate work.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
