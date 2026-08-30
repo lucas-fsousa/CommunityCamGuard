@@ -48,9 +48,10 @@ def test_builder_exposes_only_typed_read_and_boolean_write():
     assert not hasattr(white_light, "build_passthrough_message")
 
 
-def test_response_requires_exact_type_and_binary_state():
+@pytest.mark.parametrize("direction", [b"\xff", b"\x00"])
+def test_response_requires_observed_envelope_exact_type_and_binary_state(direction):
     encoded = b'{"type":12,"data":{"whiteLightStatus":1}}'
-    payload = b"\x01\xff\x00\x00" + struct.pack("<I", 44) + encoded
+    payload = b"\x01" + direction + b"\x00\x00" + struct.pack("<I", 44) + encoded
     response = bytearray(0x34 + len(payload))
     response[:2] = b"\x7e\xb9"
     struct.pack_into("<H", response, 0x30, len(payload))
@@ -63,6 +64,17 @@ def test_response_requires_exact_type_and_binary_state():
     assert (
         white_light.extract_white_light_state({"type": 12, "data": {"whiteLightStatus": 2}}) is None
     )
+
+
+def test_response_rejects_unobserved_passthrough_envelope():
+    encoded = b'{"type":12,"data":{"whiteLightStatus":0}}'
+    payload = b"\x01\x01\x00\x00" + struct.pack("<I", 44) + encoded
+    response = bytearray(0x34 + len(payload))
+    response[:2] = b"\x7e\xb9"
+    struct.pack_into("<H", response, 0x30, len(payload))
+    response[0x34:] = payload
+
+    assert white_light.parse_white_light_response(bytes(response), 12) is None
 
 
 def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):

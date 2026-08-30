@@ -19,6 +19,13 @@ from .contracts import CertifiedNode, OnlineDevice, P2PProbeError
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
+_PASSTHROUGH_REQUEST_PREFIX = b"\x01\xff\x00\x00"
+# Camera 3 (firmware 40.1.14) uses 0 in the response direction byte. Older captures and units use
+# the echoed 0xff form, so accept exactly these two observed envelopes and no generic passthrough.
+_PASSTHROUGH_RESPONSE_PREFIXES = frozenset(
+    {_PASSTHROUGH_REQUEST_PREFIX, b"\x01\x00\x00\x00"}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class WhiteLightExchange:
@@ -71,7 +78,7 @@ def build_white_light_request(
             "type": 11,
         }
     encoded = json.dumps(message, separators=(",", ":")).encode("utf-8")
-    payload = b"\x01\xff\x00\x00" + struct.pack("<I", request_id) + encoded
+    payload = _PASSTHROUGH_REQUEST_PREFIX + struct.pack("<I", request_id) + encoded
     frame = new_header(
         0xB9,
         0x34 + len(payload),
@@ -100,7 +107,7 @@ def parse_white_light_response(
     if payload_length < 8 or 0x34 + payload_length > len(frame):
         return None
     payload = frame[0x34 : 0x34 + payload_length]
-    if payload[:4] != b"\x01\xff\x00\x00":
+    if payload[:4] not in _PASSTHROUGH_RESPONSE_PREFIXES:
         return None
     try:
         value = json.loads(payload[8:].decode("utf-8"))

@@ -73,6 +73,10 @@ string alone must never grant another driver's controls.
 - Speaker volume is exposed as the APK's semantic 0/25/50/75/100% positions. The driver keeps the
   raw 0..10 representation private, normalizes reads using the APK buckets and requires exact raw
   readback after a change.
+- White-light passthrough keeps distinct request/response envelopes. Requests always use the proven
+  `01 ff 00 00` prefix; responses accept only that legacy echo or camera 3 firmware 40.1.14's
+  observed `01 00 00 00` response-direction prefix. The parser still requires the fixed type and a
+  binary state and does not expose a generic passthrough surface.
 - Night vision is exposed as the semantic automatic/daytime/night choice. The current Yoosee
   profile maps only to its physically proven legacy 0/1/2 scalar with preflight and exact readback;
   the unadvertised V2 support/selection bitfield is not accepted through the production boundary.
