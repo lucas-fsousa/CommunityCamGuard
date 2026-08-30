@@ -111,6 +111,10 @@ string alone must never grant another driver's controls.
   result. A bounded `media_session` now owns the camera-facing mode-1 A4 and MTP meter exchange;
   it validates the exact peer and route identities, acknowledges camera meter requests and does
   not yet send AV or microphone frames.
+- AV initialization is a separate bounded session layer. It sends the four native INIT attempts,
+  acknowledges every validated camera KCP PUSH, records ACCEPT/START proposals and decodes the v1
+  codec header through the pure StreamPipe layer. This stage still does not echo AV START or emit
+  talk/audio records; its result carries only typed state needed by the later intercom lifecycle.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
