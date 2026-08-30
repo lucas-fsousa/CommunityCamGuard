@@ -39,3 +39,44 @@ def test_access_session_skips_certified_node_that_cannot_initialize(monkeypatch)
     assert devices == (device,)
     assert skipped == 1
     assert attempted == endpoints
+
+
+def test_list_query_retransmits_boundedly_before_accepting_reply(monkeypatch):
+    sent = []
+    receives = [[], [], [(b"\x7f\x16" + bytes(62), ("192.0.2.1", 51701))]]
+
+    class FakeSocket:
+        def sendto(self, payload, peer):
+            sent.append((payload, peer))
+
+    monkeypatch.setattr(
+        access_session.socket,
+        "getaddrinfo",
+        lambda *_args: [(2, 2, 17, "", ("192.0.2.1", 51701))],
+    )
+    monkeypatch.setattr(
+        access_session,
+        "receive_datagrams",
+        lambda _sock, _until: receives.pop(0),
+    )
+    monkeypatch.setattr(
+        access_session,
+        "parse_list_reply",
+        lambda _wire: [("192.0.2.10", 19800)],
+    )
+
+    result = access_session.obtain_list(
+        FakeSocket(), 123, 0.1, retries=3, deadline=10**20  # type: ignore[arg-type]
+    )
+
+    assert result == [("192.0.2.10", 19800)]
+    assert [peer for _payload, peer in sent] == [("192.0.2.1", 51701)] * 3
+
+
+def test_list_query_rejects_unbounded_retry_configuration():
+    try:
+        access_session.obtain_list(object(), 123, 0.1, retries=0)  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "positive" in str(exc)
+    else:
+        raise AssertionError("zero retries were accepted")

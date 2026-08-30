@@ -39,7 +39,18 @@ LIST_HOST = "list.iotvideo.tencentcs.com"
 LIST_PORT = 51701
 
 
-def obtain_list(sock: socket.socket, access_id: int, timeout: float) -> list[tuple[str, int]]:
+def obtain_list(
+    sock: socket.socket,
+    access_id: int,
+    timeout: float,
+    *,
+    retries: int = 3,
+    deadline: float | None = None,
+) -> list[tuple[str, int]]:
+    """Query the stateless UDP list service with bounded, side-effect-free retransmission."""
+
+    if retries < 1:
+        raise ValueError("list-service retries must be positive")
     try:
         hosts = {
             item[4][0]
@@ -48,14 +59,20 @@ def obtain_list(sock: socket.socket, access_id: int, timeout: float) -> list[tup
     except OSError as exc:
         raise P2PProbeError("P2P list service could not be resolved") from exc
     query = build_list_query(access_id)
-    for host in hosts:
-        sock.sendto(query, (host, LIST_PORT))
-    for wire, _peer in receive_datagrams(sock, time.monotonic() + timeout):
-        if len(wire) >= 0x20 and wire[:2] == b"\x7f\x16":
-            try:
-                return parse_list_reply(wire)
-            except ValueError:
-                continue
+    for _attempt in range(retries):
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        for host in hosts:
+            sock.sendto(query, (host, LIST_PORT))
+        receive_until = time.monotonic() + timeout
+        if deadline is not None:
+            receive_until = min(receive_until, deadline)
+        for wire, _peer in receive_datagrams(sock, receive_until):
+            if len(wire) >= 0x20 and wire[:2] == b"\x7f\x16":
+                try:
+                    return parse_list_reply(wire)
+                except ValueError:
+                    continue
     raise P2PProbeError("P2P list service did not answer")
 
 

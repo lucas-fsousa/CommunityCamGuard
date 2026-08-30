@@ -18,7 +18,11 @@ def test_camera_session_selects_only_the_durable_enrollment(monkeypatch):
     )
     selected: list[int] = []
 
-    monkeypatch.setattr(camera_session, "obtain_list", lambda *_args: [("192.0.2.10", 19800)])
+    monkeypatch.setattr(
+        camera_session,
+        "obtain_list",
+        lambda *_args, **_kwargs: [("192.0.2.10", 19800)],
+    )
     monkeypatch.setattr(
         camera_session,
         "establish_initialized_node",

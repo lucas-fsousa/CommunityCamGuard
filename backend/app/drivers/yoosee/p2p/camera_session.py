@@ -24,7 +24,7 @@ def open_camera_session(
     """Open one initialized route to exactly the durable enrollment's camera."""
 
     material = LoginMaterial(enrollment.access_id, enrollment.access_token)
-    endpoints = obtain_list(sock, material.access_id, timeout)
+    endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline)
     endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
     node, devices, _skipped = establish_initialized_node(
         sock,

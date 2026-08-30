@@ -73,6 +73,9 @@ string alone must never grant another driver's controls.
   cameras remain independent. The Yoosee driver additionally serializes all entry points by native
   device ID and waits 1.5 seconds after one direct route closes before opening the next; live camera
   3 testing showed an immediate post-session handshake can fail while an isolated request succeeds.
+  Its stateless UDP list-service query is retransmitted at most three times within the operation's
+  existing deadline. This retry happens before a camera route or action exists, so it cannot replay
+  a device write; it only tolerates a lost discovery datagram.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
