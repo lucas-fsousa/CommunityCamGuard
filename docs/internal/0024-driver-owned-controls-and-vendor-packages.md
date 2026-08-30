@@ -131,6 +131,12 @@ string alone must never grant another driver's controls.
   operation cannot accept audio frames, so this validation was silent by construction. The base
   RTSP producer, H.264 restream and recorder remained active and a subsequent recording segment
   was observed.
+- AMR-NB encoding is driver-owned rather than delegated to the browser or an ignored laboratory
+  binary. The Docker image installs the reproducible OpenCORE runtime, while a bounded streaming
+  wrapper keeps one encoder state per utterance, accepts only signed 8 kHz mono PCM16, emits the
+  APK's 20 ms mode-7 frames, caps session duration and rejects unexpected native output. This
+  encoder is not connected to the camera transport until the audio send lifecycle has equivalent
+  cleanup/backpressure coverage.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
