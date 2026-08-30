@@ -136,7 +136,13 @@ string alone must never grant another driver's controls.
   wrapper keeps one encoder state per utterance, accepts only signed 8 kHz mono PCM16, emits the
   APK's 20 ms mode-7 frames, caps session duration and rejects unexpected native output. This
   encoder is not connected to the camera transport until the audio send lifecycle has equivalent
-  cleanup/backpressure coverage.
+  cleanup/backpressure coverage. The deployed container encoded 0.2 seconds of silence into ten
+  exact 32-byte mode-7 frames through the installed OpenCORE runtime.
+- The internal legacy audio sender now enforces that ten-second/raw-mode-7 boundary again at the
+  transport edge, emits one v1 record per 20 ms, waits for each KCP acknowledgement before advancing
+  the queue, acknowledges reverse camera PUSH traffic and aborts the remainder on bounded ACK loss.
+  The enclosing lifecycle still executes talk OFF and AV CLOSE after an audio failure. This remains
+  deliberately disconnected from HTTP/browser input pending a controlled intelligibility test.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

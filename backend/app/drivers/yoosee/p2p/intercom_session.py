@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import socket
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from .audio_sender import (
+    LegacyAudioSendResult,
+    send_legacy_audio_frames,
+    validate_legacy_audio_frames,
+)
 from .av_session import AvSessionResult
 from .contracts import CallingResult
 from .media_protocol import (
@@ -31,6 +37,7 @@ class IntercomControlResult:
     talk_start_acknowledged: bool
     talk_stop_acknowledged: bool
     av_close_acknowledged: bool
+    audio: LegacyAudioSendResult | None = None
 
     @property
     def completed(self) -> bool:
@@ -41,17 +48,23 @@ class IntercomControlResult:
                 self.talk_start_acknowledged,
                 self.talk_stop_acknowledged,
                 self.av_close_acknowledged,
+                self.audio is None or self.audio.completed,
             )
         )
 
 
-def run_silent_legacy_intercom_control(
+def run_legacy_intercom_control(
     sock: socket.socket,
     calling: CallingResult,
     av: AvSessionResult,
     timeout: float,
+    *,
+    audio_frames: Sequence[bytes] = (),
 ) -> IntercomControlResult:
-    """Exercise START/STOP/CLOSE with zero audio frames and unconditional cleanup."""
+    """Exercise legacy talk with bounded optional audio and unconditional cleanup."""
+
+    if audio_frames:
+        validate_legacy_audio_frames(audio_frames)
 
     attempt = calling.attempt
     peer = calling.peer_endpoint
@@ -77,7 +90,7 @@ def run_silent_legacy_intercom_control(
             for wire, source in receive_datagrams(
                 sock, time.monotonic() + min(bounded_timeout, 0.4)
             ):
-                if source != peer or wire[:2] != b"\xC0\x10":
+                if source != peer or wire[:2] != b"\xc0\x10":
                     continue
                 try:
                     segments = parse_kcp_segments(wire)
@@ -116,6 +129,7 @@ def run_silent_legacy_intercom_control(
     talk_start_acknowledged = False
     talk_stop_acknowledged = False
     av_close_acknowledged = False
+    audio: LegacyAudioSendResult | None = None
     try:
         av_start_acknowledged = send_and_wait(
             frame(build_av_control(attempt.call_id, 6), sequence), sequence, 2
@@ -129,6 +143,18 @@ def run_silent_legacy_intercom_control(
             start = encrypt_media_tlv(pack_legacy_talk_control(True), attempt.cookie)
             talk_start_acknowledged = send_and_wait(frame(start, sequence), sequence, 3)
             sequence += 1
+        if talk_start_acknowledged and audio_frames:
+            audio = send_legacy_audio_frames(
+                sock,
+                peer,
+                conv,
+                attempt.cookie,
+                inbound_next,
+                sequence,
+                audio_frames,
+                bounded_timeout,
+            )
+            sequence = audio.next_sequence
     finally:
         try:
             stop = encrypt_media_tlv(pack_legacy_talk_control(False), attempt.cookie)
@@ -143,4 +169,16 @@ def run_silent_legacy_intercom_control(
         talk_start_acknowledged,
         talk_stop_acknowledged,
         av_close_acknowledged,
+        audio,
     )
+
+
+def run_silent_legacy_intercom_control(
+    sock: socket.socket,
+    calling: CallingResult,
+    av: AvSessionResult,
+    timeout: float,
+) -> IntercomControlResult:
+    """Validate START/STOP/CLOSE while making audio transmission impossible."""
+
+    return run_legacy_intercom_control(sock, calling, av, timeout)
