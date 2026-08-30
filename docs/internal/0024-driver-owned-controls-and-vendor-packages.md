@@ -71,8 +71,9 @@ string alone must never grant another driver's controls.
   dynamic-option queries and writes share the same non-blocking lock; overlap returns HTTP 409
   instead of opening competing P2P sessions or racing two read-before-write transactions. Different
   cameras remain independent. The Yoosee driver additionally serializes all entry points by native
-  device ID and waits 1.5 seconds after one direct route closes before opening the next; live camera
-  3 testing showed an immediate post-session handshake can fail while an isolated request succeeds.
+  device ID and waits five seconds after one direct route closes before opening the next; live
+  camera 3 stress testing showed its fourth fresh route inside roughly 30 seconds is commonly
+  dropped while an isolated request succeeds.
   Its stateless UDP list-service query is retransmitted at most three times within the operation's
   existing deadline. This retry happens before a camera route or action exists, so it cannot replay
   a device write; it only tolerates a lost discovery datagram.

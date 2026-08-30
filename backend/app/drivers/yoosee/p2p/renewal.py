@@ -18,7 +18,11 @@ _refresh_lock = threading.Lock()
 _session_locks_guard = threading.Lock()
 _session_locks: dict[str, threading.Lock] = {}
 _session_finished: dict[str, float] = {}
-_SESSION_SETTLE_SECONDS = 1.5
+# The field unit accepts three fresh routes in quick succession but commonly drops the fourth until
+# the oldest rendezvous ages out. Five seconds spaces four operations across that observed ~30 s
+# window once their normal 4-6 s handshakes are included. A persistent session pool can remove this
+# conservative pacing later without weakening write safety.
+_SESSION_SETTLE_SECONDS = 5.0
 
 
 def _session_lock(device_id: str) -> threading.Lock:
