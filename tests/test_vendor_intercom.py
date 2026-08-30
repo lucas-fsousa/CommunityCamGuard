@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.db.p2p import P2PEnrollment
 from backend.app.drivers.yoosee.p2p import intercom
+from backend.app.drivers.yoosee.p2p.audio_sender import LegacyAudioSendResult
 from backend.app.drivers.yoosee.p2p.av_session import AvSessionResult
 from backend.app.drivers.yoosee.p2p.contracts import (
     CallingAttempt,
@@ -60,16 +61,13 @@ def test_complete_silent_probe_releases_exact_route(monkeypatch) -> None:
         "initialize_av_session",
         lambda *_args: AvSessionResult(3, (2, 6), 4, 4, (), 1, None),
     )
-    monkeypatch.setattr(
-        intercom, "run_silent_legacy_intercom_control", lambda *_args: control
-    )
+    monkeypatch.setattr(intercom, "run_silent_legacy_intercom_control", lambda *_args: control)
     monkeypatch.setattr(
         intercom,
         "close_device_route",
-        lambda _sock, _node, _access, selected, link, sequence, _timeout: closed.append(
-            (selected.device_id, link, sequence)
-        )
-        or True,
+        lambda _sock, _node, _access, selected, link, sequence, _timeout: (
+            closed.append((selected.device_id, link, sequence)) or True
+        ),
     )
 
     result = intercom._probe_silent_intercom(enrollment, timeout=0.5, total_timeout=8)
@@ -115,3 +113,78 @@ def test_public_probe_uses_serialized_renewal_boundary(monkeypatch) -> None:
 
     assert intercom.probe_silent_intercom(enrollment) == expected
     assert seen == [enrollment.device_id]
+
+
+def test_audio_probe_uses_encoded_frames_and_releases_exact_route(monkeypatch) -> None:
+    enrollment, node, target, calling = _fixture()
+    audio = LegacyAudioSendResult(2, 2, 2, 5, False)
+    control = IntercomControlResult(True, True, True, True, True, audio)
+    frames = (bytes.fromhex("3c") + bytes(31),) * 2
+    observed = []
+    closed = []
+    monkeypatch.setattr(intercom.socket, "socket", lambda *_args: FakeSocket())
+    monkeypatch.setattr(intercom, "open_camera_session", lambda *_args: (node, target, 17))
+    monkeypatch.setattr(intercom, "call_device", lambda *_args, **_kwargs: calling)
+    monkeypatch.setattr(
+        intercom, "open_media_channel", lambda *_args: MediaChannelResult(False, True, 4)
+    )
+    monkeypatch.setattr(
+        intercom,
+        "initialize_av_session",
+        lambda *_args: AvSessionResult(3, (2, 6), 4, 4, (), 1, None),
+    )
+
+    def run_control(_sock, selected_calling, _av, _timeout, *, audio_frames):
+        observed.append((selected_calling.attempt, audio_frames))
+        return control
+
+    monkeypatch.setattr(intercom, "run_legacy_intercom_control", run_control)
+    monkeypatch.setattr(
+        intercom,
+        "close_device_route",
+        lambda _sock, _node, _access, selected, link, sequence, _timeout: (
+            closed.append((selected.device_id, link, sequence)) or True
+        ),
+    )
+
+    result = intercom._probe_intercom(
+        enrollment,
+        timeout=0.5,
+        total_timeout=8,
+        audio_frames=frames,
+        failure_message="audio failed",
+    )
+
+    assert result.completed is True
+    assert observed == [(calling.attempt, frames)]
+    assert closed == [(target.device_id, calling.route_link_id, calling.next_sequence + 1)]
+
+
+def test_pcm_entrypoint_encodes_before_serialized_operation(monkeypatch) -> None:
+    enrollment, _node, _target, _calling = _fixture()
+    frames = (bytes.fromhex("3c") + bytes(31),)
+    expected = intercom._empty_result(enrollment.device_id)
+    events = []
+
+    def encode(pcm, *, max_seconds):
+        events.append(("encode", pcm, max_seconds))
+        return frames
+
+    def serialize(selected, operation):
+        events.append(("serialize", selected.device_id))
+        return operation(selected)
+
+    def probe(selected, **kwargs):
+        events.append(("probe", selected.device_id, kwargs["audio_frames"]))
+        return expected
+
+    monkeypatch.setattr(intercom, "encode_pcm16le", encode)
+    monkeypatch.setattr(intercom, "run_with_fresh_access", serialize)
+    monkeypatch.setattr(intercom, "_probe_intercom", probe)
+
+    assert intercom.send_pcm_intercom(enrollment, bytes(320), max_seconds=1.0) == expected
+    assert events == [
+        ("encode", bytes(320), 1.0),
+        ("serialize", enrollment.device_id),
+        ("probe", enrollment.device_id, frames),
+    ]

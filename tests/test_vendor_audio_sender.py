@@ -96,6 +96,36 @@ def test_sender_aborts_queue_after_bounded_ack_loss(monkeypatch) -> None:
     assert len(sock.sent) == 3
 
 
+def test_sender_has_an_absolute_session_deadline(monkeypatch) -> None:
+    sock = FakeSocket()
+    now = 10.0
+
+    def monotonic() -> float:
+        return now
+
+    def receive(*_args):
+        nonlocal now
+        now += 3.0
+        return iter(())
+
+    monkeypatch.setattr(audio_sender.time, "monotonic", monotonic)
+    monkeypatch.setattr(audio_sender, "receive_datagrams", receive)
+
+    result = audio_sender.send_legacy_audio_frames(
+        sock,
+        PEER,
+        CONV,
+        COOKIE,
+        {},
+        3,
+        (AMR, AMR),
+        0.4,  # type: ignore[arg-type]
+    )
+
+    assert result == audio_sender.LegacyAudioSendResult(2, 1, 0, 4, True)
+    assert len(sock.sent) == 1
+
+
 def test_sender_acks_camera_push_while_waiting_for_audio_ack(monkeypatch) -> None:
     sock = FakeSocket()
     camera_push = build_kcp_push(CONV, 11, b"camera", timestamp=45)

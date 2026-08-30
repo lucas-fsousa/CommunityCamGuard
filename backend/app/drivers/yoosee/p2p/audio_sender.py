@@ -21,6 +21,7 @@ AMR_MODE_7_TOC = 0x3C
 AMR_MODE_7_FRAME_BYTES = 32
 FRAME_INTERVAL_SECONDS = 0.020
 MAX_AUDIO_FRAMES = 500  # Ten seconds at one AMR frame per 20 ms.
+MAX_TRANSPORT_SLACK_SECONDS = 2.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,9 +75,16 @@ def send_legacy_audio_frames(
     acknowledged = 0
     sent = 0
     aborted = False
+    started_at = time.monotonic()
+    session_deadline = (
+        started_at + len(frames) * FRAME_INTERVAL_SECONDS + MAX_TRANSPORT_SLACK_SECONDS
+    )
     last_send_at: float | None = None
 
     for index, audio_frame in enumerate(frames):
+        if time.monotonic() >= session_deadline:
+            aborted = True
+            break
         if last_send_at is not None:
             due = last_send_at + FRAME_INTERVAL_SECONDS
             remaining = due - time.monotonic()
@@ -93,9 +101,12 @@ def send_legacy_audio_frames(
         )
         frame_acknowledged = False
         for _attempt in range(3):
+            now = time.monotonic()
+            if now >= session_deadline:
+                break
             sock.sendto(wire, peer)
             for response, source in receive_datagrams(
-                sock, time.monotonic() + min(bounded_timeout, 0.4)
+                sock, min(now + min(bounded_timeout, 0.4), session_deadline)
             ):
                 if source != peer or response[:2] != b"\xc0\x10":
                     continue
