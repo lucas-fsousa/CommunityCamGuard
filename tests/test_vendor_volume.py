@@ -120,7 +120,7 @@ def test_volume_read_returns_normalized_percent_and_preserves_raw_value(monkeypa
     assert result.volume_percent == 75
     assert result.raw_value == 6
     assert result.authenticated is True
-    assert result.direct_handshake is True
+    assert result.direct_handshake is False
 
 
 def test_volume_is_idempotent_within_the_same_apk_bucket(monkeypatch):

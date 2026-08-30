@@ -199,7 +199,7 @@ def read_camera_smart_protection_schedule(
         enrollment.device_id,
         schedule,
         True,
-        True,
+        False,
         result.transport_acknowledged,
         result.error_code,
     )

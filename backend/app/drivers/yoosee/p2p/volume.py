@@ -166,7 +166,7 @@ def read_camera_speaker_volume(
         volume_percent(raw),
         raw,
         True,
-        True,
+        False,
         result.transport_acknowledged,
         result.error_code,
     )

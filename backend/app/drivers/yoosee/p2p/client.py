@@ -68,7 +68,7 @@ def read_camera_property(
     timeout: float = 1.5,
     total_timeout: float = 25.0,
 ) -> P2PPropertyRead:
-    """Open only the selected target route and perform one allowlisted B7 read."""
+    """Open the selected target's brokered route and perform one allowlisted B7 read."""
     if property_path not in MODEL_READ_PATHS:
         raise P2PProbeError("thing-model path is not in the read-only allowlist")
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
@@ -96,7 +96,7 @@ def read_camera_property(
         device_id=enrollment.device_id,
         property_path=property_path,
         authenticated=True,
-        direct_handshake=True,
+        direct_handshake=False,
         transport_acknowledged=model.transport_acknowledged,
         error_code=model.error_code,
         value=model.value,

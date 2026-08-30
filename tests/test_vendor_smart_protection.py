@@ -121,7 +121,7 @@ def test_smart_protection_read_is_explicit_and_typed(monkeypatch):
 
     assert result.enabled is True
     assert result.authenticated is True
-    assert result.direct_handshake is True
+    assert result.direct_handshake is False
 
 
 @pytest.mark.parametrize("selected", [0, 1, "true", None])

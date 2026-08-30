@@ -275,7 +275,7 @@ def read_camera_white_light(
         device_id=enrollment.device_id,
         enabled=enabled,
         authenticated=True,
-        direct_handshake=True,
+        direct_handshake=False,
         transport_acknowledged=result.transport_acknowledged,
         application_acknowledged=result.application_acknowledged,
     )

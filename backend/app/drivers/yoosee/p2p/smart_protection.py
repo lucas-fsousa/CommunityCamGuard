@@ -143,7 +143,7 @@ def read_camera_smart_protection(
         enrollment.device_id,
         enabled,
         True,
-        True,
+        False,
         result.transport_acknowledged,
         result.error_code,
     )

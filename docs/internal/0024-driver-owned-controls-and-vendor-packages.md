@@ -49,9 +49,9 @@ string alone must never grant another driver's controls.
   `p2p/model_write_protocol.py` and `p2p/model_write_session.py` layers. Feature modules still own
   every fixed path, semantic allowlist, preflight and readback; this helper is not a public command
   tunnel and rejects object/array payloads.
-- Durable enrollment selection and the authenticated access-node-to-camera handshake live in
+- Durable enrollment selection and authenticated brokered control-session initialization live in
   `p2p/camera_session.py`. Feature modules call this explicit boundary instead of a private helper
-  on the compatibility client.
+  on the compatibility client. It deliberately does not open an A4/CA/CB direct-media route.
 - `p2p/client.py` is retained as a compatibility facade for the three read/probe operations and
   historical protocol reexports. Executable architecture tests prevent protocol/session layers
   and feature modules from importing that facade or accumulating new operation implementations in
@@ -71,12 +71,21 @@ string alone must never grant another driver's controls.
   dynamic-option queries and writes share the same non-blocking lock; overlap returns HTTP 409
   instead of opening competing P2P sessions or racing two read-before-write transactions. Different
   cameras remain independent. The Yoosee driver additionally serializes all entry points by native
-  device ID and waits five seconds after one direct route closes before opening the next; live
-  camera 3 stress testing showed its fourth fresh route inside roughly 30 seconds is commonly
-  dropped while an isolated request succeeds.
+  device ID so independent compatibility routes cannot race one read/modify/write transaction.
   Its stateless UDP list-service query is retransmitted at most three times within the operation's
   existing deadline. This retry happens before a camera route or action exists, so it cannot replay
   a device write; it only tolerates a lost discovery datagram.
+- Thing-model (`B7`, `D2`, `AC`), passthrough (`B9`) and resource-service (`C0`) frames include the
+  destination camera ID and are routed by the certified access node. Production originally also
+  opened A4/A3 plus CA/CB before every control. The SDK's direct-link teardown is separate from
+  closing the host UDP socket, so those disposable media rendezvous accumulated until camera 3
+  commonly rejected its fourth fresh route. Static SDK analysis and a live read-only run proved the
+  direct link unnecessary: six distinct roots returned error zero in one brokered session at
+  60–110 ms each without A4/CA/CB. Controls now stay brokered; direct rendezvous remains isolated to
+  explicit reachability probes and future media sessions. The obsolete five-second pacing delay was
+  removed. After rebuilding the production container, eight fresh canonical HTTP reads completed
+  consecutively with HTTP 200, verified state and `direct_connection=false` in 1.8–3.4 seconds each;
+  the former fourth-route failure did not recur.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

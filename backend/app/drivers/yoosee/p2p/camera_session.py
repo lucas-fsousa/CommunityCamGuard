@@ -1,4 +1,4 @@
-"""Open one authenticated direct session to a durable Yoosee enrollment."""
+"""Open one authenticated brokered control session to a durable Yoosee enrollment."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from .access_session import (
     obtain_list,
 )
 from .contracts import CertifiedNode, LoginMaterial, OnlineDevice, P2PProbeError
-from .rendezvous_session import call_device
 
 
 def open_camera_session(
@@ -21,7 +20,13 @@ def open_camera_session(
     timeout: float,
     deadline: float,
 ) -> tuple[CertifiedNode, OnlineDevice, int]:
-    """Open one initialized route to exactly the durable enrollment's camera."""
+    """Open the access-node control route for exactly the enrolled camera.
+
+    Thing-model, passthrough and resource-service messages already carry their destination device
+    ID and are routed by the authenticated access node.  A4/CA/CB is a separate direct-media
+    rendezvous and must not be opened for these brokered controls: doing so consumes a camera link
+    slot that cannot be reclaimed by merely closing this UDP socket.
+    """
 
     material = LoginMaterial(enrollment.access_id, enrollment.access_token)
     endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline)
@@ -43,14 +48,4 @@ def open_camera_session(
     )
     if target is None or not target.status:
         raise P2PProbeError("selected P2P camera is not online")
-    calling = call_device(
-        sock,
-        node,
-        material.access_id,
-        target,
-        timeout,
-        deadline=deadline,
-    )
-    if not calling.direct_handshake:
-        raise P2PProbeError("selected P2P camera did not complete the direct handshake")
-    return node, target, calling.next_sequence
+    return node, target, node.next_sequence

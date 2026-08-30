@@ -10,12 +10,6 @@ from backend.app.drivers.yoosee.p2p.account import AccountSession
 from backend.app.drivers.yoosee.p2p.contracts import InitInfoRejectedError
 
 
-@pytest.fixture(autouse=True)
-def _reset_session_gate(monkeypatch):
-    renewal._session_finished.clear()
-    monkeypatch.setattr(renewal, "_SESSION_SETTLE_SECONDS", 0.0)
-
-
 def _enrollment(token: bytes) -> P2PEnrollment:
     return P2PEnrollment(
         "7000000002", 123, token, "ab" * 64, "created", "updated", "cam_" + "1" * 24
@@ -111,21 +105,3 @@ def test_non_stale_rejection_is_not_refreshed(monkeypatch):
         renewal.run_with_fresh_access(
             old, lambda _enrollment: (_ for _ in ()).throw(InitInfoRejectedError(123))
         )
-
-
-def test_sequential_sessions_wait_for_the_device_route_to_settle(monkeypatch):
-    enrollment = _enrollment(bytes(range(64)))
-    clock = [100.0]
-    slept = []
-    monkeypatch.setattr(renewal, "_SESSION_SETTLE_SECONDS", 1.5)
-    monkeypatch.setattr(renewal.time, "monotonic", lambda: clock[0])
-
-    def sleep(seconds):
-        slept.append(seconds)
-        clock[0] += seconds
-
-    monkeypatch.setattr(renewal.time, "sleep", sleep)
-
-    assert renewal.run_with_fresh_access(enrollment, lambda _selected: "first") == "first"
-    assert renewal.run_with_fresh_access(enrollment, lambda _selected: "second") == "second"
-    assert slept == [1.5]
