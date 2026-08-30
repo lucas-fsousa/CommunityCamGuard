@@ -1,7 +1,7 @@
 """Typed persistent alarm-voice selection using only a validated catalogue resource.
 
-No public adapter imports this module yet.  A future orchestrator must obtain the resource through
-the read-only catalogue decoder; callers cannot supply a raw vendor resource id.
+The Yoosee semantic-control adapter always resolves a public option key through a fresh sanitized
+catalogue before entering this module; callers cannot supply a raw vendor resource ID.
 """
 
 from __future__ import annotations

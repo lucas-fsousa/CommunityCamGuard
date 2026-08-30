@@ -91,7 +91,8 @@ string alone must never grant another driver's controls.
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
 - Speaker volume is exposed as the APK's semantic 0/25/50/75/100% positions. The driver keeps the
   raw 0..10 representation private, normalizes reads using the APK buckets and requires exact raw
-  readback after a change.
+  readback after a change. Camera 3 completed a canonical-API 75→50→75 cycle with transport ACK,
+  error zero and exact readback; a final independent read confirmed 75% without playing audio.
 - White-light passthrough keeps distinct request/response envelopes. Requests always use the proven
   `01 ff 00 00` prefix; responses accept only that legacy echo or camera 3 firmware 40.1.14's
   observed `01 00 00 00` response-direction prefix. The parser still requires the fixed type and a
@@ -137,8 +138,9 @@ string alone must never grant another driver's controls.
 - The selection codec accepts an internal `AlarmVoiceResource`, never a raw string from HTTP. It
   performs `resFile` preflight, is idempotent by the stable type/number prefix and requires fresh
   logical-number readback. The driver registers it only behind the dynamic option lookup: every PUT
-  re-queries the catalogue and resolves the semantic key before the private resource reaches the
-  codec. Camera 3 live validation of its already-active key returned idempotently without a write.
+  resolves the semantic key through a fresh catalogue. Camera 3 completed a canonical-API
+  `Zumbido 1→Zumbido 2→Zumbido 1` cycle with ACK, error zero and exact readback; no siren/action or
+  audio playback was invoked, and a final independent read confirmed the original selection.
 - In-repository drivers remain explicitly registered. Automatic filesystem imports are rejected:
   registration order affects detection and implicit imports make startup and security auditing less
   predictable. Python entry points may be added later if out-of-tree plugins become a real need.
