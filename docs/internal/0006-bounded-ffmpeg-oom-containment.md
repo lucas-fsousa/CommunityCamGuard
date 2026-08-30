@@ -23,6 +23,12 @@ Defence in depth:
    transcode).
 3. **Harden the supervisor** (backoff on respawn) and **rotate the ffmpeg logs** (they had grown to
    tens of MB) so a crash loop can't fill the disk.
+4. **Do not restart an unchanged external go2rtc at app startup.** Its in-process `/api/restart`
+   can keep a producer used by an old consumer alive while the reconnecting dashboard creates an
+   identical replacement. This was observed as four H.264 FFmpeg processes for three cameras and
+   861 MiB in the 1 GiB media cgroup after an app-only rebuild. Startup now compares the complete
+   generated config and merely checks health when unchanged; real registry/config changes and the
+   explicit repair action still reload the media engine.
 
 ## Consequences
 
@@ -31,3 +37,5 @@ Defence in depth:
   the kernel stops logging global OOM.
 - The root cause was the **camera's broken bitstream timing**, not the recorder design; the fix
   stamps packets on arrival rather than trusting the camera's PTS.
+- Rebuilding/restarting only the app container no longer creates duplicate preloaded transcoders
+  in the long-lived external go2rtc container.

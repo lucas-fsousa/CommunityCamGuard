@@ -293,6 +293,24 @@ def test_go2rtc_restart_external_reloads_never_spawns(monkeypatch, tmp_path):
     assert (tmp_path / "g.yaml").exists()  # config regenerated for the external go2rtc
 
 
+def test_go2rtc_startup_does_not_reload_unchanged_external_config(monkeypatch, tmp_path):
+    from backend.app.db import registry
+
+    registry.init_db()
+    g = go2rtc.Go2rtc(manage=False, config_path=tmp_path / "g.yaml")
+    reloaded = []
+    healthy = []
+    monkeypatch.setattr(g, "reload_external", lambda: reloaded.append(True) or True)
+    monkeypatch.setattr(g, "wait_healthy", lambda timeout: healthy.append(timeout) or True)
+
+    assert g.ensure_external_config() is True
+    assert reloaded == [True]
+    assert healthy == []
+    assert g.ensure_external_config() is True
+    assert reloaded == [True]
+    assert healthy == [5]
+
+
 def test_reload_external_posts_restart(monkeypatch):
     seen = {}
 

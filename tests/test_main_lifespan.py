@@ -21,6 +21,10 @@ def _fake_service(name, events):
             events.append(f"{name}.reload_external")
             return True
 
+        def ensure_external_config(self, *a, **k):
+            events.append(f"{name}.ensure_external_config")
+            return True
+
         def wait_healthy(self, *a, **k):
             return True
 
@@ -56,7 +60,7 @@ def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
     config.get_settings.cache_clear()
 
 
-def test_lifespan_external_go2rtc_writes_and_reloads_instead_of_spawning(monkeypatch):
+def test_lifespan_external_go2rtc_syncs_without_spawning(monkeypatch):
     monkeypatch.setenv("AUTOSTART_SERVICES", "true")
     monkeypatch.setenv("MANAGE_GO2RTC", "false")   # go2rtc is its own container
     config.get_settings.cache_clear()
@@ -64,7 +68,7 @@ def test_lifespan_external_go2rtc_writes_and_reloads_instead_of_spawning(monkeyp
     _patch_services(monkeypatch, events)
     with TestClient(main.app):
         pass
-    assert "media.write_config" in events and "media.reload_external" in events
-    assert events.index("media.write_config") < events.index("media.reload_external")
+    assert "media.ensure_external_config" in events
+    assert "media.write_config" not in events and "media.reload_external" not in events
     assert "media.start" not in events
     config.get_settings.cache_clear()
