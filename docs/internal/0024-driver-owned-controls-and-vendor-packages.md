@@ -143,6 +143,12 @@ string alone must never grant another driver's controls.
   the queue, acknowledges reverse camera PUSH traffic and aborts the remainder on bounded ACK loss.
   The enclosing lifecycle still executes talk OFF and AV CLOSE after an audio failure. This remains
   deliberately disconnected from HTTP/browser input pending a controlled intelligibility test.
+- Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
+  encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
+  the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept
+  audio. A production-container run against camera 3 sent 0.2 seconds of silence as ten AMR frames:
+  direct handshake, meter, AV v1, header, talk ON, all 10 frame ACKs, talk OFF, AV CLOSE and B9 release
+  completed. All three RTSP transcoders and recorders continued without replacement or interruption.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
