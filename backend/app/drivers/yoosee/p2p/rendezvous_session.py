@@ -119,6 +119,7 @@ def call_device(
         peer_endpoint=peer_endpoint,
         next_sequence=next_sequence,
         route_link_id=attempt.link_id,
+        attempt=attempt,
     )
 
 

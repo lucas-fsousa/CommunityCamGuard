@@ -106,6 +106,11 @@ string alone must never grant another driver's controls.
   v1 codec header, legacy talk state and encoded-audio records. Historical golden datagrams and
   malformed-input tests protect these codecs before any long-lived media session or public talk
   API is introduced.
+- Direct-route results retain the randomized calling attempt only inside the driver, so the media
+  layer can reuse its link ID, call ID and cookie without exposing them through the sanitized route
+  result. A bounded `media_session` now owns the camera-facing mode-1 A4 and MTP meter exchange;
+  it validates the exact peer and route identities, acknowledges camera meter requests and does
+  not yet send AV or microphone frames.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

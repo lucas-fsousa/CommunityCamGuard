@@ -47,6 +47,46 @@ def build_calling_request(
     return finish_mode2(frame, node.session_key)
 
 
+def build_direct_calling_request(
+    node: CertifiedNode,
+    access_id: int,
+    device: OnlineDevice,
+    local_ip: str,
+    local_port: int,
+    attempt: CallingAttempt,
+    sequence: int,
+) -> bytes:
+    """Build the camera-facing mode-1 A4 that opens the direct media channel."""
+
+    if len(attempt.cookie) != 8:
+        raise ValueError("calling cookie must be eight bytes")
+    if not 0 < attempt.link_id <= 0xFFFFFF:
+        raise ValueError("calling link id must be a non-zero 24-bit value")
+    frame = new_header(
+        0xA4,
+        177,
+        node.session_id,
+        sequence,
+        randomized_flags(mode=1, proc=1),
+    )
+    frame[0] = 0x7E
+    struct.pack_into("<H", frame, 0x18, 0x4483)
+    struct.pack_into("<I", frame, 0x1C, attempt.link_id)
+    struct.pack_into("<Q", frame, 0x20, access_id)
+    struct.pack_into("<Q", frame, 0x28, device.device_id)
+    frame[0x32] = 1
+    struct.pack_into("<H", frame, 0x36, local_port)
+    frame[0x40:0x44] = socket.inet_aton(local_ip)
+    frame[0x78:0x80] = attempt.cookie
+    struct.pack_into("<I", frame, 0x84, attempt.call_id)
+    struct.pack_into("<I", frame, 0x88, 1)
+    struct.pack_into("<I", frame, 0x8C, 1)
+    struct.pack_into("<I", frame, 0x90, 1)
+    frame[0xA7] = 0x12
+    frame[0xB0] = 1
+    return finish_mode1(frame)
+
+
 def build_nat_online(access_id: int, device_id: int, link_id: int) -> bytes:
     """Build the clear-payload CA NAT-presence frame."""
     frame = new_header(0xCA, 52, access_id, 0, 0)

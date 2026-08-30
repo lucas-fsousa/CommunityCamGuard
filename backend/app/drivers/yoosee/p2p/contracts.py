@@ -115,6 +115,7 @@ class CallingResult:
     peer_endpoint: tuple[str, int] | None
     next_sequence: int = 0
     route_link_id: int = 0
+    attempt: CallingAttempt | None = None
 
 
 @dataclass(frozen=True, slots=True)
