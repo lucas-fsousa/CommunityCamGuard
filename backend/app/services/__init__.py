@@ -2,6 +2,7 @@
 
 from .camera_controls import (
     CameraNotFound,
+    ControlBusy,
     control_catalog,
     control_options,
     read_control,
@@ -10,6 +11,7 @@ from .camera_controls import (
 
 __all__ = [
     "CameraNotFound",
+    "ControlBusy",
     "control_catalog",
     "control_options",
     "read_control",

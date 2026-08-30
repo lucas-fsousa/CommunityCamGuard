@@ -147,6 +147,7 @@ def test_dynamic_options_return_only_the_generic_public_contract(monkeypatch):
     [
         (Unsupported("hidden"), 501),
         (ControlNotReady("driver material missing"), 409),
+        (controls.ControlBusy("camera busy"), 409),
     ],
 )
 def test_generic_driver_failures_have_stable_http_semantics(monkeypatch, error, status):

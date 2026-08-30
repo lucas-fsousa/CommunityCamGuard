@@ -110,3 +110,19 @@ def test_dynamic_options_require_an_explicit_choice_descriptor(monkeypatch):
     )
     with pytest.raises(Unsupported):
         camera_controls.control_options(CAMERA_ID, "white_light")
+
+
+def test_overlapping_operations_on_one_camera_fail_busy_without_driver_dispatch(monkeypatch):
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+    monkeypatch.setattr(
+        drivers,
+        "for_camera",
+        lambda _camera: (_ for _ in ()).throw(AssertionError("driver must not be reached")),
+    )
+    lock = camera_controls._control_lock(CAMERA_ID)
+    lock.acquire()
+    try:
+        with pytest.raises(camera_controls.ControlBusy, match="already running"):
+            camera_controls.read_control(CAMERA_ID, "white_light")
+    finally:
+        lock.release()

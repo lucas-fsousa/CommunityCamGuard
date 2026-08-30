@@ -14,7 +14,7 @@ from ..drivers.contracts import (
     WeeklySchedule,
     public_control_value,
 )
-from ..services import CameraNotFound, control_options, read_control, write_control
+from ..services import CameraNotFound, ControlBusy, control_options, read_control, write_control
 from .local_only import require_local_request
 
 router = APIRouter(
@@ -59,7 +59,7 @@ def _failure(exc: Exception) -> HTTPException:
         return HTTPException(status_code=404, detail=str(exc))
     if isinstance(exc, Unsupported):
         return HTTPException(status_code=501, detail="this camera doesn't support that control")
-    if isinstance(exc, ControlNotReady):
+    if isinstance(exc, (ControlNotReady, ControlBusy)):
         return HTTPException(status_code=409, detail=str(exc))
     return HTTPException(status_code=502, detail=str(exc))
 
@@ -92,7 +92,7 @@ def read_camera_control_options(
 
     try:
         options = control_options(camera_id, control_key)
-    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
         raise _failure(exc) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -113,7 +113,7 @@ def read_camera_control(
 
     try:
         result = read_control(camera_id, control_key)
-    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
         raise _failure(exc) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -131,7 +131,7 @@ def write_camera_control(
 
     try:
         result = write_control(camera_id, control_key, body.contract_value())
-    except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
         raise _failure(exc) from exc
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
