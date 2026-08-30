@@ -115,6 +115,11 @@ string alone must never grant another driver's controls.
   acknowledges every validated camera KCP PUSH, records ACCEPT/START proposals and decodes the v1
   codec header through the pure StreamPipe layer. This stage still does not echo AV START or emit
   talk/audio records; its result carries only typed state needed by the later intercom lifecycle.
+- The legacy intercom-control layer accepts only an acknowledged v1 AV session. It sends AV START,
+  the recovered capture header and talk ON, but has no audio-frame input at this stage. Talk OFF
+  and AV CLOSE run through nested cleanup blocks even when negotiation or an acknowledgement fails;
+  every camera KCP PUSH is itself acknowledged. This makes the zero-audio lifecycle testable before
+  browser capture and AMR encoding are attached.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.
