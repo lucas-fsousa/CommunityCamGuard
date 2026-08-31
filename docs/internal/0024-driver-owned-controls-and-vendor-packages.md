@@ -146,6 +146,11 @@ string alone must never grant another driver's controls.
   producer cannot cause a catch-up burst. The proven batch API delegates to this core without changing
   its result or deadline semantics. The enclosing lifecycle still executes talk OFF and AV CLOSE after
   an audio failure; a continuous browser session still needs its own WebSocket/lifecycle boundary.
+- The legacy control lifecycle is incremental as well: its explicit start phase performs AV START,
+  capture header and talk ON; each subsequent call hands exactly one AMR frame to the bounded sender;
+  and idempotent close performs talk OFF and AV CLOSE once. The recorded-message wrapper delegates to
+  this stateful path, preserving its sequence numbers, cleanup behavior and public result. Opening the
+  direct route and owning it across browser messages remains a separate high-level session concern.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

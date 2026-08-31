@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from backend.app.drivers.yoosee.p2p import audio_sender, intercom_session
 from backend.app.drivers.yoosee.p2p.av_session import AvSessionResult
 from backend.app.drivers.yoosee.p2p.contracts import CallingAttempt, CallingResult
@@ -192,6 +194,59 @@ def test_legacy_intercom_sends_audio_between_talk_start_and_cleanup(monkeypatch)
     assert first_audio[-32:] == AMR
     assert decrypt_media_tlv(segments[5].body, attempt.cookie) == pack_legacy_talk_control(False)
     assert int.from_bytes(segments[6].body[8:12], "little") == 7
+
+
+def test_incremental_intercom_session_keeps_talk_open_between_frames(monkeypatch) -> None:
+    calling, av = _state()
+    peer = calling.peer_endpoint
+    assert peer is not None
+    sent: list[tuple[bytes, tuple[str, int]]] = []
+
+    class FakeSocket:
+        def sendto(self, payload, address):
+            sent.append((payload, address))
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sent[-1][0])[0]
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    peer,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(intercom_session, "receive_datagrams", receive)
+    monkeypatch.setattr(audio_sender, "receive_datagrams", receive)
+    monkeypatch.setattr(audio_sender.time, "sleep", lambda *_args: None)
+    session = intercom_session.LegacyIntercomSession(
+        FakeSocket(),
+        calling,
+        av,
+        0.1,
+        max_audio_frames=2,
+    )  # type: ignore[arg-type]
+
+    assert session.start() is True
+    assert len(sent) == 3
+    assert session.send_audio_frame(AMR) is True
+    assert session.result().audio == intercom_session.LegacyAudioSendResult(
+        1, 1, 1, 4, False
+    )
+    assert len(sent) == 4
+    result = session.close()
+
+    assert result.completed is True
+    assert [parse_kcp_segments(wire)[0].sequence for wire, _peer in sent] == list(range(6))
+    assert session.close() == result
+    with pytest.raises(RuntimeError, match="closed"):
+        session.send_audio_frame(AMR)
 
 
 def test_legacy_intercom_audio_ack_loss_aborts_audio_but_still_cleans_up(monkeypatch) -> None:
