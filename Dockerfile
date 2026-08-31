@@ -10,9 +10,14 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY pyproject.toml README.md ./
+RUN python -c 'import tomllib; data=tomllib.load(open("pyproject.toml", "rb")); print("\n".join(data["project"]["dependencies"] + data["build-system"]["requires"]))' \
+        > /tmp/requirements-runtime.txt \
+    && pip install --no-cache-dir -r /tmp/requirements-runtime.txt \
+    && rm /tmp/requirements-runtime.txt
+
 COPY backend ./backend
 COPY frontend ./frontend
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation -e .
 
 # Runs with host networking (see docker-compose.yml) and binds 127.0.0.1:3200 from settings
 # — loopback only, nothing exposed to the network. go2rtc runs as its own container, so the
