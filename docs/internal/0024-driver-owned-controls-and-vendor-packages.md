@@ -183,6 +183,13 @@ string alone must never grant another driver's controls.
   upgrade using a nonexistent opaque camera ID was accepted, dispatched through the generic service
   and returned the sanitized `camera not found` error. Neither check opened a P2P camera route or sent
   audio. Physical camera-3 speech validation remains pending a suitable audible-test window.
+- A subsequent production WebSocket session targeted only camera 3 and sent ten paced zero-valued PCM
+  frames (200 ms, acoustically silent). It received `ready`, then reported 10 requested/10 acknowledged
+  frames with session completion, B9 route release and aggregate `completed=true`. The three recorder
+  FFmpeg PIDs remained `76506`, `76507` and `76508`; all three recording trees received their next
+  segment updates, app/go2rtc CPU remained approximately 5%/3%, and `/health` stayed green. This proves
+  the deployed continuous backend path and cleanup without disturbing nearby users. Human speech from
+  the browser AudioWorklet remains the final audible validation.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept
