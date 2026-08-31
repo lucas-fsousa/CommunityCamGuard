@@ -28,6 +28,14 @@ class V1EncodingHeader:
     video_height: int
 
 
+@dataclass(frozen=True, slots=True)
+class BuiltinCommand:
+    command: int
+    flags: int
+    timestamp: int
+    payload: bytes
+
+
 def _crypt_tlv(payload: bytes, cookie: bytes, *, inner_type: int, encrypt: bool) -> bytes:
     if len(cookie) != 8:
         raise ValueError("CALLING cookie must be eight bytes")
@@ -99,12 +107,55 @@ def build_builtin_command(
     return struct.pack("<BBHI", 0, command, flags, timestamp_us & 0xFFFFFFFF) + bytes(payload)
 
 
+def parse_builtin_command(frame: bytes) -> BuiltinCommand:
+    if len(frame) < 8:
+        raise ValueError("built-in command body is shorter than eight bytes")
+    reserved, command, flags, timestamp = struct.unpack_from("<BBHI", frame)
+    if reserved != 0:
+        raise ValueError("unexpected built-in command reserved byte")
+    if flags & ~0x03:
+        raise ValueError("unexpected built-in command flag bits")
+    return BuiltinCommand(command, flags, timestamp, frame[8:])
+
+
 def pack_v1_sequence_user_data(body: bytes) -> bytes:
     """Mirror ``trans_proto_v1::packing_sequence_user_data`` exactly."""
 
     if len(body) > 0xFFFF:
         raise ValueError("v1 sequenced user-data body is too large")
     return V1_MAGIC + struct.pack("<HH", 0x0300, len(body)) + bytes(20) + bytes(body)
+
+
+def unpack_v1_sequence_user_data(frame: bytes) -> bytes:
+    if len(frame) < 28 or frame[:4] != V1_MAGIC:
+        raise ValueError("not a v1 sequenced user-data frame")
+    marker, length = struct.unpack_from("<HH", frame, 4)
+    if marker != 0x0300 or any(frame[8:28]):
+        raise ValueError("invalid v1 sequenced user-data header")
+    if len(frame) != length + 28:
+        raise ValueError("v1 sequenced user-data length mismatch")
+    return frame[28:]
+
+
+def unpack_v1_user_data_frames(payload: bytes) -> tuple[bytes, ...]:
+    """Unpack concatenated compact non-sequenced v1 command records."""
+
+    frames: list[bytes] = []
+    cursor = 0
+    while cursor < len(payload):
+        if cursor + 8 > len(payload) or payload[cursor : cursor + 4] != V1_MAGIC:
+            raise ValueError("not a complete v1 user-data record")
+        marker, length = struct.unpack_from("<HH", payload, cursor + 4)
+        if marker != 0x0200:
+            raise ValueError("invalid v1 user-data header")
+        end = cursor + 8 + length
+        if end > len(payload):
+            raise ValueError("truncated v1 user-data body")
+        frames.append(payload[cursor + 8 : end])
+        cursor = end
+    if not frames:
+        raise ValueError("empty v1 user-data payload")
+    return tuple(frames)
 
 
 def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -> bytes:
@@ -115,6 +166,25 @@ def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -
             timestamp_us=timestamp_us,
         )
     )
+
+
+def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
+    """Build the audio-only HEADER_ONLY record sent by ``send_av_enc_info(2)``."""
+
+    if header.audio_channels not in (1, 2):
+        raise ValueError("v1 encoding header supports mono or stereo audio")
+    if not 8 <= header.audio_bit_width <= 2048 or header.audio_bit_width % 8:
+        raise ValueError("audio bit width must be an 8-bit multiple")
+    frame = bytearray(28)
+    frame[:4] = V1_MAGIC
+    struct.pack_into("<H", frame, 4, 0x0102)
+    frame[8] = header.audio_codec & 0xFF
+    frame[9] = header.audio_codec_option & 0xFF
+    frame[10] = header.audio_channels - 1
+    frame[11] = header.audio_bit_width // 8 - 1
+    struct.pack_into("<I", frame, 12, header.audio_sample_rate)
+    struct.pack_into("<H", frame, 16, header.audio_frame_size)
+    return bytes(frame)
 
 
 def unpack_v1_encoding_header(frame: bytes) -> V1EncodingHeader:

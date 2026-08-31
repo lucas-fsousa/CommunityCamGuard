@@ -7,6 +7,9 @@ from backend.app.drivers.yoosee.p2p.media_protocol import build_kcp_ack, parse_k
 from backend.app.drivers.yoosee.p2p.stream_protocol import (
     V1EncodingHeader,
     decrypt_command_tlv,
+    decrypt_media_tlv,
+    encrypt_command_tlv,
+    unpack_v1_sequence_user_data,
 )
 
 
@@ -41,19 +44,31 @@ def test_modern_lifecycle_separates_media_and_command_channels(monkeypatch) -> N
 
     def receive(*_args):
         outbound = parse_kcp_segments(sent[-1][0])[0]
-        return iter(
+        responses = [
             (
+                build_kcp_ack(
+                    outbound.conv,
+                    outbound.sequence,
+                    outbound.timestamp,
+                    unacknowledged=outbound.sequence + 1,
+                ),
+                peer,
+            )
+        ]
+        if outbound.conv == attempt.link_id | 0x80000000 and outbound.sequence == 4:
+            command = decrypt_command_tlv(outbound.body, attempt.cookie)
+            assert unpack_v1_sequence_user_data(command)[1] == 0x32
+            responses.append(
                 (
-                    build_kcp_ack(
+                    modern_intercom_session.build_kcp_push(
                         outbound.conv,
-                        outbound.sequence,
-                        outbound.timestamp,
-                        unacknowledged=outbound.sequence + 1,
+                        11,
+                        encrypt_command_tlv(command, attempt.cookie),
                     ),
                     peer,
-                ),
+                )
             )
-        )
+        return iter(responses)
 
     monkeypatch.setattr(modern_intercom_session, "receive_datagrams", receive)
     result = modern_intercom_session.run_modern_intercom_control(
@@ -61,19 +76,27 @@ def test_modern_lifecycle_separates_media_and_command_channels(monkeypatch) -> N
     )
 
     assert result.completed is True
-    segments = [parse_kcp_segments(wire)[0] for wire, _peer in sent]
+    segments = [
+        segment
+        for wire, _peer in sent
+        for segment in parse_kcp_segments(wire)
+        if segment.command == modern_intercom_session.KCP_PUSH
+    ]
     assert [(item.conv, item.sequence) for item in segments] == [
         (attempt.link_id, 0),
         (attempt.link_id | 0x80000000, 4),
-        (attempt.link_id | 0x80000000, 5),
         (attempt.link_id, 1),
+        (attempt.link_id | 0x80000000, 5),
+        (attempt.link_id, 2),
     ]
     talk_on = decrypt_command_tlv(segments[1].body, attempt.cookie)
-    talk_off = decrypt_command_tlv(segments[2].body, attempt.cookie)
+    talk_off = decrypt_command_tlv(segments[3].body, attempt.cookie)
     assert talk_on[29] == talk_off[29] == 0x32
     assert talk_on[-1] == 1 and talk_off[-1] == 0
+    encoding = decrypt_media_tlv(segments[2].body, attempt.cookie)
+    assert encoding[:6] == bytes.fromhex("ff ff ff 88 02 01")
     assert int.from_bytes(segments[0].body[8:12], "little") == 6
-    assert int.from_bytes(segments[3].body[8:12], "little") == 7
+    assert int.from_bytes(segments[4].body[8:12], "little") == 7
 
 
 def test_modern_lifecycle_rejects_an_unexpected_negotiated_codec() -> None:
@@ -105,3 +128,53 @@ def test_modern_lifecycle_rejects_an_unexpected_negotiated_codec() -> None:
         object(), calling, unsupported, 0.1  # type: ignore[arg-type]
     )
     assert result.completed is False
+
+
+def test_modern_lifecycle_does_not_send_header_or_audio_without_command_response(
+    monkeypatch,
+) -> None:
+    calling, av = _state()
+    attempt = calling.attempt
+    peer = calling.peer_endpoint
+    assert attempt is not None and peer is not None
+    sent: list[tuple[bytes, tuple[str, int]]] = []
+
+    class FakeSocket:
+        def sendto(self, payload, address):
+            sent.append((payload, address))
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sent[-1][0])[0]
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    peer,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(modern_intercom_session, "receive_datagrams", receive)
+    result = modern_intercom_session.run_modern_intercom_control(
+        FakeSocket(), calling, av, 0.1  # type: ignore[arg-type]
+    )
+
+    assert result.talk_start_acknowledged is False
+    assert result.header_acknowledged is False
+    pushes = [
+        segment
+        for wire, _peer in sent
+        for segment in parse_kcp_segments(wire)
+        if segment.command == modern_intercom_session.KCP_PUSH
+    ]
+    assert [(item.conv, item.sequence) for item in pushes] == [
+        (attempt.link_id, 0),
+        (attempt.link_id | 0x80000000, 4),
+        (attempt.link_id | 0x80000000, 5),
+        (attempt.link_id, 1),
+    ]

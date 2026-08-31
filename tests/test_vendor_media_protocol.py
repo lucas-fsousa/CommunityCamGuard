@@ -25,8 +25,12 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import (
     pack_legacy_capture_header,
     pack_legacy_talk_control,
     pack_microphone_command,
+    pack_v1_audio_encoding_header,
     pack_v1_sequence_user_data,
+    parse_builtin_command,
     unpack_v1_encoding_header,
+    unpack_v1_sequence_user_data,
+    unpack_v1_user_data_frames,
 )
 
 GOLDEN_METER = bytes.fromhex(
@@ -151,6 +155,33 @@ def test_modern_talk_command_matches_native_v1_sequence_layout() -> None:
         pack_v1_sequence_user_data(builtin)
     )
     assert pack_microphone_command(False, timestamp_us=0x12345678)[-1] == 0
+    assert (
+        parse_builtin_command(
+            unpack_v1_sequence_user_data(pack_v1_sequence_user_data(builtin))
+        ).timestamp
+        == 0x12345678
+    )
+
+
+def test_modern_audio_header_is_sent_by_live_player_start_callback() -> None:
+    camera_header = unpack_v1_encoding_header(
+        bytes.fromhex(
+            "ff ff ff 88 08 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 05 0f 80 02 00 00 68 01 00 00"
+        )
+    )
+    assert pack_v1_audio_encoding_header(camera_header) == bytes.fromhex(
+        "ff ff ff 88 02 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 00 00 00 00 00 00 00 00 00 00"
+    )
+
+
+def test_compact_v1_command_notifications_can_be_concatenated() -> None:
+    first = bytes.fromhex("ff ff ff 88 00 02 09 00 00 30 00 00 00 00 00 00 01")
+    second = bytes.fromhex("ff ff ff 88 00 02 09 00 00 31 00 00 00 00 00 00 00")
+    bodies = unpack_v1_user_data_frames(first + second)
+    assert [(item.command, item.payload) for item in map(parse_builtin_command, bodies)] == [
+        (0x30, b"\x01"),
+        (0x31, b"\x00"),
+    ]
 
 
 def test_malformed_frames_fail_closed() -> None:

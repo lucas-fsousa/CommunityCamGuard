@@ -20,9 +20,19 @@ from .media_protocol import (
 from .modern_audio_sender import MAX_AUDIO_FRAMES, ModernAudioSender
 from .session_io import receive_datagrams
 from .stream_protocol import (
+    MICROPHONE_STATE_CHANGE,
+    decrypt_command_tlv,
+    decrypt_media_tlv,
     encrypt_command_tlv,
+    encrypt_media_tlv,
     pack_microphone_command,
+    pack_v1_audio_encoding_header,
+    parse_builtin_command,
+    unpack_v1_sequence_user_data,
+    unpack_v1_user_data_frames,
 )
+
+APPLICATION_RESPONSE_TIMEOUT_SECONDS = 10.0
 
 
 class ModernIntercomSession:
@@ -63,20 +73,58 @@ class ModernIntercomSession:
         self._media_sequence = 0
         self._command_sequence = av.next_send_sequence
         self._inbound_next = dict(av.inbound_next)
+        self._header = header
         self._bounded_timeout = max(0.1, min(float(timeout), 5.0))
         self._max_audio_frames = max_audio_frames
         self._audio_sender: ModernAudioSender | None = None
         self._start_called = False
         self._closed = False
         self._av_start_acknowledged = False
-        # IoTVideo configures its local encoder from the camera's RX header. Unlike
-        # GwMonitorPlayer, it does not transmit a separate capture header before AVDATA.
-        self._header_acknowledged = self._valid
+        self._header_acknowledged = False
         self._talk_start_acknowledged = False
         self._talk_stop_acknowledged = False
         self._av_close_acknowledged = False
 
-    def _send_and_wait(self, conv: int, sequence: int, body: bytes, attempts: int) -> bool:
+    def _matching_command_response(
+        self,
+        body: bytes,
+        command: int,
+        timestamp: int,
+    ) -> bool:
+        attempt = self._attempt
+        if attempt is None or not body:
+            return False
+        try:
+            if body[0] == 2:
+                payload = decrypt_command_tlv(body, attempt.cookie)
+            elif body[0] == 4:
+                payload = decrypt_media_tlv(body, attempt.cookie)
+            else:
+                return False
+            try:
+                command_bodies: tuple[bytes, ...] = (unpack_v1_sequence_user_data(payload),)
+            except ValueError:
+                command_bodies = unpack_v1_user_data_frames(payload)
+        except ValueError:
+            return False
+        for command_body in command_bodies:
+            try:
+                parsed = parse_builtin_command(command_body)
+            except ValueError:
+                continue
+            if parsed.command == command and parsed.timestamp == timestamp:
+                return True
+        return False
+
+    def _send_and_wait(
+        self,
+        conv: int,
+        sequence: int,
+        body: bytes,
+        attempts: int,
+        *,
+        response_match: tuple[int, int] | None = None,
+    ) -> bool:
         peer = self._peer
         if peer is None:
             return False
@@ -87,10 +135,16 @@ class ModernIntercomSession:
             unacknowledged=self._inbound_next.get(conv, 0),
         )
         acknowledged = False
+        application_responded = response_match is None
         for _attempt in range(attempts):
             self._sock.sendto(wire, peer)
+            receive_window = (
+                APPLICATION_RESPONSE_TIMEOUT_SECONDS
+                if response_match is not None
+                else min(self._bounded_timeout, 0.4)
+            )
             for response, source in receive_datagrams(
-                self._sock, time.monotonic() + min(self._bounded_timeout, 0.4)
+                self._sock, time.monotonic() + receive_window
             ):
                 if source != peer or response[:2] != b"\xc0\x10":
                     continue
@@ -120,11 +174,15 @@ class ModernIntercomSession:
                         ),
                         peer,
                     )
-                if acknowledged:
+                    if response_match is not None and self._matching_command_response(
+                        segment.body, *response_match
+                    ):
+                        application_responded = True
+                if acknowledged and application_responded:
                     break
-            if acknowledged:
+            if acknowledged and application_responded:
                 break
-        return acknowledged
+        return acknowledged and application_responded
 
     def start(self) -> bool:
         if self._closed:
@@ -136,7 +194,8 @@ class ModernIntercomSession:
             return False
         attempt = self._attempt
         peer = self._peer
-        assert attempt is not None and peer is not None
+        header = self._header
+        assert attempt is not None and peer is not None and header is not None
 
         self._av_start_acknowledged = self._send_and_wait(
             self._media_conv,
@@ -146,12 +205,25 @@ class ModernIntercomSession:
         )
         self._media_sequence += 1
         if self._av_start_acknowledged:
-            command = encrypt_command_tlv(pack_microphone_command(True), attempt.cookie)
+            timestamp = time.time_ns() // 1_000
+            command = encrypt_command_tlv(
+                pack_microphone_command(True, timestamp_us=timestamp), attempt.cookie
+            )
             self._talk_start_acknowledged = self._send_and_wait(
-                self._command_conv, self._command_sequence, command, 3
+                self._command_conv,
+                self._command_sequence,
+                command,
+                1,
+                response_match=(MICROPHONE_STATE_CHANGE, timestamp & 0xFFFFFFFF),
             )
             self._command_sequence += 1
         if self._talk_start_acknowledged:
+            encoding = encrypt_media_tlv(pack_v1_audio_encoding_header(header), attempt.cookie)
+            self._header_acknowledged = self._send_and_wait(
+                self._media_conv, self._media_sequence, encoding, 3
+            )
+            self._media_sequence += 1
+        if self._header_acknowledged:
             self._audio_sender = ModernAudioSender(
                 self._sock,
                 peer,
