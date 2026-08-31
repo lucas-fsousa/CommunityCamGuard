@@ -141,8 +141,11 @@ string alone must never grant another driver's controls.
 - The internal legacy audio sender now enforces that ten-second/raw-mode-7 boundary again at the
   transport edge, emits one v1 record per 20 ms, waits for each KCP acknowledgement before advancing
   the queue, acknowledges reverse camera PUSH traffic and aborts the remainder on bounded ACK loss.
-  The enclosing lifecycle still executes talk OFF and AV CLOSE after an audio failure. This remains
-  deliberately disconnected from HTTP/browser input pending a controlled intelligibility test.
+  Its core is now an incremental sender that accepts one complete frame at a time, exposes progress
+  snapshots, rejects input after close/abort and paces from the previous actual send so a stalled
+  producer cannot cause a catch-up burst. The proven batch API delegates to this core without changing
+  its result or deadline semantics. The enclosing lifecycle still executes talk OFF and AV CLOSE after
+  an audio failure; a continuous browser session still needs its own WebSocket/lifecycle boundary.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

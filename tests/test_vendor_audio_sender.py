@@ -76,6 +76,90 @@ def test_sender_paces_frames_and_requires_each_ack(monkeypatch) -> None:
     assert all(segment.command != KCP_ACK for segment in outbound)
 
 
+def test_incremental_sender_exposes_snapshots_and_closes(monkeypatch) -> None:
+    sock = FakeSocket()
+    now = 100.0
+
+    def monotonic() -> float:
+        return now
+
+    def sleep(duration: float) -> None:
+        nonlocal now
+        now += duration
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sock.sent[-1][0])[0]
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    PEER,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(audio_sender.time, "monotonic", monotonic)
+    monkeypatch.setattr(audio_sender.time, "sleep", sleep)
+    monkeypatch.setattr(audio_sender, "receive_datagrams", receive)
+    sender = audio_sender.LegacyAudioSender(
+        sock, PEER, CONV, COOKIE, {}, 20, 0.1, max_frames=2  # type: ignore[arg-type]
+    )
+
+    assert sender.send(AMR) is True
+    assert sender.result() == audio_sender.LegacyAudioSendResult(1, 1, 1, 21, False)
+    assert sender.send(AMR) is True
+    assert sender.close() == audio_sender.LegacyAudioSendResult(2, 2, 2, 22, False)
+    with pytest.raises(RuntimeError, match="closed"):
+        sender.send(AMR)
+
+
+def test_incremental_sender_enforces_configured_frame_bound(monkeypatch) -> None:
+    sock = FakeSocket()
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sock.sent[-1][0])[0]
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    PEER,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(audio_sender, "receive_datagrams", receive)
+    sender = audio_sender.LegacyAudioSender(
+        sock, PEER, CONV, COOKIE, {}, 1, 0.1, max_frames=1  # type: ignore[arg-type]
+    )
+
+    assert sender.send(AMR) is True
+    with pytest.raises(ValueError, match="safety bound"):
+        sender.send(AMR)
+
+
+def test_incremental_sender_rejects_frames_after_ack_failure(monkeypatch) -> None:
+    sock = FakeSocket()
+    monkeypatch.setattr(audio_sender, "receive_datagrams", lambda *_args: iter(()))
+    sender = audio_sender.LegacyAudioSender(
+        sock, PEER, CONV, COOKIE, {}, 1, 0.1, max_frames=2  # type: ignore[arg-type]
+    )
+
+    assert sender.send(AMR) is False
+    assert sender.result() == audio_sender.LegacyAudioSendResult(1, 1, 0, 2, True)
+    with pytest.raises(RuntimeError, match="aborted"):
+        sender.send(AMR)
+
+
 def test_sender_aborts_queue_after_bounded_ack_loss(monkeypatch) -> None:
     sock = FakeSocket()
     monkeypatch.setattr(audio_sender, "receive_datagrams", lambda *_args: iter(()))
