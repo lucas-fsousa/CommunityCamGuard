@@ -10,6 +10,7 @@ import time
 
 INPUT_RATE = 8_000
 OUTPUT_RATE = 16_000
+OUTPUT_BIT_RATE = 40_000
 INPUT_FRAME_BYTES = 320
 AAC_FRAME_INTERVAL_SECONDS = 0.064
 MAX_SECONDS = 10.0
@@ -98,7 +99,7 @@ class AacLcAdtsEncoder:
             "-profile:a",
             "aac_low",
             "-b:a",
-            "32k",
+            str(OUTPUT_BIT_RATE),
             "-flush_packets",
             "1",
             "-f",

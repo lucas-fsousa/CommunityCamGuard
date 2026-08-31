@@ -305,7 +305,8 @@ string alone must never grant another driver's controls.
   16-bit, 16 kHz and 1024 samples per frame.
 - Native `fill_adts_header` proves that transmitted frames start with MPEG-4 ADTS `ff f1`, although
   received camera audio starts with MPEG-2 ADTS `ff f9`. Native `systemTime` uses Unix epoch
-  microseconds. Both details are now explicit validation boundaries rather than inferred from RX.
+  microseconds. `AudioInputImpl::apply_codec_format` also fixes the AAC encoder bit rate at 40,000
+  bit/s. These details are now explicit validation boundaries rather than inferred from RX.
 - The generic HTTP/WebSocket contract remains 8 kHz mono PCM. The Yoosee driver alone chooses an
   incremental OpenCORE AMR encoder for legacy IDs or a bounded FFmpeg AAC encoder for IoTVideo
   IDs. Codec bytes and family selection remain invisible to the application and browser.

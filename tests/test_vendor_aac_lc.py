@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app.drivers.yoosee.p2p.aac_lc import (
+    OUTPUT_BIT_RATE,
     extract_adts_frames,
     validate_aac_lc_adts_frame,
 )
@@ -24,6 +25,10 @@ def _adts(payload: bytes = b"aac") -> bytes:
         )
         + payload
     )
+
+
+def test_encoder_bitrate_matches_native_audio_input() -> None:
+    assert OUTPUT_BIT_RATE == 40_000
 
 
 def test_extracts_complete_mpeg4_aac_lc_frames_incrementally() -> None:
