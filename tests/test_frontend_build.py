@@ -126,6 +126,8 @@ def test_push_to_talk_ui_streams_exact_frames_only_while_held():
     assert "const FRAME_SAMPLES = 160" in talk
     assert "new Uint8Array(FRAME_SAMPLES * 2)" in talk
     assert 'this.socket.send("stop")' in talk
+    assert "await Promise.race([" in talk
+    assert 'message.type === "complete"' in talk
     assert 'talk.addEventListener("pointerdown"' in talk
     assert '["pointerup", "pointercancel", "lostpointercapture"]' in talk
     assert "/intercom/stream`" in talk

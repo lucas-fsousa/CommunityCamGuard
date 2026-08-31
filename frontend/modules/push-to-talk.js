@@ -106,24 +106,40 @@ class PushToTalkSession {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(websocketUrl(this.cameraId));
       this.socket = socket;
+      this.completion = new Promise((complete, fail) => {
+        this.completeSession = complete;
+        this.failSession = fail;
+      });
+      this.completion.catch(() => {});
       const timeout = setTimeout(() => reject(new Error(t("talk.timeout"))), 15000);
       socket.addEventListener("message", (event) => {
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
         if (message.type === "ready") {
           clearTimeout(timeout);
+          this.ready = true;
           this.onStatus("talk.active");
           resolve();
         } else if (message.type === "error") {
           clearTimeout(timeout);
-          reject(new Error(message.detail || t("talk.failed")));
+          const error = new Error(message.detail || t("talk.failed"));
+          this.failSession(error);
+          reject(error);
+        } else if (message.type === "complete") {
+          this.completeSession(message);
         }
       });
       socket.addEventListener("close", () => {
         clearTimeout(timeout);
-        if (!this.finished) reject(new Error(t("talk.closed")));
+        const error = new Error(t("talk.closed"));
+        this.failSession(error);
+        if (!this.ready) reject(error);
       });
-      socket.addEventListener("error", () => reject(new Error(t("talk.failed"))));
+      socket.addEventListener("error", () => {
+        const error = new Error(t("talk.failed"));
+        this.failSession(error);
+        reject(error);
+      });
     });
   }
 
@@ -136,8 +152,19 @@ class PushToTalkSession {
     this.silence?.disconnect();
     this.stream?.getTracks().forEach((track) => track.stop());
     if (this.context && this.context.state !== "closed") await this.context.close();
-    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send("stop");
-    setTimeout(() => this.socket?.close(), 1500);
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send("stop");
+      try {
+        await Promise.race([
+          this.completion,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(t("talk.timeout"))), 12000)),
+        ]);
+      } finally {
+        this.socket.close();
+      }
+    } else {
+      this.socket?.close();
+    }
   }
 }
 
@@ -167,9 +194,15 @@ export function pushToTalkButton(cam) {
       if (!session) return;
       const current = session;
       session = null;
-      await current.stop();
-      talk.disabled = false;
-      setStatus("talk.done");
+      try {
+        await current.stop();
+        setStatus("talk.done");
+      } catch (error) {
+        status.classList.add("error");
+        status.textContent = t("talk.failedDetail", { msg: error.message });
+      } finally {
+        talk.disabled = false;
+      }
     };
     const start = async () => {
       if (starting || session) return;
@@ -182,7 +215,7 @@ export function pushToTalkButton(cam) {
         session = current;
         if (!held) await stop();
       } catch (error) {
-        await current.stop();
+        try { await current.stop(); } catch { /* Preserve the original startup error. */ }
         setStatus("talk.failedDetail", true);
         status.textContent = t("talk.failedDetail", { msg: error.message });
         talk.disabled = false;
