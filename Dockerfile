@@ -17,7 +17,7 @@ RUN python -c 'import tomllib; data=tomllib.load(open("pyproject.toml", "rb")); 
 
 COPY backend ./backend
 COPY frontend ./frontend
-RUN pip install --no-cache-dir --no-deps --no-build-isolation -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 
 # Runs with host networking (see docker-compose.yml) and binds 127.0.0.1:3200 from settings
 # — loopback only, nothing exposed to the network. go2rtc runs as its own container, so the
