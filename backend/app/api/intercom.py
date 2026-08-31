@@ -3,22 +3,33 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import queue
+import re
+import threading
+import time
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, WebSocket
+from starlette.websockets import WebSocketState
 
-from ..auth import require_auth
+from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
-from ..services import CameraNotFound, ControlBusy, send_audio_message
-from .local_only import require_local_request
+from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
+from .local_only import require_local_request, require_local_websocket
 
 MAX_PCM_BYTES = 160_000  # Ten seconds of mono 8 kHz signed 16-bit PCM.
 PCM_FRAME_BYTES = 320  # One 20 ms AMR-NB input frame.
+STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
+STREAM_IDLE_SECONDS = 2.0
+_CAMERA_ID = re.compile(r"^cam_[0-9a-f]{24}$")
+_STREAM_STOP = object()
 
 router = APIRouter(
     prefix="/api/cameras/{camera_id}/intercom",
     dependencies=[Depends(require_auth), Depends(require_local_request)],
     tags=["cameras"],
 )
+stream_router = APIRouter(prefix="/api/cameras/{camera_id}/intercom", tags=["cameras"])
 
 
 def _failure(exc: Exception) -> HTTPException:
@@ -84,3 +95,137 @@ async def create_audio_message(
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {"id": camera_id, **result.public()}
+
+
+def _pcm_queue_iterator(
+    chunks: queue.Queue[bytes | object],
+    stop: threading.Event,
+    ready: threading.Event,
+):
+    """Bridge a bounded queue to the synchronous driver without blocking the event loop."""
+
+    ready.set()
+    idle_deadline = time.monotonic() + STREAM_IDLE_SECONDS
+    while not stop.is_set():
+        try:
+            item = chunks.get(timeout=min(0.25, max(0.01, idle_deadline - time.monotonic())))
+        except queue.Empty:
+            if time.monotonic() >= idle_deadline:
+                raise TimeoutError("audio stream became idle") from None
+            continue
+        if item is _STREAM_STOP:
+            return
+        if not isinstance(item, bytes):
+            raise ValueError("invalid audio stream queue item")
+        idle_deadline = time.monotonic() + STREAM_IDLE_SECONDS
+        yield item
+
+
+async def _send_ws_json(websocket: WebSocket, payload: dict[str, object]) -> None:
+    if websocket.application_state == WebSocketState.CONNECTED:
+        await websocket.send_text(json.dumps(payload, separators=(",", ":")))
+
+
+@stream_router.websocket("/stream")
+async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
+    """Feed one bounded PCM push-to-talk session through a driver worker."""
+
+    if not _CAMERA_ID.fullmatch(camera_id) or not verify_token(
+        websocket.cookies.get(COOKIE_NAME) or ""
+    ):
+        await websocket.close(code=1008)
+        return
+    try:
+        require_local_websocket(websocket)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    chunks: queue.Queue[bytes | object] = queue.Queue(maxsize=STREAM_QUEUE_FRAMES)
+    stop = threading.Event()
+    ready = threading.Event()
+    iterator = _pcm_queue_iterator(chunks, stop, ready)
+    await websocket.accept()
+    worker = asyncio.create_task(asyncio.to_thread(send_audio_stream, camera_id, iterator))
+    total_bytes = 0
+    reported_error = False
+    try:
+        for _attempt in range(240):  # Route setup may take time, but never more than 12 seconds here.
+            if ready.is_set() or worker.done():
+                break
+            await asyncio.sleep(0.05)
+        if not ready.is_set():
+            if worker.done():
+                await worker
+            raise TimeoutError("camera audio stream did not become ready")
+        await _send_ws_json(websocket, {"type": "ready", "max_ms": 10_000})
+
+        while total_bytes < MAX_PCM_BYTES and not worker.done():
+            try:
+                message = await asyncio.wait_for(websocket.receive(), timeout=0.25)
+            except TimeoutError:
+                continue
+            if message["type"] == "websocket.disconnect":
+                break
+            payload = message.get("bytes")
+            if payload is not None:
+                if len(payload) != PCM_FRAME_BYTES:
+                    await _send_ws_json(
+                        websocket,
+                        {"type": "error", "detail": "one 20 ms PCM frame is required"},
+                    )
+                    reported_error = True
+                    break
+                if total_bytes + len(payload) > MAX_PCM_BYTES:
+                    await _send_ws_json(
+                        websocket,
+                        {"type": "error", "detail": "audio stream exceeds ten seconds"},
+                    )
+                    reported_error = True
+                    break
+                try:
+                    chunks.put_nowait(bytes(payload))
+                except queue.Full:
+                    await _send_ws_json(
+                        websocket,
+                        {"type": "error", "detail": "camera audio stream is congested"},
+                    )
+                    reported_error = True
+                    break
+                total_bytes += len(payload)
+                continue
+            if (message.get("text") or "").strip().lower() == "stop":
+                break
+            await _send_ws_json(
+                websocket,
+                {"type": "error", "detail": "binary PCM or stop was expected"},
+            )
+            reported_error = True
+            break
+    except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
+        await _send_ws_json(websocket, {"type": "error", "detail": str(_failure(exc).detail)})
+        reported_error = True
+    except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+        await _send_ws_json(websocket, {"type": "error", "detail": str(exc)})
+        reported_error = True
+    finally:
+        stop.set()
+        try:
+            chunks.put_nowait(_STREAM_STOP)
+        except queue.Full:
+            pass
+        try:
+            result = await asyncio.wait_for(asyncio.shield(worker), timeout=12.0)
+            if total_bytes and result.completed:
+                await _send_ws_json(websocket, {"type": "complete", **result.public()})
+        except Exception:
+            if not reported_error:
+                await _send_ws_json(
+                    websocket,
+                    {"type": "error", "detail": "camera audio stream failed"},
+                )
+        if websocket.application_state != WebSocketState.DISCONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass

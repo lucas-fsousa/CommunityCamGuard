@@ -48,6 +48,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 | POST | `/api/cameras/{camera_id}/ptz` | `PtzIn` | Pan/tilt. See PTZ below. |
 | POST | `/api/cameras/{camera_id}/reboot` | — | Reboot the camera (driver-dependent; `501` if unsupported). |
 | POST | `/api/cameras/{camera_id}/intercom/messages` | raw `audio/pcm` | Play one bounded voice message through a supporting driver; authenticated trusted LAN only. |
+| WS | `/api/cameras/{camera_id}/intercom/stream` | binary PCM frames | Bounded push-to-talk session through a supporting driver; authenticated trusted LAN only. |
 
 **`CameraIn`** (fields other than `mac` are optional; omitted fields are left unchanged on update):
 
@@ -165,6 +166,22 @@ partial samples and ambiguous content types. The bundled client records only in 
 AudioWorklet, downsamples to the fixed contract, offers a local preview and requires a separate
 confirmed send. Browser microphone access requires a secure context (`localhost` or trusted HTTPS);
 ordinary LAN HTTP pages cannot request it even though the authenticated API itself remains LAN-only.
+
+### Bounded push-to-talk WebSocket (authenticated trusted LAN only)
+
+`WS /api/cameras/{camera_id}/intercom/stream` is advertised by `audio_streams` separately from
+recorded messages. After the server completes the driver-owned camera setup it sends
+`{"type":"ready","max_ms":10000}`. The client may then send exactly one 320-byte signed
+16-bit little-endian, mono, 8 kHz PCM frame per binary WebSocket message. Text `stop` ends the
+utterance. A successful teardown returns `type: "complete"` with the same transport-neutral fields
+as a bounded message; errors use `type: "error"` and a `detail` string.
+
+The server retains at most 25 frames (500 ms) between the event loop and its blocking driver worker,
+stops an idle source after two seconds and caps the complete utterance at 500 frames/10 seconds.
+Congestion fails closed instead of accumulating delayed speech, and disconnect/timeout/error signals
+the worker to release the camera lock, talk/AV state, direct route and socket. Authentication and the
+strict client/Host/Origin/forwarding LAN checks run before WebSocket acceptance. Browser microphone
+policy still independently requires `localhost` or trusted HTTPS.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
 selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous

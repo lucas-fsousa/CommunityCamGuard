@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import threading
 
 import pytest
 from fastapi import HTTPException, Response
 from starlette.requests import Request
+from starlette.websockets import WebSocketState
 
 from backend.app.api import intercom
 from backend.app.api.local_only import require_local_request
@@ -93,3 +96,72 @@ def test_incomplete_camera_delivery_is_an_http_failure(monkeypatch) -> None:
     with pytest.raises(HTTPException) as caught:
         asyncio.run(intercom.create_audio_message(_request(bytes(320)), Response(), CAMERA_ID))
     assert caught.value.status_code == 502
+
+
+class _AudioBrowser:
+    def __init__(self, consumed: threading.Event) -> None:
+        self.cookies = {intercom.COOKIE_NAME: "test-token"}
+        self.application_state = WebSocketState.CONNECTING
+        self.sent: list[dict[str, object]] = []
+        self.closed_code = None
+        self._consumed = consumed
+        self._step = 0
+
+    async def accept(self) -> None:
+        self.application_state = WebSocketState.CONNECTED
+
+    async def receive(self) -> dict:
+        if self._step == 0:
+            self._step += 1
+            return {"type": "websocket.receive", "bytes": bytes(320)}
+        while not self._consumed.is_set():
+            await asyncio.sleep(0.001)
+        return {"type": "websocket.receive", "text": "stop"}
+
+    async def send_text(self, value: str) -> None:
+        self.sent.append(json.loads(value))
+
+    async def close(self, *, code=1000) -> None:
+        self.closed_code = code
+        self.application_state = WebSocketState.DISCONNECTED
+
+
+def test_audio_websocket_bridges_bounded_pcm_to_generic_stream_service(monkeypatch) -> None:
+    consumed = threading.Event()
+    browser = _AudioBrowser(consumed)
+    observed = []
+
+    def dispatch(camera_id, chunks):
+        payload = bytearray()
+        for chunk in chunks:
+            payload.extend(chunk)
+            consumed.set()
+        observed.append((camera_id, bytes(payload)))
+        frames = len(payload) // intercom.PCM_FRAME_BYTES
+        return AudioMessageResult(len(payload) // 16, frames, frames, frames, True, True, True)
+
+    monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
+    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
+    monkeypatch.setattr(intercom, "send_audio_stream", dispatch)
+
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
+
+    assert observed == [(CAMERA_ID, bytes(320))]
+    assert browser.sent[0] == {"type": "ready", "max_ms": 10_000}
+    assert browser.sent[-1]["type"] == "complete"
+    assert browser.application_state == WebSocketState.DISCONNECTED
+
+
+def test_audio_websocket_rejects_auth_before_accepting_or_dispatching(monkeypatch) -> None:
+    browser = _AudioBrowser(threading.Event())
+    monkeypatch.setattr(intercom, "verify_token", lambda _token: False)
+    monkeypatch.setattr(
+        intercom,
+        "send_audio_stream",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not dispatch")),
+    )
+
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
+
+    assert browser.closed_code == 1008
+    assert browser.sent == []

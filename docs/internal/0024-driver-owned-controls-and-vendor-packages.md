@@ -145,13 +145,13 @@ string alone must never grant another driver's controls.
   snapshots, rejects input after close/abort and paces from the previous actual send so a stalled
   producer cannot cause a catch-up burst. The proven batch API delegates to this core without changing
   its result or deadline semantics. The enclosing lifecycle still executes talk OFF and AV CLOSE after
-  an audio failure; a continuous browser session still needs its own WebSocket/lifecycle boundary.
+  an audio failure; the continuous WebSocket remains a separate lifecycle boundary.
 - The legacy control lifecycle is incremental as well: its explicit start phase performs AV START,
   capture header and talk ON; each subsequent call hands exactly one AMR frame to the bounded sender;
   and idempotent close performs talk OFF and AV CLOSE once. The recorded-message wrapper delegates to
   this stateful path, preserving its sequence numbers, cleanup behavior and public result. Opening the
   direct route and owning it across browser messages remains a separate high-level session concern.
-- That high-level concern now has an internal module with no public route: it owns the UDP socket,
+- That high-level concern has an internal module behind the generic stream boundary: it owns the UDP socket,
   direct route, media/AV negotiation, incremental OpenCORE encoder and control lifecycle until close.
   PCM chunks remain capped at ten seconds; each emitted AMR frame must be acknowledged; deadline or
   ACK failure aborts the stream; and nested cleanup closes codec, talk state, AV, B9 route and socket.
@@ -163,7 +163,14 @@ string alone must never grant another driver's controls.
   and validates nonempty complete 320-byte PCM-frame multiples under the same ten-second ceiling.
   The Yoosee adapter alone maps that iterator to its internal route orchestrator. Other brands remain
   unsupported unless their own driver opts in; camera JSON advertises recorded messages and streaming
-  separately. No WebSocket route consumes this contract yet.
+  separately. The continuous WebSocket consumes only this generic contract.
+- The continuous API is a separate manually guarded WebSocket because HTTP-only dependencies cannot
+  be assumed to protect an upgrade. It verifies the signed dashboard cookie plus the same strict LAN
+  client/Host/Origin/forwarding evidence before acceptance. Only exact 320-byte binary frames and text
+  `stop` are valid after readiness. A 25-frame queue isolates the async socket from one blocking driver
+  worker; overflow and two-second idle timeout fail closed, and ten seconds is an absolute content cap.
+  The handler signals the iterator and waits boundedly for teardown on every exit. The dashboard does
+  not expose this route yet, so camera validation remains an explicit later step.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

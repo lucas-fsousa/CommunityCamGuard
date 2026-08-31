@@ -11,7 +11,8 @@ from __future__ import annotations
 import ipaddress
 from urllib.parse import urlsplit
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, WebSocket
+from starlette.requests import HTTPConnection
 
 from ..config import get_settings
 
@@ -59,7 +60,7 @@ def _header_hostname(value: str) -> str:
     return parsed.hostname or ""
 
 
-def _forwarded_addresses(request: Request) -> list[str]:
+def _forwarded_addresses(request: HTTPConnection) -> list[str]:
     values: list[str] = []
     for name in ("x-forwarded-for", "x-real-ip", "cf-connecting-ip", "true-client-ip"):
         for raw in request.headers.getlist(name):
@@ -73,12 +74,7 @@ def _forwarded_addresses(request: Request) -> list[str]:
     return values
 
 
-def require_local_request(request: Request) -> None:
-    """Reject provisioning requests not provably made from the authenticated local network.
-
-    The generic 403 deliberately does not disclose which check failed.  This guard must remain on
-    every provisioning route even when the normal dashboard session dependency is also present.
-    """
+def _require_local_connection(request: HTTPConnection) -> None:
     client = request.client
     host = _header_hostname(request.headers.get("host", ""))
     if client is None or not _trusted_ip(client.host) or not _local_hostname(host):
@@ -101,6 +97,18 @@ def require_local_request(request: Request) -> None:
     for value in _forwarded_addresses(request):
         if not _trusted_ip(_header_hostname(value)):
             raise HTTPException(status_code=403, detail=_LAN_ONLY_DETAIL)
+
+
+def require_local_request(request: Request) -> None:
+    """Reject HTTP requests not provably made from the authenticated local network."""
+
+    _require_local_connection(request)
+
+
+def require_local_websocket(websocket: WebSocket) -> None:
+    """Apply the same trusted-client/host/origin rules before accepting a WebSocket."""
+
+    _require_local_connection(websocket)
 
 
 def require_local_or_remote_ble_request(request: Request) -> None:
