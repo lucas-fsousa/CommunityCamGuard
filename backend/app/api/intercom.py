@@ -99,7 +99,7 @@ async def create_audio_message(
         raise HTTPException(status_code=502, detail="camera did not complete the audio message")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    log.info(
+    log.warning(
         "intercom_audio %s",
         json.dumps(
             {"mode": "message", "camera_id": camera_id, **levels.public(), **result.public()},
@@ -163,6 +163,7 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     total_bytes = 0
     levels = PcmLevelAccumulator()
     reported_error = False
+    graceful_stop = False
     try:
         for _attempt in range(240):  # Route setup may take time, but never more than 12 seconds here.
             if ready.is_set() or worker.done():
@@ -208,8 +209,11 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
                     break
                 levels.feed(payload)
                 total_bytes += len(payload)
+                if total_bytes == MAX_PCM_BYTES:
+                    graceful_stop = True
                 continue
             if (message.get("text") or "").strip().lower() == "stop":
+                graceful_stop = True
                 break
             await _send_ws_json(
                 websocket,
@@ -224,15 +228,21 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
         await _send_ws_json(websocket, {"type": "error", "detail": str(exc)})
         reported_error = True
     finally:
-        stop.set()
-        try:
-            chunks.put_nowait(_STREAM_STOP)
-        except queue.Full:
-            pass
+        if graceful_stop:
+            try:
+                await asyncio.to_thread(chunks.put, _STREAM_STOP, True, 1.0)
+            except queue.Full:
+                stop.set()
+        else:
+            stop.set()
+            try:
+                chunks.put_nowait(_STREAM_STOP)
+            except queue.Full:
+                pass
         try:
             result = await asyncio.wait_for(asyncio.shield(worker), timeout=12.0)
             if total_bytes:
-                log.info(
+                log.warning(
                     "intercom_audio %s",
                     json.dumps(
                         {

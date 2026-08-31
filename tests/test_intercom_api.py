@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 
 import pytest
 from fastapi import HTTPException, Response
@@ -189,3 +190,35 @@ def test_audio_websocket_reports_incomplete_driver_teardown(monkeypatch) -> None
         "type": "error",
         "detail": "camera did not complete the audio stream",
     }
+
+
+def test_audio_websocket_drains_frames_queued_before_graceful_stop(monkeypatch) -> None:
+    consumed = threading.Event()
+    browser = _AudioBrowser(consumed)
+    browser._consumed.set()
+    frames_seen = []
+
+    async def burst_receive():
+        if browser._step < 10:
+            browser._step += 1
+            return {"type": "websocket.receive", "bytes": bytes(320)}
+        return {"type": "websocket.receive", "text": "stop"}
+
+    browser.receive = burst_receive
+
+    def slow_dispatch(_camera_id, chunks):
+        for chunk in chunks:
+            time.sleep(0.01)
+            frames_seen.append(chunk)
+        frames = len(frames_seen)
+        return AudioMessageResult(frames * 20, frames, frames, frames, True, True, True)
+
+    monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
+    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
+    monkeypatch.setattr(intercom, "send_audio_stream", slow_dispatch)
+
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
+
+    assert len(frames_seen) == 10
+    assert browser.sent[-1]["type"] == "complete"
+    assert browser.sent[-1]["acknowledged_frames"] == 10

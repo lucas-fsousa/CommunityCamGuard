@@ -198,6 +198,13 @@ string alone must never grant another driver's controls.
   No PCM, encoded frame, token, peer or protocol secret is stored or logged. The next controlled retry
   can therefore distinguish silent/attenuated browser capture from acknowledged-but-inaudible camera
   playback without repeatedly guessing at native commands.
+- The first deployed diagnostic probe exposed a continuous-path tail-loss bug independently of the
+  audible report: ten paced frames entered the WebSocket, but immediate `stop` set the abort event and
+  only nine reached the driver. Graceful text `stop` and the normal ten-second ceiling now enqueue a
+  terminal marker and drain the bounded 500 ms queue before teardown; disconnect, invalid input,
+  congestion and other errors still discard delayed speech immediately. A deliberately slow-worker
+  regression test proves all frames preceding graceful `stop` are consumed. Diagnostic completion is
+  logged at the visible application level rather than relying on the server's suppressed INFO logger.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept
