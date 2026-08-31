@@ -223,6 +223,9 @@ header {
 .schedule-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .schedule-actions .camera-control-status { flex: 1; }
 .dynamic-choice-modal > .camera-control-select { width: 100%; margin: 10px 0 18px; }
+.audio-message-modal { width: min(620px, 92vw); }
+.audio-message-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 12px; }
+.audio-message-actions button { min-width: 110px; }
 
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }

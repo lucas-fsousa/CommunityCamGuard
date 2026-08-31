@@ -1,5 +1,6 @@
 import { t } from "ccg/i18n";
 import { $, api, el, state, svgIcon } from "ccg/core";
+import { audioMessageButton } from "ccg/audio-message";
 
 let reloadCameras = async () => {};
 let refreshView = () => {};
@@ -152,6 +153,7 @@ function camBar(cam) {
   if (Object.keys(cam.controls || {}).length) {
     actions.append(cameraControls(cam));
   }
+  if (cam.audio_messages) actions.append(audioMessageButton(cam));
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
     status,

@@ -161,7 +161,10 @@ response reports only duration, frame counts, direct-connection/session-cleanup/
 This endpoint is the generic recorded-message transport. `audio_messages` in the camera response
 indicates whether the selected driver and exact camera enrollment support it. The current endpoint
 does not claim real-time push-to-talk and deliberately rejects WAV, compressed browser blobs,
-partial samples and ambiguous content types. Browser capture/resampling is a separate client layer.
+partial samples and ambiguous content types. The bundled client records only in memory through an
+AudioWorklet, downsamples to the fixed contract, offers a local preview and requires a separate
+confirmed send. Browser microphone access requires a secure context (`localhost` or trusted HTTPS);
+ordinary LAN HTTP pages cannot request it even though the authenticated API itself remains LAN-only.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
 selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous

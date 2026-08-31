@@ -24,6 +24,7 @@
     "ccg/i18n": moduleUrl("/i18n.js"),
     "ccg/live": moduleUrl("/modules/live-cameras.js"),
     "ccg/cameras": moduleUrl("/modules/camera-management.js"),
+    "ccg/audio-message": moduleUrl("/modules/audio-message.js"),
     "ccg/provisioning-ble": moduleUrl("/modules/camera-provisioning-ble.js"),
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
   } });

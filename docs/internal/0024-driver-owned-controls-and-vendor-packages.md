@@ -161,6 +161,12 @@ string alone must never grant another driver's controls.
   work runs outside the FastAPI event loop. Unsupported drivers fail closed and public results omit
   enrollment, route, codec and peer details. Continuous push-to-talk remains a distinct future
   session contract rather than overloading this bounded request.
+- The dashboard's recorded-message client is an isolated semantic module. It creates an
+  AudioWorklet only after an explicit click, keeps Float32 capture and converted PCM in memory,
+  averages the native sample windows down to 8 kHz, trims to complete 160-sample frames and stops at
+  ten seconds. Stopping does not transmit: local preview and confirmed send are separate actions,
+  and opening/closing the modal never contacts the camera. Browser microphone policy still requires
+  `localhost` or trusted HTTPS; the API retains its independent trusted-LAN/authentication checks.
 - The siren is exposed only as a bounded semantic pulse (2, 5 or 10 seconds). Its typed Yoosee
   adapter requires a confirmed OFF preflight, never retries ON, sends OFF unconditionally with a
   dedicated cleanup budget, and reports success only after the AD response and final OFF readback.

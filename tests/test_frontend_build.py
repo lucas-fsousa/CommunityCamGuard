@@ -93,6 +93,26 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
     assert "Nothing is read automatically" in live
 
 
+def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
+    frontend = Path(__file__).parents[1] / "frontend"
+    live = (frontend / "modules" / "live-cameras.js").read_text()
+    audio = (frontend / "modules" / "audio-message.js").read_text()
+    boot = (frontend / "boot.js").read_text()
+
+    assert "if (cam.audio_messages) actions.append(audioMessageButton(cam))" in live
+    assert 'from "ccg/audio-message"' in live
+    assert '"ccg/audio-message": moduleUrl("/modules/audio-message.js")' in boot
+    assert "navigator.mediaDevices?.getUserMedia" in audio
+    assert "new AudioWorkletNode" in audio
+    assert "const TARGET_RATE = 8000" in audio
+    assert "const FRAME_SAMPLES = 160" in audio
+    assert "const MAX_SECONDS = 10" in audio
+    assert 'headers: { "Content-Type": "audio/pcm" }' in audio
+    assert "/intercom/messages`" in audio
+    assert 'window.confirm(t("intercom.confirm"' in audio
+    assert "previewPcm(pcm)" in audio
+
+
 def test_camera_operations_address_api_by_opaque_id():
     live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
 
