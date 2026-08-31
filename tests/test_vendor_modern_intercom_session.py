@@ -7,7 +7,6 @@ from backend.app.drivers.yoosee.p2p.media_protocol import build_kcp_ack, parse_k
 from backend.app.drivers.yoosee.p2p.stream_protocol import (
     V1EncodingHeader,
     decrypt_command_tlv,
-    decrypt_media_tlv,
 )
 
 
@@ -66,18 +65,15 @@ def test_modern_lifecycle_separates_media_and_command_channels(monkeypatch) -> N
     assert [(item.conv, item.sequence) for item in segments] == [
         (attempt.link_id, 0),
         (attempt.link_id | 0x80000000, 4),
-        (attempt.link_id, 1),
         (attempt.link_id | 0x80000000, 5),
-        (attempt.link_id, 2),
+        (attempt.link_id, 1),
     ]
     talk_on = decrypt_command_tlv(segments[1].body, attempt.cookie)
-    talk_off = decrypt_command_tlv(segments[3].body, attempt.cookie)
+    talk_off = decrypt_command_tlv(segments[2].body, attempt.cookie)
     assert talk_on[29] == talk_off[29] == 0x32
     assert talk_on[-1] == 1 and talk_off[-1] == 0
-    encoding = decrypt_media_tlv(segments[2].body, attempt.cookie)
-    assert encoding[:6] == bytes.fromhex("ff ff ff 88 02 01")
     assert int.from_bytes(segments[0].body[8:12], "little") == 6
-    assert int.from_bytes(segments[4].body[8:12], "little") == 7
+    assert int.from_bytes(segments[3].body[8:12], "little") == 7
 
 
 def test_modern_lifecycle_rejects_an_unexpected_negotiated_codec() -> None:

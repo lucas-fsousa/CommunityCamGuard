@@ -25,7 +25,6 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import (
     pack_legacy_capture_header,
     pack_legacy_talk_control,
     pack_microphone_command,
-    pack_v1_audio_encoding_header,
     pack_v1_sequence_user_data,
     unpack_v1_encoding_header,
 )
@@ -152,17 +151,6 @@ def test_modern_talk_command_matches_native_v1_sequence_layout() -> None:
         pack_v1_sequence_user_data(builtin)
     )
     assert pack_microphone_command(False, timestamp_us=0x12345678)[-1] == 0
-
-
-def test_modern_audio_header_is_audio_only_tx_layout() -> None:
-    camera_header = unpack_v1_encoding_header(
-        bytes.fromhex(
-            "ff ff ff 88 08 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 05 0f 80 02 00 00 68 01 00 00"
-        )
-    )
-    assert pack_v1_audio_encoding_header(camera_header) == bytes.fromhex(
-        "ff ff ff 88 02 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 00 00 00 00 00 00 00 00 00 00"
-    )
 
 
 def test_malformed_frames_fail_closed() -> None:

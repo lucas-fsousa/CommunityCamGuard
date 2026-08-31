@@ -117,26 +117,6 @@ def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -
     )
 
 
-def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
-    """Build the audio-only HEADER_ONLY record emitted by ``LivePlayer``."""
-
-    if header.audio_channels not in (1, 2):
-        raise ValueError("v1 encoding header supports mono or stereo audio")
-    if not 8 <= header.audio_bit_width <= 2048 or header.audio_bit_width % 8:
-        raise ValueError("audio bit width must be an 8-bit multiple")
-    frame = bytearray(28)
-    frame[:4] = V1_MAGIC
-    # The client-side v1 packer emits source mask 2; camera RX headers use 8.
-    struct.pack_into("<H", frame, 4, 0x0102)
-    frame[8] = header.audio_codec & 0xFF
-    frame[9] = header.audio_codec_option & 0xFF
-    frame[10] = header.audio_channels - 1
-    frame[11] = header.audio_bit_width // 8 - 1
-    struct.pack_into("<I", frame, 12, header.audio_sample_rate)
-    struct.pack_into("<H", frame, 16, header.audio_frame_size)
-    return bytes(frame)
-
-
 def unpack_v1_encoding_header(frame: bytes) -> V1EncodingHeader:
     if len(frame) != 28 or frame[:4] != V1_MAGIC:
         raise ValueError("not a complete v1 encoding header")

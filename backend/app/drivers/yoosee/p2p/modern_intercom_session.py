@@ -21,9 +21,7 @@ from .modern_audio_sender import MAX_AUDIO_FRAMES, ModernAudioSender
 from .session_io import receive_datagrams
 from .stream_protocol import (
     encrypt_command_tlv,
-    encrypt_media_tlv,
     pack_microphone_command,
-    pack_v1_audio_encoding_header,
 )
 
 
@@ -65,14 +63,15 @@ class ModernIntercomSession:
         self._media_sequence = 0
         self._command_sequence = av.next_send_sequence
         self._inbound_next = dict(av.inbound_next)
-        self._header = header
         self._bounded_timeout = max(0.1, min(float(timeout), 5.0))
         self._max_audio_frames = max_audio_frames
         self._audio_sender: ModernAudioSender | None = None
         self._start_called = False
         self._closed = False
         self._av_start_acknowledged = False
-        self._header_acknowledged = False
+        # IoTVideo configures its local encoder from the camera's RX header. Unlike
+        # GwMonitorPlayer, it does not transmit a separate capture header before AVDATA.
+        self._header_acknowledged = self._valid
         self._talk_start_acknowledged = False
         self._talk_stop_acknowledged = False
         self._av_close_acknowledged = False
@@ -137,8 +136,7 @@ class ModernIntercomSession:
             return False
         attempt = self._attempt
         peer = self._peer
-        header = self._header
-        assert attempt is not None and peer is not None and header is not None
+        assert attempt is not None and peer is not None
 
         self._av_start_acknowledged = self._send_and_wait(
             self._media_conv,
@@ -154,12 +152,6 @@ class ModernIntercomSession:
             )
             self._command_sequence += 1
         if self._talk_start_acknowledged:
-            encoding = encrypt_media_tlv(pack_v1_audio_encoding_header(header), attempt.cookie)
-            self._header_acknowledged = self._send_and_wait(
-                self._media_conv, self._media_sequence, encoding, 3
-            )
-            self._media_sequence += 1
-        if self._header_acknowledged:
             self._audio_sender = ModernAudioSender(
                 self._sock,
                 peer,
