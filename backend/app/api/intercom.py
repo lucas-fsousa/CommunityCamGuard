@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import queue
 import re
 import threading
@@ -12,6 +13,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, WebSocket
 from starlette.websockets import WebSocketState
 
+from ..audio_diagnostics import PcmLevelAccumulator
 from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
@@ -23,6 +25,7 @@ STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
 STREAM_IDLE_SECONDS = 2.0
 _CAMERA_ID = re.compile(r"^cam_[0-9a-f]{24}$")
 _STREAM_STOP = object()
+log = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/cameras/{camera_id}/intercom",
@@ -80,6 +83,8 @@ async def create_audio_message(
     """Play up to ten seconds of fixed-format PCM through the selected camera driver."""
 
     pcm16le = await _bounded_pcm(request)
+    levels = PcmLevelAccumulator()
+    levels.feed(pcm16le)
     try:
         result = await asyncio.to_thread(send_audio_message, camera_id, pcm16le)
     except (
@@ -94,6 +99,14 @@ async def create_audio_message(
         raise HTTPException(status_code=502, detail="camera did not complete the audio message")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
+    log.info(
+        "intercom_audio %s",
+        json.dumps(
+            {"mode": "message", "camera_id": camera_id, **levels.public(), **result.public()},
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+    )
     return {"id": camera_id, **result.public()}
 
 
@@ -148,6 +161,7 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     await websocket.accept()
     worker = asyncio.create_task(asyncio.to_thread(send_audio_stream, camera_id, iterator))
     total_bytes = 0
+    levels = PcmLevelAccumulator()
     reported_error = False
     try:
         for _attempt in range(240):  # Route setup may take time, but never more than 12 seconds here.
@@ -192,6 +206,7 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
                     )
                     reported_error = True
                     break
+                levels.feed(payload)
                 total_bytes += len(payload)
                 continue
             if (message.get("text") or "").strip().lower() == "stop":
@@ -217,6 +232,19 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
         try:
             result = await asyncio.wait_for(asyncio.shield(worker), timeout=12.0)
             if total_bytes:
+                log.info(
+                    "intercom_audio %s",
+                    json.dumps(
+                        {
+                            "mode": "stream",
+                            "camera_id": camera_id,
+                            **levels.public(),
+                            **result.public(),
+                        },
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                )
                 if result.completed:
                     await _send_ws_json(websocket, {"type": "complete", **result.public()})
                 elif not reported_error:

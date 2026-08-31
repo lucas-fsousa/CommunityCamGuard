@@ -190,6 +190,14 @@ string alone must never grant another driver's controls.
   segment updates, app/go2rtc CPU remained approximately 5%/3%, and `/health` stayed green. This proves
   the deployed continuous backend path and cleanup without disturbing nearby users. Human speech from
   the browser AudioWorklet remains the final audible validation.
+- After a user reported no audible output from both recorded-message and hold-to-talk UI paths, the
+  camera-3 speaker-volume read still returned verified 75% with error zero. Both requests had reached
+  their intended backend endpoints, but the prior access log did not retain delivery counters or input
+  level. Both APIs now emit one content-free `intercom_audio` diagnostic at completion: sample count,
+  peak percentage, RMS dBFS, nonzero percentage, transport-neutral frame counters and cleanup flags.
+  No PCM, encoded frame, token, peer or protocol secret is stored or logged. The next controlled retry
+  can therefore distinguish silent/attenuated browser capture from acknowledged-but-inaudible camera
+  playback without repeatedly guessing at native commands.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept
