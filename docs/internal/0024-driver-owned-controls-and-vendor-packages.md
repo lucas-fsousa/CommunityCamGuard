@@ -151,6 +151,13 @@ string alone must never grant another driver's controls.
   and idempotent close performs talk OFF and AV CLOSE once. The recorded-message wrapper delegates to
   this stateful path, preserving its sequence numbers, cleanup behavior and public result. Opening the
   direct route and owning it across browser messages remains a separate high-level session concern.
+- That high-level concern now has an internal module with no public route: it owns the UDP socket,
+  direct route, media/AV negotiation, incremental OpenCORE encoder and control lifecycle until close.
+  PCM chunks remain capped at ten seconds; each emitted AMR frame must be acknowledged; deadline or
+  ACK failure aborts the stream; and nested cleanup closes codec, talk state, AV, B9 route and socket.
+  The whole trusted chunk iterator runs inside the existing stale-access renewal/device mutex. This
+  is infrastructure for a bounded WebSocket worker, not authorization to expose vendor details or
+  hold a P2P route directly from the event loop.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

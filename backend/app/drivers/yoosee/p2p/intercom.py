@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import socket
 import time
-from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
 from .amr_nb import encode_pcm16le
 from .av_session import initialize_av_session
 from .camera_session import open_camera_session
 from .contracts import P2PProbeError
+from .intercom_result import IntercomProbeResult, empty_intercom_result
 from .intercom_session import (
-    IntercomControlResult,
     run_legacy_intercom_control,
     run_silent_legacy_intercom_control,
 )
@@ -20,41 +19,13 @@ from .media_session import open_media_channel
 from .rendezvous_session import call_device, close_device_route
 from .renewal import run_with_fresh_access
 
-
-@dataclass(frozen=True, slots=True)
-class IntercomProbeResult:
-    device_id: str
-    direct_handshake: bool
-    media_meter_acknowledged: bool
-    av_accepted: bool
-    stream_version: int | None
-    control: IntercomControlResult
-    route_released: bool
-
-    @property
-    def completed(self) -> bool:
-        return (
-            self.direct_handshake
-            and self.media_meter_acknowledged
-            and self.av_accepted
-            and self.control.completed
-            and self.route_released
-        )
-
-
 SilentIntercomProbeResult = IntercomProbeResult
 
 
 def _empty_result(device_id: str) -> IntercomProbeResult:
-    return IntercomProbeResult(
-        device_id,
-        False,
-        False,
-        False,
-        None,
-        IntercomControlResult(False, False, False, False, False),
-        False,
-    )
+    """Compatibility alias for existing internal callers and tests."""
+
+    return empty_intercom_result(device_id)
 
 
 def _probe_silent_intercom(
