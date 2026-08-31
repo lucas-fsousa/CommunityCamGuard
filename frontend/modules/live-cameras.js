@@ -1,6 +1,7 @@
 import { t } from "ccg/i18n";
 import { $, api, el, state, svgIcon } from "ccg/core";
 import { audioMessageButton } from "ccg/audio-message";
+import { pushToTalkButton } from "ccg/push-to-talk";
 
 let reloadCameras = async () => {};
 let refreshView = () => {};
@@ -154,6 +155,7 @@ function camBar(cam) {
     actions.append(cameraControls(cam));
   }
   if (cam.audio_messages) actions.append(audioMessageButton(cam));
+  if (cam.audio_streams) actions.append(pushToTalkButton(cam));
   actions.append(zoomControls(cam), reload, probe, del);
   return el("div", { className: "bar" },
     status,

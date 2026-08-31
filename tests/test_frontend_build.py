@@ -113,6 +113,24 @@ def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
     assert "previewPcm(pcm)" in audio
 
 
+def test_push_to_talk_ui_streams_exact_frames_only_while_held():
+    frontend = Path(__file__).parents[1] / "frontend"
+    live = (frontend / "modules" / "live-cameras.js").read_text()
+    talk = (frontend / "modules" / "push-to-talk.js").read_text()
+    boot = (frontend / "boot.js").read_text()
+
+    assert "if (cam.audio_streams) actions.append(pushToTalkButton(cam))" in live
+    assert 'from "ccg/push-to-talk"' in live
+    assert '"ccg/push-to-talk": moduleUrl("/modules/push-to-talk.js")' in boot
+    assert "const TARGET_RATE = 8000" in talk
+    assert "const FRAME_SAMPLES = 160" in talk
+    assert "new Uint8Array(FRAME_SAMPLES * 2)" in talk
+    assert 'this.socket.send("stop")' in talk
+    assert 'talk.addEventListener("pointerdown"' in talk
+    assert '["pointerup", "pointercancel", "lostpointercapture"]' in talk
+    assert "/intercom/stream`" in talk
+
+
 def test_camera_operations_address_api_by_opaque_id():
     live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
 

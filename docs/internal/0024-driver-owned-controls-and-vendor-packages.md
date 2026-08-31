@@ -169,8 +169,13 @@ string alone must never grant another driver's controls.
   client/Host/Origin/forwarding evidence before acceptance. Only exact 320-byte binary frames and text
   `stop` are valid after readiness. A 25-frame queue isolates the async socket from one blocking driver
   worker; overflow and two-second idle timeout fail closed, and ten seconds is an absolute content cap.
-  The handler signals the iterator and waits boundedly for teardown on every exit. The dashboard does
-  not expose this route yet, so camera validation remains an explicit later step.
+  The handler signals the iterator and waits boundedly for teardown on every exit.
+- The dashboard consumer is another isolated semantic module. Merely opening its modal has no camera
+  or microphone side effect. Pointer-down explicitly obtains the microphone and opens the protected
+  socket; after `ready`, a phase-preserving 8 kHz resampler emits only 160-sample/320-byte little-endian
+  frames. Pointer-up, cancellation, lost capture or the ten-second timer sends `stop` and closes browser
+  media resources. The new route and UI remain simulation-tested only; physical speech validation is
+  deliberately tracked separately for camera 3.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

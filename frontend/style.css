@@ -226,6 +226,8 @@ header {
 .audio-message-modal { width: min(620px, 92vw); }
 .audio-message-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 12px; }
 .audio-message-actions button { min-width: 110px; }
+.push-talk-button { min-width: 210px !important; touch-action: none; user-select: none; }
+.push-talk-button.active { filter: brightness(.82); transform: translateY(1px); }
 
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }

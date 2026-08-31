@@ -25,6 +25,7 @@
     "ccg/live": moduleUrl("/modules/live-cameras.js"),
     "ccg/cameras": moduleUrl("/modules/camera-management.js"),
     "ccg/audio-message": moduleUrl("/modules/audio-message.js"),
+    "ccg/push-to-talk": moduleUrl("/modules/push-to-talk.js"),
     "ccg/provisioning-ble": moduleUrl("/modules/camera-provisioning-ble.js"),
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
   } });
