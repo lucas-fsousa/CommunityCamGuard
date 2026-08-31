@@ -185,7 +185,7 @@ def test_legacy_intercom_sends_audio_between_talk_start_and_cleanup(monkeypatch)
     )
 
     assert result.completed is True
-    assert result.audio == intercom_session.LegacyAudioSendResult(2, 2, 2, 5, False)
+    assert result.audio == intercom_session.AudioSendResult(2, 2, 2, 5, False)
     segments = [parse_kcp_segments(wire)[0] for wire, _peer in sent]
     assert [segment.sequence for segment in segments] == list(range(7))
     first_audio = decrypt_media_tlv(segments[3].body, attempt.cookie)
@@ -236,9 +236,7 @@ def test_incremental_intercom_session_keeps_talk_open_between_frames(monkeypatch
     assert session.start() is True
     assert len(sent) == 3
     assert session.send_audio_frame(AMR) is True
-    assert session.result().audio == intercom_session.LegacyAudioSendResult(
-        1, 1, 1, 4, False
-    )
+    assert session.result().audio == intercom_session.AudioSendResult(1, 1, 1, 4, False)
     assert len(sent) == 4
     result = session.close()
 
@@ -288,7 +286,7 @@ def test_legacy_intercom_audio_ack_loss_aborts_audio_but_still_cleans_up(monkeyp
     )
 
     assert result.completed is False
-    assert result.audio == intercom_session.LegacyAudioSendResult(2, 1, 0, 4, True)
+    assert result.audio == intercom_session.AudioSendResult(2, 1, 0, 4, True)
     segments = [parse_kcp_segments(wire)[0] for wire, _peer in sent]
     assert [segment.sequence for segment in segments[-2:]] == [4, 5]
     assert int.from_bytes(segments[-1].body[8:12], "little") == 7

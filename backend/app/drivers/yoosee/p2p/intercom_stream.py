@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 import socket
 import time
 from collections.abc import Iterable
 
 from ....db.p2p import P2PEnrollment
+from .aac_lc import AAC_FRAME_INTERVAL_SECONDS, AacLcAdtsEncoder
 from .amr_nb import AmrNbEncoder
 from .av_session import initialize_av_session
 from .camera_session import open_camera_session
@@ -14,6 +16,8 @@ from .contracts import CallingResult, CertifiedNode, OnlineDevice, P2PProbeError
 from .intercom_result import IntercomProbeResult, empty_intercom_result
 from .intercom_session import LegacyIntercomSession
 from .media_session import open_media_channel
+from .modern_intercom_session import ModernIntercomSession
+from .player_family import PlayerFamily, player_family
 from .rendezvous_session import call_device, close_device_route
 from .renewal import run_with_fresh_access
 
@@ -36,14 +40,19 @@ class PcmIntercomStream:
         self._enrollment = enrollment
         self._timeout = max(0.5, min(float(timeout), 5.0))
         self._deadline = time.monotonic() + max(8.0, min(float(total_timeout), 45.0))
-        self._max_frames = int(max_seconds * 50)
+        self._family = player_family(enrollment.device_id)
+        self._max_frames = (
+            math.ceil(max_seconds / AAC_FRAME_INTERVAL_SECONDS) + 3
+            if self._family is PlayerFamily.IOTVIDEO
+            else int(max_seconds * 50)
+        )
         self._max_seconds = max_seconds
         self._sock: socket.socket | None = None
         self._node: CertifiedNode | None = None
         self._target: OnlineDevice | None = None
         self._calling: CallingResult | None = None
-        self._control: LegacyIntercomSession | None = None
-        self._encoder: AmrNbEncoder | None = None
+        self._control: LegacyIntercomSession | ModernIntercomSession | None = None
+        self._encoder: AmrNbEncoder | AacLcAdtsEncoder | None = None
         self._direct_handshake = False
         self._media_meter_acknowledged = False
         self._av_accepted = False
@@ -102,7 +111,12 @@ class PcmIntercomStream:
         if not av.accepted or av.stream_version != 1:
             return False
 
-        self._control = LegacyIntercomSession(
+        control_type = (
+            ModernIntercomSession
+            if self._family is PlayerFamily.IOTVIDEO
+            else LegacyIntercomSession
+        )
+        self._control = control_type(
             sock,
             calling,
             av,
@@ -111,7 +125,11 @@ class PcmIntercomStream:
         )
         if not self._control.start():
             return False
-        self._encoder = AmrNbEncoder(max_seconds=self._max_seconds)
+        self._encoder = (
+            AacLcAdtsEncoder(max_seconds=self._max_seconds)
+            if self._family is PlayerFamily.IOTVIDEO
+            else AmrNbEncoder(max_seconds=self._max_seconds)
+        )
         return True
 
     def feed_pcm16le(self, pcm16le: bytes) -> int:

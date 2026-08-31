@@ -61,7 +61,11 @@ def test_complete_silent_probe_releases_exact_route(monkeypatch) -> None:
         "initialize_av_session",
         lambda *_args: AvSessionResult(3, (2, 6), 4, 4, (), 1, None),
     )
-    monkeypatch.setattr(intercom, "run_silent_legacy_intercom_control", lambda *_args: control)
+    monkeypatch.setattr(
+        intercom,
+        "run_modern_intercom_control",
+        lambda *_args, **_kwargs: control,
+    )
     monkeypatch.setattr(
         intercom,
         "close_device_route",
@@ -138,7 +142,7 @@ def test_audio_probe_uses_encoded_frames_and_releases_exact_route(monkeypatch) -
         observed.append((selected_calling.attempt, audio_frames))
         return control
 
-    monkeypatch.setattr(intercom, "run_legacy_intercom_control", run_control)
+    monkeypatch.setattr(intercom, "run_modern_intercom_control", run_control)
     monkeypatch.setattr(
         intercom,
         "close_device_route",
@@ -178,7 +182,7 @@ def test_pcm_entrypoint_encodes_before_serialized_operation(monkeypatch) -> None
         events.append(("probe", selected.device_id, kwargs["audio_frames"]))
         return expected
 
-    monkeypatch.setattr(intercom, "encode_pcm16le", encode)
+    monkeypatch.setattr(intercom, "encode_pcm16le_aac", encode)
     monkeypatch.setattr(intercom, "run_with_fresh_access", serialize)
     monkeypatch.setattr(intercom, "_probe_intercom", probe)
 

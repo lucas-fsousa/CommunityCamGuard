@@ -6,6 +6,7 @@ import socket
 import time
 
 from ....db.p2p import P2PEnrollment
+from .aac_lc import encode_pcm16le as encode_pcm16le_aac
 from .amr_nb import encode_pcm16le
 from .av_session import initialize_av_session
 from .camera_session import open_camera_session
@@ -16,6 +17,8 @@ from .intercom_session import (
     run_silent_legacy_intercom_control,
 )
 from .media_session import open_media_channel
+from .modern_intercom_session import run_modern_intercom_control
+from .player_family import PlayerFamily, player_family
 from .rendezvous_session import call_device, close_device_route
 from .renewal import run_with_fresh_access
 
@@ -51,7 +54,7 @@ def _probe_intercom(
     audio_frames: tuple[bytes, ...],
     failure_message: str,
 ) -> IntercomProbeResult:
-    """Run one already-encoded legacy session and always release its direct route."""
+    """Run one family-selected encoded session and always release its direct route."""
 
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
     deadline = time.monotonic() + max(8.0, min(float(total_timeout), 45.0))
@@ -89,22 +92,31 @@ def _probe_intercom(
                 )
                 if av.accepted and av.stream_version == 1:
                     control_timeout = min(bounded_timeout, max(0.1, deadline - time.monotonic()))
-                    control = (
-                        run_legacy_intercom_control(
+                    if player_family(enrollment.device_id) is PlayerFamily.IOTVIDEO:
+                        control = run_modern_intercom_control(
                             sock,
                             calling,
                             av,
                             control_timeout,
                             audio_frames=audio_frames,
                         )
-                        if audio_frames
-                        else run_silent_legacy_intercom_control(
-                            sock,
-                            calling,
-                            av,
-                            control_timeout,
+                    else:
+                        control = (
+                            run_legacy_intercom_control(
+                                sock,
+                                calling,
+                                av,
+                                control_timeout,
+                                audio_frames=audio_frames,
+                            )
+                            if audio_frames
+                            else run_silent_legacy_intercom_control(
+                                sock,
+                                calling,
+                                av,
+                                control_timeout,
+                            )
                         )
-                    )
                 else:
                     control = result.control
                 result = IntercomProbeResult(
@@ -167,7 +179,7 @@ def probe_silent_intercom(
     timeout: float = 1.5,
     total_timeout: float = 30.0,
 ) -> IntercomProbeResult:
-    """Validate the complete legacy control lifecycle while sending zero audio frames."""
+    """Validate the selected control lifecycle while sending zero audio frames."""
 
     return run_with_fresh_access(
         enrollment,
@@ -187,12 +199,16 @@ def send_pcm_intercom(
     total_timeout: float = 45.0,
     max_seconds: float = 10.0,
 ) -> IntercomProbeResult:
-    """Send bounded 8 kHz mono PCM through the internal legacy talk path.
+    """Send bounded 8 kHz mono PCM through the selected native talk path.
 
     This function intentionally has no driver-control, HTTP or browser binding.
     """
 
-    frames = encode_pcm16le(pcm16le, max_seconds=max_seconds)
+    frames = (
+        encode_pcm16le_aac(pcm16le, max_seconds=max_seconds)
+        if player_family(enrollment.device_id) is PlayerFamily.IOTVIDEO
+        else encode_pcm16le(pcm16le, max_seconds=max_seconds)
+    )
     return run_with_fresh_access(
         enrollment,
         lambda current: _probe_intercom(

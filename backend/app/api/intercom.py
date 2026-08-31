@@ -20,7 +20,7 @@ from ..services import CameraNotFound, ControlBusy, send_audio_message, send_aud
 from .local_only import require_local_request, require_local_websocket
 
 MAX_PCM_BYTES = 160_000  # Ten seconds of mono 8 kHz signed 16-bit PCM.
-PCM_FRAME_BYTES = 320  # One 20 ms AMR-NB input frame.
+PCM_FRAME_BYTES = 320  # One codec-neutral 20 ms block of mono 8 kHz s16le input.
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
 STREAM_IDLE_SECONDS = 2.0
 _CAMERA_ID = re.compile(r"^cam_[0-9a-f]{24}$")
@@ -165,7 +165,9 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     reported_error = False
     graceful_stop = False
     try:
-        for _attempt in range(240):  # Route setup may take time, but never more than 12 seconds here.
+        for _attempt in range(
+            240
+        ):  # Route setup may take time, but never more than 12 seconds here.
             if ready.is_set() or worker.done():
                 break
             await asyncio.sleep(0.05)
@@ -221,7 +223,13 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
             )
             reported_error = True
             break
-    except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
+    except (
+        CameraNotFound,
+        Unsupported,
+        ControlNotReady,
+        ControlBusy,
+        ControlOperationError,
+    ) as exc:
         await _send_ws_json(websocket, {"type": "error", "detail": str(_failure(exc).detail)})
         reported_error = True
     except (OSError, RuntimeError, TimeoutError, ValueError) as exc:

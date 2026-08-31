@@ -1,14 +1,16 @@
-"""Pure StreamPipe framing for the proven legacy Yoosee talk channel."""
+"""Pure StreamPipe framing shared by legacy and IoTVideo talk channels."""
 
 from __future__ import annotations
 
 import struct
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .crypto import RC5
 
 V1_MAGIC = bytes.fromhex("ffffff88")
+MICROPHONE_STATE_CHANGE = 0x32
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +79,62 @@ def pack_legacy_capture_header(frame_rate: int = 15) -> bytes:
 
 def pack_legacy_talk_control(enabled: bool) -> bytes:
     return V1_MAGIC + bytes((0, 2, 5, int(enabled))) + bytes(20)
+
+
+def build_builtin_command(
+    command: int,
+    payload: bytes = b"",
+    *,
+    flags: int = 0,
+    timestamp_us: int | None = None,
+) -> bytes:
+    """Mirror ``Connection::Impl::send_cmd``'s built-in command body."""
+
+    if not 0 <= command <= 0xFF:
+        raise ValueError("command must fit in one byte")
+    if not 0 <= flags <= 0x03:
+        raise ValueError("only the low two command flag bits are defined")
+    if timestamp_us is None:
+        timestamp_us = time.time_ns() // 1_000
+    return struct.pack("<BBHI", 0, command, flags, timestamp_us & 0xFFFFFFFF) + bytes(payload)
+
+
+def pack_v1_sequence_user_data(body: bytes) -> bytes:
+    """Mirror ``trans_proto_v1::packing_sequence_user_data`` exactly."""
+
+    if len(body) > 0xFFFF:
+        raise ValueError("v1 sequenced user-data body is too large")
+    return V1_MAGIC + struct.pack("<HH", 0x0300, len(body)) + bytes(20) + bytes(body)
+
+
+def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -> bytes:
+    return pack_v1_sequence_user_data(
+        build_builtin_command(
+            MICROPHONE_STATE_CHANGE,
+            bytes((int(enabled),)),
+            timestamp_us=timestamp_us,
+        )
+    )
+
+
+def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
+    """Build the audio-only HEADER_ONLY record emitted by ``LivePlayer``."""
+
+    if header.audio_channels not in (1, 2):
+        raise ValueError("v1 encoding header supports mono or stereo audio")
+    if not 8 <= header.audio_bit_width <= 2048 or header.audio_bit_width % 8:
+        raise ValueError("audio bit width must be an 8-bit multiple")
+    frame = bytearray(28)
+    frame[:4] = V1_MAGIC
+    # The client-side v1 packer emits source mask 2; camera RX headers use 8.
+    struct.pack_into("<H", frame, 4, 0x0102)
+    frame[8] = header.audio_codec & 0xFF
+    frame[9] = header.audio_codec_option & 0xFF
+    frame[10] = header.audio_channels - 1
+    frame[11] = header.audio_bit_width // 8 - 1
+    struct.pack_into("<I", frame, 12, header.audio_sample_rate)
+    struct.pack_into("<H", frame, 16, header.audio_frame_size)
+    return bytes(frame)
 
 
 def unpack_v1_encoding_header(frame: bytes) -> V1EncodingHeader:

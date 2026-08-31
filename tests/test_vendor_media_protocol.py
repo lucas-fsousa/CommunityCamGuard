@@ -16,6 +16,7 @@ from backend.app.drivers.yoosee.p2p.media_protocol import (
     verify_mtp_frame,
 )
 from backend.app.drivers.yoosee.p2p.stream_protocol import (
+    build_builtin_command,
     build_v1_audio_packet,
     decrypt_command_tlv,
     decrypt_media_tlv,
@@ -23,6 +24,9 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import (
     encrypt_media_tlv,
     pack_legacy_capture_header,
     pack_legacy_talk_control,
+    pack_microphone_command,
+    pack_v1_audio_encoding_header,
+    pack_v1_sequence_user_data,
     unpack_v1_encoding_header,
 )
 
@@ -110,12 +114,10 @@ def test_stream_tlv_round_trips() -> None:
 
 def test_legacy_talk_records_match_native_sender() -> None:
     assert pack_legacy_capture_header() == bytes.fromhex(
-        "ff ff ff 88 00 01 05 21 01 14 f0 3c "
-        "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        "ff ff ff 88 00 01 05 21 01 14 f0 3c " "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
     )
     assert pack_legacy_talk_control(True) == bytes.fromhex(
-        "ff ff ff 88 00 02 05 01 "
-        "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        "ff ff ff 88 00 02 05 01 " "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
     )
     assert pack_legacy_talk_control(False)[7] == 0
     with pytest.raises(ValueError, match="frame rate"):
@@ -125,8 +127,7 @@ def test_legacy_talk_records_match_native_sender() -> None:
 def test_camera_encoding_header_and_audio_packet() -> None:
     header = unpack_v1_encoding_header(
         bytes.fromhex(
-            "ff ff ff 88 08 01 00 00 04 02 00 01 80 3e 00 00 "
-            "00 04 05 0f 80 02 00 00 68 01 00 00"
+            "ff ff ff 88 08 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 05 0f 80 02 00 00 68 01 00 00"
         )
     )
     assert (header.audio_codec, header.audio_sample_rate) == (4, 16_000)
@@ -137,6 +138,31 @@ def test_camera_encoding_header_and_audio_packet() -> None:
         "ffffff8808000100000000000000000000000000a05c5508000000000e00"
     )
     assert packet[30:] == audio
+
+
+def test_modern_talk_command_matches_native_v1_sequence_layout() -> None:
+    builtin = build_builtin_command(0x32, b"\x01", timestamp_us=0x12345678)
+    assert builtin == bytes.fromhex("00 32 00 00 78 56 34 12 01")
+    assert pack_v1_sequence_user_data(builtin) == bytes.fromhex(
+        "ff ff ff 88 00 03 09 00 "
+        "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+        "00 32 00 00 78 56 34 12 01"
+    )
+    assert pack_microphone_command(True, timestamp_us=0x12345678) == (
+        pack_v1_sequence_user_data(builtin)
+    )
+    assert pack_microphone_command(False, timestamp_us=0x12345678)[-1] == 0
+
+
+def test_modern_audio_header_is_audio_only_tx_layout() -> None:
+    camera_header = unpack_v1_encoding_header(
+        bytes.fromhex(
+            "ff ff ff 88 08 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 05 0f 80 02 00 00 68 01 00 00"
+        )
+    )
+    assert pack_v1_audio_encoding_header(camera_header) == bytes.fromhex(
+        "ff ff ff 88 02 01 00 00 04 02 00 01 80 3e 00 00 " "00 04 00 00 00 00 00 00 00 00 00 00"
+    )
 
 
 def test_malformed_frames_fail_closed() -> None:

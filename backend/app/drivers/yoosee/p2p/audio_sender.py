@@ -25,7 +25,7 @@ MAX_TRANSPORT_SLACK_SECONDS = 2.0
 
 
 @dataclass(frozen=True, slots=True)
-class LegacyAudioSendResult:
+class AudioSendResult:
     requested_frames: int
     sent_frames: int
     acknowledged_frames: int
@@ -90,9 +90,7 @@ class LegacyAudioSender:
         self._bounded_timeout = max(0.1, min(float(timeout), 2.0))
         self._max_frames = max_frames
         self._session_deadline = (
-            time.monotonic()
-            + max_frames * FRAME_INTERVAL_SECONDS
-            + MAX_TRANSPORT_SLACK_SECONDS
+            time.monotonic() + max_frames * FRAME_INTERVAL_SECONDS + MAX_TRANSPORT_SLACK_SECONDS
         )
         self._last_send_at: float | None = None
         self._requested_frames = 0
@@ -183,13 +181,11 @@ class LegacyAudioSender:
         self._acknowledged_frames += 1
         return True
 
-    def result(self, *, expected_frames: int | None = None) -> LegacyAudioSendResult:
+    def result(self, *, expected_frames: int | None = None) -> AudioSendResult:
         """Return a snapshot without closing the incremental sender."""
 
-        requested_frames = (
-            self._requested_frames if expected_frames is None else expected_frames
-        )
-        return LegacyAudioSendResult(
+        requested_frames = self._requested_frames if expected_frames is None else expected_frames
+        return AudioSendResult(
             requested_frames,
             self._sent_frames,
             self._acknowledged_frames,
@@ -197,7 +193,7 @@ class LegacyAudioSender:
             self._aborted,
         )
 
-    def close(self) -> LegacyAudioSendResult:
+    def close(self) -> AudioSendResult:
         """Prevent any additional frames and return the final counters."""
 
         self._closed = True
@@ -213,7 +209,7 @@ def send_legacy_audio_frames(
     sequence: int,
     frames: Sequence[bytes],
     timeout: float,
-) -> LegacyAudioSendResult:
+) -> AudioSendResult:
     """Send one frame per packet, awaiting KCP ACK before advancing the queue.
 
     A missing ACK aborts the remaining utterance instead of feeding an unbounded
@@ -238,3 +234,7 @@ def send_legacy_audio_frames(
     result = sender.result(expected_frames=len(frames))
     sender.close()
     return result
+
+
+# Compatibility for third-party extensions that imported the old name.
+LegacyAudioSendResult = AudioSendResult

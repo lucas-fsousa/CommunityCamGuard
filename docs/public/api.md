@@ -185,8 +185,10 @@ policy still independently requires `localhost` or trusted HTTPS.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
 selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous
-infrastructure, so it is host-only but not yet LAN-only. The first production validation must target
-only the designated test camera. API results
+infrastructure, so it is host-only but not yet LAN-only. The driver selects its legacy AMR or
+IoTVideo AAC transport from the vendor device identity; callers always send the same PCM contract.
+Until broader hardware validation is complete, active production tests must target only the
+designated test camera. API results
 contain state/acknowledgement booleans but no access token, route, session key or raw camera payload.
 If the access node returns the explicit stale-session code, the backend renews the encrypted native
 vendor-account session and retries exactly once. Without a vendor account configured in the

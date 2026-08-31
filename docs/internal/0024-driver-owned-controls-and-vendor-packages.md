@@ -293,6 +293,27 @@ string alone must never grant another driver's controls.
 - A family driver may contain model/firmware profiles. We do not create one application-level
   driver instance per physical camera, nor assume every model of a brand shares one wire contract.
 
+### Intercom player-family correction (2026-08-31)
+
+- The earlier camera-3 AMR path was selected from the legacy monitor screen without applying the
+  APK's player factory. Static analysis of `DeviceUtils.y()` and `bf.o` proves that numeric device
+  IDs above unsigned 32-bit use IoTVideo `LivePlayer`; camera 3's vendor ID `7443576841` is in that
+  family. IDs through `0xffffffff` retain the legacy Gwell/AMR implementation.
+- IoTVideo talk has a separate driver-owned lifecycle: AV START and media use the low KCP
+  conversation; sequenced built-in command `0x32` uses the high conversation; STOP and AV CLOSE
+  remain unconditional cleanup. The negotiated camera-3 audio header is AAC-LC, option 2, mono,
+  16-bit, 16 kHz and 1024 samples per frame.
+- Native `fill_adts_header` proves that transmitted frames start with MPEG-4 ADTS `ff f1`, although
+  received camera audio starts with MPEG-2 ADTS `ff f9`. Native `systemTime` uses Unix epoch
+  microseconds. Both details are now explicit validation boundaries rather than inferred from RX.
+- The generic HTTP/WebSocket contract remains 8 kHz mono PCM. The Yoosee driver alone chooses an
+  incremental OpenCORE AMR encoder for legacy IDs or a bounded FFmpeg AAC encoder for IoTVideo
+  IDs. Codec bytes and family selection remain invisible to the application and browser.
+- Golden framing tests cover the command wrapper and TX header; sender/session tests cover epoch
+  timestamps, channel/sequence separation, ACK backpressure and cleanup. The full suite and static
+  checks pass, and a local encoder integration produced validated `ff f1` frames. A corrected
+  camera-3 research run acknowledged 80/80 frames; physical audibility is still pending.
+
 ## Consequences
 
 - Adding an implementation of an existing semantic control no longer changes the HTTP router or

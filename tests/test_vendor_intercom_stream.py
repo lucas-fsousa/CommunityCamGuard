@@ -19,9 +19,7 @@ AMR = bytes.fromhex("3c") + bytes(31)
 
 
 def _fixture():
-    enrollment = P2PEnrollment(
-        "7443576841", 123, bytes(range(64)), None, "now", "now", "cam_test"
-    )
+    enrollment = P2PEnrollment("7443576841", 123, bytes(range(64)), None, "now", "now", "cam_test")
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     target = OnlineDevice(7_443_576_841, 1, False, 1, bytes(16))
     attempt = CallingAttempt(0x123456, 0x89ABCDEF, b"12345678")
@@ -70,9 +68,13 @@ class FakeControl:
         return True
 
     def result(self):
-        audio = LegacyAudioSendResult(
-            len(self.frames), len(self.frames), len(self.frames), 3 + len(self.frames), False
-        ) if self.frames else None
+        audio = (
+            LegacyAudioSendResult(
+                len(self.frames), len(self.frames), len(self.frames), 3 + len(self.frames), False
+            )
+            if self.frames
+            else None
+        )
         return IntercomControlResult(True, True, True, self.closed, self.closed, audio)
 
     def close(self):
@@ -92,14 +94,14 @@ def test_stream_owns_route_encoder_and_control_until_close(monkeypatch) -> None:
         intercom_stream, "open_media_channel", lambda *_args: MediaChannelResult(False, True, 4)
     )
     monkeypatch.setattr(intercom_stream, "initialize_av_session", lambda *_args: av)
-    monkeypatch.setattr(intercom_stream, "AmrNbEncoder", FakeEncoder)
+    monkeypatch.setattr(intercom_stream, "AacLcAdtsEncoder", FakeEncoder)
 
     def control(*args, **kwargs):
         instance = FakeControl(*args, **kwargs)
         controls.append(instance)
         return instance
 
-    monkeypatch.setattr(intercom_stream, "LegacyIntercomSession", control)
+    monkeypatch.setattr(intercom_stream, "ModernIntercomSession", control)
     monkeypatch.setattr(
         intercom_stream,
         "close_device_route",
