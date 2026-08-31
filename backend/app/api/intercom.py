@@ -216,8 +216,14 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
             pass
         try:
             result = await asyncio.wait_for(asyncio.shield(worker), timeout=12.0)
-            if total_bytes and result.completed:
-                await _send_ws_json(websocket, {"type": "complete", **result.public()})
+            if total_bytes:
+                if result.completed:
+                    await _send_ws_json(websocket, {"type": "complete", **result.public()})
+                elif not reported_error:
+                    await _send_ws_json(
+                        websocket,
+                        {"type": "error", "detail": "camera did not complete the audio stream"},
+                    )
         except Exception:
             if not reported_error:
                 await _send_ws_json(

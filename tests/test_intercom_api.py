@@ -165,3 +165,27 @@ def test_audio_websocket_rejects_auth_before_accepting_or_dispatching(monkeypatc
 
     assert browser.closed_code == 1008
     assert browser.sent == []
+
+
+def test_audio_websocket_reports_incomplete_driver_teardown(monkeypatch) -> None:
+    consumed = threading.Event()
+    browser = _AudioBrowser(consumed)
+
+    def incomplete(_camera_id, chunks):
+        payload = bytearray()
+        for chunk in chunks:
+            payload.extend(chunk)
+            consumed.set()
+        frames = len(payload) // intercom.PCM_FRAME_BYTES
+        return AudioMessageResult(len(payload) // 16, frames, frames, frames, True, False, True)
+
+    monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
+    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
+    monkeypatch.setattr(intercom, "send_audio_stream", incomplete)
+
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
+
+    assert browser.sent[-1] == {
+        "type": "error",
+        "detail": "camera did not complete the audio stream",
+    }
