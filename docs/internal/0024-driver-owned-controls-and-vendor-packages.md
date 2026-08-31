@@ -158,6 +158,12 @@ string alone must never grant another driver's controls.
   The whole trusted chunk iterator runs inside the existing stale-access renewal/device mutex. This
   is infrastructure for a bounded WebSocket worker, not authorization to expose vendor details or
   hold a P2P route directly from the event loop.
+- Incremental audio is also a distinct driver-neutral capability. The application service resolves
+  one camera/driver, acquires that camera's nonblocking operation lock for the full iterator lifetime,
+  and validates nonempty complete 320-byte PCM-frame multiples under the same ten-second ceiling.
+  The Yoosee adapter alone maps that iterator to its internal route orchestrator. Other brands remain
+  unsupported unless their own driver opts in; camera JSON advertises recorded messages and streaming
+  separately. No WebSocket route consumes this contract yet.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept

@@ -35,6 +35,14 @@ class FakeControlDriver(CameraDriver):
     def send_audio_message(self, camera, pcm16le):
         return AudioMessageResult(len(pcm16le) // 16, 2, 2, 2, True, True, True)
 
+    def supports_audio_streams(self, camera):
+        return True
+
+    def send_audio_stream(self, camera, pcm16le_chunks):
+        payload = b"".join(pcm16le_chunks)
+        frames = len(payload) // 320
+        return AudioMessageResult(len(payload) // 16, frames, frames, frames, True, True, True)
+
 
 def _camera(driver="fake-control"):
     return registry.Camera(
@@ -81,6 +89,37 @@ def test_audio_message_is_driver_dispatched_under_the_same_camera_lock(monkeypat
             camera_controls.send_audio_message(CAMERA_ID, bytes(640))
     finally:
         lock.release()
+
+
+def test_audio_stream_is_bounded_and_holds_the_camera_lock(monkeypatch):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+    lock_observed = []
+
+    def chunks():
+        lock_observed.append(camera_controls._control_lock(CAMERA_ID).locked())
+        yield bytes(320)
+        yield bytes(320)
+
+    result = camera_controls.send_audio_stream(CAMERA_ID, chunks())
+
+    assert lock_observed == [True]
+    assert result.completed is True
+    assert result.duration_ms == 40
+
+
+@pytest.mark.parametrize(
+    "chunks",
+    [(), (b"",), (bytes(318),), (bytes(320),) * 501],
+)
+def test_audio_stream_rejects_empty_partial_or_unbounded_chunks(monkeypatch, chunks):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+
+    with pytest.raises(ValueError):
+        camera_controls.send_audio_stream(CAMERA_ID, chunks)
 
 
 def test_unknown_camera_is_rejected_before_driver_selection(monkeypatch):

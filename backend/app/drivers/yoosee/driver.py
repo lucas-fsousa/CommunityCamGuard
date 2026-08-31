@@ -9,6 +9,7 @@ Confirmed on the project's field units (model ``IPC``, firmware ``40.01.22``/``4
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from ...control import device, media, ptz
@@ -90,3 +91,11 @@ class YooseeDriver(CameraDriver):
 
     def send_audio_message(self, camera: Camera, pcm16le: bytes) -> AudioMessageResult:
         return audio.send(camera, pcm16le)
+
+    def supports_audio_streams(self, camera: Camera) -> bool:
+        return audio.supported(camera)
+
+    def send_audio_stream(
+        self, camera: Camera, pcm16le_chunks: Iterable[bytes]
+    ) -> AudioMessageResult:
+        return audio.send_stream(camera, pcm16le_chunks)

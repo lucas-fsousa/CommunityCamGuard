@@ -19,6 +19,7 @@ to add what's specific (PTZ, reboot, model/firmware, ...).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -210,6 +211,18 @@ class CameraDriver:
         """Send fixed-format 8 kHz/mono/s16le PCM through a driver-owned transport."""
 
         raise Unsupported("audio_message")
+
+    def supports_audio_streams(self, camera: Camera) -> bool:
+        """Whether this camera can consume a bounded incremental PCM iterator."""
+
+        return False
+
+    def send_audio_stream(
+        self, camera: Camera, pcm16le_chunks: Iterable[bytes]
+    ) -> AudioMessageResult:
+        """Consume one bounded 8 kHz/mono/s16le stream while retaining driver state."""
+
+        raise Unsupported("audio_stream")
 
     # --- controls (default: unsupported) -----------------------------------------------
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:

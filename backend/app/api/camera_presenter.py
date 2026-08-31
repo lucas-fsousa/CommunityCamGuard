@@ -12,7 +12,9 @@ def camera_out(camera: registry.Camera) -> dict:
     """Serialize one camera without leaking its stored password."""
 
     controls = control_catalog(camera)
-    audio_messages = drivers.for_camera(camera).supports_audio_messages(camera)
+    driver = drivers.for_camera(camera)
+    audio_messages = driver.supports_audio_messages(camera)
+    audio_streams = driver.supports_audio_streams(camera)
     return {
         "id": camera.camera_id,
         "mac": camera.mac,
@@ -32,6 +34,7 @@ def camera_out(camera: registry.Camera) -> dict:
         "has_quality_variants": True,
         "controls": controls,
         "audio_messages": audio_messages,
+        "audio_streams": audio_streams,
         # Temporary compatibility projection; ``controls`` is authoritative.
         "vendor_controls": {key: True for key in controls},
         "webrtc_url": go2rtc.webrtc_page_url(camera.camera_id),

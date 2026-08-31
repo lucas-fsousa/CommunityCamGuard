@@ -53,6 +53,38 @@ def test_audio_adapter_maps_only_transport_neutral_delivery_state(monkeypatch) -
     assert "device_id" not in result.public()
 
 
+def test_streaming_audio_adapter_consumes_chunks_once_and_maps_result(monkeypatch) -> None:
+    enrollment = _enrollment()
+    transport = LegacyAudioSendResult(2, 2, 2, 5, False)
+    probe = IntercomProbeResult(
+        enrollment.device_id,
+        True,
+        True,
+        True,
+        1,
+        IntercomControlResult(True, True, True, True, True, transport),
+        True,
+    )
+    observed = []
+    monkeypatch.setattr(
+        audio.p2p,
+        "get_enrollment_for_camera",
+        lambda camera_id: enrollment if camera_id == CAMERA_ID else None,
+    )
+
+    def stream(selected, chunks):
+        observed.append((selected.device_id, tuple(chunks)))
+        return probe
+
+    monkeypatch.setattr(audio, "send_pcm_intercom_chunks", stream)
+
+    result = audio.send_stream(_camera(), iter((bytes(320), bytes(320))))
+
+    assert observed == [(enrollment.device_id, (bytes(320), bytes(320)))]
+    assert result.duration_ms == 40
+    assert result.completed is True
+
+
 def test_audio_adapter_requires_exact_camera_enrollment(monkeypatch) -> None:
     monkeypatch.setattr(audio.p2p, "get_enrollment_for_camera", lambda _camera_id: None)
     with pytest.raises(ControlNotReady):

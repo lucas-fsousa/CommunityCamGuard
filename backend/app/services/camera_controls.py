@@ -7,6 +7,7 @@ only a public camera ID and semantic control key; the resolved driver owns every
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 
 from .. import drivers
@@ -31,6 +32,8 @@ class ControlBusy(RuntimeError):
 
 _locks_guard = threading.Lock()
 _camera_locks: dict[str, threading.Lock] = {}
+_PCM_FRAME_BYTES = 320
+_MAX_PCM_BYTES = 160_000
 
 
 def _control_lock(camera_id: str) -> threading.Lock:
@@ -108,3 +111,27 @@ def send_audio_message(camera_id: str, pcm16le: bytes) -> AudioMessageResult:
         if not driver.supports_audio_messages(camera):
             raise drivers.Unsupported("audio_message")
         return driver.send_audio_message(camera, pcm16le)
+
+
+def _bounded_pcm_chunks(chunks: Iterable[bytes]) -> Iterator[bytes]:
+    received = 0
+    for chunk in chunks:
+        if not chunk or len(chunk) % _PCM_FRAME_BYTES:
+            raise ValueError("audio stream chunks must contain complete 20 ms PCM frames")
+        received += len(chunk)
+        if received > _MAX_PCM_BYTES:
+            raise ValueError("audio stream exceeds the ten-second safety bound")
+        yield chunk
+    if not received:
+        raise ValueError("audio stream is empty")
+
+
+def send_audio_stream(camera_id: str, pcm16le_chunks: Iterable[bytes]) -> AudioMessageResult:
+    """Hold the camera lock while its driver consumes one bounded PCM iterator."""
+
+    camera = _camera(camera_id)
+    with _exclusive(camera_id):
+        driver = drivers.for_camera(camera)
+        if not driver.supports_audio_streams(camera):
+            raise drivers.Unsupported("audio_stream")
+        return driver.send_audio_stream(camera, _bounded_pcm_chunks(pcm16le_chunks))

@@ -42,6 +42,9 @@ def test_default_controls_are_unsupported():
     assert d.supports_audio_messages(cam) is False
     with pytest.raises(Unsupported):
         d.send_audio_message(cam, bytes(320))
+    assert d.supports_audio_streams(cam) is False
+    with pytest.raises(Unsupported):
+        d.send_audio_stream(cam, (bytes(320),))
 
 
 # --- probe / _probe_rtsp ------------------------------------------------------------
