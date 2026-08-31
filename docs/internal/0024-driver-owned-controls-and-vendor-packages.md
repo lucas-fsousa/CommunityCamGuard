@@ -176,6 +176,13 @@ string alone must never grant another driver's controls.
   frames. Pointer-up, cancellation, lost capture or the ten-second timer sends `stop` and closes browser
   media resources. The new route and UI remain simulation-tested only; physical speech validation is
   deliberately tracked separately for camera 3.
+- The complete continuous stack was deployed as build `b-b6eb3c9475a9` without restarting go2rtc.
+  The new frontend module served successfully, camera 3 resolved locally to the Yoosee driver with
+  `audio_streams=true`, and all three recorder FFmpeg processes restarted exactly once under the new
+  app container. An unauthenticated upgrade was rejected before acceptance; an authenticated LAN
+  upgrade using a nonexistent opaque camera ID was accepted, dispatched through the generic service
+  and returned the sanitized `camera not found` error. Neither check opened a P2P camera route or sent
+  audio. Physical camera-3 speech validation remains pending a suitable audible-test window.
 - Encoder and sender are now joined only through an internal, device-serialized orchestrator. It
   encodes bounded PCM before allocating a route, retains one-shot stale-access renewal, and releases
   the exact B9 route in `finally`; the silent probe remains a separate entry point that cannot accept
