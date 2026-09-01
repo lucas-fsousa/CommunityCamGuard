@@ -105,3 +105,15 @@ def test_non_stale_rejection_is_not_refreshed(monkeypatch):
         renewal.run_with_fresh_access(
             old, lambda _enrollment: (_ for _ in ()).throw(InitInfoRejectedError(123))
         )
+
+
+def test_stuck_device_session_lock_fails_with_a_bounded_error(monkeypatch):
+    enrollment = _enrollment(bytes(range(64)))
+    lock = renewal._session_lock(enrollment.device_id)
+    lock.acquire()
+    monkeypatch.setattr(renewal, "SESSION_LOCK_TIMEOUT_SECONDS", 0.01)
+    try:
+        with pytest.raises(renewal.P2PProbeError, match="did not release"):
+            renewal.run_with_fresh_access(enrollment, lambda _current: "unexpected")
+    finally:
+        lock.release()

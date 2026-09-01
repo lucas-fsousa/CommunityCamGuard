@@ -168,6 +168,26 @@ def test_audio_websocket_rejects_auth_before_accepting_or_dispatching(monkeypatc
     assert browser.sent == []
 
 
+def test_audio_websocket_bounds_a_stuck_camera_setup(monkeypatch) -> None:
+    browser = _AudioBrowser(threading.Event())
+
+    def stuck_setup(_camera_id, _chunks):
+        time.sleep(0.05)
+        return AudioMessageResult(0, 0, 0, 0, False, False, False)
+
+    monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
+    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
+    monkeypatch.setattr(intercom, "send_audio_stream", stuck_setup)
+    monkeypatch.setattr(intercom, "STREAM_SETUP_SECONDS", 0.0)
+
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
+
+    assert browser.sent == [
+        {"type": "error", "detail": "camera audio stream did not become ready"}
+    ]
+    assert browser.application_state == WebSocketState.DISCONNECTED
+
+
 def test_audio_websocket_reports_incomplete_driver_teardown(monkeypatch) -> None:
     consumed = threading.Event()
     browser = _AudioBrowser(consumed)

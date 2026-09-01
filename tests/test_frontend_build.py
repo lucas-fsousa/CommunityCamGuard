@@ -110,7 +110,11 @@ def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
     assert 'headers: { "Content-Type": "audio/pcm" }' in audio
     assert "/intercom/messages`" in audio
     assert 'window.confirm(t("intercom.confirm"' in audio
-    assert "previewPcm(pcm)" in audio
+    assert "class PcmPreview" in audio
+    assert "this.stop();" in audio
+    assert "source.stop()" in audio
+    assert "pcmPreview.play(pcm)" in audio
+    assert audio.count("pcmPreview.stop()") >= 3
 
 
 def test_push_to_talk_ui_streams_exact_frames_only_while_held():

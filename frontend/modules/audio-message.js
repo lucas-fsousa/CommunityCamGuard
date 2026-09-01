@@ -106,18 +106,43 @@ class PcmRecorder {
   }
 }
 
-async function previewPcm(pcm) {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  const context = new AudioContextClass({ sampleRate: TARGET_RATE });
-  const samples = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength / 2);
-  const buffer = context.createBuffer(1, samples.length, TARGET_RATE);
-  const channel = buffer.getChannelData(0);
-  for (let index = 0; index < samples.length; index += 1) channel[index] = samples[index] / 0x8000;
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.addEventListener("ended", () => void context.close(), { once: true });
-  source.start();
+class PcmPreview {
+  stop() {
+    const source = this.source;
+    const context = this.context;
+    this.source = null;
+    this.context = null;
+    if (source) {
+      try { source.stop(); } catch { /* It may already have ended. */ }
+      source.disconnect();
+    }
+    if (context?.state !== "closed") void context.close();
+  }
+
+  play(pcm) {
+    this.stop();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const context = new AudioContextClass({ sampleRate: TARGET_RATE });
+    const samples = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength / 2);
+    const buffer = context.createBuffer(1, samples.length, TARGET_RATE);
+    const channel = buffer.getChannelData(0);
+    for (let index = 0; index < samples.length; index += 1) {
+      channel[index] = samples[index] / 0x8000;
+    }
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    this.source = source;
+    this.context = context;
+    source.addEventListener("ended", () => {
+      if (this.source !== source) return;
+      this.source = null;
+      this.context = null;
+      source.disconnect();
+      if (context.state !== "closed") void context.close();
+    }, { once: true });
+    source.start();
+  }
 }
 
 export function audioMessageButton(cam) {
@@ -130,6 +155,7 @@ export function audioMessageButton(cam) {
     let pcm = null;
     let elapsedTimer = null;
     let sending = false;
+    const pcmPreview = new PcmPreview();
     const status = el("small", { className: "camera-control-status" });
     const record = el("button", { className: "btn-primary", textContent: t("intercom.record") });
     const stop = el("button", { textContent: t("intercom.stop"), disabled: true });
@@ -165,10 +191,12 @@ export function audioMessageButton(cam) {
       if (sending) return;
       clearInterval(elapsedTimer);
       await recorder?.cancel();
+      pcmPreview.stop();
       overlay.remove();
     };
 
     record.addEventListener("click", async () => {
+      pcmPreview.stop();
       pcm = null;
       record.disabled = true;
       preview.disabled = true;
@@ -190,9 +218,10 @@ export function audioMessageButton(cam) {
       }
     });
     stop.addEventListener("click", () => void finishRecording());
-    preview.addEventListener("click", () => pcm && void previewPcm(pcm));
+    preview.addEventListener("click", () => pcm && pcmPreview.play(pcm));
     send.addEventListener("click", async () => {
       if (!pcm || !window.confirm(t("intercom.confirm", { name: cam.name || cam.mac }))) return;
+      pcmPreview.stop();
       sending = true;
       close.disabled = true;
       send.disabled = true;

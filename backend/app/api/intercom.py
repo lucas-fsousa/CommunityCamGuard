@@ -23,6 +23,8 @@ MAX_PCM_BYTES = 160_000  # Ten seconds of mono 8 kHz signed 16-bit PCM.
 PCM_FRAME_BYTES = 320  # One codec-neutral 20 ms block of mono 8 kHz s16le input.
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
 STREAM_IDLE_SECONDS = 2.0
+STREAM_SETUP_SECONDS = 15.0
+STREAM_TOTAL_SECONDS = 30.0
 _CAMERA_ID = re.compile(r"^cam_[0-9a-f]{24}$")
 _STREAM_STOP = object()
 log = logging.getLogger(__name__)
@@ -164,10 +166,9 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     levels = PcmLevelAccumulator()
     reported_error = False
     graceful_stop = False
+    request_deadline = time.monotonic() + STREAM_TOTAL_SECONDS
     try:
-        for _attempt in range(
-            240
-        ):  # Route setup may take time, but never more than 12 seconds here.
+        for _attempt in range(int(STREAM_SETUP_SECONDS / 0.05)):
             if ready.is_set() or worker.done():
                 break
             await asyncio.sleep(0.05)
@@ -178,8 +179,13 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
         await _send_ws_json(websocket, {"type": "ready", "max_ms": 10_000})
 
         while total_bytes < MAX_PCM_BYTES and not worker.done():
+            remaining = request_deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("camera audio stream exceeded its absolute deadline")
             try:
-                message = await asyncio.wait_for(websocket.receive(), timeout=0.25)
+                message = await asyncio.wait_for(
+                    websocket.receive(), timeout=min(0.25, remaining)
+                )
             except TimeoutError:
                 continue
             if message["type"] == "websocket.disconnect":
@@ -270,7 +276,20 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
                         websocket,
                         {"type": "error", "detail": "camera did not complete the audio stream"},
                     )
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "intercom_audio %s",
+                json.dumps(
+                    {
+                        "mode": "stream",
+                        "camera_id": camera_id,
+                        "completed": False,
+                        "error": type(exc).__name__,
+                    },
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+            )
             if not reported_error:
                 await _send_ws_json(
                     websocket,

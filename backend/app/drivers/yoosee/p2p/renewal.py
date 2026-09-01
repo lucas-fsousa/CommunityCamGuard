@@ -13,6 +13,7 @@ from .account import VendorAccountError, refresh_account_session
 from .contracts import InitInfoRejectedError, P2PProbeError
 
 ResultT = TypeVar("ResultT")
+SESSION_LOCK_TIMEOUT_SECONDS = 15.0
 _refresh_lock = threading.Lock()
 _session_locks_guard = threading.Lock()
 _session_locks: dict[str, threading.Lock] = {}
@@ -72,5 +73,10 @@ def run_with_fresh_access(
     The mutex remains: it prevents concurrent read/modify/write cycles from racing on one camera.
     """
 
-    with _session_lock(enrollment.device_id):
+    lock = _session_lock(enrollment.device_id)
+    if not lock.acquire(timeout=SESSION_LOCK_TIMEOUT_SECONDS):
+        raise P2PProbeError("another P2P session did not release this camera in time")
+    try:
         return _run_with_renewal(enrollment, operation)
+    finally:
+        lock.release()
