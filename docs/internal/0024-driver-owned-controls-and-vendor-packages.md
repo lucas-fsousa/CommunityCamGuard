@@ -312,6 +312,10 @@ string alone must never grant another driver's controls.
   input and only then dispatches asynchronous `send_intercom_cmd(1)`. The camera does not emit the
   expected correlated response to `0x32`; matching the SDK means starting AVDATA after its KCP
   transport ACK rather than blocking an already active audio input for ten seconds.
+- The callback does not use the ordinary camera-originated `0x01xx` encoding header. Complete
+  disassembly of `trans_proto_v1::packing_header_enc` shows an independent `0x0500` HEADER_ENC
+  record containing a stream count and packed 20-byte audio descriptor. The earlier `0x0102`
+  transmit header received KCP ACKs but was not the native intercom wire format.
 - Modern AMR frames retain the native `systemTime` epoch-microsecond timestamps. Codec identity,
   frame cadence and timestamp units are explicit transmit-side boundaries rather than inferences
   from the independent receive stream.
@@ -324,8 +328,9 @@ string alone must never grant another driver's controls.
   checks pass. A corrected camera-3 research run acknowledged its AMR header, START, 251/251 audio
   frames, STOP, CLOSE and direct-route teardown. Its recording contains the strongest normalized
   waveform correlation at `00:28:03.825 UTC` (`r=0.1095`); simultaneous control-camera maxima were
-  only `0.0431` and `0.0314`. This is independent acoustic loopback evidence; human intelligibility
-  remains the final acceptance check.
+  only `0.0431` and `0.0314`. A subsequent human test heard no playback, so that correlation is not
+  accepted as acoustic proof. Functional status remains experimental until the corrected `0x0500`
+  header produces repeatable audible output.
 
 ## Consequences
 

@@ -169,21 +169,34 @@ def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -
 
 
 def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
-    """Build the audio-only HEADER_ONLY record sent by ``send_av_enc_info(2)``."""
+    """Build the audio-only HEADER_ENC record sent by ``send_av_enc_info(2)``.
+
+    ``LivePlayer`` first serializes a two-byte stream count followed by one
+    20-byte audio descriptor. ``trans_proto_v1::packing_header_enc`` then
+    copies the first 20 payload bytes behind marker ``0x0500``. This is not the
+    camera-originated ``0x01xx`` encoding-header layout parsed below.
+    """
 
     if header.audio_channels not in (1, 2):
         raise ValueError("v1 encoding header supports mono or stereo audio")
-    if not 8 <= header.audio_bit_width <= 2048 or header.audio_bit_width % 8:
-        raise ValueError("audio bit width must be an 8-bit multiple")
+    if not 8 <= header.audio_bit_width <= 0xFFFF or header.audio_bit_width % 8:
+        raise ValueError("audio bit width must be an 8-bit multiple fitting u16")
+    if not 1 <= header.audio_sample_rate <= 0xFFFF:
+        raise ValueError("intercom sample rate must fit in the native u16 field")
+
+    descriptor = bytearray(20)
+    descriptor[1] = 1  # audio stream
+    struct.pack_into("<H", descriptor, 4, header.audio_bit_width)
+    struct.pack_into("<H", descriptor, 6, header.audio_sample_rate)
+    struct.pack_into("<I", descriptor, 8, header.audio_channels)
+    descriptor[12] = header.audio_codec & 0xFF
+    descriptor[13] = 2  # HEADER_ONLY selection used by send_av_enc_info(2)
+
     frame = bytearray(28)
     frame[:4] = V1_MAGIC
-    struct.pack_into("<H", frame, 4, 0x0102)
-    frame[8] = header.audio_codec & 0xFF
-    frame[9] = header.audio_codec_option & 0xFF
-    frame[10] = header.audio_channels - 1
-    frame[11] = header.audio_bit_width // 8 - 1
-    struct.pack_into("<I", frame, 12, header.audio_sample_rate)
-    struct.pack_into("<H", frame, 16, header.audio_frame_size)
+    struct.pack_into("<H", frame, 4, 0x0500)
+    serialized = bytes((0, 1)) + bytes(descriptor)
+    frame[8:] = serialized[:20]
     return bytes(frame)
 
 
