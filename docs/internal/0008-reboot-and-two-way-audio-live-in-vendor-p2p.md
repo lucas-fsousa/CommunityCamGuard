@@ -57,3 +57,12 @@ still ignored, so this is deliberately isolated in the Yoosee driver rather than
 generic ONVIF capability. The firmware also accepts `USER_CMD_SET` without Digest authentication;
 the app's existing local-only intercom boundary is therefore a security requirement, not merely a
 product choice.
+
+Both production dashboard paths were then exercised against camera 3 through the rebuilt app:
+
+- the recorded-message HTTP endpoint delivered 250/250 frames (5.0 seconds), completed the direct
+  LAN session and released the route;
+- the push-to-talk WebSocket delivered 100/100 frames (2.0 seconds) with the same clean teardown.
+
+The application diagnostics measured non-silent PCM in both cases and physical listening confirmed
+audible output. Neither path used the vendor app, cloud transport or the experimental P2P fallback.
