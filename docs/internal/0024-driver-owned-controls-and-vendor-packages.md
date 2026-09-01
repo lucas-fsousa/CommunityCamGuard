@@ -322,7 +322,10 @@ string alone must never grant another driver's controls.
 - Golden framing tests cover the command wrapper and TX header; sender/session tests cover epoch
   timestamps, channel/sequence separation, ACK backpressure and cleanup. The full suite and static
   checks pass. A corrected camera-3 research run acknowledged its AMR header, START, 251/251 audio
-  frames, STOP, CLOSE and direct-route teardown. Physical audibility of that exact run is pending.
+  frames, STOP, CLOSE and direct-route teardown. Its recording contains the strongest normalized
+  waveform correlation at `00:28:03.825 UTC` (`r=0.1095`); simultaneous control-camera maxima were
+  only `0.0431` and `0.0314`. This is independent acoustic loopback evidence; human intelligibility
+  remains the final acceptance check.
 
 ## Consequences
 
