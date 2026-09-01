@@ -1,4 +1,4 @@
-# 0008 — Reboot and two-way audio live in the vendor P2P channel (ONVIF exhausted)
+# 0008 — Reboot and two-way audio outside standard ONVIF
 
 **Status:** accepted · **Date:** 2026-07-27
 
@@ -47,9 +47,12 @@ hard-coded list when absent).
 The original conclusion remains correct for standard ONVIF and its advertised SDP, but is no longer
 correct for the firmware's complete RTSP surface. Static analysis of the matching
 `RtspServer_0.0.0.2` executable recovered an undocumented `USER_CMD_SET` method. Its
-`AudioCtlCmd: OPEN|CLOSE` control enables a fixed PCMA/8 kHz decoder fed through RTP-over-TCP
-interleaved channel 2 (320-byte payloads). A host-only live test on camera 3 was audible and the
-production driver completed 100/100 browser-format PCM frames with explicit cleanup.
+`AudioCtlCmd: OPEN|CLOSE` control enables the speaker path fed through RTP-over-TCP interleaved
+channel 2 (320-byte payloads). Although the RTP header retains payload type 8, the proprietary
+handler bypasses the advertised capture codec: its mixer reads each payload directly as 160 signed
+16-bit PCM samples. The archived firmware revision configures 8 kHz, but camera 3 firmware 40.1.14
+advertises and consumes 16 kHz on the live path. The driver therefore splits each canonical 640-byte
+browser frame into two 320-byte/10 ms RTP packets. It completes the session with explicit cleanup.
 
 The dashboard now prefers this LAN-only RTSP backchannel and retains Gwell P2P only as a fallback
 for enrolled cameras without usable local RTSP material. Standard `Require: .../backchannel` is
@@ -65,4 +68,17 @@ Both production dashboard paths were then exercised against camera 3 through the
 - the push-to-talk WebSocket delivered 100/100 frames (2.0 seconds) with the same clean teardown.
 
 The application diagnostics measured non-silent PCM in both cases and physical listening confirmed
-audible output. Neither path used the vendor app, cloud transport or the experimental P2P fallback.
+speaker output, but encoding those blocks as G.711 A-law produced distorted, unintelligible audio.
+Static inspection of the firmware's 320-byte PCM mixer exposed that mismatch. Controlled live tests
+then isolated all remaining variables: little-endian raw PCM at 16 kHz was recognizable, while
+big-endian was severe noise and 8 kHz was degraded. A 100 ms/ten-packet preload plus absolute-clock
+pacing absorbed WSL scheduler delays and made music clearly recognizable with almost no cuts. CLOSE
+waits for the queued audio to drain. Neither path uses the vendor app, cloud transport or the
+experimental P2P fallback.
+
+Final dashboard homologation used build `b-e8c8be95de38`. The operator physically tested the audio
+on all three current units, covering camera firmware 40.1.14 and 40.1.22; recorded-message and
+hold-to-speak playback were intelligible and passed. This closes codec, byte order, sample rate,
+packet cadence and browser integration as a delivered feature. Remaining work is endurance across
+repeated maximum-duration sessions, simultaneous listen/talk characterization and adapters for
+other camera families—not basic Yoosee speech delivery.

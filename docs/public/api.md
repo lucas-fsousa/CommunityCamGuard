@@ -153,8 +153,8 @@ as a deprecated compatibility surface while older dashboard builds are phased ou
 ### Bounded audio messages (authenticated trusted LAN only)
 
 `POST /api/cameras/{camera_id}/intercom/messages` accepts `Content-Type: audio/pcm` containing
-signed 16-bit little-endian, mono, 8 kHz PCM. The body must contain complete 320-byte/20 ms frames
-and may contain at most 160,000 bytes (10 seconds). The server executes the blocking camera session
+signed 16-bit little-endian, mono, 16 kHz PCM. The body must contain complete 640-byte/20 ms frames
+and may contain at most 320,000 bytes (10 seconds). The server executes the blocking camera session
 outside the HTTP event loop and serializes it with other operations on that camera. A successful
 response reports only duration, frame counts, direct-connection/session-cleanup/route-cleanup booleans and
 `completed`; it exposes no codec bytes, enrollment ID, peer address, token or protocol state.
@@ -171,8 +171,8 @@ ordinary LAN HTTP pages cannot request it even though the authenticated API itse
 
 `WS /api/cameras/{camera_id}/intercom/stream` is advertised by `audio_streams` separately from
 recorded messages. After the server completes the driver-owned camera setup it sends
-`{"type":"ready","max_ms":10000}`. The client may then send exactly one 320-byte signed
-16-bit little-endian, mono, 8 kHz PCM frame per binary WebSocket message. Text `stop` ends the
+`{"type":"ready","max_ms":10000}`. The client may then send exactly one 640-byte signed
+16-bit little-endian, mono, 16 kHz PCM frame per binary WebSocket message. Text `stop` ends the
 utterance. A successful teardown returns `type: "complete"` with the same transport-neutral fields
 as a bounded message; errors use `type: "error"` and a `detail` string.
 
@@ -184,9 +184,9 @@ strict client/Host/Origin/forwarding LAN checks run before WebSocket acceptance.
 policy still independently requires `localhost` or trusted HTTPS.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's
-selected driver. For the current Yoosee driver the implementation uses the vendor P2P rendezvous
-infrastructure, so it is host-only but not yet LAN-only. The driver selects its legacy AMR or
-IoTVideo AAC transport from the vendor device identity; callers always send the same PCM contract.
+selected driver. The current Yoosee driver prefers its recovered LAN RTSP backchannel. Its P2P
+fallback downsamples the canonical 16 kHz input inside the driver for the native 8 kHz AMR-NB
+encoder; callers always send the same PCM contract.
 Until broader hardware validation is complete, active production tests must target only the
 designated test camera. API results
 contain state/acknowledgement booleans but no access token, route, session key or raw camera payload.

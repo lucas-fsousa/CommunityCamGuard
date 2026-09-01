@@ -14,13 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, 
 from starlette.websockets import WebSocketState
 
 from ..audio_diagnostics import PcmLevelAccumulator
+from ..audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES
 from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
 from .local_only import require_local_request, require_local_websocket
 
-MAX_PCM_BYTES = 160_000  # Ten seconds of mono 8 kHz signed 16-bit PCM.
-PCM_FRAME_BYTES = 320  # One codec-neutral 20 ms block of mono 8 kHz s16le input.
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
 STREAM_IDLE_SECONDS = 2.0
 STREAM_SETUP_SECONDS = 15.0
@@ -52,7 +51,7 @@ async def _bounded_pcm(request: Request) -> bytes:
     if media_type != "audio/pcm":
         raise HTTPException(
             status_code=415,
-            detail="content type must be audio/pcm (8 kHz, mono, signed 16-bit little-endian)",
+            detail="content type must be audio/pcm (16 kHz, mono, signed 16-bit little-endian)",
         )
     declared = request.headers.get("content-length")
     if declared is not None:

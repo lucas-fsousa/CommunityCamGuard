@@ -1,8 +1,8 @@
 import { el } from "ccg/core";
 import { t } from "ccg/i18n";
 
-const TARGET_RATE = 8000;
-const FRAME_SAMPLES = 160;
+const TARGET_RATE = 16000;
+const FRAME_SAMPLES = 320;
 const MAX_SECONDS = 10;
 
 class PcmFramer {

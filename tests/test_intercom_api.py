@@ -35,7 +35,7 @@ def _request(payload: bytes, content_type: str = "audio/pcm", *, declared: int |
 
 
 def test_audio_message_dispatches_only_bounded_pcm_off_event_loop(monkeypatch) -> None:
-    pcm = bytes(640)
+    pcm = bytes(1280)
     observed = []
 
     def dispatch(camera_id, payload):
@@ -70,9 +70,9 @@ def test_audio_message_dispatches_only_bounded_pcm_off_event_loop(monkeypatch) -
     ("request_obj", "status"),
     [
         (_request(bytes(320), "application/octet-stream"), 415),
-        (_request(bytes(318)), 422),
+        (_request(bytes(638)), 422),
         (_request(bytes(320), declared=intercom.MAX_PCM_BYTES + 1), 413),
-        (_request(bytes(intercom.MAX_PCM_BYTES + 320)), 413),
+        (_request(bytes(intercom.MAX_PCM_BYTES + 640)), 413),
     ],
 )
 def test_audio_message_rejects_ambiguous_or_unbounded_payloads(request_obj, status) -> None:
@@ -95,7 +95,7 @@ def test_incomplete_camera_delivery_is_an_http_failure(monkeypatch) -> None:
         lambda *_args: AudioMessageResult(20, 1, 1, 0, True, True, True),
     )
     with pytest.raises(HTTPException) as caught:
-        asyncio.run(intercom.create_audio_message(_request(bytes(320)), Response(), CAMERA_ID))
+        asyncio.run(intercom.create_audio_message(_request(bytes(640)), Response(), CAMERA_ID))
     assert caught.value.status_code == 502
 
 
@@ -114,7 +114,7 @@ class _AudioBrowser:
     async def receive(self) -> dict:
         if self._step == 0:
             self._step += 1
-            return {"type": "websocket.receive", "bytes": bytes(320)}
+            return {"type": "websocket.receive", "bytes": bytes(640)}
         while not self._consumed.is_set():
             await asyncio.sleep(0.001)
         return {"type": "websocket.receive", "text": "stop"}
@@ -139,7 +139,7 @@ def test_audio_websocket_bridges_bounded_pcm_to_generic_stream_service(monkeypat
             consumed.set()
         observed.append((camera_id, bytes(payload)))
         frames = len(payload) // intercom.PCM_FRAME_BYTES
-        return AudioMessageResult(len(payload) // 16, frames, frames, frames, True, True, True)
+        return AudioMessageResult(len(payload) // 32, frames, frames, frames, True, True, True)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
     monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
@@ -147,7 +147,7 @@ def test_audio_websocket_bridges_bounded_pcm_to_generic_stream_service(monkeypat
 
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
 
-    assert observed == [(CAMERA_ID, bytes(320))]
+    assert observed == [(CAMERA_ID, bytes(640))]
     assert browser.sent[0] == {"type": "ready", "max_ms": 10_000}
     assert browser.sent[-1]["type"] == "complete"
     assert browser.application_state == WebSocketState.DISCONNECTED
@@ -198,7 +198,7 @@ def test_audio_websocket_reports_incomplete_driver_teardown(monkeypatch) -> None
             payload.extend(chunk)
             consumed.set()
         frames = len(payload) // intercom.PCM_FRAME_BYTES
-        return AudioMessageResult(len(payload) // 16, frames, frames, frames, True, False, True)
+        return AudioMessageResult(len(payload) // 32, frames, frames, frames, True, False, True)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
     monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
@@ -221,7 +221,7 @@ def test_audio_websocket_drains_frames_queued_before_graceful_stop(monkeypatch) 
     async def burst_receive():
         if browser._step < 10:
             browser._step += 1
-            return {"type": "websocket.receive", "bytes": bytes(320)}
+            return {"type": "websocket.receive", "bytes": bytes(640)}
         return {"type": "websocket.receive", "text": "stop"}
 
     browser.receive = burst_receive

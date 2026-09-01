@@ -45,7 +45,7 @@ def test_audio_adapter_maps_only_transport_neutral_delivery_state(monkeypatch) -
         lambda selected, pcm: observed.append((selected.device_id, pcm)) or probe,
     )
 
-    result = audio.send(_camera(), bytes(640))
+    result = audio.send(_camera(), bytes(1280))
 
     assert observed == [(enrollment.device_id, bytes(640))]
     assert result.duration_ms == 40
@@ -78,7 +78,7 @@ def test_streaming_audio_adapter_consumes_chunks_once_and_maps_result(monkeypatc
 
     monkeypatch.setattr(audio, "send_pcm_intercom_chunks", stream)
 
-    result = audio.send_stream(_camera(), iter((bytes(320), bytes(320))))
+    result = audio.send_stream(_camera(), iter((bytes(640), bytes(640))))
 
     assert observed == [(enrollment.device_id, (bytes(320), bytes(320)))]
     assert result.duration_ms == 40
@@ -119,8 +119,8 @@ def test_audio_adapter_prefers_direct_rtsp_when_local_material_exists(monkeypatc
         lambda *_args: (_ for _ in ()).throw(AssertionError("P2P fallback must not run")),
     )
 
-    assert audio.send(camera, bytes(320)) is expected
-    assert observed == [(CAMERA_ID, bytes(320))]
+    assert audio.send(camera, bytes(640)) is expected
+    assert observed == [(CAMERA_ID, bytes(640))]
 
 
 @pytest.mark.parametrize(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from ...audio_format import downsample_to_8khz, duration_ms
 from ...db import p2p
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
 from . import rtsp_backchannel
@@ -33,12 +34,12 @@ def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
     if enrollment is None:
         raise ControlNotReady("camera has no linked Yoosee P2P enrollment")
     try:
-        result = send_pcm_intercom(enrollment, pcm16le)
+        result = send_pcm_intercom(enrollment, downsample_to_8khz(pcm16le))
     except (P2PProbeError, RuntimeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc
     audio = result.control.audio
     return AudioMessageResult(
-        duration_ms=len(pcm16le) // 16,
+        duration_ms=duration_ms(pcm16le),
         requested_frames=audio.requested_frames if audio else 0,
         sent_frames=audio.sent_frames if audio else 0,
         acknowledged_frames=audio.acknowledged_frames if audio else 0,
@@ -68,7 +69,7 @@ def send_stream(camera: Camera, pcm16le_chunks: Iterable[bytes]) -> AudioMessage
         nonlocal received_bytes
         for chunk in pcm16le_chunks:
             received_bytes += len(chunk)
-            yield chunk
+            yield downsample_to_8khz(chunk)
 
     try:
         result = send_pcm_intercom_chunks(enrollment, counted_chunks())
@@ -76,7 +77,7 @@ def send_stream(camera: Camera, pcm16le_chunks: Iterable[bytes]) -> AudioMessage
         raise ControlOperationError(str(exc)) from exc
     audio = result.control.audio
     return AudioMessageResult(
-        duration_ms=received_bytes // 16,
+        duration_ms=received_bytes * 1_000 // (16_000 * 2),
         requested_frames=audio.requested_frames if audio else 0,
         sent_frames=audio.sent_frames if audio else 0,
         acknowledged_frames=audio.acknowledged_frames if audio else 0,

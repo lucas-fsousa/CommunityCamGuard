@@ -182,9 +182,11 @@ MAC identity after DHCP changes; future drivers may map a serial or vendor-nativ
 Discovery, driver-independent camera IDs, go2rtc live view, 24/7 recording + retention, storage policy,
 pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
 API are all **working**. Still open: final physical validation of continuous **two-way audio
-(talk)**, broader camera-family coverage for proprietary controls, and optional S3 tiering. Yoosee
-talk uses either legacy Gwell/AMR or IoTVideo/AAC according to the APK's player-family rule; see
-`docs/DECISIONS.md`.
+API are all **working**. Yoosee two-way audio is physically homologated on every current unit through
+the recovered LAN RTSP backchannel, including recorded messages and hold-to-speak from the browser.
+Still open: WAN-independent camera bootstrap/control, long-session intercom hardening, broader
+camera-family coverage for proprietary controls, and optional S3 tiering. See `ROADMAP.md` and
+`docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
 Full backlog, priorities and milestones: **[ROADMAP.md](ROADMAP.md)**.
 

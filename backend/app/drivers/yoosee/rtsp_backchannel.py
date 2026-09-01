@@ -1,9 +1,12 @@
 """Proprietary Yoosee RTSP talkback recovered from the camera firmware.
 
 The firmware advertises ``USER_CMD_SET`` alongside the standard RTSP methods.  Its handler opens
-audio output with an ``AudioCtlCmd: OPEN`` header and consumes fixed-size G.711 A-law RTP packets
-on interleaved TCP channel 2.  This module contains that family-specific lifecycle; the generic
-RTSP layer only supplies request and interleaved-frame primitives.
+audio output with an ``AudioCtlCmd: OPEN`` header and consumes fixed-size PCM blocks inside RTP
+packets on interleaved TCP channel 2.  The payload type remains 8 for compatibility with its RTSP
+parser, but the proprietary speaker path bypasses the advertised G.711 capture codec: firmware
+mixing code reads the 320-byte payload directly as signed 16-bit samples.  This module contains
+that family-specific lifecycle; the generic RTSP layer only supplies request and interleaved-frame
+primitives.
 """
 
 from __future__ import annotations
@@ -14,21 +17,21 @@ import time
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING
 
+from ...audio_format import PCM_FRAME_BYTES, PCM_FRAME_MS
 from ...discovery import rtsp
 from ..contracts import AudioMessageResult
 
 if TYPE_CHECKING:
     from ...db.registry import Camera
 
-PCM_FRAME_BYTES = 320  # 20 ms, 8 kHz, mono, signed 16-bit little-endian.
-PCM_FRAMES_PER_RTP = 2
-PCMA_PAYLOAD_BYTES = 320  # The native decoder copies exactly 0x140 bytes per packet.
+RTP_PAYLOAD_BYTES = 320  # 160 native 16 kHz s16le samples.
 RTP_CHANNEL = 2
 RTP_PAYLOAD_TYPE = 8
-RTP_CLOCK_RATE = 8000
-RTP_PACKET_SECONDS = 0.040
+RTP_CLOCK_RATE = 16_000
+RTP_TIMESTAMP_STEP = 160
+RTP_PACKET_SECONDS = 0.010
+PRELOAD_PACKETS = 10  # The live camera needs about 100 ms queued to avoid speaker underflow.
 OPEN_REFRESH_SECONDS = 4.0  # Firmware closes its decoder after roughly five seconds.
-PCMA_SILENCE = 0xD5
 
 
 class RtspBackchannelError(RuntimeError):
@@ -41,60 +44,11 @@ def supported(camera: Camera) -> bool:
     return bool(camera.last_ip and camera.stream_path and camera.rtsp_port)
 
 
-def _alaw_to_linear(encoded: int) -> int:
-    """Decode one A-law byte as used to build FFmpeg's canonical reverse table."""
-
-    value = encoded ^ 0x55
-    quantized = value & 0x0F
-    segment = (value & 0x70) >> 4
-    if segment:
-        linear = (quantized * 2 + 1 + 32) << (segment + 2)
-    else:
-        linear = (quantized * 2 + 1) << 3
-    return linear if value & 0x80 else -linear
-
-
-def _build_alaw_table() -> bytes:
-    """Build the same nearest-decoded-value lookup used by FFmpeg's PCM encoder."""
-
-    mask = 0xD5
-    table = bytearray(16384)
-    table[8192] = mask
-    magnitude = 1
-    for encoded in range(127):
-        first = _alaw_to_linear(encoded ^ mask)
-        second = _alaw_to_linear((encoded + 1) ^ mask)
-        boundary = (first + second + 4) >> 3
-        while magnitude < boundary:
-            table[8192 - magnitude] = encoded ^ (mask ^ 0x80)
-            table[8192 + magnitude] = encoded ^ mask
-            magnitude += 1
-    while magnitude < 8192:
-        table[8192 - magnitude] = 127 ^ (mask ^ 0x80)
-        table[8192 + magnitude] = 127 ^ mask
-        magnitude += 1
-    table[0] = table[1]
-    return bytes(table)
-
-
-_LINEAR_TO_ALAW = _build_alaw_table()
-
-
-def pcm16le_to_alaw(pcm16le: bytes) -> bytes:
-    """Encode complete little-endian PCM samples without an FFmpeg subprocess."""
-
-    if len(pcm16le) % 2:
-        raise ValueError("PCM input must contain complete signed 16-bit samples")
-    return bytes(
-        _LINEAR_TO_ALAW[(sample + 32768) >> 2] for (sample,) in struct.iter_unpack("<h", pcm16le)
-    )
-
-
 def pack_rtp(payload: bytes, sequence: int, timestamp: int, ssrc: int, *, marker: bool) -> bytes:
-    """Pack one native fixed-size PCMA RTP record (the RTSP ``$`` framing is added later)."""
+    """Pack one proprietary PCM RTP record (the RTSP ``$`` framing is added later)."""
 
-    if len(payload) != PCMA_PAYLOAD_BYTES:
-        raise ValueError("Yoosee RTSP talkback requires exactly 320 PCMA payload bytes")
+    if len(payload) != RTP_PAYLOAD_BYTES:
+        raise ValueError("Yoosee RTSP talkback requires exactly 320 PCM payload bytes")
     payload_type = RTP_PAYLOAD_TYPE | (0x80 if marker else 0)
     return (
         struct.pack(
@@ -110,7 +64,7 @@ def pack_rtp(payload: bytes, sequence: int, timestamp: int, ssrc: int, *, marker
 
 
 class RtspTalkSession:
-    """Own one authenticated RTSP socket and its proprietary speaker lifecycle."""
+    """Own the RTSP probe/media sockets and proprietary speaker lifecycle."""
 
     def __init__(
         self,
@@ -191,7 +145,6 @@ class RtspTalkSession:
             raise RtspBackchannelError(
                 f"camera rejected RTSP credentials ({rtsp.parse_status(response)})"
             )
-
         options = self._request("OPTIONS")
         public = rtsp.parse_headers(options).get("public", "").upper()
         if rtsp.parse_status(options) != 200 or "USER_CMD_SET" not in public:
@@ -206,7 +159,7 @@ class RtspTalkSession:
         self._opened = True
         self._refresh_at = self._clock() + OPEN_REFRESH_SECONDS
 
-    def send_pcma(self, payload: bytes) -> None:
+    def send_pcm(self, payload: bytes) -> None:
         if not self._opened:
             raise RtspBackchannelError("RTSP talkback is not open")
         if self._clock() >= self._refresh_at:
@@ -222,7 +175,7 @@ class RtspTalkSession:
         self._session.send_interleaved(RTP_CHANNEL, packet)
         self._first_packet = False
         self._sequence = (self._sequence + 1) & 0xFFFF
-        self._timestamp = (self._timestamp + PCMA_PAYLOAD_BYTES) & 0xFFFFFFFF
+        self._timestamp = (self._timestamp + RTP_TIMESTAMP_STEP) & 0xFFFFFFFF
 
     def close(self) -> bool:
         closed = not self._opened
@@ -265,45 +218,57 @@ def _send_chunks(
     session = RtspTalkSession(camera, session_factory=session_factory, clock=clock)
     requested_frames = 0
     sent_frames = 0
-    pending = bytearray()
     opened = False
     released = False
-    started = clock()
-    packets = 0
+    pending: list[bytes] = []
+    playback_started: float | None = None
+    sent_packets = 0
+
+    def send_pending(*, preload: bool = False) -> None:
+        nonlocal playback_started, sent_packets
+        if playback_started is None:
+            playback_started = clock()
+        while pending:
+            if not preload or sent_packets >= PRELOAD_PACKETS:
+                deadline = playback_started + (
+                    sent_packets - PRELOAD_PACKETS + 1
+                ) * RTP_PACKET_SECONDS
+                wait = deadline - clock()
+                if wait > 0:
+                    sleep(wait)
+            session.send_pcm(pending.pop(0))
+            sent_packets += 1
+
     try:
         session.open()
         opened = True
-        started = clock()
         for chunk in chunks:
             if len(chunk) != PCM_FRAME_BYTES:
                 raise ValueError("RTSP talkback requires complete 20 ms PCM frames")
-            pending.extend(pcm16le_to_alaw(chunk))
             requested_frames += 1
-            if len(pending) < PCMA_PAYLOAD_BYTES:
+            pending.extend(
+                chunk[offset : offset + RTP_PAYLOAD_BYTES]
+                for offset in range(0, PCM_FRAME_BYTES, RTP_PAYLOAD_BYTES)
+            )
+            if playback_started is None and len(pending) < PRELOAD_PACKETS:
                 continue
-            if packets:
-                wait = started + packets * RTP_PACKET_SECONDS - clock()
-                if wait > 0:
-                    sleep(wait)
-            session.send_pcma(bytes(pending))
-            pending.clear()
-            packets += 1
+            send_pending(preload=playback_started is None)
             sent_frames = requested_frames
         if pending:
-            if packets:
-                wait = started + packets * RTP_PACKET_SECONDS - clock()
-                if wait > 0:
-                    sleep(wait)
-            pending.extend(bytes((PCMA_SILENCE,)) * (PCMA_PAYLOAD_BYTES - len(pending)))
-            session.send_pcma(bytes(pending))
+            send_pending(preload=True)
             sent_frames = requested_frames
+        if playback_started is not None:
+            # CLOSE disables the camera-global decoder immediately. Let its queued PCM drain first.
+            wait = playback_started + sent_packets * RTP_PACKET_SECONDS - clock()
+            if wait > 0:
+                sleep(wait)
     finally:
         released = session.close()
 
     if requested_frames == 0:
         raise ValueError("RTSP talkback requires at least one PCM frame")
     return AudioMessageResult(
-        duration_ms=requested_frames * 20,
+        duration_ms=requested_frames * PCM_FRAME_MS,
         requested_frames=requested_frames,
         sent_frames=sent_frames,
         acknowledged_frames=sent_frames,

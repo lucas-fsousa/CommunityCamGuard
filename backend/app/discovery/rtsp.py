@@ -178,6 +178,7 @@ class RtspSession:
         self._delay = delay
         self._cseq = 0
         self._first = True
+        self._interleaved_started = False
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.settimeout(timeout)
         self._sock.connect((ip, port))
@@ -242,6 +243,11 @@ class RtspSession:
             raise ValueError("RTSP interleaved channel must fit in one byte")
         if not payload or len(payload) > 0xFFFF:
             raise ValueError("RTSP interleaved payload must contain 1..65535 bytes")
+        if not self._interleaved_started:
+            # Avoid holding the first tiny media record while TCP waits for an ACK. The receiver
+            # can parse multiple interleaved records from one recv, so coalescing remains safe.
+            self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self._interleaved_started = True
         self._sock.sendall(b"$" + bytes((channel,)) + struct.pack("!H", len(payload)) + payload)
 
     def close(self) -> None:

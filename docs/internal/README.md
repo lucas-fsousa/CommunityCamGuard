@@ -18,7 +18,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 | [0005](0005-live-view-transcode-and-codec-ceiling.md) | Live view: go2rtc, mandatory transcode, codec/CPU ceiling |
 | [0006](0006-bounded-ffmpeg-oom-containment.md) | Bounded ffmpeg + cgroup limits to contain OOM |
 | [0007](0007-ptz-onvif-fire-and-forget.md) | PTZ over ONVIF, fire-and-forget |
-| [0008](0008-reboot-and-two-way-audio-live-in-vendor-p2p.md) | Reboot & two-way audio live in the vendor P2P channel |
+| [0008](0008-reboot-and-two-way-audio-live-in-vendor-p2p.md) | Reboot and two-way audio outside standard ONVIF; LAN RTSP talkback recovered |
 | [0009](0009-storage-policy-never-delete-plus-retention.md) | Storage policy: never-delete monitor + opt-in retention |
 | [0010](0010-rekey-to-authoritative-mac-and-backfill.md) | Re-key to authoritative MAC + capability backfill |
 | [0011](0011-listen-in-audio-via-h264-web-variant.md) | Listen-in audio via the H.264 `_web` variant |

@@ -160,19 +160,19 @@ string alone must never grant another driver's controls.
   hold a P2P route directly from the event loop.
 - Incremental audio is also a distinct driver-neutral capability. The application service resolves
   one camera/driver, acquires that camera's nonblocking operation lock for the full iterator lifetime,
-  and validates nonempty complete 320-byte PCM-frame multiples under the same ten-second ceiling.
+  and validates nonempty complete 640-byte PCM-frame multiples under the same ten-second ceiling.
   The Yoosee adapter alone maps that iterator to its internal route orchestrator. Other brands remain
   unsupported unless their own driver opts in; camera JSON advertises recorded messages and streaming
   separately. The continuous WebSocket consumes only this generic contract.
 - The continuous API is a separate manually guarded WebSocket because HTTP-only dependencies cannot
   be assumed to protect an upgrade. It verifies the signed dashboard cookie plus the same strict LAN
-  client/Host/Origin/forwarding evidence before acceptance. Only exact 320-byte binary frames and text
+  client/Host/Origin/forwarding evidence before acceptance. Only exact 640-byte binary frames and text
   `stop` are valid after readiness. A 25-frame queue isolates the async socket from one blocking driver
   worker; overflow and two-second idle timeout fail closed, and ten seconds is an absolute content cap.
   The handler signals the iterator and waits boundedly for teardown on every exit.
 - The dashboard consumer is another isolated semantic module. Merely opening its modal has no camera
   or microphone side effect. Pointer-down explicitly obtains the microphone and opens the protected
-  socket; after `ready`, a phase-preserving 8 kHz resampler emits only 160-sample/320-byte little-endian
+  socket; after `ready`, a phase-preserving 16 kHz resampler emits only 320-sample/640-byte little-endian
   frames. Pointer-up, cancellation, lost capture or the ten-second timer sends `stop` and closes browser
   media resources. The new route and UI remain simulation-tested only; physical speech validation is
   deliberately tracked separately for camera 3.
@@ -217,7 +217,7 @@ string alone must never grant another driver's controls.
   instant, peaking 27.6 dB above the capture baseline. This closes server-to-speaker playback with
   acoustic loopback evidence; human speech intelligibility and browser capture remain separate work.
 - The first public audio boundary is driver-neutral recorded-message delivery, not a vendor command
-  endpoint. It accepts only complete 8 kHz/mono/s16le 20 ms frames, caps bodies at ten seconds,
+  endpoint. It accepts only complete 16 kHz/mono/s16le 20 ms frames, caps bodies at ten seconds,
   requires the same authenticated trusted-LAN checks as camera controls, dispatches through the
   selected driver's explicit support method and shares the per-camera operation lock. Blocking P2P
   work runs outside the FastAPI event loop. Unsupported drivers fail closed and public results omit
@@ -225,7 +225,7 @@ string alone must never grant another driver's controls.
   session contract rather than overloading this bounded request.
 - The dashboard's recorded-message client is an isolated semantic module. It creates an
   AudioWorklet only after an explicit click, keeps Float32 capture and converted PCM in memory,
-  averages the native sample windows down to 8 kHz, trims to complete 160-sample frames and stops at
+  averages the native sample windows down to 16 kHz, trims to complete 320-sample frames and stops at
   ten seconds. Stopping does not transmit: local preview and confirmed send are separate actions,
   and opening/closing the modal never contacts the camera. Browser microphone policy still requires
   `localhost` or trusted HTTPS; the API retains its independent trusted-LAN/authentication checks.
@@ -319,8 +319,9 @@ string alone must never grant another driver's controls.
 - Modern AMR frames retain the native `systemTime` epoch-microsecond timestamps. Codec identity,
   frame cadence and timestamp units are explicit transmit-side boundaries rather than inferences
   from the independent receive stream.
-- The generic HTTP/WebSocket contract remains 8 kHz mono PCM. The Yoosee driver alone chooses an
-  incremental OpenCORE AMR encoder for both player families. Family selection still determines the
+- The generic HTTP/WebSocket contract is 16 kHz mono PCM. The Yoosee RTSP route preserves it and
+  sends two 10 ms raw-PCM records per generic frame; the P2P fallback downsamples inside the Yoosee
+  adapter before its incremental OpenCORE AMR encoder. Family selection still determines the
   control lifecycle, command channel and timestamp units; those details remain invisible to the
   application and browser.
 - Golden framing tests cover the command wrapper and TX header; sender/session tests cover epoch

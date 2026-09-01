@@ -104,8 +104,8 @@ def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
     assert '"ccg/audio-message": moduleUrl("/modules/audio-message.js")' in boot
     assert "navigator.mediaDevices?.getUserMedia" in audio
     assert "new AudioWorkletNode" in audio
-    assert "const TARGET_RATE = 8000" in audio
-    assert "const FRAME_SAMPLES = 160" in audio
+    assert "const TARGET_RATE = 16000" in audio
+    assert "const FRAME_SAMPLES = 320" in audio
     assert "const MAX_SECONDS = 10" in audio
     assert 'headers: { "Content-Type": "audio/pcm" }' in audio
     assert "/intercom/messages`" in audio
@@ -128,8 +128,8 @@ def test_push_to_talk_ui_streams_exact_frames_only_while_held():
     assert "if (cam.audio_streams) actions.append(pushToTalkButton(cam))" in live
     assert 'from "ccg/push-to-talk"' in live
     assert '"ccg/push-to-talk": moduleUrl("/modules/push-to-talk.js")' in boot
-    assert "const TARGET_RATE = 8000" in talk
-    assert "const FRAME_SAMPLES = 160" in talk
+    assert "const TARGET_RATE = 16000" in talk
+    assert "const FRAME_SAMPLES = 320" in talk
     assert "new Uint8Array(FRAME_SAMPLES * 2)" in talk
     assert 'this.socket.send("stop")' in talk
     assert "await Promise.race([" in talk

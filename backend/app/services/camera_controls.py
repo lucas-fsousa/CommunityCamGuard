@@ -11,6 +11,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 
 from .. import drivers
+from ..audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES
 from ..db import registry
 from ..db.registry import Camera
 from ..drivers.contracts import (
@@ -32,10 +33,6 @@ class ControlBusy(RuntimeError):
 
 _locks_guard = threading.Lock()
 _camera_locks: dict[str, threading.Lock] = {}
-_PCM_FRAME_BYTES = 320
-_MAX_PCM_BYTES = 160_000
-
-
 def _control_lock(camera_id: str) -> threading.Lock:
     with _locks_guard:
         return _camera_locks.setdefault(camera_id, threading.Lock())
@@ -116,10 +113,10 @@ def send_audio_message(camera_id: str, pcm16le: bytes) -> AudioMessageResult:
 def _bounded_pcm_chunks(chunks: Iterable[bytes]) -> Iterator[bytes]:
     received = 0
     for chunk in chunks:
-        if not chunk or len(chunk) % _PCM_FRAME_BYTES:
+        if not chunk or len(chunk) % PCM_FRAME_BYTES:
             raise ValueError("audio stream chunks must contain complete 20 ms PCM frames")
         received += len(chunk)
-        if received > _MAX_PCM_BYTES:
+        if received > MAX_PCM_BYTES:
             raise ValueError("audio stream exceeds the ten-second safety bound")
         yield chunk
     if not received:

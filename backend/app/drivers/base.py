@@ -208,7 +208,7 @@ class CameraDriver:
         return False
 
     def send_audio_message(self, camera: Camera, pcm16le: bytes) -> AudioMessageResult:
-        """Send fixed-format 8 kHz/mono/s16le PCM through a driver-owned transport."""
+        """Send canonical 16 kHz/mono/s16le PCM through a driver-owned transport."""
 
         raise Unsupported("audio_message")
 
@@ -220,7 +220,7 @@ class CameraDriver:
     def send_audio_stream(
         self, camera: Camera, pcm16le_chunks: Iterable[bytes]
     ) -> AudioMessageResult:
-        """Consume one bounded 8 kHz/mono/s16le stream while retaining driver state."""
+        """Consume one bounded 16 kHz/mono/s16le stream while retaining driver state."""
 
         raise Unsupported("audio_stream")
 
