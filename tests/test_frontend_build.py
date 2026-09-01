@@ -113,6 +113,8 @@ def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
     assert "class PcmPreview" in audio
     assert "this.stop();" in audio
     assert "source.stop()" in audio
+    assert 'context && context.state !== "closed"' in audio
+    assert 'context?.state !== "closed"' not in audio
     assert "pcmPreview.play(pcm)" in audio
     assert audio.count("pcmPreview.stop()") >= 3
 

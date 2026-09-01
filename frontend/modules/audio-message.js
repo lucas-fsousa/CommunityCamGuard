@@ -116,7 +116,7 @@ class PcmPreview {
       try { source.stop(); } catch { /* It may already have ended. */ }
       source.disconnect();
     }
-    if (context?.state !== "closed") void context.close();
+    if (context && context.state !== "closed") void context.close();
   }
 
   play(pcm) {
