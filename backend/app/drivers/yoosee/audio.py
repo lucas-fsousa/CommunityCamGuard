@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ...db import p2p
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
+from . import rtsp_backchannel
 from .p2p import P2PProbeError, send_pcm_intercom
 from .p2p.intercom_stream import send_pcm_intercom_chunks
 
@@ -15,10 +16,17 @@ if TYPE_CHECKING:
 
 
 def supported(camera: Camera) -> bool:
-    return bool(camera.camera_id and p2p.has_enrollment_for_camera(camera.camera_id))
+    return rtsp_backchannel.supported(camera) or bool(
+        camera.camera_id and p2p.has_enrollment_for_camera(camera.camera_id)
+    )
 
 
 def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
+    if rtsp_backchannel.supported(camera):
+        try:
+            return rtsp_backchannel.send(camera, pcm16le)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise ControlOperationError(str(exc)) from exc
     if not camera.camera_id:
         raise ControlNotReady("camera has no stable public identity")
     enrollment = p2p.get_enrollment_for_camera(camera.camera_id)
@@ -42,6 +50,12 @@ def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
 
 def send_stream(camera: Camera, pcm16le_chunks: Iterable[bytes]) -> AudioMessageResult:
     """Consume one trusted bounded PCM iterator through a single direct route."""
+
+    if rtsp_backchannel.supported(camera):
+        try:
+            return rtsp_backchannel.send_stream(camera, pcm16le_chunks)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise ControlOperationError(str(exc)) from exc
 
     if not camera.camera_id:
         raise ControlNotReady("camera has no stable public identity")

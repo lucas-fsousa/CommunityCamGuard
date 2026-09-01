@@ -15,6 +15,7 @@ import base64
 import hashlib
 import re
 import socket
+import struct
 import time
 import uuid
 
@@ -228,6 +229,20 @@ class RtspSession:
                     break
                 body += data
         return head + b"\r\n\r\n" + body
+
+    def send_interleaved(self, channel: int, payload: bytes) -> None:
+        """Send one RFC 2326 RTP-over-RTSP frame on the existing TCP connection.
+
+        Some camera families use a proprietary RTSP control verb to enable a backchannel and
+        then consume RTP on that same socket.  Keeping the framing primitive here lets those
+        drivers own the codec and lifecycle without reaching into this session's private socket.
+        """
+
+        if not 0 <= channel <= 0xFF:
+            raise ValueError("RTSP interleaved channel must fit in one byte")
+        if not payload or len(payload) > 0xFFFF:
+            raise ValueError("RTSP interleaved payload must contain 1..65535 bytes")
+        self._sock.sendall(b"$" + bytes((channel,)) + struct.pack("!H", len(payload)) + payload)
 
     def close(self) -> None:
         try:

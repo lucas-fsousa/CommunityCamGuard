@@ -41,3 +41,19 @@ hard-coded list when absent).
 - Also found in the sweep and deliberately **not wired**: `Get/SetVideoEncoderConfigurations` — a
   decoy that reports H.264 720p while the real stream is HEVC 1080p; the ONVIF encoder metadata is
   disconnected from the real encoder, so a quality feature built on it would be fiction (see ADR 0005).
+
+## 2026-09-01 amendment — proprietary RTSP talkback recovered
+
+The original conclusion remains correct for standard ONVIF and its advertised SDP, but is no longer
+correct for the firmware's complete RTSP surface. Static analysis of the matching
+`RtspServer_0.0.0.2` executable recovered an undocumented `USER_CMD_SET` method. Its
+`AudioCtlCmd: OPEN|CLOSE` control enables a fixed PCMA/8 kHz decoder fed through RTP-over-TCP
+interleaved channel 2 (320-byte payloads). A host-only live test on camera 3 was audible and the
+production driver completed 100/100 browser-format PCM frames with explicit cleanup.
+
+The dashboard now prefers this LAN-only RTSP backchannel and retains Gwell P2P only as a fallback
+for enrolled cameras without usable local RTSP material. Standard `Require: .../backchannel` is
+still ignored, so this is deliberately isolated in the Yoosee driver rather than presented as a
+generic ONVIF capability. The firmware also accepts `USER_CMD_SET` without Digest authentication;
+the app's existing local-only intercom boundary is therefore a security requirement, not merely a
+product choice.

@@ -102,6 +102,27 @@ def test_audio_adapter_normalizes_protocol_failures(monkeypatch) -> None:
         audio.send(_camera(), bytes(320))
 
 
+def test_audio_adapter_prefers_direct_rtsp_when_local_material_exists(monkeypatch) -> None:
+    camera = _camera()
+    camera.last_ip = "192.0.2.10"
+    camera.stream_path = "/onvif1"
+    expected = AudioMessageResult(20, 1, 1, 1, True, True, True)
+    observed = []
+    monkeypatch.setattr(
+        audio.rtsp_backchannel,
+        "send",
+        lambda selected, pcm: observed.append((selected.camera_id, pcm)) or expected,
+    )
+    monkeypatch.setattr(
+        audio,
+        "send_pcm_intercom",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("P2P fallback must not run")),
+    )
+
+    assert audio.send(camera, bytes(320)) is expected
+    assert observed == [(CAMERA_ID, bytes(320))]
+
+
 @pytest.mark.parametrize(
     "result",
     [
