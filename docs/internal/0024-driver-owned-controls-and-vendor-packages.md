@@ -295,29 +295,34 @@ string alone must never grant another driver's controls.
 
 ### Intercom player-family correction (2026-08-31)
 
-- The earlier camera-3 AMR path was selected from the legacy monitor screen without applying the
-  APK's player factory. Static analysis of `DeviceUtils.y()` and `bf.o` proves that numeric device
+- The earlier camera-3 control path was selected from the legacy monitor screen without applying
+  the APK's player factory. Static analysis of `DeviceUtils.y()` and `bf.o` proves that numeric device
   IDs above unsigned 32-bit use IoTVideo `LivePlayer`; camera 3's vendor ID `7443576841` is in that
   family. IDs through `0xffffffff` retain the legacy Gwell/AMR implementation.
 - IoTVideo talk has a separate driver-owned lifecycle: AV START and media use the low KCP
   conversation; sequenced built-in command `0x32` uses the high conversation; STOP and AV CLOSE
-  remain unconditional cleanup. The negotiated camera-3 audio header is AAC-LC, option 2, mono,
-  16-bit, 16 kHz and 1024 samples per frame.
-- The negotiated header configures `AudioInputImpl` locally. `LivePlayer::set_intercom` also
-  registers `send_av_enc_info(2)` through `Intercom::on_start_cb`; therefore the audio-only header
-  is transmitted on the low conversation, but only after the correlated application response to
-  `0x32`. KCP delivery ACK alone must not unlock the header or AVDATA sender.
-- Native `fill_adts_header` proves that transmitted frames start with MPEG-4 ADTS `ff f1`, although
-  received camera audio starts with MPEG-2 ADTS `ff f9`. Native `systemTime` uses Unix epoch
-  microseconds. `AudioInputImpl::apply_codec_format` also fixes the AAC encoder bit rate at 40,000
-  bit/s. These details are now explicit validation boundaries rather than inferred from RX.
+  remain unconditional cleanup. The negotiated camera receive header is AAC-LC, but it does not
+  define the intercom transmit format.
+- Complete DEX disassembly recovered the omitted `df.a` (`TMonitorPlayer`) implementation. Before
+  playback it calls `configAudioFormat(AudioFormat(AMR, 8000, 160, 1, 16, 0))` explicitly. The
+  driver must therefore advertise and send AMR-NB mode 7, mono, 16-bit, 8 kHz and 160 samples per
+  frame even while the camera-to-client stream remains AAC/16 kHz.
+- `LivePlayer::set_intercom` registers `send_av_enc_info(2)` through `Intercom::on_start_cb`.
+  Native disassembly proves that `Intercom::start_intercom` invokes that callback, starts the audio
+  input and only then dispatches asynchronous `send_intercom_cmd(1)`. The camera does not emit the
+  expected correlated response to `0x32`; matching the SDK means starting AVDATA after its KCP
+  transport ACK rather than blocking an already active audio input for ten seconds.
+- Modern AMR frames retain the native `systemTime` epoch-microsecond timestamps. Codec identity,
+  frame cadence and timestamp units are explicit transmit-side boundaries rather than inferences
+  from the independent receive stream.
 - The generic HTTP/WebSocket contract remains 8 kHz mono PCM. The Yoosee driver alone chooses an
-  incremental OpenCORE AMR encoder for legacy IDs or a bounded FFmpeg AAC encoder for IoTVideo
-  IDs. Codec bytes and family selection remain invisible to the application and browser.
+  incremental OpenCORE AMR encoder for both player families. Family selection still determines the
+  control lifecycle, command channel and timestamp units; those details remain invisible to the
+  application and browser.
 - Golden framing tests cover the command wrapper and TX header; sender/session tests cover epoch
   timestamps, channel/sequence separation, ACK backpressure and cleanup. The full suite and static
-  checks pass, and a local encoder integration produced validated `ff f1` frames. A corrected
-  camera-3 research run acknowledged 80/80 frames; physical audibility is still pending.
+  checks pass. A corrected camera-3 research run acknowledged its AMR header, START, 251/251 audio
+  frames, STOP, CLOSE and direct-route teardown. Physical audibility of that exact run is pending.
 
 ## Consequences
 

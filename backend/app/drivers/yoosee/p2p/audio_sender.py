@@ -42,20 +42,20 @@ class AudioSendResult:
         )
 
 
-def validate_legacy_audio_frames(frames: Sequence[bytes]) -> None:
+def validate_amr_audio_frames(frames: Sequence[bytes]) -> None:
     """Reject unbounded input and anything other than raw AMR-NB mode-7 frames."""
 
     if not frames:
         raise ValueError("at least one AMR-NB frame is required")
     if len(frames) > MAX_AUDIO_FRAMES:
-        raise ValueError("legacy talk audio exceeds the ten-second safety bound")
+        raise ValueError("AMR-NB talk audio exceeds the ten-second safety bound")
     if any(len(frame) != AMR_MODE_7_FRAME_BYTES or frame[0] != AMR_MODE_7_TOC for frame in frames):
-        raise ValueError("legacy talk requires complete AMR-NB mode-7 frames")
+        raise ValueError("talk audio requires complete AMR-NB mode-7 frames")
 
 
-def _validate_legacy_audio_frame(frame: bytes) -> None:
+def validate_amr_audio_frame(frame: bytes) -> None:
     if len(frame) != AMR_MODE_7_FRAME_BYTES or frame[0] != AMR_MODE_7_TOC:
-        raise ValueError("legacy talk requires a complete AMR-NB mode-7 frame")
+        raise ValueError("talk audio requires a complete AMR-NB mode-7 frame")
 
 
 class LegacyAudioSender:
@@ -108,7 +108,7 @@ class LegacyAudioSender:
             raise RuntimeError("legacy talk sender has aborted")
         if self._requested_frames >= self._max_frames:
             raise ValueError("legacy talk audio exceeds the configured safety bound")
-        _validate_legacy_audio_frame(audio_frame)
+        validate_amr_audio_frame(audio_frame)
 
         if time.monotonic() >= self._session_deadline:
             self._aborted = True
@@ -217,7 +217,7 @@ def send_legacy_audio_frames(
     waiting is acknowledged so the reverse stream cannot deadlock this channel.
     """
 
-    validate_legacy_audio_frames(frames)
+    validate_amr_audio_frames(frames)
     sender = LegacyAudioSender(
         sock,
         peer,
@@ -238,3 +238,4 @@ def send_legacy_audio_frames(
 
 # Compatibility for third-party extensions that imported the old name.
 LegacyAudioSendResult = AudioSendResult
+validate_legacy_audio_frames = validate_amr_audio_frames

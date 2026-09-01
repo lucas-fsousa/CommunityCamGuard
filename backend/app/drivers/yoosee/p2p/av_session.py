@@ -40,7 +40,7 @@ def initialize_av_session(
     calling: CallingResult,
     timeout: float,
 ) -> AvSessionResult:
-    """Send four bounded AV INIT attempts and ACK camera pushes without opening talk."""
+    """Retry AV INIT until the camera accepts it and publishes its codec header."""
 
     attempt = calling.attempt
     peer = calling.peer_endpoint
@@ -56,8 +56,10 @@ def initialize_av_session(
     encoding_header: V1EncodingHeader | None = None
     bounded_timeout = max(0.1, min(float(timeout), 5.0))
 
+    next_send_sequence = 0
     for sequence in range(4):
         sock.sendto(build_kcp_push(conv, sequence, init), peer)
+        next_send_sequence = sequence + 1
         for wire, source in receive_datagrams(
             sock, time.monotonic() + min(bounded_timeout, 0.25)
         ):
@@ -108,11 +110,17 @@ def initialize_av_session(
                         encoding_header = unpack_v1_encoding_header(payload[:28])
                     except ValueError:
                         pass
+        if (
+            kcp_ack_count > 0
+            and any(action in (2, 6) for action in actions)
+            and encoding_header is not None
+        ):
+            break
     return AvSessionResult(
         kcp_ack_count,
         tuple(actions),
         bulk_frames,
-        4,
+        next_send_sequence,
         tuple(sorted(inbound_next.items())),
         stream_version,
         encoding_header,

@@ -6,7 +6,6 @@ import socket
 import time
 
 from ....db.p2p import P2PEnrollment
-from .aac_lc import encode_pcm16le as encode_pcm16le_aac
 from .amr_nb import encode_pcm16le
 from .av_session import initialize_av_session
 from .camera_session import open_camera_session
@@ -204,11 +203,7 @@ def send_pcm_intercom(
     This function intentionally has no driver-control, HTTP or browser binding.
     """
 
-    frames = (
-        encode_pcm16le_aac(pcm16le, max_seconds=max_seconds)
-        if player_family(enrollment.device_id) is PlayerFamily.IOTVIDEO
-        else encode_pcm16le(pcm16le, max_seconds=max_seconds)
-    )
+    frames = encode_pcm16le(pcm16le, max_seconds=max_seconds)
     return run_with_fresh_access(
         enrollment,
         lambda current: _probe_intercom(

@@ -84,23 +84,28 @@ def test_modern_lifecycle_separates_media_and_command_channels(monkeypatch) -> N
     ]
     assert [(item.conv, item.sequence) for item in segments] == [
         (attempt.link_id, 0),
-        (attempt.link_id | 0x80000000, 4),
         (attempt.link_id, 1),
+        (attempt.link_id | 0x80000000, 4),
         (attempt.link_id | 0x80000000, 5),
         (attempt.link_id, 2),
     ]
-    talk_on = decrypt_command_tlv(segments[1].body, attempt.cookie)
+    talk_on = decrypt_command_tlv(segments[2].body, attempt.cookie)
     talk_off = decrypt_command_tlv(segments[3].body, attempt.cookie)
     assert talk_on[29] == talk_off[29] == 0x32
     assert talk_on[-1] == 1 and talk_off[-1] == 0
-    encoding = decrypt_media_tlv(segments[2].body, attempt.cookie)
-    assert encoding[:6] == bytes.fromhex("ff ff ff 88 02 01")
+    encoding = decrypt_media_tlv(segments[1].body, attempt.cookie)
+    assert encoding == bytes.fromhex(
+        "ff ff ff 88 02 01 00 00 05 00 00 01 40 1f 00 00 "
+        "a0 00 00 00 00 00 00 00 00 00 00 00"
+    )
     assert int.from_bytes(segments[0].body[8:12], "little") == 6
     assert int.from_bytes(segments[4].body[8:12], "little") == 7
 
 
-def test_modern_lifecycle_rejects_an_unexpected_negotiated_codec() -> None:
+def test_modern_lifecycle_does_not_reuse_the_negotiated_receive_codec(monkeypatch) -> None:
     calling, av = _state()
+    peer = calling.peer_endpoint
+    assert peer is not None
     header = av.encoding_header
     assert header is not None
     unsupported = AvSessionResult(
@@ -124,13 +129,36 @@ def test_modern_lifecycle_rejects_an_unexpected_negotiated_codec() -> None:
             header.video_height,
         ),
     )
+    sent = []
+
+    class FakeSocket:
+        def sendto(self, payload, address):
+            sent.append((payload, address))
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sent[-1][0])[0]
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    peer,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(modern_intercom_session, "receive_datagrams", receive)
     result = modern_intercom_session.run_modern_intercom_control(
-        object(), calling, unsupported, 0.1  # type: ignore[arg-type]
+        FakeSocket(), calling, unsupported, 0.1  # type: ignore[arg-type]
     )
-    assert result.completed is False
+    assert result.completed is True
 
 
-def test_modern_lifecycle_does_not_send_header_or_audio_without_command_response(
+def test_modern_lifecycle_uses_transport_ack_without_command_response(
     monkeypatch,
 ) -> None:
     calling, av = _state()
@@ -164,8 +192,8 @@ def test_modern_lifecycle_does_not_send_header_or_audio_without_command_response
         FakeSocket(), calling, av, 0.1  # type: ignore[arg-type]
     )
 
-    assert result.talk_start_acknowledged is False
-    assert result.header_acknowledged is False
+    assert result.talk_start_acknowledged is True
+    assert result.header_acknowledged is True
     pushes = [
         segment
         for wire, _peer in sent
@@ -174,7 +202,49 @@ def test_modern_lifecycle_does_not_send_header_or_audio_without_command_response
     ]
     assert [(item.conv, item.sequence) for item in pushes] == [
         (attempt.link_id, 0),
+        (attempt.link_id, 1),
         (attempt.link_id | 0x80000000, 4),
         (attempt.link_id | 0x80000000, 5),
-        (attempt.link_id, 1),
+        (attempt.link_id, 2),
     ]
+
+
+def test_modern_start_fails_when_the_microphone_command_is_not_delivered(monkeypatch) -> None:
+    calling, av = _state()
+    attempt = calling.attempt
+    peer = calling.peer_endpoint
+    assert attempt is not None and peer is not None
+    sent = []
+
+    class FakeSocket:
+        def sendto(self, payload, address):
+            sent.append((payload, address))
+
+    def receive(*_args):
+        outbound = parse_kcp_segments(sent[-1][0])[0]
+        if outbound.conv == attempt.link_id | 0x80000000 and outbound.sequence == 4:
+            return iter(())
+        return iter(
+            (
+                (
+                    build_kcp_ack(
+                        outbound.conv,
+                        outbound.sequence,
+                        outbound.timestamp,
+                        unacknowledged=outbound.sequence + 1,
+                    ),
+                    peer,
+                ),
+            )
+        )
+
+    monkeypatch.setattr(modern_intercom_session, "receive_datagrams", receive)
+    session = modern_intercom_session.ModernIntercomSession(
+        FakeSocket(), calling, av, 0.1  # type: ignore[arg-type]
+    )
+
+    assert session.start() is False
+    result = session.close()
+    assert result.talk_start_acknowledged is False
+    assert result.talk_stop_acknowledged is True
+    assert result.av_close_acknowledged is True

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import math
 import socket
 import time
 from collections.abc import Iterable
 
 from ....db.p2p import P2PEnrollment
-from .aac_lc import AAC_FRAME_INTERVAL_SECONDS, AacLcAdtsEncoder
 from .amr_nb import AmrNbEncoder
 from .av_session import initialize_av_session
 from .camera_session import open_camera_session
@@ -41,18 +39,14 @@ class PcmIntercomStream:
         self._timeout = max(0.5, min(float(timeout), 5.0))
         self._deadline = time.monotonic() + max(8.0, min(float(total_timeout), 45.0))
         self._family = player_family(enrollment.device_id)
-        self._max_frames = (
-            math.ceil(max_seconds / AAC_FRAME_INTERVAL_SECONDS) + 3
-            if self._family is PlayerFamily.IOTVIDEO
-            else int(max_seconds * 50)
-        )
+        self._max_frames = int(max_seconds * 50)
         self._max_seconds = max_seconds
         self._sock: socket.socket | None = None
         self._node: CertifiedNode | None = None
         self._target: OnlineDevice | None = None
         self._calling: CallingResult | None = None
         self._control: LegacyIntercomSession | ModernIntercomSession | None = None
-        self._encoder: AmrNbEncoder | AacLcAdtsEncoder | None = None
+        self._encoder: AmrNbEncoder | None = None
         self._direct_handshake = False
         self._media_meter_acknowledged = False
         self._av_accepted = False
@@ -125,11 +119,7 @@ class PcmIntercomStream:
         )
         if not self._control.start():
             return False
-        self._encoder = (
-            AacLcAdtsEncoder(max_seconds=self._max_seconds)
-            if self._family is PlayerFamily.IOTVIDEO
-            else AmrNbEncoder(max_seconds=self._max_seconds)
-        )
+        self._encoder = AmrNbEncoder(max_seconds=self._max_seconds)
         return True
 
     def feed_pcm16le(self, pcm16le: bytes) -> int:

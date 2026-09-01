@@ -1,22 +1,25 @@
-"""Paced AAC transport for an established IoTVideo intercom session."""
+"""Paced AMR-NB transport for an established IoTVideo intercom session."""
 
 from __future__ import annotations
 
 import socket
 import time
 
-from .aac_lc import AAC_FRAME_INTERVAL_SECONDS, validate_aac_lc_adts_frame
-from .audio_sender import AudioSendResult
+from .audio_sender import (
+    FRAME_INTERVAL_SECONDS,
+    MAX_AUDIO_FRAMES,
+    AudioSendResult,
+    validate_amr_audio_frame,
+)
 from .media_protocol import KCP_ACK, KCP_PUSH, build_kcp_ack, build_kcp_push, parse_kcp_segments
 from .session_io import receive_datagrams
 from .stream_protocol import build_v1_audio_packet, encrypt_media_tlv
 
-MAX_AUDIO_FRAMES = 160
 MAX_TRANSPORT_SLACK_SECONDS = 2.0
 
 
 class ModernAudioSender:
-    """Send one MPEG-4 AAC/ADTS frame per acknowledged v1 media packet."""
+    """Send one AMR-NB frame per acknowledged IoTVideo v1 media packet."""
 
     def __init__(
         self,
@@ -31,7 +34,7 @@ class ModernAudioSender:
         max_frames: int = MAX_AUDIO_FRAMES,
     ) -> None:
         if not 1 <= max_frames <= MAX_AUDIO_FRAMES:
-            raise ValueError("modern talk frame bound must be between one and 160")
+            raise ValueError("modern talk frame bound must be between one and 500")
         self._sock = sock
         self._peer = peer
         self._conv = conv
@@ -41,7 +44,9 @@ class ModernAudioSender:
         self._bounded_timeout = max(0.1, min(float(timeout), 2.0))
         self._max_frames = max_frames
         self._session_deadline = (
-            time.monotonic() + max_frames * AAC_FRAME_INTERVAL_SECONDS + MAX_TRANSPORT_SLACK_SECONDS
+            time.monotonic()
+            + max_frames * FRAME_INTERVAL_SECONDS
+            + MAX_TRANSPORT_SLACK_SECONDS
         )
         self._last_send_at: float | None = None
         self._requested_frames = 0
@@ -57,12 +62,12 @@ class ModernAudioSender:
             raise RuntimeError("modern talk sender has aborted")
         if self._requested_frames >= self._max_frames:
             raise ValueError("modern talk audio exceeds the configured safety bound")
-        validate_aac_lc_adts_frame(audio_frame)
+        validate_amr_audio_frame(audio_frame)
         if time.monotonic() >= self._session_deadline:
             self._aborted = True
             return False
         if self._last_send_at is not None:
-            remaining = self._last_send_at + AAC_FRAME_INTERVAL_SECONDS - time.monotonic()
+            remaining = self._last_send_at + FRAME_INTERVAL_SECONDS - time.monotonic()
             if remaining > 0:
                 time.sleep(remaining)
 

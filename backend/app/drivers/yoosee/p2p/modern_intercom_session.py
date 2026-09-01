@@ -1,4 +1,4 @@
-"""IoTVideo intercom control lifecycle with incremental AAC transport."""
+"""IoTVideo intercom control lifecycle with incremental AMR-NB transport."""
 
 from __future__ import annotations
 
@@ -20,23 +20,30 @@ from .media_protocol import (
 from .modern_audio_sender import MAX_AUDIO_FRAMES, ModernAudioSender
 from .session_io import receive_datagrams
 from .stream_protocol import (
-    MICROPHONE_STATE_CHANGE,
-    decrypt_command_tlv,
-    decrypt_media_tlv,
+    V1EncodingHeader,
     encrypt_command_tlv,
     encrypt_media_tlv,
     pack_microphone_command,
     pack_v1_audio_encoding_header,
-    parse_builtin_command,
-    unpack_v1_sequence_user_data,
-    unpack_v1_user_data_frames,
 )
 
-APPLICATION_RESPONSE_TIMEOUT_SECONDS = 10.0
+INTERCOM_AUDIO_FORMAT = V1EncodingHeader(
+    0x0102,
+    5,  # AudioCodecId.AMR
+    0,
+    1,
+    16,
+    8_000,
+    160,
+    0,
+    0,
+    0,
+    0,
+)
 
 
 class ModernIntercomSession:
-    """Own START/header/AAC/STOP/CLOSE for an IoTVideo ``LivePlayer``."""
+    """Own AV START/header/talk START/AMR/STOP/CLOSE for ``LivePlayer``."""
 
     def __init__(
         self,
@@ -57,15 +64,6 @@ class ModernIntercomSession:
             and av.accepted
             and av.stream_version == 1
             and header is not None
-            and (
-                header.audio_codec,
-                header.audio_codec_option,
-                header.audio_channels,
-                header.audio_bit_width,
-                header.audio_sample_rate,
-                header.audio_frame_size,
-            )
-            == (4, 2, 1, 16, 16_000, 1024)
         )
         link_id = self._attempt.link_id if self._attempt is not None else 0
         self._media_conv = link_id
@@ -73,7 +71,6 @@ class ModernIntercomSession:
         self._media_sequence = 0
         self._command_sequence = av.next_send_sequence
         self._inbound_next = dict(av.inbound_next)
-        self._header = header
         self._bounded_timeout = max(0.1, min(float(timeout), 5.0))
         self._max_audio_frames = max_audio_frames
         self._audio_sender: ModernAudioSender | None = None
@@ -85,45 +82,12 @@ class ModernIntercomSession:
         self._talk_stop_acknowledged = False
         self._av_close_acknowledged = False
 
-    def _matching_command_response(
-        self,
-        body: bytes,
-        command: int,
-        timestamp: int,
-    ) -> bool:
-        attempt = self._attempt
-        if attempt is None or not body:
-            return False
-        try:
-            if body[0] == 2:
-                payload = decrypt_command_tlv(body, attempt.cookie)
-            elif body[0] == 4:
-                payload = decrypt_media_tlv(body, attempt.cookie)
-            else:
-                return False
-            try:
-                command_bodies: tuple[bytes, ...] = (unpack_v1_sequence_user_data(payload),)
-            except ValueError:
-                command_bodies = unpack_v1_user_data_frames(payload)
-        except ValueError:
-            return False
-        for command_body in command_bodies:
-            try:
-                parsed = parse_builtin_command(command_body)
-            except ValueError:
-                continue
-            if parsed.command == command and parsed.timestamp == timestamp:
-                return True
-        return False
-
     def _send_and_wait(
         self,
         conv: int,
         sequence: int,
         body: bytes,
         attempts: int,
-        *,
-        response_match: tuple[int, int] | None = None,
     ) -> bool:
         peer = self._peer
         if peer is None:
@@ -135,16 +99,10 @@ class ModernIntercomSession:
             unacknowledged=self._inbound_next.get(conv, 0),
         )
         acknowledged = False
-        application_responded = response_match is None
         for _attempt in range(attempts):
             self._sock.sendto(wire, peer)
-            receive_window = (
-                APPLICATION_RESPONSE_TIMEOUT_SECONDS
-                if response_match is not None
-                else min(self._bounded_timeout, 0.4)
-            )
             for response, source in receive_datagrams(
-                self._sock, time.monotonic() + receive_window
+                self._sock, time.monotonic() + min(self._bounded_timeout, 0.4)
             ):
                 if source != peer or response[:2] != b"\xc0\x10":
                     continue
@@ -174,15 +132,11 @@ class ModernIntercomSession:
                         ),
                         peer,
                     )
-                    if response_match is not None and self._matching_command_response(
-                        segment.body, *response_match
-                    ):
-                        application_responded = True
-                if acknowledged and application_responded:
+                if acknowledged:
                     break
-            if acknowledged and application_responded:
+            if acknowledged:
                 break
-        return acknowledged and application_responded
+        return acknowledged
 
     def start(self) -> bool:
         if self._closed:
@@ -194,8 +148,7 @@ class ModernIntercomSession:
             return False
         attempt = self._attempt
         peer = self._peer
-        header = self._header
-        assert attempt is not None and peer is not None and header is not None
+        assert attempt is not None and peer is not None
 
         self._av_start_acknowledged = self._send_and_wait(
             self._media_conv,
@@ -205,25 +158,28 @@ class ModernIntercomSession:
         )
         self._media_sequence += 1
         if self._av_start_acknowledged:
-            timestamp = time.time_ns() // 1_000
+            # TMonitorPlayer configures the encoder explicitly as AMR-NB before
+            # playback. Intercom invokes the header callback and starts the
+            # AudioInput before dispatching the asynchronous 0x32 command.
+            encoding = encrypt_media_tlv(
+                pack_v1_audio_encoding_header(INTERCOM_AUDIO_FORMAT), attempt.cookie
+            )
+            self._header_acknowledged = self._send_and_wait(
+                self._media_conv, self._media_sequence, encoding, 3
+            )
+            self._media_sequence += 1
+        if self._header_acknowledged:
             command = encrypt_command_tlv(
-                pack_microphone_command(True, timestamp_us=timestamp), attempt.cookie
+                pack_microphone_command(True), attempt.cookie
             )
             self._talk_start_acknowledged = self._send_and_wait(
                 self._command_conv,
                 self._command_sequence,
                 command,
                 1,
-                response_match=(MICROPHONE_STATE_CHANGE, timestamp & 0xFFFFFFFF),
             )
             self._command_sequence += 1
         if self._talk_start_acknowledged:
-            encoding = encrypt_media_tlv(pack_v1_audio_encoding_header(header), attempt.cookie)
-            self._header_acknowledged = self._send_and_wait(
-                self._media_conv, self._media_sequence, encoding, 3
-            )
-            self._media_sequence += 1
-        if self._header_acknowledged:
             self._audio_sender = ModernAudioSender(
                 self._sock,
                 peer,
@@ -234,7 +190,7 @@ class ModernIntercomSession:
                 self._bounded_timeout,
                 max_frames=self._max_audio_frames,
             )
-        return self._header_acknowledged
+        return self._talk_start_acknowledged
 
     def send_audio_frame(self, audio_frame: bytes) -> bool:
         if self._closed:

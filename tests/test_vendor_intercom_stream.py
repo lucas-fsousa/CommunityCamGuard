@@ -94,7 +94,7 @@ def test_stream_owns_route_encoder_and_control_until_close(monkeypatch) -> None:
         intercom_stream, "open_media_channel", lambda *_args: MediaChannelResult(False, True, 4)
     )
     monkeypatch.setattr(intercom_stream, "initialize_av_session", lambda *_args: av)
-    monkeypatch.setattr(intercom_stream, "AacLcAdtsEncoder", FakeEncoder)
+    monkeypatch.setattr(intercom_stream, "AmrNbEncoder", FakeEncoder)
 
     def control(*args, **kwargs):
         instance = FakeControl(*args, **kwargs)

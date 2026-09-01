@@ -9,10 +9,8 @@ CONV = 0x123456
 COOKIE = bytes.fromhex("aa17cd6974f58b1e")
 
 
-def _adts() -> bytes:
-    payload = b"aac"
-    length = 7 + len(payload)
-    return bytes((0xFF, 0xF1, 0x60, 0x40, length >> 3, ((length & 7) << 5) | 0x1F, 0xFC)) + payload
+def _amr() -> bytes:
+    return bytes.fromhex("3c") + bytes(31)
 
 
 class FakeSocket:
@@ -58,11 +56,11 @@ def test_modern_sender_uses_epoch_microseconds_and_ack_backpressure(monkeypatch)
         sock, PEER, CONV, COOKIE, {}, 7, 0.1, max_frames=2  # type: ignore[arg-type]
     )
 
-    assert sender.send(_adts()) is True
-    assert sender.send(_adts()) is True
+    assert sender.send(_amr()) is True
+    assert sender.send(_amr()) is True
     assert sender.close().completed is True
     segments = [parse_kcp_segments(wire)[0] for wire, _peer in sock.sent]
     assert [segment.sequence for segment in segments] == [7, 8]
     first = decrypt_media_tlv(segments[0].body, COOKIE)
     assert int.from_bytes(first[20:28], "little") == 1_750_000_123_456_000
-    assert first[30:] == _adts()
+    assert first[30:] == _amr()

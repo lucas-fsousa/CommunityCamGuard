@@ -182,7 +182,7 @@ def test_pcm_entrypoint_encodes_before_serialized_operation(monkeypatch) -> None
         events.append(("probe", selected.device_id, kwargs["audio_frames"]))
         return expected
 
-    monkeypatch.setattr(intercom, "encode_pcm16le_aac", encode)
+    monkeypatch.setattr(intercom, "encode_pcm16le", encode)
     monkeypatch.setattr(intercom, "run_with_fresh_access", serialize)
     monkeypatch.setattr(intercom, "_probe_intercom", probe)
 

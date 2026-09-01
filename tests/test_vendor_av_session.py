@@ -74,11 +74,11 @@ def test_av_initialization_acknowledges_pushes_and_reads_codec(monkeypatch) -> N
     assert result.encoding_header.audio_sample_rate == 16_000
     assert (result.encoding_header.video_width, result.encoding_header.video_height) == (640, 360)
     assert result.inbound_next == ((low_conv, 4),)
-    assert result.next_send_sequence == 4
+    assert result.next_send_sequence == 1
     init_segments = parse_kcp_segments(sent[0][0])
     assert init_segments[0].conv == high_conv
     assert init_segments[0].body[:4] == b"\x03\x02\x4c\x00"
-    assert len(sent) == 6  # four INIT frames plus ACKs for two camera PUSH frames
+    assert len(sent) == 3  # one accepted INIT plus ACKs for two camera PUSH frames
 
 
 def test_av_initialization_fails_closed_without_private_route() -> None:
