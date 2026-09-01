@@ -170,8 +170,8 @@ def test_modern_audio_header_is_sent_by_live_player_start_callback() -> None:
         )
     )
     assert pack_v1_audio_encoding_header(camera_header) == bytes.fromhex(
-        "ff ff ff 88 00 05 00 00 00 01 00 01 00 00 10 00 "
-        "80 3e 01 00 00 00 04 02 00 00 00 00"
+        "ff ff ff 88 00 05 00 00 00 01 00 02 00 00 80 3e "
+        "00 00 00 04 01 10 04 02 00 00 00 00"
     )
 
 

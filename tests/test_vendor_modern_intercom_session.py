@@ -95,8 +95,8 @@ def test_modern_lifecycle_separates_media_and_command_channels(monkeypatch) -> N
     assert talk_on[-1] == 1 and talk_off[-1] == 0
     encoding = decrypt_media_tlv(segments[1].body, attempt.cookie)
     assert encoding == bytes.fromhex(
-        "ff ff ff 88 00 05 00 00 00 01 00 01 00 00 10 00 "
-        "40 1f 01 00 00 00 05 02 00 00 00 00"
+        "ff ff ff 88 00 05 00 00 00 01 00 02 00 00 40 1f "
+        "00 00 a0 00 01 10 05 00 00 00 00 00"
     )
     assert int.from_bytes(segments[0].body[8:12], "little") == 6
     assert int.from_bytes(segments[4].body[8:12], "little") == 7
