@@ -16,6 +16,8 @@ from .session_io import receive_datagrams
 from .stream_protocol import build_v1_audio_packet, encrypt_media_tlv
 
 MAX_TRANSPORT_SLACK_SECONDS = 2.0
+NATIVE_BATCH_THRESHOLD_US = 64_000
+AMR_FRAME_DURATION_US = 20_000
 
 
 class ModernAudioSender:
@@ -49,6 +51,8 @@ class ModernAudioSender:
             + MAX_TRANSPORT_SLACK_SECONDS
         )
         self._last_send_at: float | None = None
+        self._pending: list[bytes] = []
+        self._pending_timestamp_us: int | None = None
         self._requested_frames = 0
         self._sent_frames = 0
         self._acknowledged_frames = 0
@@ -73,7 +77,24 @@ class ModernAudioSender:
 
         self._requested_frames += 1
         self._last_send_at = time.monotonic()
-        packet = build_v1_audio_packet((audio_frame,), time.time_ns() // 1_000)
+        if not self._pending:
+            self._pending_timestamp_us = time.time_ns() // 1_000
+        self._pending.append(audio_frame)
+        if len(self._pending) * AMR_FRAME_DURATION_US < NATIVE_BATCH_THRESHOLD_US:
+            return True
+        return self._flush()
+
+    def _flush(self) -> bool:
+        """Send the current native 64 ms audio burst as one v1 AVDATA record."""
+
+        if not self._pending:
+            return True
+        frames = tuple(self._pending)
+        timestamp_us = self._pending_timestamp_us
+        assert timestamp_us is not None
+        self._pending.clear()
+        self._pending_timestamp_us = None
+        packet = build_v1_audio_packet(frames, timestamp_us)
         media = encrypt_media_tlv(packet, self._cookie)
         wire = build_kcp_push(
             self._conv,
@@ -124,12 +145,12 @@ class ModernAudioSender:
             if acknowledged:
                 break
 
-        self._sent_frames += 1
+        self._sent_frames += len(frames)
         self._sequence += 1
         if not acknowledged:
             self._aborted = True
             return False
-        self._acknowledged_frames += 1
+        self._acknowledged_frames += len(frames)
         return True
 
     def result(self, *, expected_frames: int | None = None) -> AudioSendResult:
@@ -142,5 +163,7 @@ class ModernAudioSender:
         )
 
     def close(self) -> AudioSendResult:
+        if not self._closed and not self._aborted:
+            self._flush()
         self._closed = True
         return self.result()
