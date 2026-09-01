@@ -67,6 +67,9 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
 
     assert "encodeURIComponent(cam.id)" in live
     assert "cam.controls || cam.vendor_controls" not in live
+    assert "cam.vendor" not in live
+    assert "cam.model" not in live
+    assert "cam.driver" not in live
     assert "const available = cam.controls || {}" in live
     assert "available.white_light?.writable" in live
     assert '"white_light", (value) => value === "on"' in live

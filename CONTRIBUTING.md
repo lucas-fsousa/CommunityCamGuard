@@ -22,6 +22,23 @@ or provisioning gets its own package (`drivers/mybrand/`) containing its driver,
 controls and protocol adapters. Generic API code accepts only semantic operations and dispatches
 them through `CameraDriver`; never add vendor imports or raw command payloads to an API router.
 
+### Non-negotiable capability rule
+
+Selecting a driver identifies **who knows how to inspect and operate the camera**; it does not imply
+that every camera claimed by that driver supports every feature implemented in its package. Support
+is resolved for the concrete camera, model and firmware:
+
+- `probe(camera)` records discovered media/device capabilities;
+- `control_catalog(camera)` returns only semantic controls supported by that exact camera;
+- `supports_audio_messages(camera)` and `supports_audio_streams(camera)` gate the corresponding UI;
+- an unknown, stale or failed capability check fails closed and does not produce a button.
+
+The dashboard consumes only those per-camera descriptors/booleans. It must never branch on brand,
+model, driver key, open port, enrollment presence alone or a family-wide static feature list. A
+driver may use a runtime probe or a verified model/firmware profile internally, but the generic API
+and frontend must not know that mapping. Adding another brand means plugging in another driver—not
+adding brand conditionals to the monitoring core.
+
 ### 1. Discovery-only driver (just RTSP paths)
 
 Create `backend/app/drivers/mybrand.py` (or `drivers/mybrand/driver.py` when the family needs more
@@ -58,8 +75,6 @@ Override the hooks and reuse the ONVIF toolbox in `control/` (`ptz.py`, `device.
 non-ONVIF adapter inside the family package. See `drivers/yoosee/` for the current example:
 
 ```python
-    features = frozenset({"ptz"})           # advertise what you support
-
     def _probe_controls(self, camera, caps):  # fill family-specific capabilities
         if ptz.supports_ptz(camera.last_ip):
             caps.ptz = True; caps.ptz_protocol = "onvif"
@@ -69,7 +84,8 @@ non-ONVIF adapter inside the family package. See `drivers/yoosee/` for the curre
 ```
 
 Anything you don't override stays **`Unsupported`** (the API returns 501), so a partial driver
-is fine and honest.
+is fine and honest. Do not add a static family-wide feature set: two models—or two firmware
+revisions—handled by the same driver may expose different controls.
 
 For an existing semantic control, implement `control_catalog`, `read_control` and/or
 `write_control`. Return the neutral descriptors/results from `drivers/contracts.py`; translate to

@@ -145,9 +145,10 @@ def test_generic_driver_has_no_controls():
         drivers.GENERIC.reboot(cam)
 
 
-def test_yoosee_driver_advertises_ptz_not_reboot():
+def test_yoosee_driver_does_not_advertise_family_wide_static_features():
     yoosee = drivers.get("yoosee")
-    assert "ptz" in yoosee.features and "reboot" not in yoosee.features
+    assert not hasattr(yoosee, "features")
+    assert yoosee.control_catalog(Camera(mac="aa:bb", last_ip="1.2.3.4")) == ()
     # reboot stays Unsupported on Yoosee (Gwell P2P only)
     import pytest
 

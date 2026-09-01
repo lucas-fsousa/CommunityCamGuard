@@ -42,9 +42,6 @@ class Unsupported(Exception):
     """A driver was asked for a control its family doesn't support (PTZ, reboot, ...)."""
 
 
-# The controllable features a driver may advertise — used for UI gating and docs.
-FEATURES = ("ptz", "reboot", "audio_in", "audio_out", "led", "siren")
-
 # How to label an open port when the dashboard surfaces it.
 PORT_ROLES: dict[int, str] = {
     554: "rtsp",
@@ -112,14 +109,12 @@ def _now() -> str:
 
 
 class CameraDriver:
-    """Base class for a camera family. Subclass, set the attributes, override what differs."""
+    """Base class for a camera family; capabilities are always resolved per camera instance."""
 
     key: str = "generic"
     label: str = "Generic RTSP"
     rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
     transport: str = "auto"  # media-layer hint: auto | tcp | udp
-    features: frozenset[str] = frozenset()  # advertised controllable features
-
     def onboarding(self) -> OnboardingPort | None:
         """Return this family onboarding port, when factory enrollment is implemented."""
 

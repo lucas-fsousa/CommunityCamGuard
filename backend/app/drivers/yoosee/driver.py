@@ -4,7 +4,9 @@ These cameras expose ONVIF on port 5000 and proprietary controls through Gwell P
 transports are private implementation details of this driver package; callers use only the
 semantic :class:`CameraDriver` contract.
 
-Confirmed on the project's field units (model ``IPC``, firmware ``40.01.22``/``40.1.14``).
+Confirmed on the project's field units (model ``IPC``, firmware ``40.01.22``/``40.1.14``). This
+does not grant the same controls to every Yoosee-branded model: each newly catalogued model must add
+probe/profile evidence before its per-camera catalogue may advertise proprietary capabilities.
 """
 
 from __future__ import annotations
@@ -33,8 +35,6 @@ class YooseeDriver(CameraDriver):
     label = "Yoosee / generic HiSilicon (ONVIF port 5000)"
     rtsp_paths = ("/onvif1", "/onvif2", "/11", "/12", "/live.sdp", "/0", "/1")
     transport = "udp"
-    features = frozenset({"ptz", "audio_in", "audio_out", "led", "siren"})
-
     def onboarding(self) -> OnboardingPort:
         from .onboarding import ONBOARDING
 

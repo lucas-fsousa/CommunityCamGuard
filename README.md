@@ -47,7 +47,10 @@ supported) PTZ, audio, microphone and LED/siren control.
 
 Cameras vary wildly. On discovery we probe each device (ONVIF capabilities + fallback
 scans) and **only enable in the UI the features the camera actually supports** — PTZ, audio
-out, two-way audio (mic), digital outputs (LED / "anti-thief" siren).
+out, two-way audio (mic), digital outputs (LED / "anti-thief" siren). Driver selection identifies
+the component responsible for that camera; it never grants every feature implemented for the whole
+brand. The selected driver returns a catalogue for the exact model/firmware instance, and the
+dashboard renders only that catalogue. Unknown support fails closed.
 
 ## Architecture
 

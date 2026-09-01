@@ -19,6 +19,12 @@ string alone must never grant another driver's controls.
   HTTP accepts values such as `white_light=true`, never an opcode, thing-model path or raw payload.
 - An application service resolves `camera_id -> camera -> driver`; only that driver may describe,
   read or write controls for the camera.
+- Selecting a driver assigns responsibility, not capabilities. There is no family-wide feature
+  grant: the driver must resolve support for the concrete camera/model/firmware through a probe or
+  verified internal profile. Missing, stale or inconclusive evidence fails closed.
+- The dashboard may consume only the exact camera's `controls`, `audio_messages`, `audio_streams`
+  and generic media capability fields. Brand/model/driver strings, open ports and enrollment
+  presence are never UI feature gates.
 - Camera-family code is organized as a package under `drivers/<family>/`. The Yoosee package owns
   the adapter from semantic controls to its encrypted P2P enrollment and protocol operations.
 - The recovered GAT/IoTVideo transport, crypto, authentication, RTSP setup and typed feature
