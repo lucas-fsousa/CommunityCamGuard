@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 Weekday = Literal["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 _WEEKDAYS: tuple[Weekday, ...] = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
 _CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 _OPTION_VALUE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_OPAQUE_RECORDING_ID = re.compile(r"^[A-Za-z0-9._~-]{1,240}$")
+_RECORDING_KIND = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,87 @@ class ControlNotReady(RuntimeError):
 
 class ControlOperationError(RuntimeError):
     """A typed driver operation failed after the camera and control were resolved."""
+
+
+def _is_utc(value: datetime) -> bool:
+    return value.tzinfo is not None and value.utcoffset() is not None and not value.utcoffset()
+
+
+@dataclass(frozen=True, slots=True)
+class OnboardRecordingQuery:
+    """Bounded vendor-neutral query for recordings stored by one camera."""
+
+    start_utc: datetime
+    end_utc: datetime
+    limit: int = 50
+    cursor: str | None = None
+
+    def __post_init__(self) -> None:
+        if not _is_utc(self.start_utc) or not _is_utc(self.end_utc):
+            raise ValueError("onboard-recording query timestamps must be UTC")
+        if self.end_utc <= self.start_utc:
+            raise ValueError("onboard-recording query window must be positive")
+        if type(self.limit) is not int or not 1 <= self.limit <= 200:
+            raise ValueError("onboard-recording query limit must be between 1 and 200")
+        if self.cursor is not None and _OPAQUE_RECORDING_ID.fullmatch(self.cursor) is None:
+            raise ValueError("onboard-recording cursor is invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class OnboardRecording:
+    """One read-only camera-card item with no vendor path exposed to the API."""
+
+    recording_id: str
+    started_at_utc: datetime
+    ended_at_utc: datetime
+    kind: str = "unknown"
+    size_bytes: int | None = None
+
+    def __post_init__(self) -> None:
+        if _OPAQUE_RECORDING_ID.fullmatch(self.recording_id) is None:
+            raise ValueError("onboard-recording ID is invalid")
+        if not _is_utc(self.started_at_utc) or not _is_utc(self.ended_at_utc):
+            raise ValueError("onboard-recording timestamps must be UTC")
+        if self.ended_at_utc <= self.started_at_utc:
+            raise ValueError("onboard-recording duration must be positive")
+        if _RECORDING_KIND.fullmatch(self.kind) is None:
+            raise ValueError("onboard-recording kind is invalid")
+        if self.size_bytes is not None and (type(self.size_bytes) is not int or self.size_bytes < 0):
+            raise ValueError("onboard-recording size is invalid")
+
+    def public(self) -> dict[str, object]:
+        return {
+            "id": self.recording_id,
+            "started_at": self.started_at_utc.isoformat().replace("+00:00", "Z"),
+            "ended_at": self.ended_at_utc.isoformat().replace("+00:00", "Z"),
+            "duration_ms": int((self.ended_at_utc - self.started_at_utc).total_seconds() * 1000),
+            "kind": self.kind,
+            "size_bytes": self.size_bytes,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OnboardRecordingPage:
+    """A bounded page; the opaque cursor is interpreted only by the selected driver."""
+
+    items: tuple[OnboardRecording, ...]
+    next_cursor: str | None = None
+    total: int | None = None
+
+    def __post_init__(self) -> None:
+        if len(self.items) > 200:
+            raise ValueError("onboard-recording page is too large")
+        if self.next_cursor is not None and _OPAQUE_RECORDING_ID.fullmatch(self.next_cursor) is None:
+            raise ValueError("onboard-recording cursor is invalid")
+        if self.total is not None and (type(self.total) is not int or self.total < len(self.items)):
+            raise ValueError("onboard-recording total is invalid")
+
+    def public(self) -> dict[str, object]:
+        return {
+            "items": [item.public() for item in self.items],
+            "next_cursor": self.next_cursor,
+            "total": self.total,
+        }
 
 
 @dataclass(frozen=True, slots=True)

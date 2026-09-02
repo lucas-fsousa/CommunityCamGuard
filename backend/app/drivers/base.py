@@ -31,6 +31,8 @@ from .contracts import (
     ControlOption,
     ControlResult,
     ControlValue,
+    OnboardRecordingPage,
+    OnboardRecordingQuery,
 )
 
 if TYPE_CHECKING:
@@ -216,6 +218,13 @@ class CameraDriver:
         """Whether this exact camera has verified readable onboard-storage recordings."""
 
         return False
+
+    def list_onboard_recordings(
+        self, camera: Camera, query: OnboardRecordingQuery
+    ) -> OnboardRecordingPage:
+        """List a bounded page from this camera's storage without exposing vendor identifiers."""
+
+        raise Unsupported("onboard_recordings")
 
     def send_audio_stream(
         self, camera: Camera, pcm16le_chunks: Iterable[bytes]

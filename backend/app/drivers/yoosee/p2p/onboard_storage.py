@@ -8,6 +8,7 @@ onboard recordings may be advertised for one exact camera.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 TF_INFO_PATH = "ProReadonly.tfInfo"
 _WRAPPER_KEYS = ("tfInfo", "ProReadonly", "setVal")
@@ -42,11 +43,14 @@ def extract_onboard_storage_state(value: object) -> OnboardStorageState | None:
     if not isinstance(value, dict):
         return None
     if {"total", "remain", "stat"}.issubset(value):
-        total = value.get("total")
-        remaining = value.get("remain")
-        status = value.get("stat")
-        if any(type(item) is not int for item in (total, remaining, status)):
+        raw_total = value.get("total")
+        raw_remaining = value.get("remain")
+        raw_status = value.get("stat")
+        if any(type(item) is not int for item in (raw_total, raw_remaining, raw_status)):
             return None
+        total = cast(int, raw_total)
+        remaining = cast(int, raw_remaining)
+        status = cast(int, raw_status)
         if total < 0 or remaining < 0 or remaining > total or status < 0:
             return None
         card_id = value.get("cid")

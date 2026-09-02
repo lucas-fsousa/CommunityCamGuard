@@ -30,6 +30,10 @@ string alone must never grant another driver's controls.
   slot, family match or SDK playback implementation is not evidence that a card is present. Listing,
   playback and bounded download are read-only capabilities; delete and format are separate
   destructive operations and are never implied by archive support.
+- Onboard archive items cross the driver boundary using an opaque ID, UTC start/end timestamps,
+  normalized semantic kind and bounded cursor pagination. Native paths, camera-local timestamps,
+  command IDs and vendor page indexes stay inside the driver. The server archive remains a separate
+  source behind the same future recordings timeline rather than being re-keyed to a vendor format.
 - Camera-family code is organized as a package under `drivers/<family>/`. The Yoosee package owns
   the adapter from semantic controls to its encrypted P2P enrollment and protocol operations.
 - The recovered GAT/IoTVideo transport, crypto, authentication, RTSP setup and typed feature
