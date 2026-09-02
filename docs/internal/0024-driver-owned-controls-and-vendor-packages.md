@@ -25,6 +25,11 @@ string alone must never grant another driver's controls.
 - The dashboard may consume only the exact camera's `controls`, `audio_messages`, `audio_streams`
   and generic media capability fields. Brand/model/driver strings, open ports and enrollment
   presence are never UI feature gates.
+- Camera-side archives follow the same rule as controls. A future generic onboard-recording source
+  is advertised only after the selected driver verifies usable storage on that exact camera; an SD
+  slot, family match or SDK playback implementation is not evidence that a card is present. Listing,
+  playback and bounded download are read-only capabilities; delete and format are separate
+  destructive operations and are never implied by archive support.
 - Camera-family code is organized as a package under `drivers/<family>/`. The Yoosee package owns
   the adapter from semantic controls to its encrypted P2P enrollment and protocol operations.
 - The recovered GAT/IoTVideo transport, crypto, authentication, RTSP setup and typed feature

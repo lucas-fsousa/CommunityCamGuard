@@ -91,6 +91,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
   },
   "has_audio": true,
   "audio_messages": true,
+  "onboard_recordings": false,
   "stream_id": "cam_0123456789abcdef01234567",
   "web_stream_id": "cam_0123456789abcdef01234567_web",
   "hd_stream_id": "cam_0123456789abcdef01234567_hd",
@@ -109,6 +110,12 @@ older than the opaque-ID migration, but it is deprecated and is not used by the 
 `mac` may be empty for a driver whose durable native identity is a serial/vendor ID; it is discovery
 metadata, not the registry key. The current manual `POST /cameras` form still targets MAC-addressed
 LAN RTSP enrollment, while driver-owned onboarding can create canonical records without one.
+
+`onboard_recordings` is a strict per-camera capability gate. It is true only when the selected
+driver has verified readable camera-side storage on that exact device; a card slot, model family,
+open port or enrollment is insufficient. It does not imply permission to delete files or format a
+card. No onboard-recording endpoint is exposed until a driver completes read-only list/download
+homologation.
 The password is **never** returned — only `has_password`. Stream IDs are go2rtc stream names (see
 Media). `online` means that video packets in the camera's shared base stream are currently advancing;
 `recording` is whether the recorder process is currently running for the camera. The dashboard polls

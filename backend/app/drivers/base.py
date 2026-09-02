@@ -212,6 +212,11 @@ class CameraDriver:
 
         return False
 
+    def supports_onboard_recordings(self, camera: Camera) -> bool:
+        """Whether this exact camera has verified readable onboard-storage recordings."""
+
+        return False
+
     def send_audio_stream(
         self, camera: Camera, pcm16le_chunks: Iterable[bytes]
     ) -> AudioMessageResult:
