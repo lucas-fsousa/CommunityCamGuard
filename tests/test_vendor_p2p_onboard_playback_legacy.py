@@ -4,6 +4,8 @@ import pytest
 
 from backend.app.drivers.yoosee.p2p.onboard_playback_legacy import (
     build_legacy_recording_list_request,
+    can_use_legacy_playback_manager,
+    legacy_manager_accepts_decimal,
     parse_legacy_recording_filename,
     parse_legacy_recording_list_payload,
     unpack_legacy_recording_list_request,
@@ -46,6 +48,23 @@ def test_rejects_non_utc_or_invalid_windows_and_payloads():
         unpack_legacy_recording_list_request(bytes(15))
     with pytest.raises(ValueError):
         unpack_legacy_recording_list_request(bytes(16))
+
+
+@pytest.mark.parametrize("value", ["0", "+1", "-1", "2147483647", "-2147483648"])
+def test_accepts_only_decimal_values_carried_by_java_signed_int(value):
+    assert legacy_manager_accepts_decimal(value)
+
+
+@pytest.mark.parametrize(
+    "value", ["", " 1", "1 ", "1.0", "\u0661", "2147483648", "-2147483649", "camera-1"]
+)
+def test_rejects_values_the_apk_legacy_manager_cannot_carry(value):
+    assert not legacy_manager_accepts_decimal(value)
+
+
+def test_camera3_cannot_use_legacy_manager_without_a_proven_alias():
+    assert not can_use_legacy_playback_manager("7443576841", "123")
+    assert can_use_legacy_playback_manager("123456789", "123")
 
 
 def test_parses_apk_legacy_filename_in_explicit_camera_timezone():

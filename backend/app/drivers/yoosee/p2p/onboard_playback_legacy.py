@@ -17,6 +17,8 @@ LEGACY_RESPONSE_HEADER_SIZE = 4
 LEGACY_RESPONSE_ITEM_SIZE = 8
 LEGACY_RESPONSE_MAX_ITEMS = 128
 LEGACY_RESPONSE_HAS_DURATION = 1
+JAVA_INT32_MIN = -(1 << 31)
+JAVA_INT32_MAX = (1 << 31) - 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +43,27 @@ class LegacyPlaybackList:
     option0: int
     option1: int
     items: tuple[LegacyPlaybackFile, ...]
+
+
+def legacy_manager_accepts_decimal(value: str) -> bool:
+    """Whether APK ``Integer.parseInt`` can carry this value without truncation or aliases."""
+
+    if not isinstance(value, str) or not value:
+        return False
+    unsigned = value[1:] if value[0] in "+-" else value
+    if not unsigned or not unsigned.isascii() or not unsigned.isdigit():
+        return False
+    try:
+        parsed = int(value, 10)
+    except ValueError:
+        return False
+    return JAVA_INT32_MIN <= parsed <= JAVA_INT32_MAX
+
+
+def can_use_legacy_playback_manager(device_id: str, password: str) -> bool:
+    """Apply both signed-int constraints present immediately before native ``nSendRemoteMsg``."""
+
+    return legacy_manager_accepts_decimal(device_id) and legacy_manager_accepts_decimal(password)
 
 
 def _require_utc(value: datetime, label: str) -> None:
