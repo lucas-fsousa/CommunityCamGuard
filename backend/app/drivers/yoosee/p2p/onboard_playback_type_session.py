@@ -15,6 +15,7 @@ from .onboard_playback_carrier import (
     build_onboard_playback_recording_types_request,
     parse_onboard_playback_recording_types_response,
 )
+from .onboard_playback_protocol import select_onboard_playback_protocol
 from .onboard_playback_transport import exchange_built_in_read
 from .onboard_playback_types import (
     ModernPlaybackRecordingTypePage,
@@ -40,11 +41,18 @@ def exchange_onboard_playback_recording_types(
     *,
     page_index: int = 0,
     protocol_version: int = 3,
+    device_platform_version: int | None = None,
     retries: int = 3,
     deadline: float | None = None,
 ) -> OnboardPlaybackRecordingTypesExchange:
     """Perform one idempotent command-15 query without opening camera media."""
 
+    protocol_version = select_onboard_playback_protocol(
+        query,
+        requested_version=protocol_version,
+        minimum_version=3,
+        device_platform_version=device_platform_version,
+    )
     message_id = secrets.randbits(31)
     request_id = secrets.randbits(32)
     request = build_onboard_playback_recording_types_request(
@@ -105,6 +113,7 @@ def list_camera_onboard_recording_types(
     *,
     page_index: int = 0,
     protocol_version: int = 3,
+    device_platform_version: int | None = None,
     timeout: float = 1.5,
     total_timeout: float = 25.0,
 ) -> OnboardPlaybackRecordingTypesExchange:
@@ -126,6 +135,7 @@ def list_camera_onboard_recording_types(
             bounded_timeout,
             page_index=page_index,
             protocol_version=protocol_version,
+            device_platform_version=device_platform_version,
             deadline=deadline,
         )
     except P2PProbeError:

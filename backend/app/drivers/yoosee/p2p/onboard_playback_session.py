@@ -16,6 +16,7 @@ from .onboard_playback_carrier import (
     parse_onboard_playback_list_response,
 )
 from .onboard_playback_modern import ModernPlaybackPage
+from .onboard_playback_protocol import select_onboard_playback_protocol
 from .onboard_playback_transport import exchange_built_in_read
 from .onboard_playback_v34 import (
     merge_modern_playback_v4_fragments,
@@ -40,11 +41,18 @@ def exchange_onboard_playback_list(
     *,
     page_index: int = 0,
     protocol_version: int = 2,
+    device_platform_version: int | None = None,
     retries: int = 3,
     deadline: float | None = None,
 ) -> OnboardPlaybackListExchange:
     """Perform one idempotent command-16 list exchange without opening media playback."""
 
+    protocol_version = select_onboard_playback_protocol(
+        query,
+        requested_version=protocol_version,
+        minimum_version=2,
+        device_platform_version=device_platform_version,
+    )
     message_id = secrets.randbits(31)
     request_id = secrets.randbits(32)
     request = build_onboard_playback_list_request(
@@ -105,6 +113,7 @@ def list_camera_onboard_recordings(
     *,
     page_index: int = 0,
     protocol_version: int = 2,
+    device_platform_version: int | None = None,
     timeout: float = 1.5,
     total_timeout: float = 25.0,
 ) -> OnboardPlaybackListExchange:
@@ -126,6 +135,7 @@ def list_camera_onboard_recordings(
             bounded_timeout,
             page_index=page_index,
             protocol_version=protocol_version,
+            device_platform_version=device_platform_version,
             deadline=deadline,
         )
     except P2PProbeError:
