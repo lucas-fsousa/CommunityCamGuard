@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.drivers.yoosee.p2p.onboard_playback_legacy import (
     build_legacy_recording_list_request,
+    parse_legacy_recording_filename,
     unpack_legacy_recording_list_request,
 )
 
@@ -44,3 +45,42 @@ def test_rejects_non_utc_or_invalid_windows_and_payloads():
         unpack_legacy_recording_list_request(bytes(15))
     with pytest.raises(ValueError):
         unpack_legacy_recording_list_request(bytes(16))
+
+
+def test_parses_apk_legacy_filename_in_explicit_camera_timezone():
+    item = parse_legacy_recording_filename(
+        "disc1/2026-09-07_12:34:56_M.mp4(60s)",
+        camera_timezone=timezone(timedelta(hours=-3)),
+    )
+
+    assert item.filename == "disc1/2026-09-07_12:34:56_M.mp4(60s)"
+    assert item.start_utc == datetime(2026, 9, 7, 15, 34, 56, tzinfo=UTC)
+    assert item.end_utc == datetime(2026, 9, 7, 15, 35, 56, tzinfo=UTC)
+    assert item.duration_seconds == 60
+    assert item.recording_type == "M"
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "short",
+        "disc1/2026-09-07_12:34:56_X.mp4(60s)",
+        "disc1/2026-09-07_12:34:56_M.mp4(xs)",
+        "disc1/2026-09-07_12:34:56_M.mp4(0s)",
+        "disc1/2026-09-07_12:34:56_M.mp4(60s)junk",
+        "disc1/2026-09-07_12:34:56_M.mp4(60s)|other",
+    ],
+)
+def test_rejects_malformed_legacy_filenames(filename):
+    with pytest.raises(ValueError):
+        parse_legacy_recording_filename(filename, camera_timezone=UTC)
+
+
+def test_rejects_ambiguous_camera_wall_time():
+    from zoneinfo import ZoneInfo
+
+    with pytest.raises(ValueError, match="timestamp is invalid"):
+        parse_legacy_recording_filename(
+            "disc1/2026-11-01_01:30:00_A.mp4(10s)",
+            camera_timezone=ZoneInfo("America/New_York"),
+        )
