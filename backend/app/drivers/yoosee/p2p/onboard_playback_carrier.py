@@ -22,6 +22,12 @@ from .onboard_playback_modern import (
     parse_modern_playback_list_v1_response,
     parse_modern_playback_list_v2_response,
 )
+from .onboard_playback_types import (
+    PLAYBACK_GET_RECORDING_TYPES_COMMAND,
+    ModernPlaybackRecordingTypePage,
+    parse_modern_playback_recording_types_v3_response,
+    parse_modern_playback_recording_types_v4_response,
+)
 from .onboard_playback_v34 import (
     build_modern_playback_list_v3_request,
     build_modern_playback_list_v4_request,
@@ -115,6 +121,34 @@ def build_onboard_playback_date_request(
     )
 
 
+def build_onboard_playback_recording_types_request(
+    node: CertifiedNode,
+    access_id: int,
+    device_id: int,
+    query: OnboardRecordingQuery,
+    sequence: int,
+    message_id: int,
+    request_id: int,
+    *,
+    page_index: int = 0,
+    protocol_version: int = 3,
+) -> bytes:
+    """Wrap the recovered V3/V4 recording-type body in BuiltIn command ``15``."""
+
+    if protocol_version not in (3, 4):
+        raise ValueError("only playback recording-type protocols V3 and V4 are supported")
+    return _build_onboard_playback_request(
+        node,
+        access_id,
+        device_id,
+        sequence,
+        message_id,
+        request_id,
+        command=PLAYBACK_GET_RECORDING_TYPES_COMMAND,
+        body=_build_list_body(query, page_index, protocol_version),
+    )
+
+
 def _build_onboard_playback_request(
     node: CertifiedNode,
     access_id: int,
@@ -191,6 +225,31 @@ def parse_onboard_playback_date_response(
         2: parse_modern_playback_date_v2_response,
         3: parse_modern_playback_date_v3_response,
         4: parse_modern_playback_date_v4_response,
+    }
+    try:
+        return parsers[protocol_version](body)
+    except (KeyError, ValueError):
+        return None
+
+
+def parse_onboard_playback_recording_types_response(
+    frame: bytes,
+    *,
+    request_id: int,
+    protocol_version: int = 3,
+) -> ModernPlaybackRecordingTypePage | None:
+    """Parse only a correlated BuiltIn command-15 recording-type response."""
+
+    body = _extract_correlated_body(
+        frame,
+        request_id=request_id,
+        command=PLAYBACK_GET_RECORDING_TYPES_COMMAND,
+    )
+    if body is None:
+        return None
+    parsers = {
+        3: parse_modern_playback_recording_types_v3_response,
+        4: parse_modern_playback_recording_types_v4_response,
     }
     try:
         return parsers[protocol_version](body)

@@ -9,11 +9,16 @@ from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.onboard_playback_carrier import (
     build_onboard_playback_date_request,
     build_onboard_playback_list_request,
+    build_onboard_playback_recording_types_request,
     parse_onboard_playback_date_response,
     parse_onboard_playback_list_response,
+    parse_onboard_playback_recording_types_response,
 )
 from backend.app.drivers.yoosee.p2p.onboard_playback_dates import ModernPlaybackDatePage
 from backend.app.drivers.yoosee.p2p.onboard_playback_modern import ModernPlaybackPage
+from backend.app.drivers.yoosee.p2p.onboard_playback_types import (
+    ModernPlaybackRecordingTypePage,
+)
 
 
 def _query() -> OnboardRecordingQuery:
@@ -111,6 +116,27 @@ def test_wraps_date_query_in_builtin_command_18_for_v2_through_v4():
         assert frame[0x3C] == protocol_version
 
 
+def test_wraps_recording_type_query_in_internal_command_15_for_v3_and_v4():
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+
+    for protocol_version in (3, 4):
+        frame = gute_mode2_decrypt(
+            build_onboard_playback_recording_types_request(
+                node,
+                123,
+                7_000_000_002,
+                _query(),
+                18,
+                19,
+                20,
+                protocol_version=protocol_version,
+            ),
+            node.session_key,
+        )
+        assert frame[0x34:0x3C] == b"\x00\x0f\x00\x00" + struct.pack("<I", 20)
+        assert frame[0x3C] == protocol_version
+
+
 def _empty_response(request_id: int) -> bytes:
     body = bytearray(26)
     body[0] = 2
@@ -126,6 +152,13 @@ def _empty_response(request_id: int) -> bytes:
 def _empty_date_response(request_id: int) -> bytes:
     response = bytearray(_empty_response(request_id))
     response[0x35] = 18
+    return bytes(response)
+
+
+def _empty_recording_types_response(request_id: int) -> bytes:
+    response = bytearray(_empty_response(request_id))
+    response[0x35] = 15
+    response[0x3C] = 3
     return bytes(response)
 
 
@@ -159,3 +192,20 @@ def test_date_response_requires_command_18_and_request_correlation():
     wrong_command = bytearray(response)
     wrong_command[0x35] = 16
     assert parse_onboard_playback_date_response(bytes(wrong_command), request_id=44) is None
+
+
+def test_recording_type_response_requires_command_15_and_request_correlation():
+    response = _empty_recording_types_response(44)
+
+    assert parse_onboard_playback_recording_types_response(
+        response,
+        request_id=44,
+    ) == ModernPlaybackRecordingTypePage(0, 0, -1, ())
+    assert parse_onboard_playback_recording_types_response(response, request_id=45) is None
+
+    wrong_command = bytearray(response)
+    wrong_command[0x35] = 16
+    assert (
+        parse_onboard_playback_recording_types_response(bytes(wrong_command), request_id=44)
+        is None
+    )
