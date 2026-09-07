@@ -1,4 +1,4 @@
-"""Bounded read-only Yoosee IoTVideo onboard-recording list exchange."""
+"""Bounded read-only Yoosee IoTVideo onboard-recording date exchange."""
 
 from __future__ import annotations
 
@@ -12,24 +12,24 @@ from ...contracts import OnboardRecordingQuery
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, OnlineDevice, P2PProbeError
 from .onboard_playback_carrier import (
-    build_onboard_playback_list_request,
-    parse_onboard_playback_list_response,
+    build_onboard_playback_date_request,
+    parse_onboard_playback_date_response,
 )
-from .onboard_playback_modern import ModernPlaybackPage
+from .onboard_playback_dates import (
+    ModernPlaybackDatePage,
+    merge_modern_playback_date_v4_fragments,
+)
 from .onboard_playback_transport import exchange_built_in_read
-from .onboard_playback_v34 import (
-    merge_modern_playback_v4_fragments,
-)
 
 
 @dataclass(frozen=True, slots=True)
-class OnboardPlaybackListExchange:
+class OnboardPlaybackDateExchange:
     transport_acknowledged: bool
     application_acknowledged: bool
-    page: ModernPlaybackPage | None
+    page: ModernPlaybackDatePage | None
 
 
-def exchange_onboard_playback_list(
+def exchange_onboard_playback_dates(
     sock: socket.socket,
     node: CertifiedNode,
     access_id: int,
@@ -42,12 +42,12 @@ def exchange_onboard_playback_list(
     protocol_version: int = 2,
     retries: int = 3,
     deadline: float | None = None,
-) -> OnboardPlaybackListExchange:
-    """Perform one idempotent command-16 list exchange without opening media playback."""
+) -> OnboardPlaybackDateExchange:
+    """Perform one idempotent command-18 query without opening camera media."""
 
     message_id = secrets.randbits(31)
     request_id = secrets.randbits(32)
-    request = build_onboard_playback_list_request(
+    request = build_onboard_playback_date_request(
         node,
         access_id,
         device.device_id,
@@ -59,7 +59,7 @@ def exchange_onboard_playback_list(
         protocol_version=protocol_version,
     )
 
-    def response_set_complete(responses: tuple[ModernPlaybackPage, ...]) -> bool:
+    def response_set_complete(responses: tuple[ModernPlaybackDatePage, ...]) -> bool:
         if protocol_version != 4:
             return True
         fragment_count = responses[0].fragment_count
@@ -76,7 +76,7 @@ def exchange_onboard_playback_list(
         message_id=message_id,
         sequence=sequence,
         timeout=timeout,
-        parse_response=lambda frame: parse_onboard_playback_list_response(
+        parse_response=lambda frame: parse_onboard_playback_date_response(
             frame,
             request_id=request_id,
             protocol_version=protocol_version,
@@ -89,17 +89,17 @@ def exchange_onboard_playback_list(
     if protocol_version == 4 and raw.responses:
         unique = {response.fragment_index: response for response in raw.responses}
         try:
-            page = merge_modern_playback_v4_fragments(tuple(unique.values()))
+            page = merge_modern_playback_date_v4_fragments(tuple(unique.values()))
         except ValueError:
             page = None
-    return OnboardPlaybackListExchange(
+    return OnboardPlaybackDateExchange(
         raw.transport_acknowledged,
         raw.application_acknowledged,
         page,
     )
 
 
-def list_camera_onboard_recordings(
+def list_camera_onboard_recording_dates(
     enrollment: P2PEnrollment,
     query: OnboardRecordingQuery,
     *,
@@ -107,8 +107,8 @@ def list_camera_onboard_recordings(
     protocol_version: int = 2,
     timeout: float = 1.5,
     total_timeout: float = 25.0,
-) -> OnboardPlaybackListExchange:
-    """Open one bounded brokered session and list via an explicitly selected V1-V4 codec."""
+) -> OnboardPlaybackDateExchange:
+    """Open one bounded brokered session and query dates via a selected V2-V4 codec."""
 
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
     deadline = time.monotonic() + max(8.0, min(float(total_timeout), 35.0))
@@ -116,7 +116,7 @@ def list_camera_onboard_recordings(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
-        return exchange_onboard_playback_list(
+        return exchange_onboard_playback_dates(
             sock,
             node,
             enrollment.access_id,
@@ -131,6 +131,6 @@ def list_camera_onboard_recordings(
     except P2PProbeError:
         raise
     except (OSError, ValueError) as exc:
-        raise P2PProbeError("P2P onboard playback listing failed") from exc
+        raise P2PProbeError("P2P onboard playback date query failed") from exc
     finally:
         sock.close()

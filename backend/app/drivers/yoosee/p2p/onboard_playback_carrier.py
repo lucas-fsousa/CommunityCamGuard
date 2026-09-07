@@ -6,6 +6,13 @@ import struct
 
 from ...contracts import OnboardRecordingQuery
 from .contracts import CertifiedNode
+from .onboard_playback_dates import (
+    PLAYBACK_GET_DATE_LIST_COMMAND,
+    ModernPlaybackDatePage,
+    parse_modern_playback_date_v2_response,
+    parse_modern_playback_date_v3_response,
+    parse_modern_playback_date_v4_response,
+)
 from .onboard_playback_modern import (
     PLAYBACK_GET_LIST_V1_COMMAND,
     PLAYBACK_GET_LIST_V2_COMMAND,
@@ -68,8 +75,57 @@ def build_onboard_playback_list_request(
 ) -> bytes:
     """Wrap one recovered V1-V4 list body in the native MessageMgr B9 envelope."""
 
-    command = _command_for_protocol(protocol_version)
-    body = _build_list_body(query, page_index, protocol_version)
+    return _build_onboard_playback_request(
+        node,
+        access_id,
+        device_id,
+        sequence,
+        message_id,
+        request_id,
+        command=_command_for_protocol(protocol_version),
+        body=_build_list_body(query, page_index, protocol_version),
+    )
+
+
+def build_onboard_playback_date_request(
+    node: CertifiedNode,
+    access_id: int,
+    device_id: int,
+    query: OnboardRecordingQuery,
+    sequence: int,
+    message_id: int,
+    request_id: int,
+    *,
+    page_index: int = 0,
+    protocol_version: int = 2,
+) -> bytes:
+    """Wrap one recovered date-list body in BuiltIn command ``18``."""
+
+    if protocol_version not in (2, 3, 4):
+        raise ValueError("only playback-date protocols V2 through V4 are supported")
+    return _build_onboard_playback_request(
+        node,
+        access_id,
+        device_id,
+        sequence,
+        message_id,
+        request_id,
+        command=PLAYBACK_GET_DATE_LIST_COMMAND,
+        body=_build_list_body(query, page_index, protocol_version),
+    )
+
+
+def _build_onboard_playback_request(
+    node: CertifiedNode,
+    access_id: int,
+    device_id: int,
+    sequence: int,
+    message_id: int,
+    request_id: int,
+    *,
+    command: int,
+    body: bytes,
+) -> bytes:
     prefix = bytes((_BUILTIN_DOMAIN, command, 0, 0))
     payload = prefix + struct.pack("<I", request_id) + body
     frame = new_header(
@@ -97,16 +153,12 @@ def parse_onboard_playback_list_response(
 ) -> ModernPlaybackPage | None:
     """Parse only a correlated BuiltIn list response and its bounded selected body."""
 
-    if len(frame) < 0x3C or frame[1] != 0xB9:
-        return None
-    payload_length = struct.unpack_from("<H", frame, 0x30)[0]
-    if payload_length < 8 or 0x34 + payload_length > len(frame):
-        return None
-    payload = frame[0x34 : 0x34 + payload_length]
-    command = _command_for_protocol(protocol_version)
-    if payload[:4] != bytes((_BUILTIN_DOMAIN, command, 0, 0)):
-        return None
-    if struct.unpack_from("<I", payload, 4)[0] != request_id:
+    body = _extract_correlated_body(
+        frame,
+        request_id=request_id,
+        command=_command_for_protocol(protocol_version),
+    )
+    if body is None:
         return None
     parsers = {
         1: parse_modern_playback_list_v1_response,
@@ -115,9 +167,54 @@ def parse_onboard_playback_list_response(
         4: parse_modern_playback_list_v4_response,
     }
     try:
-        return parsers[protocol_version](payload[8:])
+        return parsers[protocol_version](body)
     except (KeyError, ValueError):
         return None
+
+
+def parse_onboard_playback_date_response(
+    frame: bytes,
+    *,
+    request_id: int,
+    protocol_version: int = 2,
+) -> ModernPlaybackDatePage | None:
+    """Parse only a correlated BuiltIn command-18 date-list response."""
+
+    body = _extract_correlated_body(
+        frame,
+        request_id=request_id,
+        command=PLAYBACK_GET_DATE_LIST_COMMAND,
+    )
+    if body is None:
+        return None
+    parsers = {
+        2: parse_modern_playback_date_v2_response,
+        3: parse_modern_playback_date_v3_response,
+        4: parse_modern_playback_date_v4_response,
+    }
+    try:
+        return parsers[protocol_version](body)
+    except (KeyError, ValueError):
+        return None
+
+
+def _extract_correlated_body(
+    frame: bytes,
+    *,
+    request_id: int,
+    command: int,
+) -> bytes | None:
+    if len(frame) < 0x3C or frame[1] != 0xB9:
+        return None
+    payload_length = struct.unpack_from("<H", frame, 0x30)[0]
+    if payload_length < 8 or 0x34 + payload_length > len(frame):
+        return None
+    payload = frame[0x34 : 0x34 + payload_length]
+    if payload[:4] != bytes((_BUILTIN_DOMAIN, command, 0, 0)):
+        return None
+    if struct.unpack_from("<I", payload, 4)[0] != request_id:
+        return None
+    return payload[8:]
 
 
 def build_onboard_playback_receipt(

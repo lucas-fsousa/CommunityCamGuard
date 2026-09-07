@@ -7,9 +7,12 @@ from backend.app.drivers.contracts import OnboardRecordingQuery
 from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.onboard_playback_carrier import (
+    build_onboard_playback_date_request,
     build_onboard_playback_list_request,
+    parse_onboard_playback_date_response,
     parse_onboard_playback_list_response,
 )
+from backend.app.drivers.yoosee.p2p.onboard_playback_dates import ModernPlaybackDatePage
 from backend.app.drivers.yoosee.p2p.onboard_playback_modern import ModernPlaybackPage
 
 
@@ -87,6 +90,27 @@ def test_wraps_v3_and_v4_in_builtin_command_16_with_exact_protocol_byte():
         assert frame[0x3C] == protocol_version
 
 
+def test_wraps_date_query_in_builtin_command_18_for_v2_through_v4():
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+
+    for protocol_version in (2, 3, 4):
+        frame = gute_mode2_decrypt(
+            build_onboard_playback_date_request(
+                node,
+                123,
+                7_000_000_002,
+                _query(),
+                18,
+                19,
+                20,
+                protocol_version=protocol_version,
+            ),
+            node.session_key,
+        )
+        assert frame[0x34:0x3C] == b"\x00\x12\x00\x00" + struct.pack("<I", 20)
+        assert frame[0x3C] == protocol_version
+
+
 def _empty_response(request_id: int) -> bytes:
     body = bytearray(26)
     body[0] = 2
@@ -96,6 +120,12 @@ def _empty_response(request_id: int) -> bytes:
     response[:2] = b"\x7e\xb9"
     struct.pack_into("<H", response, 0x30, len(payload))
     response[0x34:] = payload
+    return bytes(response)
+
+
+def _empty_date_response(request_id: int) -> bytes:
+    response = bytearray(_empty_response(request_id))
+    response[0x35] = 18
     return bytes(response)
 
 
@@ -115,3 +145,17 @@ def test_response_requires_exact_builtin_command_and_request_correlation():
     malformed_body = bytearray(response)
     malformed_body[-1] = 1
     assert parse_onboard_playback_list_response(bytes(malformed_body), request_id=44) is None
+
+
+def test_date_response_requires_command_18_and_request_correlation():
+    response = _empty_date_response(44)
+
+    assert parse_onboard_playback_date_response(
+        response,
+        request_id=44,
+    ) == ModernPlaybackDatePage(0, 0, -1, ())
+    assert parse_onboard_playback_date_response(response, request_id=45) is None
+
+    wrong_command = bytearray(response)
+    wrong_command[0x35] = 16
+    assert parse_onboard_playback_date_response(bytes(wrong_command), request_id=44) is None
