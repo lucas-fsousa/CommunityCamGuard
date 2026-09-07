@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from ...contracts import OnboardRecordingQuery
@@ -11,6 +12,25 @@ PLAYBACK_GET_LIST_V2_COMMAND = 16
 PLAYBACK_PROTOCOL_V2 = 2
 PLAYBACK_LIST_REQUEST_SIZE = 43
 PLAYBACK_FILTER_SIZE = 18
+PLAYBACK_V2_RESPONSE_HEADER_SIZE = 26
+PLAYBACK_V2_TYPE_SIZE = 17
+PLAYBACK_V2_ITEM_SIZE = 9
+
+
+@dataclass(frozen=True, slots=True)
+class ModernPlaybackFile:
+    start_ms: int
+    end_ms: int
+    duration_ms: int
+    native_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModernPlaybackPage:
+    page_index: int
+    total_pages: int
+    marker: int
+    items: tuple[ModernPlaybackFile, ...]
 
 
 def _epoch_milliseconds(value: datetime) -> int:
@@ -82,3 +102,61 @@ def unpack_modern_playback_list_v2_request(payload: bytes) -> dict[str, object]:
         "count_per_page": struct.unpack_from(">I", payload, 21)[0],
         "filter_type": filter_type,
     }
+
+
+def _decode_native_type(field: bytes) -> str:
+    terminator = field.find(0)
+    if terminator < 0:
+        raise ValueError("modern playback-list type field is invalid")
+    try:
+        value = field[:terminator].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("modern playback-list type is not UTF-8") from exc
+    if not value:
+        raise ValueError("modern playback-list type is empty")
+    return value
+
+
+def parse_modern_playback_list_v2_response(payload: bytes) -> ModernPlaybackPage:
+    """Parse the V2 response recovered from ``_rsp_list_parse_v2<PlaybackFile>``.
+
+    The native marker at offset 1 is retained without assigning semantics beyond the observed
+    ``-1`` end condition. Native recording-type strings also remain unnormalized until a real
+    camera response establishes their model/firmware vocabulary.
+    """
+
+    if len(payload) < PLAYBACK_V2_RESPONSE_HEADER_SIZE or payload[0] != PLAYBACK_PROTOCOL_V2:
+        raise ValueError("modern playback-list V2 response is invalid")
+    marker = struct.unpack_from("<i", payload, 1)[0]
+    page_index, total_pages = struct.unpack_from("<II", payload, 5)
+    item_count = struct.unpack_from("<I", payload, 13)[0]
+    base_time_ms = struct.unpack_from("<Q", payload, 17)[0]
+    type_count = payload[25]
+    if item_count > 200 or type_count > 64:
+        raise ValueError("modern playback-list V2 response exceeds bounded counts")
+    type_end = PLAYBACK_V2_RESPONSE_HEADER_SIZE + type_count * PLAYBACK_V2_TYPE_SIZE
+    expected_size = type_end + item_count * PLAYBACK_V2_ITEM_SIZE
+    if len(payload) != expected_size:
+        raise ValueError("modern playback-list V2 response size is inconsistent")
+    native_types = tuple(
+        _decode_native_type(
+            payload[
+                PLAYBACK_V2_RESPONSE_HEADER_SIZE + index * PLAYBACK_V2_TYPE_SIZE :
+                PLAYBACK_V2_RESPONSE_HEADER_SIZE + (index + 1) * PLAYBACK_V2_TYPE_SIZE
+            ]
+        )
+        for index in range(type_count)
+    )
+    items: list[ModernPlaybackFile] = []
+    for index in range(item_count):
+        offset = type_end + index * PLAYBACK_V2_ITEM_SIZE
+        start_offset_ms, duration_ms = struct.unpack_from("<II", payload, offset)
+        type_index = payload[offset + 8]
+        if type_index >= len(native_types):
+            raise ValueError("modern playback-list V2 item has an unknown type index")
+        start_ms = base_time_ms + start_offset_ms
+        end_ms = start_ms + duration_ms
+        if duration_ms == 0 or end_ms > 0x7FFFFFFFFFFFFFFF:
+            raise ValueError("modern playback-list V2 item has an invalid duration")
+        items.append(ModernPlaybackFile(start_ms, end_ms, duration_ms, native_types[type_index]))
+    return ModernPlaybackPage(page_index, total_pages, marker, tuple(items))

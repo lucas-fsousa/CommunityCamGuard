@@ -1,4 +1,6 @@
 from backend.app.drivers.yoosee.p2p.onboard_storage import (
+    TF_CARD_ERROR,
+    TF_CARD_NORMAL,
     OnboardStorageState,
     can_advertise_onboard_recordings,
     extract_onboard_storage_state,
@@ -21,12 +23,52 @@ def test_extracts_known_wrapped_tf_info_without_guessing_capacity_units():
     assert state.present is True
 
 
+def test_extracts_real_stval_double_shape_and_normalizes_observed_signed_total_quirk():
+    state = extract_onboard_storage_state(
+        {
+            "stVal": {
+                "total": -15_355_872.0,
+                "remain": 11_972_800.0,
+                "stat": TF_CARD_NORMAL,
+                "cid": "sanitized-card-id",
+            },
+            "t": 1_788_749_700,
+        }
+    )
+
+    assert state == OnboardStorageState(
+        15_355_872,
+        11_972_800,
+        TF_CARD_NORMAL,
+        "sanitized-card-id",
+        -15_355_872,
+    )
+    assert state.present is True
+
+
 def test_rejects_malformed_or_inconsistent_tf_info():
     assert extract_onboard_storage_state(None) is None
     assert extract_onboard_storage_state({"total": True, "remain": 0, "stat": 0}) is None
     assert extract_onboard_storage_state({"total": 10, "remain": 11, "stat": 1}) is None
     assert extract_onboard_storage_state({"total": 10, "remain": 1, "stat": -1}) is None
     assert extract_onboard_storage_state({"total": 10, "remain": 1, "stat": 1, "cid": []}) is None
+    assert extract_onboard_storage_state({"total": 10.5, "remain": 1, "stat": 1}) is None
+    assert extract_onboard_storage_state({"total": float("nan"), "remain": 1, "stat": 1}) is None
+    assert extract_onboard_storage_state({"total": -10, "remain": 1, "stat": 0}) is None
+    assert extract_onboard_storage_state({"total": -10, "remain": 11, "stat": 1}) is None
+
+
+def test_apk_card_status_constants_do_not_make_an_error_card_readable():
+    state = OnboardStorageState(31_000, 20_000, TF_CARD_ERROR)
+
+    assert (
+        can_advertise_onboard_recordings(
+            state,
+            readable_statuses=frozenset({TF_CARD_NORMAL}),
+            playback_probe_verified=True,
+        )
+        is False
+    )
 
 
 def test_capability_gate_has_no_optimistic_status_or_family_default():
