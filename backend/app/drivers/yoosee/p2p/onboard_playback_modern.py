@@ -1,4 +1,4 @@
-"""Socket-free codec for the recovered IoTVideo V2 playback-list request."""
+"""Socket-free codecs for IoTVideo playback-list protocols V1 and V2."""
 
 from __future__ import annotations
 
@@ -8,10 +8,14 @@ from datetime import UTC, datetime, timedelta
 
 from ...contracts import OnboardRecordingQuery
 
+PLAYBACK_GET_LIST_V1_COMMAND = 0
 PLAYBACK_GET_LIST_V2_COMMAND = 16
+PLAYBACK_PROTOCOL_V1 = 1
 PLAYBACK_PROTOCOL_V2 = 2
 PLAYBACK_LIST_REQUEST_SIZE = 43
 PLAYBACK_FILTER_SIZE = 18
+PLAYBACK_V1_RESPONSE_HEADER_SIZE = 13
+PLAYBACK_V1_ITEM_SIZE = 33
 PLAYBACK_V2_RESPONSE_HEADER_SIZE = 26
 PLAYBACK_V2_TYPE_SIZE = 17
 PLAYBACK_V2_ITEM_SIZE = 9
@@ -29,11 +33,13 @@ class ModernPlaybackFile:
 class ModernPlaybackPage:
     page_index: int
     total_pages: int
-    marker: int
+    marker: int | None
     items: tuple[ModernPlaybackFile, ...]
+    fragment_index: int | None = None
+    fragment_count: int | None = None
 
 
-def _epoch_milliseconds(value: datetime) -> int:
+def epoch_milliseconds(value: datetime) -> int:
     if value.tzinfo is None or value.utcoffset() is None or value.utcoffset() != timedelta(0):
         raise ValueError("playback-list timestamps must be UTC")
     elapsed = value - datetime(1970, 1, 1, tzinfo=UTC)
@@ -72,11 +78,31 @@ def build_modern_playback_list_v2_request(
 
     payload = bytearray(PLAYBACK_LIST_REQUEST_SIZE)
     payload[0] = PLAYBACK_PROTOCOL_V2
-    struct.pack_into("<Q", payload, 1, _epoch_milliseconds(query.start_utc))
-    struct.pack_into("<Q", payload, 9, _epoch_milliseconds(query.end_utc))
+    struct.pack_into("<Q", payload, 1, epoch_milliseconds(query.start_utc))
+    struct.pack_into("<Q", payload, 9, epoch_milliseconds(query.end_utc))
     struct.pack_into(">I", payload, 17, page_index)
     struct.pack_into(">I", payload, 21, query.limit)
     payload[25 : 25 + len(encoded_filter)] = encoded_filter
+    return bytes(payload)
+
+
+def build_modern_playback_list_v1_request(
+    query: OnboardRecordingQuery,
+    *,
+    page_index: int = 0,
+) -> bytes:
+    """Build the recovered 43-byte V1 body passed to BuiltIn command ``0``."""
+
+    if not isinstance(query, OnboardRecordingQuery):
+        raise ValueError("playback-list query is invalid")
+    if type(page_index) is not int or not 0 <= page_index <= 0xFFFFFFFF:
+        raise ValueError("playback-list page index is invalid")
+    payload = bytearray(PLAYBACK_LIST_REQUEST_SIZE)
+    payload[0] = PLAYBACK_PROTOCOL_V1
+    struct.pack_into("<Q", payload, 1, epoch_milliseconds(query.start_utc))
+    struct.pack_into("<Q", payload, 9, epoch_milliseconds(query.end_utc))
+    struct.pack_into(">I", payload, 17, page_index)
+    struct.pack_into(">I", payload, 21, query.limit)
     return bytes(payload)
 
 
@@ -160,3 +186,24 @@ def parse_modern_playback_list_v2_response(payload: bytes) -> ModernPlaybackPage
             raise ValueError("modern playback-list V2 item has an invalid duration")
         items.append(ModernPlaybackFile(start_ms, end_ms, duration_ms, native_types[type_index]))
     return ModernPlaybackPage(page_index, total_pages, marker, tuple(items))
+
+
+def parse_modern_playback_list_v1_response(payload: bytes) -> ModernPlaybackPage:
+    """Parse the fixed 13-byte-header/33-byte-item V1 playback-list response."""
+
+    if len(payload) < PLAYBACK_V1_RESPONSE_HEADER_SIZE or payload[0] != PLAYBACK_PROTOCOL_V1:
+        raise ValueError("modern playback-list V1 response is invalid")
+    page_index, total_pages, item_count = struct.unpack_from("<III", payload, 1)
+    if item_count > 200:
+        raise ValueError("modern playback-list V1 response exceeds bounded item count")
+    if len(payload) != PLAYBACK_V1_RESPONSE_HEADER_SIZE + item_count * PLAYBACK_V1_ITEM_SIZE:
+        raise ValueError("modern playback-list V1 response size is inconsistent")
+    items: list[ModernPlaybackFile] = []
+    for index in range(item_count):
+        offset = PLAYBACK_V1_RESPONSE_HEADER_SIZE + index * PLAYBACK_V1_ITEM_SIZE
+        start_ms, end_ms = struct.unpack_from("<QQ", payload, offset)
+        native_type = _decode_native_type(payload[offset + 16 : offset + 33])
+        if end_ms <= start_ms or end_ms > 0x7FFFFFFFFFFFFFFF:
+            raise ValueError("modern playback-list V1 item has an invalid time range")
+        items.append(ModernPlaybackFile(start_ms, end_ms, end_ms - start_ms, native_type))
+    return ModernPlaybackPage(page_index, total_pages, None, tuple(items))

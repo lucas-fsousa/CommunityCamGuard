@@ -4,10 +4,13 @@ import pytest
 
 from backend.app.drivers.contracts import OnboardRecordingQuery
 from backend.app.drivers.yoosee.p2p.onboard_playback_modern import (
+    PLAYBACK_GET_LIST_V1_COMMAND,
     PLAYBACK_GET_LIST_V2_COMMAND,
     ModernPlaybackFile,
     ModernPlaybackPage,
+    build_modern_playback_list_v1_request,
     build_modern_playback_list_v2_request,
+    parse_modern_playback_list_v1_response,
     parse_modern_playback_list_v2_response,
     unpack_modern_playback_list_v2_request,
 )
@@ -41,6 +44,21 @@ def test_builds_recovered_v2_payload_for_builtin_command_16():
         "count_per_page": 50,
         "filter_type": "motion",
     }
+
+
+def test_builds_recovered_v1_payload_for_builtin_command_zero():
+    payload = build_modern_playback_list_v1_request(_query(), page_index=3)
+
+    assert PLAYBACK_GET_LIST_V1_COMMAND == 0
+    assert len(payload) == 43
+    assert payload[:25].hex() == (
+        "01"
+        "002ad75ca0010000"
+        "80180e5da0010000"
+        "00000003"
+        "00000032"
+    )
+    assert payload[25:] == bytes(18)
 
 
 def test_rejects_unrecovered_or_unsafe_v2_fields():
@@ -113,3 +131,38 @@ def test_v2_response_parser_fails_closed_on_bounds_types_and_duration():
     zero_duration[first_item_offset + 4 : first_item_offset + 8] = bytes(4)
     with pytest.raises(ValueError):
         parse_modern_playback_list_v2_response(bytes(zero_duration))
+
+
+def _v1_response() -> bytes:
+    header = (
+        bytes([1])
+        + (3).to_bytes(4, "little")
+        + (5).to_bytes(4, "little")
+        + (1).to_bytes(4, "little")
+    )
+    item = (
+        (1_788_264_001_000).to_bytes(8, "little")
+        + (1_788_264_031_000).to_bytes(8, "little")
+        + b"motion\0".ljust(17, b"\0")
+    )
+    return header + item
+
+
+def test_parses_recovered_v1_header_and_fixed_items():
+    assert parse_modern_playback_list_v1_response(_v1_response()) == ModernPlaybackPage(
+        page_index=3,
+        total_pages=5,
+        marker=None,
+        items=(
+            ModernPlaybackFile(1_788_264_001_000, 1_788_264_031_000, 30_000, "motion"),
+        ),
+    )
+
+
+def test_v1_response_parser_fails_closed_on_size_and_time_range():
+    with pytest.raises(ValueError):
+        parse_modern_playback_list_v1_response(_v1_response()[:-1])
+    invalid_range = bytearray(_v1_response())
+    invalid_range[13:21] = (1_788_264_032_000).to_bytes(8, "little")
+    with pytest.raises(ValueError):
+        parse_modern_playback_list_v1_response(bytes(invalid_range))
