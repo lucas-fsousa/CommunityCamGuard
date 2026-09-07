@@ -7,12 +7,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 
 LEGACY_RECORDING_LIST_COMMAND = 3
+LEGACY_RECORDING_LIST_RESPONSE_COMMAND = 4
 LEGACY_RECORDING_LIST_VERSION = 1
 LEGACY_RECORDING_LIST_SIZE = 16
-LEGACY_FILENAME_PREFIX_SIZE = 6
 LEGACY_FILENAME_MAX_SIZE = 512
 LEGACY_DURATION_MAX = (1 << 63) - 1
 LEGACY_RECORDING_TYPES = frozenset({"A", "M", "S", "V"})
+LEGACY_RESPONSE_HEADER_SIZE = 4
+LEGACY_RESPONSE_ITEM_SIZE = 8
+LEGACY_RESPONSE_MAX_ITEMS = 128
+LEGACY_RESPONSE_HAS_DURATION = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,10 +28,19 @@ class LegacyPlaybackFile:
     """
 
     filename: str
+    disc: int
     start_utc: datetime
-    end_utc: datetime
-    duration_seconds: int
+    end_utc: datetime | None
+    duration_seconds: int | None
     recording_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyPlaybackList:
+    command: int
+    option0: int
+    option1: int
+    items: tuple[LegacyPlaybackFile, ...]
 
 
 def _require_utc(value: datetime, label: str) -> None:
@@ -134,12 +147,24 @@ def parse_legacy_recording_filename(
         raise ValueError("camera timezone is required")
     if not isinstance(filename, str):
         raise TypeError("legacy recording filename must be a string")
-    if not LEGACY_FILENAME_PREFIX_SIZE < len(filename) <= LEGACY_FILENAME_MAX_SIZE:
+    if not 6 < len(filename) <= LEGACY_FILENAME_MAX_SIZE:
         raise ValueError("legacy recording filename length is invalid")
     if "|" in filename or any(ord(char) < 32 for char in filename):
         raise ValueError("legacy recording filename contains invalid characters")
 
-    value = filename[LEGACY_FILENAME_PREFIX_SIZE:]
+    prefix_end = filename.find("/", 4)
+    disc_text = filename[4:prefix_end]
+    if (
+        not filename.startswith("disc")
+        or prefix_end not in (5, 6)
+        or not disc_text.isascii()
+        or not disc_text.isdigit()
+    ):
+        raise ValueError("legacy recording filename prefix is invalid")
+    disc = int(disc_text)
+    if disc > 0x0F:
+        raise ValueError("legacy recording disc is out of range")
+    value = filename[prefix_end + 1 :]
     first_separator = value.find("_")
     second_separator = value.find("_", first_separator + 1)
     extension_separator = value.find(".")
@@ -149,26 +174,91 @@ def parse_legacy_recording_filename(
         first_separator != 10
         or second_separator != 19
         or extension_separator <= second_separator + 1
-        or duration_start <= extension_separator
-        or duration_end <= duration_start + 2
-        or duration_end != len(value) - 1
+        or value[extension_separator : extension_separator + 3] != ".av"
     ):
         raise ValueError("legacy recording filename layout is invalid")
 
     recording_type = value[extension_separator - 1]
     if recording_type not in LEGACY_RECORDING_TYPES:
         raise ValueError("legacy recording type is unsupported")
-    duration_text = value[duration_start + 1 : duration_end - 1]
-    if not duration_text.isascii() or not duration_text.isdigit():
-        raise ValueError("legacy recording duration is invalid")
-    duration_seconds = int(duration_text)
-    if not 0 < duration_seconds <= LEGACY_DURATION_MAX:
-        raise ValueError("legacy recording duration is out of range")
+    duration_seconds: int | None = None
+    if duration_start == -1 and duration_end == -1:
+        if value[extension_separator:] != ".av":
+            raise ValueError("legacy recording filename suffix is invalid")
+    else:
+        if (
+            value[extension_separator:duration_start] != ".av "
+            or duration_end <= duration_start + 2
+            or duration_end != len(value) - 1
+            or value[duration_end - 1] != "S"
+        ):
+            raise ValueError("legacy recording filename duration layout is invalid")
+        duration_text = value[duration_start + 1 : duration_end - 1]
+        if not duration_text.isascii() or not duration_text.isdigit():
+            raise ValueError("legacy recording duration is invalid")
+        duration_seconds = int(duration_text)
+        if not 0 < duration_seconds <= LEGACY_DURATION_MAX:
+            raise ValueError("legacy recording duration is out of range")
 
     try:
         local_start = datetime.strptime(value[:second_separator], "%Y-%m-%d_%H:%M:%S")
         start_utc = _camera_wall_time_to_utc(local_start, camera_timezone)
-        end_utc = start_utc + timedelta(seconds=duration_seconds)
+        end_utc = (
+            start_utc + timedelta(seconds=duration_seconds)
+            if duration_seconds is not None
+            else None
+        )
     except (OverflowError, ValueError) as exc:
         raise ValueError("legacy recording timestamp is invalid") from exc
-    return LegacyPlaybackFile(filename, start_utc, end_utc, duration_seconds, recording_type)
+    return LegacyPlaybackFile(
+        filename, disc, start_utc, end_utc, duration_seconds, recording_type
+    )
+
+
+def parse_legacy_recording_list_payload(
+    payload: bytes, *, camera_timezone: tzinfo
+) -> LegacyPlaybackList:
+    """Decode ``sMesgRetRecListType`` as recovered from ``createRecFileJsonData``.
+
+    This parser deliberately stops below the P2P manager/envelope layer. It is safe to use only
+    after that layer has authenticated the source camera and isolated the exact response body.
+    """
+
+    if camera_timezone is None:
+        raise ValueError("camera timezone is required")
+    if len(payload) < LEGACY_RESPONSE_HEADER_SIZE:
+        raise ValueError("legacy recording-list response is truncated")
+    command, option0, option1, item_count = payload[:LEGACY_RESPONSE_HEADER_SIZE]
+    if command != LEGACY_RECORDING_LIST_RESPONSE_COMMAND:
+        raise ValueError("legacy recording-list response command is invalid")
+    if item_count > LEGACY_RESPONSE_MAX_ITEMS:
+        raise ValueError("legacy recording-list response has too many items")
+    duration_size = 2 * item_count if option0 & LEGACY_RESPONSE_HAS_DURATION else 0
+    expected_size = LEGACY_RESPONSE_HEADER_SIZE + LEGACY_RESPONSE_ITEM_SIZE * item_count + duration_size
+    if len(payload) != expected_size:
+        raise ValueError("legacy recording-list response size is invalid")
+
+    durations_offset = LEGACY_RESPONSE_HEADER_SIZE + LEGACY_RESPONSE_ITEM_SIZE * item_count
+    items: list[LegacyPlaybackFile] = []
+    for index in range(item_count):
+        offset = LEGACY_RESPONSE_HEADER_SIZE + index * LEGACY_RESPONSE_ITEM_SIZE
+        year = struct.unpack_from("<H", payload, offset)[0]
+        disc_month, day, hour, minute, second, native_type = payload[offset + 2 : offset + 8]
+        disc = disc_month >> 4
+        month = disc_month & 0x0F
+        try:
+            recording_type = chr(native_type)
+        except ValueError as exc:
+            raise ValueError("legacy recording type is invalid") from exc
+        duration = (
+            struct.unpack_from("<H", payload, durations_offset + index * 2)[0]
+            if duration_size
+            else None
+        )
+        duration_suffix = f" ({duration}S)" if duration is not None else ""
+        filename = (
+            f"disc{disc}/{year:04d}-{month:02d}-{day:02d}_"
+            f"{hour:02d}:{minute:02d}:{second:02d}_{recording_type}.av{duration_suffix}"
+        )
+        items.append(parse_legacy_recording_filename(filename, camera_timezone=camera_timezone))
+    return LegacyPlaybackList(command, option0, option1, tuple(items))

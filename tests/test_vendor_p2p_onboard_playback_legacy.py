@@ -5,6 +5,7 @@ import pytest
 from backend.app.drivers.yoosee.p2p.onboard_playback_legacy import (
     build_legacy_recording_list_request,
     parse_legacy_recording_filename,
+    parse_legacy_recording_list_payload,
     unpack_legacy_recording_list_request,
 )
 
@@ -49,11 +50,12 @@ def test_rejects_non_utc_or_invalid_windows_and_payloads():
 
 def test_parses_apk_legacy_filename_in_explicit_camera_timezone():
     item = parse_legacy_recording_filename(
-        "disc1/2026-09-07_12:34:56_M.mp4(60s)",
+        "disc1/2026-09-07_12:34:56_M.av (60S)",
         camera_timezone=timezone(timedelta(hours=-3)),
     )
 
-    assert item.filename == "disc1/2026-09-07_12:34:56_M.mp4(60s)"
+    assert item.filename == "disc1/2026-09-07_12:34:56_M.av (60S)"
+    assert item.disc == 1
     assert item.start_utc == datetime(2026, 9, 7, 15, 34, 56, tzinfo=UTC)
     assert item.end_utc == datetime(2026, 9, 7, 15, 35, 56, tzinfo=UTC)
     assert item.duration_seconds == 60
@@ -64,11 +66,12 @@ def test_parses_apk_legacy_filename_in_explicit_camera_timezone():
     "filename",
     [
         "short",
-        "disc1/2026-09-07_12:34:56_X.mp4(60s)",
-        "disc1/2026-09-07_12:34:56_M.mp4(xs)",
-        "disc1/2026-09-07_12:34:56_M.mp4(0s)",
-        "disc1/2026-09-07_12:34:56_M.mp4(60s)junk",
-        "disc1/2026-09-07_12:34:56_M.mp4(60s)|other",
+        "disc1/2026-09-07_12:34:56_X.av (60S)",
+        "disc1/2026-09-07_12:34:56_M.av (xS)",
+        "disc1/2026-09-07_12:34:56_M.av (0S)",
+        "disc1/2026-09-07_12:34:56_M.mp4 (60S)",
+        "disc1/2026-09-07_12:34:56_M.av (60S)junk",
+        "disc1/2026-09-07_12:34:56_M.av (60S)|other",
     ],
 )
 def test_rejects_malformed_legacy_filenames(filename):
@@ -81,6 +84,57 @@ def test_rejects_ambiguous_camera_wall_time():
 
     with pytest.raises(ValueError, match="timestamp is invalid"):
         parse_legacy_recording_filename(
-            "disc1/2026-11-01_01:30:00_A.mp4(10s)",
+            "disc1/2026-11-01_01:30:00_A.av (10S)",
             camera_timezone=ZoneInfo("America/New_York"),
         )
+
+
+def test_parses_exact_native_legacy_response_layout_with_durations():
+    payload = bytes.fromhex(
+        "04 01 00 02 "
+        "ea 07 19 07 0c 22 38 4d "
+        "ea 07 19 07 0c 23 38 41 "
+        "3c 00 1e 00"
+    )
+
+    page = parse_legacy_recording_list_payload(payload, camera_timezone=UTC)
+
+    assert (page.command, page.option0, page.option1) == (4, 1, 0)
+    assert [item.filename for item in page.items] == [
+        "disc1/2026-09-07_12:34:56_M.av (60S)",
+        "disc1/2026-09-07_12:35:56_A.av (30S)",
+    ]
+    assert page.items[1].end_utc == datetime(2026, 9, 7, 12, 36, 26, tzinfo=UTC)
+
+
+def test_parses_native_variant_without_duration_but_does_not_invent_end_time():
+    payload = bytes.fromhex("04 00 00 01 ea 07 19 07 0c 22 38 53")
+
+    page = parse_legacy_recording_list_payload(payload, camera_timezone=UTC)
+
+    assert page.items[0].filename == "disc1/2026-09-07_12:34:56_S.av"
+    assert page.items[0].duration_seconds is None
+    assert page.items[0].end_utc is None
+
+
+def test_accepts_full_four_bit_native_disc_number():
+    item = parse_legacy_recording_filename(
+        "disc15/2026-09-07_12:34:56_V.av (1S)", camera_timezone=UTC
+    )
+
+    assert item.disc == 15
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\x03\x01\x00",
+        b"\x03\x00\x00\x00",
+        b"\x04\x00\x00\x81" + bytes(0x81 * 8),
+        b"\x04\x01\x00\x01" + bytes(8),
+        bytes.fromhex("04 00 00 01 ea 07 19 07 0c 22 38 58"),
+    ],
+)
+def test_rejects_malformed_native_legacy_response(payload):
+    with pytest.raises(ValueError):
+        parse_legacy_recording_list_payload(payload, camera_timezone=UTC)
