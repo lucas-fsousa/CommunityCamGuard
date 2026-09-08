@@ -1,10 +1,10 @@
 """Pure SDK message bodies for Yoosee onboard-playback queries.
 
 These builders deliberately stop at the eight-byte ``BuiltInCmd`` message
-boundary used by ``iotvideo::Connection::send_cmd``.  They do not select or
-open a transport.  In particular, these messages must never be wrapped in the
-brokered B9 envelope: physical testing proved that route is not equivalent to
-the SDK's established ``Connection``/``StreamPipe`` channel.
+boundary accepted by ``MessageMgr::send_msg_to_device``.  They do not select
+or open a transport.  The current SDK eventually carries this message in B9,
+but only through its route-aware passthrough finalizer; callers must not wrap
+it in a manually assembled B9 envelope.
 """
 
 from __future__ import annotations
