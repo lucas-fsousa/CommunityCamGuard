@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import struct
+
 from backend.app.drivers.yoosee.p2p import av_session
 from backend.app.drivers.yoosee.p2p.contracts import CallingAttempt, CallingResult
 from backend.app.drivers.yoosee.p2p.media_protocol import (
@@ -7,6 +9,9 @@ from backend.app.drivers.yoosee.p2p.media_protocol import (
     build_kcp_ack,
     build_kcp_push,
     parse_kcp_segments,
+)
+from backend.app.drivers.yoosee.p2p.onboard_playback_link import (
+    build_initial_playback_link_user_data,
 )
 from backend.app.drivers.yoosee.p2p.stream_protocol import encrypt_media_tlv
 
@@ -86,3 +91,32 @@ def test_av_initialization_fails_closed_without_private_route() -> None:
     assert av_session.initialize_av_session(object(), calling, 0.1) == av_session.AvSessionResult(
         0, (), 0, 0, (), None, None
     )
+
+
+def test_av_initialization_forwards_sd_metadata_into_init(monkeypatch) -> None:
+    calling = _calling()
+    attempt = calling.attempt
+    peer = calling.peer_endpoint
+    assert attempt is not None and peer is not None
+    metadata = build_initial_playback_link_user_data(
+        1_725_000_000_000_000,
+        device_platform_version=1,
+    )
+    sent: list[bytes] = []
+
+    class FakeSocket:
+        def sendto(self, payload, _address):
+            sent.append(payload)
+
+    monkeypatch.setattr(av_session, "receive_datagrams", lambda *_args: ())
+    av_session.initialize_av_session(
+        FakeSocket(),  # type: ignore[arg-type]
+        calling,
+        0.1,
+        request_user_data=metadata,
+        connection_type=2,
+    )
+
+    init = parse_kcp_segments(sent[0])[0].body
+    assert struct.unpack_from("<I", init, 16)[0] == 2
+    assert init[24:56] == metadata

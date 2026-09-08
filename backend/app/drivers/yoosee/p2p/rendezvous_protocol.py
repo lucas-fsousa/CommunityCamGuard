@@ -8,9 +8,8 @@ import struct
 
 from .contracts import CallingAttempt, CertifiedNode, OnlineDevice
 from .crypto import gute_mode0_encrypt, gute_mode1_xor_checksum
+from .onboard_playback_link import SD_PLAYBACK_CONNECTION_TYPE
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
-
-SD_PLAYBACK_CONNECTION_TYPE = 2
 
 
 def build_calling_request(

@@ -6,6 +6,11 @@ import struct
 import time
 from dataclasses import dataclass
 
+from .onboard_playback_link import (
+    PLAYBACK_LINK_USER_DATA_SIZE,
+    SD_PLAYBACK_CONNECTION_TYPE,
+)
+
 MTP_PREFIX_SIZE = 6
 MTP_MAX_FRAME_SIZE = 0x7FF
 KCP_HEADER = struct.Struct("<IBBHIIII")
@@ -169,17 +174,41 @@ def build_kcp_ack(
     return build_mtp_frame(0x10, segment)
 
 
-def build_av_init(call_id: int, *, definition: int = 1) -> bytes:
-    """Build the native 76-byte AVSTREAMCTL INIT request."""
+def build_av_init(
+    call_id: int,
+    *,
+    request_user_data: bytes | None = None,
+    connection_type: int | None = None,
+) -> bytes:
+    """Build the native 76-byte AVSTREAMCTL INIT request.
+
+    Omitted connection metadata preserves the captured live-view request exactly. The only
+    non-live route currently proven is SD playback, whose A4 and AV INIT must carry the same
+    32-byte metadata.
+    """
+
+    if request_user_data is None and connection_type is None:
+        effective_connection_type = 1
+        effective_user_data = bytearray(PLAYBACK_LINK_USER_DATA_SIZE)
+        struct.pack_into("<I", effective_user_data, 0, 1)
+        effective_user_data[23] = 0x12
+    else:
+        if request_user_data is None or connection_type is None:
+            raise ValueError("AV INIT connection type and request user data must be provided together")
+        if not isinstance(request_user_data, bytes) or len(request_user_data) != 32:
+            raise ValueError("AV INIT request user data must be exactly 32 bytes")
+        if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
+            raise ValueError("AV INIT connection type is unsupported")
+        effective_connection_type = connection_type
+        effective_user_data = request_user_data
 
     body = bytearray(76)
     body[:4] = bytes((3, 2, 0x4C, 0))
     struct.pack_into("<I", body, 4, call_id & 0xFFFFFFFF)
     struct.pack_into("<I", body, 8, 1)
-    struct.pack_into("<I", body, 16, 1)
+    struct.pack_into("<I", body, 16, effective_connection_type)
     struct.pack_into("<I", body, 20, 1)
-    struct.pack_into("<I", body, 24, definition & 0xFFFFFFFF)
-    body[47] = 0x12
+    body[24:56] = effective_user_data
     struct.pack_into("<I", body, 64, 9)
     return bytes(body)
 

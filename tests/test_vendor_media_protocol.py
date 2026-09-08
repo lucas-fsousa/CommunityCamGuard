@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from backend.app.drivers.yoosee.p2p.media_protocol import (
@@ -14,6 +16,9 @@ from backend.app.drivers.yoosee.p2p.media_protocol import (
     parse_kcp_segments,
     parse_media_meter,
     verify_mtp_frame,
+)
+from backend.app.drivers.yoosee.p2p.onboard_playback_link import (
+    build_initial_playback_link_user_data,
 )
 from backend.app.drivers.yoosee.p2p.stream_protocol import (
     build_builtin_command,
@@ -101,6 +106,29 @@ def test_av_start_body_matches_capture() -> None:
         "0000000000000000000000000000000000000000000000000000000000000000"
         "090000000000000000000000"
     )
+
+
+def test_av_init_carries_exact_sd_playback_connection_metadata() -> None:
+    metadata = build_initial_playback_link_user_data(
+        1_725_000_000_000_000,
+        device_platform_version=2,
+    )
+
+    body = build_av_init(
+        0xEF714F65,
+        request_user_data=metadata,
+        connection_type=2,
+    )
+
+    assert struct.unpack_from("<I", body, 16)[0] == 2
+    assert struct.unpack_from("<I", body, 20)[0] == 1
+    assert body[24:56] == metadata
+
+
+@pytest.mark.parametrize("metadata", [bytes(31), bytes(33)])
+def test_av_init_rejects_incomplete_sd_metadata(metadata) -> None:
+    with pytest.raises(ValueError, match="exactly 32 bytes"):
+        build_av_init(1, request_user_data=metadata, connection_type=2)
 
 
 def test_stream_tlv_round_trips() -> None:

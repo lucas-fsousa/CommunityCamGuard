@@ -39,6 +39,9 @@ def initialize_av_session(
     sock: socket.socket,
     calling: CallingResult,
     timeout: float,
+    *,
+    request_user_data: bytes | None = None,
+    connection_type: int | None = None,
 ) -> AvSessionResult:
     """Retry AV INIT until the camera accepts it and publishes its codec header."""
 
@@ -47,7 +50,11 @@ def initialize_av_session(
     if attempt is None or peer is None:
         return AvSessionResult(0, (), 0, 0, (), None, None)
     conv = attempt.link_id | 0x80000000
-    init = build_av_init(attempt.call_id)
+    init = build_av_init(
+        attempt.call_id,
+        request_user_data=request_user_data,
+        connection_type=connection_type,
+    )
     kcp_ack_count = 0
     actions: list[int] = []
     bulk_frames = 0
