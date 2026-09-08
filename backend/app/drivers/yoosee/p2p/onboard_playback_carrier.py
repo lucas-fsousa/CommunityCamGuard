@@ -182,14 +182,14 @@ def _build_onboard_playback_request(
 def parse_onboard_playback_list_response(
     frame: bytes,
     *,
-    request_id: int,
+    message_id: int,
     protocol_version: int = 2,
 ) -> ModernPlaybackPage | None:
     """Parse only a correlated BuiltIn list response and its bounded selected body."""
 
     body = _extract_correlated_body(
         frame,
-        request_id=request_id,
+        message_id=message_id,
         command=_command_for_protocol(protocol_version),
     )
     if body is None:
@@ -209,14 +209,14 @@ def parse_onboard_playback_list_response(
 def parse_onboard_playback_date_response(
     frame: bytes,
     *,
-    request_id: int,
+    message_id: int,
     protocol_version: int = 2,
 ) -> ModernPlaybackDatePage | None:
     """Parse only a correlated BuiltIn command-18 date-list response."""
 
     body = _extract_correlated_body(
         frame,
-        request_id=request_id,
+        message_id=message_id,
         command=PLAYBACK_GET_DATE_LIST_COMMAND,
     )
     if body is None:
@@ -235,14 +235,14 @@ def parse_onboard_playback_date_response(
 def parse_onboard_playback_recording_types_response(
     frame: bytes,
     *,
-    request_id: int,
+    message_id: int,
     protocol_version: int = 3,
 ) -> ModernPlaybackRecordingTypePage | None:
     """Parse only a correlated BuiltIn command-15 recording-type response."""
 
     body = _extract_correlated_body(
         frame,
-        request_id=request_id,
+        message_id=message_id,
         command=PLAYBACK_GET_RECORDING_TYPES_COMMAND,
     )
     if body is None:
@@ -260,18 +260,24 @@ def parse_onboard_playback_recording_types_response(
 def _extract_correlated_body(
     frame: bytes,
     *,
-    request_id: int,
+    message_id: int,
     command: int,
 ) -> bytes | None:
     if len(frame) < 0x3C or frame[1] != 0xB9:
+        return None
+    if struct.unpack_from("<I", frame, 0x2C)[0] != (message_id & 0x7FFFFFFF):
         return None
     payload_length = struct.unpack_from("<H", frame, 0x30)[0]
     if payload_length < 8 or 0x34 + payload_length > len(frame):
         return None
     payload = frame[0x34 : 0x34 + payload_length]
-    if payload[:4] != bytes((_BUILTIN_DOMAIN, command, 0, 0)):
-        return None
-    if struct.unpack_from("<I", payload, 4)[0] != request_id:
+    # MessageMgr correlates replies with the outer message id. Yoosee firmware may either echo the
+    # BuiltIn command or clear the response-direction command byte, and may allocate a new inner
+    # request id. The same direction/id behaviour is physically observed on its passthrough path.
+    if payload[:4] not in {
+        bytes((_BUILTIN_DOMAIN, command, 0, 0)),
+        bytes((_BUILTIN_DOMAIN, 0, 0, 0)),
+    }:
         return None
     return payload[8:]
 

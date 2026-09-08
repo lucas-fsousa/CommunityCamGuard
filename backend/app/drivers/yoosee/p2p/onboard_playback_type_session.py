@@ -16,7 +16,10 @@ from .onboard_playback_carrier import (
     parse_onboard_playback_recording_types_response,
 )
 from .onboard_playback_protocol import select_onboard_playback_protocol
-from .onboard_playback_transport import exchange_built_in_read
+from .onboard_playback_transport import (
+    exchange_built_in_read,
+    require_runtime_playback_read_certified,
+)
 from .onboard_playback_types import (
     ModernPlaybackRecordingTypePage,
     merge_modern_playback_recording_types_v4_fragments,
@@ -47,6 +50,7 @@ def exchange_onboard_playback_recording_types(
 ) -> OnboardPlaybackRecordingTypesExchange:
     """Perform one idempotent command-15 query without opening camera media."""
 
+    require_runtime_playback_read_certified()
     protocol_version = select_onboard_playback_protocol(
         query,
         requested_version=protocol_version,
@@ -86,7 +90,7 @@ def exchange_onboard_playback_recording_types(
         timeout=timeout,
         parse_response=lambda frame: parse_onboard_playback_recording_types_response(
             frame,
-            request_id=request_id,
+            message_id=message_id,
             protocol_version=protocol_version,
         ),
         response_set_complete=response_set_complete,
@@ -119,6 +123,7 @@ def list_camera_onboard_recording_types(
 ) -> OnboardPlaybackRecordingTypesExchange:
     """Open one bounded brokered session and query type windows via selected V3/V4."""
 
+    require_runtime_playback_read_certified()
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
     deadline = time.monotonic() + max(8.0, min(float(total_timeout), 35.0))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

@@ -137,13 +137,14 @@ def test_wraps_recording_type_query_in_internal_command_15_for_v3_and_v4():
         assert frame[0x3C] == protocol_version
 
 
-def _empty_response(request_id: int) -> bytes:
+def _empty_response(request_id: int, message_id: int = 77) -> bytes:
     body = bytearray(26)
     body[0] = 2
     body[1:5] = (-1).to_bytes(4, "little", signed=True)
     payload = b"\x00\x10\x00\x00" + struct.pack("<I", request_id) + body
     response = bytearray(0x34 + len(payload))
     response[:2] = b"\x7e\xb9"
+    struct.pack_into("<I", response, 0x2C, message_id)
     struct.pack_into("<H", response, 0x30, len(payload))
     response[0x34:] = payload
     return bytes(response)
@@ -162,50 +163,71 @@ def _empty_recording_types_response(request_id: int) -> bytes:
     return bytes(response)
 
 
-def test_response_requires_exact_builtin_command_and_request_correlation():
+def test_response_uses_outer_message_correlation_and_accepts_cleared_command():
     response = _empty_response(44)
 
     assert parse_onboard_playback_list_response(
         response,
-        request_id=44,
+        message_id=77,
     ) == ModernPlaybackPage(0, 0, -1, ())
-    assert parse_onboard_playback_list_response(response, request_id=45) is None
+    assert parse_onboard_playback_list_response(response, message_id=78) is None
+
+    cleared_command = bytearray(response)
+    cleared_command[0x35] = 0
+    struct.pack_into("<I", cleared_command, 0x38, 0xDEADBEEF)
+    assert parse_onboard_playback_list_response(
+        bytes(cleared_command), message_id=77
+    ) == ModernPlaybackPage(0, 0, -1, ())
 
     wrong_command = bytearray(response)
     wrong_command[0x35] = 18
-    assert parse_onboard_playback_list_response(bytes(wrong_command), request_id=44) is None
+    assert parse_onboard_playback_list_response(bytes(wrong_command), message_id=77) is None
 
     malformed_body = bytearray(response)
     malformed_body[-1] = 1
-    assert parse_onboard_playback_list_response(bytes(malformed_body), request_id=44) is None
+    assert parse_onboard_playback_list_response(bytes(malformed_body), message_id=77) is None
 
 
-def test_date_response_requires_command_18_and_request_correlation():
+def test_date_response_requires_outer_message_and_known_response_command():
     response = _empty_date_response(44)
 
     assert parse_onboard_playback_date_response(
         response,
-        request_id=44,
+        message_id=77,
     ) == ModernPlaybackDatePage(0, 0, -1, ())
-    assert parse_onboard_playback_date_response(response, request_id=45) is None
+    assert parse_onboard_playback_date_response(response, message_id=78) is None
+
+    cleared_command = bytearray(response)
+    cleared_command[0x35] = 0
+    struct.pack_into("<I", cleared_command, 0x38, 0xDEADBEEF)
+    assert parse_onboard_playback_date_response(
+        bytes(cleared_command), message_id=77
+    ) == ModernPlaybackDatePage(0, 0, -1, ())
 
     wrong_command = bytearray(response)
     wrong_command[0x35] = 16
-    assert parse_onboard_playback_date_response(bytes(wrong_command), request_id=44) is None
+    assert parse_onboard_playback_date_response(bytes(wrong_command), message_id=77) is None
 
 
-def test_recording_type_response_requires_command_15_and_request_correlation():
+def test_recording_type_response_requires_outer_message_and_known_response_command():
     response = _empty_recording_types_response(44)
 
     assert parse_onboard_playback_recording_types_response(
         response,
-        request_id=44,
+        message_id=77,
     ) == ModernPlaybackRecordingTypePage(0, 0, -1, ())
-    assert parse_onboard_playback_recording_types_response(response, request_id=45) is None
+    assert parse_onboard_playback_recording_types_response(response, message_id=78) is None
+
+    cleared_command = bytearray(response)
+    cleared_command[0x35] = 0
+    struct.pack_into("<I", cleared_command, 0x38, 0xDEADBEEF)
+    assert parse_onboard_playback_recording_types_response(
+        bytes(cleared_command), message_id=77
+    ) == ModernPlaybackRecordingTypePage(0, 0, -1, ())
 
     wrong_command = bytearray(response)
     wrong_command[0x35] = 16
     assert (
-        parse_onboard_playback_recording_types_response(bytes(wrong_command), request_id=44)
+        parse_onboard_playback_recording_types_response(bytes(wrong_command), message_id=77)
         is None
     )

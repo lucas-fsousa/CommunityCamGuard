@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import struct
 
+import pytest
+
 from backend.app.drivers.yoosee.p2p import onboard_playback_transport
-from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode
+from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode, P2PProbeError
 
 
 class _Socket:
@@ -12,6 +14,11 @@ class _Socket:
 
     def sendto(self, payload: bytes, peer: tuple[str, int]) -> None:
         self.sent.append((payload, peer))
+
+
+def test_live_playback_transport_fails_closed_until_physically_certified():
+    with pytest.raises(P2PProbeError, match="not runtime-certified"):
+        onboard_playback_transport.require_runtime_playback_read_certified()
 
 
 def _frame(kind: int, *, flags: int = 0, message_id: int = 0) -> bytes:

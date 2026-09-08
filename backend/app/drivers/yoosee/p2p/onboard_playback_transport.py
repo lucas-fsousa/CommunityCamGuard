@@ -9,11 +9,23 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from .contracts import CertifiedNode
+from .contracts import CertifiedNode, P2PProbeError
 from .onboard_playback_carrier import build_onboard_playback_receipt
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 
 ResponseT = TypeVar("ResponseT")
+
+# BuiltIn playback commands are recovered from the SDK, but sending command 16 through the bare
+# brokered-control route caused visible LED activity on camera 3 instead of returning a list. Keep
+# all public live entrypoints fail-closed until the SDK's prerequisite connection state is cloned.
+_RUNTIME_PLAYBACK_READ_CERTIFIED = False
+
+
+def require_runtime_playback_read_certified() -> None:
+    """Reject live SD-card queries while their transport semantics are not physically safe."""
+
+    if not _RUNTIME_PLAYBACK_READ_CERTIFIED:
+        raise P2PProbeError("Yoosee onboard playback transport is not runtime-certified")
 
 
 @dataclass(frozen=True, slots=True)
