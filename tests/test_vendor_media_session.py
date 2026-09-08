@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import struct
 
+import pytest
+
 from backend.app.drivers.yoosee.p2p import media_session
 from backend.app.drivers.yoosee.p2p.contracts import (
     CallingAttempt,
@@ -11,6 +13,9 @@ from backend.app.drivers.yoosee.p2p.contracts import (
 )
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_decrypt
 from backend.app.drivers.yoosee.p2p.media_protocol import build_media_meter_request
+from backend.app.drivers.yoosee.p2p.onboard_playback_link import (
+    build_initial_playback_link_user_data,
+)
 from backend.app.drivers.yoosee.p2p.rendezvous_protocol import build_direct_calling_request
 
 
@@ -57,6 +62,46 @@ def test_direct_calling_request_has_exact_private_media_fields() -> None:
     assert plain[0x78:0x80] == attempt.cookie
     assert struct.unpack_from("<I", plain, 0x84)[0] == attempt.call_id
     assert plain[0xA7] == 0x12 and plain[0xB0] == 1
+
+
+def test_direct_calling_request_accepts_exact_playback_link_user_data() -> None:
+    node, device, attempt, _calling = _route()
+    metadata = build_initial_playback_link_user_data(
+        1_725_000_000_000_000,
+        device_platform_version=2,
+    )
+
+    plain = gute_mode1_decrypt(
+        build_direct_calling_request(
+            node,
+            123,
+            device,
+            "192.0.2.20",
+            45678,
+            attempt,
+            18,
+            request_user_data=metadata,
+        )
+    )
+
+    assert plain[0x90:0xB0] == metadata
+    assert plain[0xB0] == 1
+
+
+@pytest.mark.parametrize("size", [0, 31, 33])
+def test_direct_calling_request_rejects_wrong_user_data_size(size) -> None:
+    node, device, attempt, _calling = _route()
+    with pytest.raises(ValueError, match="exactly 32 bytes"):
+        build_direct_calling_request(
+            node,
+            123,
+            device,
+            "192.0.2.20",
+            45678,
+            attempt,
+            18,
+            request_user_data=bytes(size),
+        )
 
 
 def test_media_channel_accepts_only_matching_peer_and_route(monkeypatch) -> None:

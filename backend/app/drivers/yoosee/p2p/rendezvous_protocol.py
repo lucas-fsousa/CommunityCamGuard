@@ -19,6 +19,8 @@ def build_calling_request(
     local_port: int,
     attempt: CallingAttempt,
     sequence: int,
+    *,
+    request_user_data: bytes | None = None,
 ) -> bytes:
     """Build the broker-facing A4 request without any control/media payload."""
     if len(attempt.cookie) != 8:
@@ -44,6 +46,7 @@ def build_calling_request(
     frame[0x78:0x80] = attempt.cookie
     struct.pack_into("<I", frame, 0x84, attempt.call_id)
     struct.pack_into("<I", frame, 0x8C, 1)
+    _write_request_user_data(frame, request_user_data)
     return finish_mode2(frame, node.session_key)
 
 
@@ -55,6 +58,8 @@ def build_direct_calling_request(
     local_port: int,
     attempt: CallingAttempt,
     sequence: int,
+    *,
+    request_user_data: bytes | None = None,
 ) -> bytes:
     """Build the camera-facing mode-1 A4 that opens the direct media channel."""
 
@@ -83,8 +88,17 @@ def build_direct_calling_request(
     struct.pack_into("<I", frame, 0x8C, 1)
     struct.pack_into("<I", frame, 0x90, 1)
     frame[0xA7] = 0x12
+    _write_request_user_data(frame, request_user_data)
     frame[0xB0] = 1
     return finish_mode1(frame)
+
+
+def _write_request_user_data(frame: bytearray, request_user_data: bytes | None) -> None:
+    if request_user_data is None:
+        return
+    if not isinstance(request_user_data, bytes) or len(request_user_data) != 32:
+        raise ValueError("calling request user data must be exactly 32 bytes")
+    frame[0x90:0xB0] = request_user_data
 
 
 def build_nat_online(access_id: int, device_id: int, link_id: int) -> bytes:

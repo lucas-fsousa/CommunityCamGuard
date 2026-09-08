@@ -107,6 +107,29 @@ def test_calling_and_nat_frames_contain_only_selected_route_identity():
     assert struct.unpack_from("<I", nat, 0x24)[0] == attempt.link_id
 
 
+def test_broker_calling_accepts_exact_request_user_data():
+    node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    device = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    attempt = client.CallingAttempt(0x00FBDD35, 0xEF714F65, bytes(8))
+    metadata = bytes(range(32))
+
+    calling = gute_mode2_decrypt(
+        client.build_calling_request(
+            node,
+            123,
+            device,
+            "192.0.2.20",
+            45678,
+            attempt,
+            18,
+            request_user_data=metadata,
+        ),
+        node.session_key,
+    )
+
+    assert calling[0x90:0xB0] == metadata
+
+
 def test_parse_mtp_peer_endpoint_rejects_another_link():
     frame = bytearray(0x64)
     frame[1] = 0xA3
