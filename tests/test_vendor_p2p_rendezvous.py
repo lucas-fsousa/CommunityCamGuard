@@ -16,6 +16,7 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
     struct.pack_into("<I", direct, 0x24, 7)
     wire = b"\x7f\xca" + bytes(50)
     sent: list[tuple[bytes, tuple[str, int]]] = []
+    calling_metadata: list[tuple[bytes | None, int | None]] = []
 
     class FakeSocket:
         def getsockname(self):
@@ -28,7 +29,11 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
     monkeypatch.setattr(rendezvous_session.secrets, "randbits", lambda _bits: 8)
     monkeypatch.setattr(rendezvous_session.secrets, "token_bytes", lambda length: b"x" * length)
     monkeypatch.setattr(rendezvous_session, "local_route_ip", lambda _peer: "192.0.2.20")
-    monkeypatch.setattr(rendezvous_session, "build_calling_request", lambda *_args: b"calling")
+    def build_calling(*_args, request_user_data=None, connection_type=None):
+        calling_metadata.append((request_user_data, connection_type))
+        return b"calling"
+
+    monkeypatch.setattr(rendezvous_session, "build_calling_request", build_calling)
     monkeypatch.setattr(rendezvous_session, "build_nat_online", lambda *_args: b"online")
     monkeypatch.setattr(rendezvous_session, "build_nat_online_ack", lambda *_args: b"ack")
     monkeypatch.setattr(rendezvous_session, "gute_mode0_decrypt", lambda _wire: bytes(direct))
@@ -45,12 +50,15 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
         device,
         0.1,
         retries=1,
+        request_user_data=bytes(32),
+        connection_type=2,
     )
 
     assert result.direct_datagrams == 1
     assert result.direct_handshake is True
     assert 0 < result.route_link_id <= 0xFFFFFF
     assert result.next_sequence == 18
+    assert calling_metadata == [(bytes(32), 2)]
     assert sent == [
         (b"calling", node.address),
         (b"online", peer),

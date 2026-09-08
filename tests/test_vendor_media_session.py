@@ -138,6 +138,7 @@ def test_media_channel_accepts_only_matching_peer_and_route(monkeypatch) -> None
         attempt.call_id,
     )
     sent: list[tuple[bytes, tuple[str, int]]] = []
+    calling_metadata: list[tuple[bytes | None, int | None]] = []
 
     class FakeSocket:
         def getsockname(self):
@@ -147,7 +148,11 @@ def test_media_channel_accepts_only_matching_peer_and_route(monkeypatch) -> None
             sent.append((payload, address))
 
     monkeypatch.setattr(media_session, "local_route_ip", lambda _peer: "192.0.2.20")
-    monkeypatch.setattr(media_session, "build_direct_calling_request", lambda *_args: b"direct")
+    def build_calling(*_args, request_user_data=None, connection_type=None):
+        calling_metadata.append((request_user_data, connection_type))
+        return b"direct"
+
+    monkeypatch.setattr(media_session, "build_direct_calling_request", build_calling)
     monkeypatch.setattr(media_session, "gute_mode1_decrypt", lambda _wire: bytes(direct_ack))
     monkeypatch.setattr(
         media_session,
@@ -168,9 +173,12 @@ def test_media_channel_accepts_only_matching_peer_and_route(monkeypatch) -> None
         device,
         calling,
         0.1,
+        request_user_data=bytes(32),
+        connection_type=2,
     )
 
     assert result == media_session.MediaChannelResult(True, True, 2)
+    assert calling_metadata == [(bytes(32), 2)]
     assert [address for _payload, address in sent] == [peer, peer, peer]
     assert sent[0][0][:2] == b"\xc0\x90"
     assert sent[1][0] == b"direct"

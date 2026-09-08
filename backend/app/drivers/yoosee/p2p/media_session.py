@@ -32,6 +32,9 @@ def open_media_channel(
     device: OnlineDevice,
     calling: CallingResult,
     timeout: float,
+    *,
+    request_user_data: bytes | None = None,
+    connection_type: int | None = None,
 ) -> MediaChannelResult:
     """Open only MTP routing/meter state; do not send AV or microphone frames."""
 
@@ -49,6 +52,8 @@ def open_media_channel(
         local_port,
         attempt,
         calling.next_sequence,
+        request_user_data=request_user_data,
+        connection_type=connection_type,
     )
     direct_acknowledged = False
     meter_acknowledged = False

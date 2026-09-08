@@ -34,6 +34,8 @@ def call_device(
     retries: int = 4,
     interval: float = 3.0,
     deadline: float | None = None,
+    request_user_data: bytes | None = None,
+    connection_type: int | None = None,
 ) -> CallingResult:
     """Broker and prove a direct NAT path without opening media or sending a command."""
 
@@ -70,6 +72,8 @@ def call_device(
                 local_port,
                 attempt,
                 sequence,
+                request_user_data=request_user_data,
+                connection_type=connection_type,
             ),
             node.address,
         )
