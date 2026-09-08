@@ -66,6 +66,63 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
     ]
 
 
+def test_rendezvous_passively_carries_correlated_platform_metadata(monkeypatch):
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
+    device = OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    peer = ("198.51.100.9", 32100)
+    distribution = bytearray(0x8A)
+    distribution[:2] = b"\x7e\xe4"
+    struct.pack_into("<H", distribution, 2, len(distribution))
+    distribution[0x18] = 1
+    struct.pack_into("<Q", distribution, 0x38, device.device_id)
+    direct = bytearray(52)
+    struct.pack_into("<I", direct, 0x24, 7)
+
+    class FakeSocket:
+        def getsockname(self):
+            return "0.0.0.0", 45678
+
+        def sendto(self, _payload, _address):
+            pass
+
+    monkeypatch.setattr(rendezvous_session.secrets, "randbelow", lambda _limit: 6)
+    monkeypatch.setattr(rendezvous_session.secrets, "randbits", lambda _bits: 8)
+    monkeypatch.setattr(rendezvous_session.secrets, "token_bytes", lambda length: b"x" * length)
+    monkeypatch.setattr(rendezvous_session, "local_route_ip", lambda _peer: "192.0.2.20")
+    monkeypatch.setattr(rendezvous_session, "build_calling_request", lambda *_args, **_kwargs: b"calling")
+    monkeypatch.setattr(rendezvous_session, "build_nat_online", lambda *_args: b"online")
+    monkeypatch.setattr(rendezvous_session, "build_nat_online_ack", lambda *_args: b"ack")
+    monkeypatch.setattr(rendezvous_session, "gute_mode0_decrypt", lambda _wire: bytes(direct))
+    monkeypatch.setattr(
+        rendezvous_session,
+        "decrypt_node_frame",
+        lambda wire, _node: bytes(distribution) if wire == b"distribution" else None,
+    )
+    monkeypatch.setattr(rendezvous_session, "acknowledge_reliable_node_frame", lambda *_args: True)
+    monkeypatch.setattr(
+        rendezvous_session,
+        "receive_datagrams",
+        lambda *_args: iter(
+            (
+                (b"distribution", node.address),
+                (b"\x7f\xca" + bytes(50), peer),
+            )
+        ),
+    )
+
+    result = rendezvous_session.call_device(
+        FakeSocket(),  # type: ignore[arg-type]
+        node,
+        123,
+        device,
+        0.1,
+        retries=1,
+    )
+
+    assert result.direct_handshake is True
+    assert result.device_platform_version == 2
+
+
 def test_route_hangup_matches_the_native_p2p_inner_layout():
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
 

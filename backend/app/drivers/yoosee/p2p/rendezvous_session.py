@@ -9,6 +9,10 @@ import time
 
 from .contracts import CallingAttempt, CallingResult, CertifiedNode, OnlineDevice
 from .crypto import gute_mode0_decrypt
+from .platform_metadata import (
+    PUSH_STREAM_DISTRIBUTE_TYPE,
+    parse_push_stream_platform_metadata,
+)
 from .rendezvous_protocol import (
     build_calling_request,
     build_nat_online,
@@ -53,6 +57,7 @@ def call_device(
     direct_datagrams = 0
     direct_handshake = False
     error_code = None
+    device_platform_version = None
     peer_endpoint = None
     next_sequence = node.next_sequence
     nat_online = build_nat_online(access_id, device.device_id, attempt.link_id)
@@ -101,7 +106,14 @@ def call_device(
             if plain is None:
                 continue
             acknowledge_reliable_node_frame(sock, node, plain)
-            if plain[1] == 0xA4 and len(plain) >= 0x20:
+            if plain[1] == PUSH_STREAM_DISTRIBUTE_TYPE:
+                metadata = parse_push_stream_platform_metadata(
+                    plain,
+                    expected_device_id=device.device_id,
+                )
+                if metadata is not None:
+                    device_platform_version = metadata.version
+            elif plain[1] == 0xA4 and len(plain) >= 0x20:
                 node_acknowledged = True
             elif plain[1] == 0xA3:
                 node_notified = True
@@ -124,6 +136,7 @@ def call_device(
         next_sequence=next_sequence,
         route_link_id=attempt.link_id,
         attempt=attempt,
+        device_platform_version=device_platform_version,
     )
 
 

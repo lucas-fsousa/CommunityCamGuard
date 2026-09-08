@@ -116,6 +116,7 @@ class CallingResult:
     next_sequence: int = 0
     route_link_id: int = 0
     attempt: CallingAttempt | None = None
+    device_platform_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

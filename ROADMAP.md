@@ -76,6 +76,9 @@ settings and reboot still use the vendor control stack (see ADR 0008).
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
 fails closed on START alone.
+Authenticated, device-correlated `E4/PushStreamDistribute` metadata is now collected passively
+during rendezvous and carried as an optional platform version; it emits no additional traffic and
+remains unknown when the broker does not publish the frame.
 
 | Priority | Item | Status |
 |---|---|---|
