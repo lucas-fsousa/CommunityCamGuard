@@ -110,6 +110,8 @@ def _write_connection_metadata(
         raise ValueError("calling request user data must be exactly 32 bytes")
     if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
         raise ValueError("calling connection type is unsupported")
+    options = struct.unpack_from("<H", frame, 0x18)[0]
+    struct.pack_into("<H", frame, 0x18, options | 0x4000)
     frame[0x90:0xB0] = request_user_data
     # Native iv_init_frm_CALLING starts with userdata byte zero and adds bit 6 for route type 2.
     frame[0xB0] = request_user_data[0] | 0x40

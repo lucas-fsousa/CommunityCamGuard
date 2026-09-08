@@ -134,6 +134,7 @@ def test_broker_calling_accepts_exact_request_user_data():
         node.session_key,
     )
 
+    assert struct.unpack_from("<H", calling, 0x18)[0] == 0x4581
     assert calling[0x90:0xB0] == metadata
     assert calling[0xB0] == 0x40
 

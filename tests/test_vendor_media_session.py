@@ -85,6 +85,7 @@ def test_direct_calling_request_accepts_exact_playback_link_user_data() -> None:
         )
     )
 
+    assert struct.unpack_from("<H", plain, 0x18)[0] == 0x4483
     assert plain[0x90:0xB0] == metadata
     assert plain[0xB0] == 0x40
 
