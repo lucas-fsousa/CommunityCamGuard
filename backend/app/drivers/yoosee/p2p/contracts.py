@@ -131,6 +131,7 @@ class P2PRouteProbe:
     direct_handshake: bool
     camera_contacted: bool
     broker_error_code: int | None
+    device_platform_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,8 +14,17 @@ from .media_protocol import (
     build_media_meter_request,
     parse_media_meter,
 )
+from .platform_metadata import (
+    PUSH_STREAM_DISTRIBUTE_TYPE,
+    parse_push_stream_platform_metadata,
+)
 from .rendezvous_protocol import build_direct_calling_request
-from .session_io import local_route_ip, receive_datagrams
+from .session_io import (
+    acknowledge_reliable_node_frame,
+    decrypt_node_frame,
+    local_route_ip,
+    receive_datagrams,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +32,7 @@ class MediaChannelResult:
     direct_acknowledged: bool
     meter_acknowledged: bool
     datagrams: int
+    device_platform_version: int | None = None
 
 
 def open_media_channel(
@@ -58,6 +68,7 @@ def open_media_channel(
     direct_acknowledged = False
     meter_acknowledged = False
     datagrams = 0
+    device_platform_version = calling.device_platform_version
     bounded_timeout = max(0.1, min(float(timeout), 5.0))
 
     for meter_sequence in (1, 2):
@@ -71,6 +82,19 @@ def open_media_channel(
         sock.sendto(meter, peer)
         sock.sendto(direct_a4, peer)
         for wire, source in receive_datagrams(sock, time.monotonic() + bounded_timeout):
+            if source == node.address:
+                plain = decrypt_node_frame(wire, node)
+                if plain is None:
+                    continue
+                acknowledge_reliable_node_frame(sock, node, plain)
+                if len(plain) > 1 and plain[1] == PUSH_STREAM_DISTRIBUTE_TYPE:
+                    metadata = parse_push_stream_platform_metadata(
+                        plain,
+                        expected_device_id=device.device_id,
+                    )
+                    if metadata is not None:
+                        device_platform_version = metadata.version
+                continue
             if source != peer:
                 continue
             datagrams += 1
@@ -101,4 +125,9 @@ def open_media_channel(
                 sock.sendto(build_media_meter_ack(wire), peer)
         if direct_acknowledged and meter_acknowledged:
             break
-    return MediaChannelResult(direct_acknowledged, meter_acknowledged, datagrams)
+    return MediaChannelResult(
+        direct_acknowledged,
+        meter_acknowledged,
+        datagrams,
+        device_platform_version,
+    )

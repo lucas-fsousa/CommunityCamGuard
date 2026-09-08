@@ -77,8 +77,10 @@ Yoosee SD playback handshake invariant: native action `2` is the initiator-side 
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
 fails closed on START alone.
 Authenticated, device-correlated `E4/PushStreamDistribute` metadata is now collected passively
-during rendezvous and carried as an optional platform version; it emits no additional traffic and
-remains unknown when the broker does not publish the frame.
+during rendezvous and MTP opening and carried as an optional platform version; it emits no
+additional traffic and remains unknown when the broker does not publish the frame. A bounded
+camera-3 route/MTP probe succeeded without AV or commands but produced no E4, proving that this
+profile cannot obtain the platform enum from those phases alone.
 
 | Priority | Item | Status |
 |---|---|---|

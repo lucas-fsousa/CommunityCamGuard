@@ -347,6 +347,7 @@ def test_route_probe_selects_only_bound_camera_and_sanitizes_peer(monkeypatch):
             ("198.51.100.9", 32100),
             18,
             0x123456,
+            device_platform_version=2,
         )
 
     monkeypatch.setattr(client, "call_device", fake_call)
@@ -364,6 +365,7 @@ def test_route_probe_selects_only_bound_camera_and_sanitizes_peer(monkeypatch):
     assert closed == [(7000000002, 0x123456, 18)]
     assert result.direct_handshake is True
     assert result.camera_contacted is True
+    assert result.device_platform_version == 2
     assert not hasattr(result, "peer_endpoint")
 
 

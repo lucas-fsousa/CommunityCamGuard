@@ -200,3 +200,60 @@ def test_media_channel_fails_closed_without_private_attempt() -> None:
     assert media_session.open_media_channel(object(), node, 123, device, missing, 0.1) == (
         media_session.MediaChannelResult(False, False, 0)
     )
+
+
+def test_media_channel_passively_collects_correlated_platform_metadata(monkeypatch) -> None:
+    node, device, attempt, calling = _route()
+    peer = calling.peer_endpoint
+    assert peer is not None
+    distribution = bytearray(0x8A)
+    distribution[:2] = b"\x7e\xe4"
+    struct.pack_into("<H", distribution, 2, len(distribution))
+    distribution[0x18] = 1
+    struct.pack_into("<Q", distribution, 0x38, device.device_id)
+    direct_ack = bytearray(32)
+    direct_ack[:2] = b"\x7e\xa4"
+    struct.pack_into("<I", direct_ack, 0x0C, calling.next_sequence)
+    struct.pack_into("<I", direct_ack, 0x18, 4)
+    meter = build_media_meter_request(device.device_id, 123, attempt.link_id, attempt.call_id)
+
+    class FakeSocket:
+        def getsockname(self):
+            return "0.0.0.0", 45678
+
+        def sendto(self, _payload, _address):
+            pass
+
+    monkeypatch.setattr(media_session, "local_route_ip", lambda _peer: "192.0.2.20")
+    monkeypatch.setattr(media_session, "build_direct_calling_request", lambda *_args, **_kwargs: b"direct")
+    monkeypatch.setattr(media_session, "gute_mode1_decrypt", lambda _wire: bytes(direct_ack))
+    monkeypatch.setattr(
+        media_session,
+        "decrypt_node_frame",
+        lambda wire, _node: bytes(distribution) if wire == b"distribution" else None,
+    )
+    monkeypatch.setattr(media_session, "acknowledge_reliable_node_frame", lambda *_args: True)
+    monkeypatch.setattr(
+        media_session,
+        "receive_datagrams",
+        lambda *_args: iter(
+            (
+                (b"distribution", node.address),
+                (bytes(direct_ack), peer),
+                (meter, peer),
+            )
+        ),
+    )
+
+    result = media_session.open_media_channel(
+        FakeSocket(),  # type: ignore[arg-type]
+        node,
+        123,
+        device,
+        calling,
+        0.1,
+    )
+
+    assert result.direct_acknowledged is True
+    assert result.meter_acknowledged is True
+    assert result.device_platform_version == 2

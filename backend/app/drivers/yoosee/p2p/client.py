@@ -177,6 +177,7 @@ def probe_camera_route(
         direct_handshake=result.direct_handshake,
         camera_contacted=result.direct_handshake,
         broker_error_code=result.error_code,
+        device_platform_version=result.device_platform_version,
     )
 
 
