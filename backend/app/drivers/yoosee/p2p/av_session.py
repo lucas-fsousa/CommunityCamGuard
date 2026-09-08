@@ -19,6 +19,8 @@ from .media_protocol import (
 from .session_io import receive_datagrams
 from .stream_protocol import V1EncodingHeader, decrypt_media_tlv, unpack_v1_encoding_header
 
+_AV_ACTION_ACCEPT = 2
+
 
 @dataclass(frozen=True, slots=True)
 class AvSessionResult:
@@ -32,7 +34,7 @@ class AvSessionResult:
 
     @property
     def accepted(self) -> bool:
-        return self.kcp_ack_count > 0 and any(action in (2, 6) for action in self.actions)
+        return self.kcp_ack_count > 0 and _AV_ACTION_ACCEPT in self.actions
 
 
 def initialize_av_session(
@@ -119,7 +121,7 @@ def initialize_av_session(
                         pass
         if (
             kcp_ack_count > 0
-            and any(action in (2, 6) for action in actions)
+            and _AV_ACTION_ACCEPT in actions
             and encoding_header is not None
         ):
             break

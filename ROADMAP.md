@@ -73,6 +73,10 @@ settings and reboot still use the vendor control stack (see ADR 0008).
 
 ### Proprietary-camera capability backlog
 
+Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
+action `6` is the subsequent START reply. Session acceptance must observe action `2` and
+fails closed on START alone.
+
 | Priority | Item | Status |
 |---|---|---|
 | P1 | Evolve the Yoosee catalogue into an explicit per-model/firmware capability matrix as additional Yoosee hardware is added. The three current `IPC` units are verified; enrollment or Yoosee detection alone must never enable controls on a newly encountered model without probe/profile evidence | wip |

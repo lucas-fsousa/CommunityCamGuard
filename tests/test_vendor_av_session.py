@@ -93,6 +93,12 @@ def test_av_initialization_fails_closed_without_private_route() -> None:
     )
 
 
+def test_av_start_action_without_accept_does_not_establish_session() -> None:
+    result = av_session.AvSessionResult(1, (6,), 0, 1, (), None, None)
+
+    assert result.accepted is False
+
+
 def test_av_initialization_forwards_sd_metadata_into_init(monkeypatch) -> None:
     calling = _calling()
     attempt = calling.attempt
