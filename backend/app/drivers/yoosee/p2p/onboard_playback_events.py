@@ -10,6 +10,9 @@ PLAYBACK_RESUME_COMMAND = 2
 PLAYBACK_SEEK_COMMAND = 3
 PLAYBACK_STREAM_BEGIN_COMMAND = 4
 PLAYBACK_END_OF_FILE_COMMAND = 17
+PLAYBACK_SEEK_REQUEST_SIZE = 16
+
+_MAX_JAVA_LONG = 0x7FFFFFFFFFFFFFFF
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +29,45 @@ class PlaybackEndOfFile:
     @property
     def succeeded(self) -> bool:
         return self.file_id_ms != 0 and self.error_code == 0
+
+
+def build_playback_pause_request() -> bytes:
+    """Return command 1's proven empty request body."""
+
+    return b""
+
+
+def build_playback_resume_request() -> bytes:
+    """Return command 2's proven empty request body."""
+
+    return b""
+
+
+def _epoch_microseconds_to_milliseconds(value: int) -> int:
+    if type(value) is not int or not 0 < value <= _MAX_JAVA_LONG:
+        raise ValueError("playback seek timestamp is invalid")
+    return value // 1000
+
+
+def build_playback_seek_request(*, seek_time_us: int, recording_start_us: int) -> bytes:
+    """Build command 3's ``seek-ms + recording-start-ms`` request body."""
+
+    seek_time_ms = _epoch_microseconds_to_milliseconds(seek_time_us)
+    recording_start_ms = _epoch_microseconds_to_milliseconds(recording_start_us)
+    if seek_time_us < recording_start_us:
+        raise ValueError("playback seek precedes the selected recording")
+    return struct.pack("<QQ", seek_time_ms, recording_start_ms)
+
+
+def unpack_playback_seek_request(payload: bytes) -> tuple[int, int]:
+    """Decode a command-3 body for tests and diagnostics."""
+
+    if len(payload) != PLAYBACK_SEEK_REQUEST_SIZE:
+        raise ValueError("playback seek request size is invalid")
+    seek_time_ms, recording_start_ms = struct.unpack("<QQ", payload)
+    if recording_start_ms == 0 or seek_time_ms < recording_start_ms:
+        raise ValueError("playback seek request range is invalid")
+    return seek_time_ms, recording_start_ms
 
 
 def parse_playback_stream_event(

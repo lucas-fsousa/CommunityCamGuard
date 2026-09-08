@@ -7,10 +7,15 @@ from backend.app.drivers.yoosee.p2p.onboard_playback_events import (
     PLAYBACK_PAUSE_COMMAND,
     PLAYBACK_RESUME_COMMAND,
     PLAYBACK_SEEK_COMMAND,
+    PLAYBACK_SEEK_REQUEST_SIZE,
     PLAYBACK_STREAM_BEGIN_COMMAND,
     PlaybackEndOfFile,
     PlaybackStreamBegin,
+    build_playback_pause_request,
+    build_playback_resume_request,
+    build_playback_seek_request,
     parse_playback_stream_event,
+    unpack_playback_seek_request,
 )
 
 
@@ -22,6 +27,56 @@ def test_playback_control_and_event_command_ids_match_native_sdk():
         PLAYBACK_STREAM_BEGIN_COMMAND,
         PLAYBACK_END_OF_FILE_COMMAND,
     ) == (1, 2, 3, 4, 17)
+
+
+def test_pause_and_resume_have_empty_native_request_bodies():
+    assert build_playback_pause_request() == b""
+    assert build_playback_resume_request() == b""
+
+
+def test_builds_seek_as_target_and_recording_start_in_epoch_milliseconds():
+    recording_start_us = 1_788_264_001_000_999
+    seek_time_us = recording_start_us + 12_345_678
+
+    payload = build_playback_seek_request(
+        seek_time_us=seek_time_us,
+        recording_start_us=recording_start_us,
+    )
+
+    assert len(payload) == PLAYBACK_SEEK_REQUEST_SIZE
+    assert unpack_playback_seek_request(payload) == (
+        seek_time_us // 1000,
+        recording_start_us // 1000,
+    )
+
+
+@pytest.mark.parametrize(
+    ("seek_time_us", "recording_start_us"),
+    [
+        (0, 1),
+        (1, 0),
+        (999, 1000),
+        (1000, 2000),
+        (True, 1000),
+        (1000, True),
+        (0x8000000000000000, 1000),
+    ],
+)
+def test_seek_builder_rejects_invalid_java_timestamps(seek_time_us, recording_start_us):
+    with pytest.raises(ValueError):
+        build_playback_seek_request(
+            seek_time_us=seek_time_us,
+            recording_start_us=recording_start_us,
+        )
+
+
+def test_seek_unpacker_rejects_wrong_size_and_invalid_range():
+    with pytest.raises(ValueError):
+        unpack_playback_seek_request(bytes(15))
+    with pytest.raises(ValueError):
+        unpack_playback_seek_request(struct.pack("<QQ", 20, 0))
+    with pytest.raises(ValueError):
+        unpack_playback_seek_request(struct.pack("<QQ", 19, 20))
 
 
 def test_parses_stream_begin_with_one_or_two_epoch_millisecond_fields():
