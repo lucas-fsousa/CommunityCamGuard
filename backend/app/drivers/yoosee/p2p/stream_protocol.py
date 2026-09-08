@@ -96,7 +96,7 @@ def build_builtin_command(
     flags: int = 0,
     timestamp_us: int | None = None,
 ) -> bytes:
-    """Mirror ``Connection::Impl::send_cmd``'s built-in command body."""
+    """Mirror the SDK's transport-neutral eight-byte BuiltIn message."""
 
     if not 0 <= command <= 0xFF:
         raise ValueError("command must fit in one byte")

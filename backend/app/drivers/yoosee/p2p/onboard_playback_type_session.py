@@ -15,7 +15,7 @@ from .onboard_playback_types import ModernPlaybackRecordingTypePage
 @dataclass(frozen=True, slots=True)
 class OnboardPlaybackRecordingTypesExchange:
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
     page: ModernPlaybackRecordingTypePage | None
 
 

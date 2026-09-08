@@ -15,7 +15,7 @@ from .onboard_playback_transport import require_runtime_playback_read_certified
 @dataclass(frozen=True, slots=True)
 class OnboardPlaybackListExchange:
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
     page: ModernPlaybackPage | None
 
 
