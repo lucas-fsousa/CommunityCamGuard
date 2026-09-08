@@ -52,7 +52,7 @@ class P2PRtspPreparation:
 @dataclass(frozen=True, slots=True)
 class _PasswordExchange:
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
     response: dict[str, object] | None
 
 
@@ -307,7 +307,7 @@ def _exchange_password(
         secrets.randbits(32),
     )
     transport_acknowledged = False
-    application_acknowledged = False
+    peer_receipt_acknowledged = False
     response_value = None
     sock.sendto(request, node.address)
     for wire, peer in receive_datagrams(sock, min(time.monotonic() + timeout, deadline)):
@@ -321,11 +321,11 @@ def _exchange_password(
             if plain[1] == 0xB9:
                 transport_acknowledged = True
             elif plain[1] == 0xBA:
-                application_acknowledged = True
+                peer_receipt_acknowledged = True
             continue
         if plain[1] == 0xBA and len(plain) >= 0x34:
             if struct.unpack_from("<I", plain, 0x2C)[0] == message_id:
-                application_acknowledged = True
+                peer_receipt_acknowledged = True
                 acknowledge_reliable_node_frame(sock, node, plain)
             continue
         parsed = _parse_password_response(plain)
@@ -338,7 +338,7 @@ def _exchange_password(
         )
         response_value = parsed
         break
-    return _PasswordExchange(transport_acknowledged, application_acknowledged, response_value)
+    return _PasswordExchange(transport_acknowledged, peer_receipt_acknowledged, response_value)
 
 
 def set_camera_rtsp_enabled(
@@ -407,7 +407,7 @@ def prepare_camera_rtsp(
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline,
         )
-        delivered = exchange.transport_acknowledged or exchange.application_acknowledged
+        delivered = exchange.transport_acknowledged or exchange.peer_receipt_acknowledged
         if not delivered:
             if not previous:
                 try:
