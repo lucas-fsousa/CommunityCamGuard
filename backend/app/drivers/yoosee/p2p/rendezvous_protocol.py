@@ -10,6 +10,8 @@ from .contracts import CallingAttempt, CertifiedNode, OnlineDevice
 from .crypto import gute_mode0_encrypt, gute_mode1_xor_checksum
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
+SD_PLAYBACK_CONNECTION_TYPE = 2
+
 
 def build_calling_request(
     node: CertifiedNode,
@@ -21,6 +23,7 @@ def build_calling_request(
     sequence: int,
     *,
     request_user_data: bytes | None = None,
+    connection_type: int | None = None,
 ) -> bytes:
     """Build the broker-facing A4 request without any control/media payload."""
     if len(attempt.cookie) != 8:
@@ -46,7 +49,7 @@ def build_calling_request(
     frame[0x78:0x80] = attempt.cookie
     struct.pack_into("<I", frame, 0x84, attempt.call_id)
     struct.pack_into("<I", frame, 0x8C, 1)
-    _write_request_user_data(frame, request_user_data)
+    _write_connection_metadata(frame, request_user_data, connection_type)
     return finish_mode2(frame, node.session_key)
 
 
@@ -60,6 +63,7 @@ def build_direct_calling_request(
     sequence: int,
     *,
     request_user_data: bytes | None = None,
+    connection_type: int | None = None,
 ) -> bytes:
     """Build the camera-facing mode-1 A4 that opens the direct media channel."""
 
@@ -88,17 +92,27 @@ def build_direct_calling_request(
     struct.pack_into("<I", frame, 0x8C, 1)
     struct.pack_into("<I", frame, 0x90, 1)
     frame[0xA7] = 0x12
-    _write_request_user_data(frame, request_user_data)
     frame[0xB0] = 1
+    _write_connection_metadata(frame, request_user_data, connection_type)
     return finish_mode1(frame)
 
 
-def _write_request_user_data(frame: bytearray, request_user_data: bytes | None) -> None:
-    if request_user_data is None:
+def _write_connection_metadata(
+    frame: bytearray,
+    request_user_data: bytes | None,
+    connection_type: int | None,
+) -> None:
+    if request_user_data is None and connection_type is None:
         return
+    if request_user_data is None or connection_type is None:
+        raise ValueError("calling connection type and request user data must be provided together")
     if not isinstance(request_user_data, bytes) or len(request_user_data) != 32:
         raise ValueError("calling request user data must be exactly 32 bytes")
+    if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
+        raise ValueError("calling connection type is unsupported")
     frame[0x90:0xB0] = request_user_data
+    # Native iv_init_frm_CALLING starts with userdata byte zero and adds bit 6 for route type 2.
+    frame[0xB0] = request_user_data[0] | 0x40
 
 
 def build_nat_online(access_id: int, device_id: int, link_id: int) -> bytes:

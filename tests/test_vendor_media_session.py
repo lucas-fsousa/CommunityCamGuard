@@ -81,11 +81,12 @@ def test_direct_calling_request_accepts_exact_playback_link_user_data() -> None:
             attempt,
             18,
             request_user_data=metadata,
+            connection_type=2,
         )
     )
 
     assert plain[0x90:0xB0] == metadata
-    assert plain[0xB0] == 1
+    assert plain[0xB0] == 0x40
 
 
 @pytest.mark.parametrize("size", [0, 31, 33])
@@ -101,6 +102,23 @@ def test_direct_calling_request_rejects_wrong_user_data_size(size) -> None:
             attempt,
             18,
             request_user_data=bytes(size),
+            connection_type=2,
+        )
+
+
+def test_direct_calling_requires_supported_connection_type_and_metadata_together() -> None:
+    node, device, attempt, _calling = _route()
+    arguments = (node, 123, device, "192.0.2.20", 45678, attempt, 18)
+
+    with pytest.raises(ValueError, match="provided together"):
+        build_direct_calling_request(*arguments, connection_type=2)
+    with pytest.raises(ValueError, match="provided together"):
+        build_direct_calling_request(*arguments, request_user_data=bytes(32))
+    with pytest.raises(ValueError, match="unsupported"):
+        build_direct_calling_request(
+            *arguments,
+            request_user_data=bytes(32),
+            connection_type=8,
         )
 
 

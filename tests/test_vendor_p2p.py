@@ -17,6 +17,9 @@ from backend.app.drivers.yoosee.p2p.crypto import (
     gute_mode2_decrypt,
     gute_mode2_encrypt,
 )
+from backend.app.drivers.yoosee.p2p.onboard_playback_link import (
+    build_initial_playback_link_user_data,
+)
 from backend.app.drivers.yoosee.p2p.wire import new_header
 
 
@@ -111,7 +114,10 @@ def test_broker_calling_accepts_exact_request_user_data():
     node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
     device = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
     attempt = client.CallingAttempt(0x00FBDD35, 0xEF714F65, bytes(8))
-    metadata = bytes(range(32))
+    metadata = build_initial_playback_link_user_data(
+        1_725_000_000_000_000,
+        device_platform_version=1,
+    )
 
     calling = gute_mode2_decrypt(
         client.build_calling_request(
@@ -123,11 +129,13 @@ def test_broker_calling_accepts_exact_request_user_data():
             attempt,
             18,
             request_user_data=metadata,
+            connection_type=2,
         ),
         node.session_key,
     )
 
     assert calling[0x90:0xB0] == metadata
+    assert calling[0xB0] == 0x40
 
 
 def test_parse_mtp_peer_endpoint_rejects_another_link():
