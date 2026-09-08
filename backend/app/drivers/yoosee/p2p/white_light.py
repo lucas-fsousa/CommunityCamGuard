@@ -30,7 +30,7 @@ _PASSTHROUGH_RESPONSE_PREFIXES = frozenset(
 @dataclass(frozen=True, slots=True)
 class WhiteLightExchange:
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
     response: dict[str, object] | None
 
 
@@ -41,7 +41,7 @@ class P2PWhiteLightState:
     authenticated: bool
     direct_handshake: bool
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class P2PWhiteLightWrite:
     previous_enabled: bool
     changed: bool
     transport_acknowledged: bool
-    application_acknowledged: bool
+    peer_receipt_acknowledged: bool
     verified: bool
 
 
@@ -133,7 +133,7 @@ def extract_white_light_state(response: dict[str, object] | None) -> bool | None
 
 
 def build_white_light_receipt(node: CertifiedNode, response: bytes, sequence: int) -> bytes:
-    """Build the full BA application receipt required by a white-light B9 response."""
+    """Build the full BA peer transport receipt required by a white-light B9 response."""
 
     if len(response) < 0x34 or response[1] != 0xB9:
         raise ValueError("white-light receipt requires a full B9 response")
@@ -188,7 +188,7 @@ def exchange_white_light(
     )
     expected_type = 12 if enabled is None else 11
     transport_acknowledged = False
-    application_acknowledged = False
+    peer_receipt_acknowledged = False
     response_value = None
     for retry in range(retries):
         if deadline is not None and time.monotonic() >= deadline:
@@ -208,11 +208,11 @@ def exchange_white_light(
                 if plain[1] == 0xB9:
                     transport_acknowledged = True
                 elif plain[1] == 0xBA:
-                    application_acknowledged = True
+                    peer_receipt_acknowledged = True
                 continue
             if plain[1] == 0xBA and len(plain) >= 0x34:
                 if struct.unpack_from("<I", plain, 0x2C)[0] == message_id:
-                    application_acknowledged = True
+                    peer_receipt_acknowledged = True
                     acknowledge_reliable_node_frame(sock, node, plain)
                 continue
             parsed = parse_white_light_response(plain, expected_type)
@@ -233,7 +233,7 @@ def exchange_white_light(
             break
     return WhiteLightExchange(
         transport_acknowledged,
-        application_acknowledged,
+        peer_receipt_acknowledged,
         response_value,
     )
 
@@ -277,7 +277,7 @@ def read_camera_white_light(
         authenticated=True,
         direct_handshake=False,
         transport_acknowledged=result.transport_acknowledged,
-        application_acknowledged=result.application_acknowledged,
+        peer_receipt_acknowledged=result.peer_receipt_acknowledged,
     )
 
 
@@ -373,6 +373,6 @@ def set_camera_white_light(
         previous_enabled=previous,
         changed=True,
         transport_acknowledged=write.transport_acknowledged,
-        application_acknowledged=write.application_acknowledged,
+        peer_receipt_acknowledged=write.peer_receipt_acknowledged,
         verified=True,
     )

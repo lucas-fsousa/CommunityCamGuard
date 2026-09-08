@@ -25,6 +25,7 @@ from backend.app.drivers.yoosee.p2p import (
     P2PSmartProtectionWrite,
     P2PSpeakerVolumeState,
     P2PSpeakerVolumeWrite,
+    P2PWhiteLightState,
     P2PWhiteLightWrite,
 )
 from backend.app.drivers.yoosee.p2p.alarm_voice import AlarmVoiceResource
@@ -192,6 +193,44 @@ def test_white_light_write_maps_semantic_control_to_yoosee_adapter(monkeypatch):
     assert result.value is True
     assert result.previous_value is False
     assert result.verified is True
+
+
+def test_white_light_read_is_verified_by_typed_response_not_ba_receipt(monkeypatch):
+    camera = Camera(
+        mac="aa:bb:cc:dd:ee:01",
+        camera_id="cam_0123456789abcdef01234567",
+    )
+    enrollment = P2PEnrollment(
+        "7000000001", 123, bytes(range(64)), None, "now", "now", camera.camera_id
+    )
+    monkeypatch.setattr(
+        yoosee_controls.p2p,
+        "get_enrollment_for_camera",
+        lambda _camera_id: enrollment,
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "run_with_fresh_access",
+        lambda selected, operation: operation(selected),
+    )
+    monkeypatch.setattr(
+        yoosee_controls,
+        "read_camera_white_light",
+        lambda selected: P2PWhiteLightState(
+            selected.device_id,
+            True,
+            True,
+            False,
+            True,
+            False,
+        ),
+    )
+
+    result = _drv().read_control(camera, "white_light")
+
+    assert result.value is True
+    assert result.verified is True
+    assert result.application_acknowledged is True
 
 
 def test_siren_write_maps_only_bounded_duration_to_yoosee_adapter(monkeypatch):

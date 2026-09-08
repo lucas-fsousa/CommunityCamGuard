@@ -127,11 +127,11 @@ def read(camera: Camera, key: str) -> ControlResult:
             return ControlResult(
                 key=key,
                 value=result.enabled,
-                verified=result.application_acknowledged,
+                verified=True,
                 authenticated=result.authenticated,
                 direct_connection=result.direct_handshake,
                 transport_acknowledged=result.transport_acknowledged,
-                application_acknowledged=result.application_acknowledged,
+                application_acknowledged=True,
             )
         if key == SMART_PROTECTION:
             protection_result = run_with_fresh_access(enrollment, read_camera_smart_protection)
@@ -210,7 +210,7 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
                 changed=light_result.changed,
                 verified=light_result.verified,
                 transport_acknowledged=light_result.transport_acknowledged,
-                application_acknowledged=light_result.application_acknowledged,
+                application_acknowledged=light_result.verified,
             )
         if key == ORIENTATION:
             if not isinstance(value, str) or value not in {"normal", "inverted"}:

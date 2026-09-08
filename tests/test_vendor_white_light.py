@@ -137,6 +137,7 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
     assert result.enabled is True
     assert result.changed is True
     assert result.verified is True
+    assert result.peer_receipt_acknowledged is True
 
 
 def test_change_is_idempotent_and_invalid_values_open_no_network(monkeypatch):
