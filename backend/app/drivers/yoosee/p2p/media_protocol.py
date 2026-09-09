@@ -200,7 +200,7 @@ def build_av_init(
         if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
             raise ValueError("AV INIT connection type is unsupported")
         effective_connection_type = connection_type
-        effective_user_data = request_user_data
+        effective_user_data = bytearray(request_user_data)
 
     body = bytearray(76)
     body[:4] = bytes((3, 2, 0x4C, 0))
