@@ -26,16 +26,12 @@ _READ_ONLY_COMMANDS: Final = frozenset(
 _MAX_MESSAGE_SIZE: Final = 0x7800
 
 
-def build_onboard_playback_carrier(
-    node: CertifiedNode,
+def _validate_read_message(
     access_id: int,
     device_id: int,
-    sequence: int,
     message_id: int,
     message: bytes,
-) -> bytes:
-    """Wrap one allowlisted read message in the native brokered B9 envelope."""
-
+) -> None:
     parsed = parse_builtin_command(message)
     if parsed.command not in _READ_ONLY_COMMANDS:
         raise ValueError("onboard playback carrier command is not read-only allowlisted")
@@ -47,6 +43,19 @@ def build_onboard_playback_carrier(
         raise ValueError("onboard playback carrier access ID is invalid")
     if type(device_id) is not int or not 0 < device_id <= 0xFFFFFFFFFFFFFFFF:
         raise ValueError("onboard playback carrier device ID is invalid")
+
+
+def build_onboard_playback_carrier(
+    node: CertifiedNode,
+    access_id: int,
+    device_id: int,
+    sequence: int,
+    message_id: int,
+    message: bytes,
+) -> bytes:
+    """Wrap one allowlisted read message in the native brokered B9 envelope."""
+
+    _validate_read_message(access_id, device_id, message_id, message)
 
     frame = new_header(
         0xB9,
@@ -63,6 +72,34 @@ def build_onboard_playback_carrier(
     struct.pack_into("<H", frame, 0x30, len(message))
     frame[0x34:] = message
     return finish_mode2(frame, node.session_key)
+
+
+def build_onboard_playback_lan_carrier(
+    access_id: int,
+    device_id: int,
+    sequence: int,
+    message_id: int,
+    message: bytes,
+) -> bytes:
+    """Wrap one allowlisted read in the SDK's mode-1 known-LAN B9 copy."""
+
+    _validate_read_message(access_id, device_id, message_id, message)
+
+    frame = new_header(
+        0xB9,
+        0x34 + len(message),
+        access_id,
+        sequence,
+        randomized_flags(mode=1, proc=1, extra=1 << 25),
+    )
+    frame[0] = 0x7E
+    struct.pack_into("<I", frame, 0x18, 2)
+    struct.pack_into("<Q", frame, 0x1C, device_id)
+    struct.pack_into("<Q", frame, 0x24, access_id)
+    struct.pack_into("<I", frame, 0x2C, message_id)
+    struct.pack_into("<H", frame, 0x30, len(message))
+    frame[0x34:] = message
+    return finish_mode1(frame)
 
 
 def unwrap_onboard_playback_carrier(

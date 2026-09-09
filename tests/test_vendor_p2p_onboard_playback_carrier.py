@@ -5,9 +5,10 @@ import struct
 import pytest
 
 from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode
-from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
+from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_decrypt, gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.onboard_playback_carrier import (
     build_onboard_playback_carrier,
+    build_onboard_playback_lan_carrier,
     build_onboard_playback_receipt,
     is_onboard_playback_peer_receipt,
     is_onboard_playback_transport_ack,
@@ -40,6 +41,31 @@ def test_read_only_playback_message_matches_native_b9_layout() -> None:
     assert struct.unpack_from("<Q", plain, 0x24)[0] == ACCESS_ID
     assert struct.unpack_from("<I", plain, 0x2C)[0] == 0x123456
     assert struct.unpack_from("<H", plain, 0x30)[0] == len(message)
+    assert plain[0x34:] == message
+
+
+def test_read_only_playback_message_matches_native_known_lan_copy() -> None:
+    message = build_builtin_command(16, b"list", timestamp_us=0x11223344)
+
+    plain = gute_mode1_decrypt(
+        build_onboard_playback_lan_carrier(
+            ACCESS_ID,
+            DEVICE_ID,
+            18,
+            0x123456,
+            message,
+        )
+    )
+
+    assert plain[:2] == b"\x7e\xb9"
+    assert struct.unpack_from("<Q", plain, 4)[0] == ACCESS_ID
+    flags = struct.unpack_from("<I", plain, 0x14)[0]
+    assert (flags >> 16) & 3 == 1
+    assert (flags >> 18) & 3 == 1
+    assert flags & (1 << 25)
+    assert struct.unpack_from("<I", plain, 0x18)[0] == 2
+    assert struct.unpack_from("<Q", plain, 0x1C)[0] == DEVICE_ID
+    assert struct.unpack_from("<Q", plain, 0x24)[0] == ACCESS_ID
     assert plain[0x34:] == message
 
 

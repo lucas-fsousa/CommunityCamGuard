@@ -13,6 +13,7 @@ from .camera_session import open_camera_session
 from .contracts import CertifiedNode, OnlineDevice
 from .onboard_playback_carrier import (
     build_onboard_playback_carrier,
+    build_onboard_playback_lan_carrier,
     build_onboard_playback_receipt,
     is_onboard_playback_peer_receipt,
     is_onboard_playback_transport_ack,
@@ -23,6 +24,8 @@ from .onboard_playback_modern import ModernPlaybackPage
 from .onboard_playback_response import parse_onboard_playback_list_response
 from .onboard_playback_transport import require_runtime_playback_read_certified
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
+
+SDK_DEFAULT_RESPONSE_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,8 +46,9 @@ def _exchange_certified_onboard_playback_list(
     *,
     page_index: int = 0,
     protocol_version: int = 2,
-    retries: int = 3,
+    retries: int = 1,
     deadline: float | None = None,
+    known_lan_copy: bool = False,
 ) -> OnboardPlaybackListExchange:
     """Perform one bounded, idempotent listing exchange after external certification."""
 
@@ -59,14 +63,23 @@ def _exchange_certified_onboard_playback_list(
         page_index=page_index,
         protocol_version=protocol_version,
     )
-    request = build_onboard_playback_carrier(
-        node,
-        access_id,
-        device.device_id,
-        sequence,
-        message_id,
-        message,
-    )
+    if known_lan_copy:
+        request = build_onboard_playback_lan_carrier(
+            access_id,
+            device.device_id,
+            sequence,
+            message_id,
+            message,
+        )
+    else:
+        request = build_onboard_playback_carrier(
+            node,
+            access_id,
+            device.device_id,
+            sequence,
+            message_id,
+            message,
+        )
     transport_acknowledged = False
     peer_receipt_acknowledged = False
     page = None
@@ -196,7 +209,7 @@ def list_camera_onboard_recordings(
             target,
             query,
             sequence,
-            bounded_timeout,
+            SDK_DEFAULT_RESPONSE_TIMEOUT_SECONDS,
             page_index=page_index,
             protocol_version=protocol_version,
             deadline=deadline,
