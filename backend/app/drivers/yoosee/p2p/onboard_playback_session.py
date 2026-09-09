@@ -49,12 +49,16 @@ def _exchange_certified_onboard_playback_list(
     retries: int = 1,
     deadline: float | None = None,
     known_lan_copy: bool = False,
+    count_per_page: int | None = None,
 ) -> OnboardPlaybackListExchange:
     """Perform one bounded, idempotent listing exchange after external certification."""
 
     if type(retries) is not int or not 1 <= retries <= 3:
         raise ValueError("onboard playback retries must be between 1 and 3")
-    bounded_timeout = max(0.1, min(float(timeout), 5.0))
+    bounded_timeout = max(
+        0.1,
+        min(float(timeout), SDK_DEFAULT_RESPONSE_TIMEOUT_SECONDS),
+    )
     request_id = secrets.randbits(32)
     message_id = secrets.randbelow(0x7FFFFFFF) + 1
     message = build_onboard_playback_list_message(
@@ -62,6 +66,7 @@ def _exchange_certified_onboard_playback_list(
         request_id,
         page_index=page_index,
         protocol_version=protocol_version,
+        count_per_page=count_per_page,
     )
     if known_lan_copy:
         request = build_onboard_playback_lan_carrier(

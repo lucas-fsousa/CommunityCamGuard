@@ -57,6 +57,29 @@ def test_builds_transport_neutral_playback_list_message(protocol_version: int, c
     assert message.payload[0] == protocol_version
 
 
+def test_builds_exact_google_play_v2_native_page_size():
+    message = parse_builtin_command(
+        build_onboard_playback_list_message(
+            _query(),
+            0xDEADBEEF,
+            protocol_version=2,
+            count_per_page=500,
+        )
+    )
+
+    assert struct.unpack_from(">I", message.payload, 21)[0] == 500
+
+
+def test_rejects_page_size_override_for_uncertified_protocol():
+    with pytest.raises(ValueError, match="only certified for playback V2"):
+        build_onboard_playback_list_message(
+            _query(),
+            1,
+            protocol_version=3,
+            count_per_page=500,
+        )
+
+
 @pytest.mark.parametrize("protocol_version", (2, 3, 4))
 def test_builds_transport_neutral_date_message(protocol_version: int):
     message = parse_builtin_command(
@@ -280,3 +303,32 @@ def test_certified_exchange_ignores_uncorrelated_inner_response(monkeypatch):
     )
 
     assert result.page is None
+
+
+def test_certified_exchange_preserves_native_ten_second_response_window(monkeypatch):
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    device = OnlineDevice(7_443_576_841, 1, False, 1, bytes(16))
+    receive_deadlines: list[float] = []
+
+    monkeypatch.setattr(onboard_playback_session.time, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(onboard_playback_session.secrets, "randbits", lambda _bits: 1)
+    monkeypatch.setattr(onboard_playback_session.secrets, "randbelow", lambda _upper: 0)
+    monkeypatch.setattr(
+        onboard_playback_session,
+        "receive_datagrams",
+        lambda _sock, deadline: receive_deadlines.append(deadline) or iter(()),
+    )
+
+    onboard_playback_session._exchange_certified_onboard_playback_list(
+        _FakeSocket(),  # type: ignore[arg-type]
+        node,
+        123,
+        device,
+        _query(),
+        18,
+        30.0,
+        retries=1,
+        deadline=120.0,
+    )
+
+    assert receive_deadlines == [110.0]

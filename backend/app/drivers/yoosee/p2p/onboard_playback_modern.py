@@ -19,6 +19,7 @@ PLAYBACK_V1_ITEM_SIZE = 33
 PLAYBACK_V2_RESPONSE_HEADER_SIZE = 26
 PLAYBACK_V2_TYPE_SIZE = 17
 PLAYBACK_V2_ITEM_SIZE = 9
+YOOSEE_PLAYBACK_MAX_PAGE_SIZE = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +57,7 @@ def build_modern_playback_list_v2_request(
     *,
     page_index: int = 0,
     filter_type: str = "",
+    count_per_page: int | None = None,
 ) -> bytes:
     """Build the 43-byte payload passed to IoTVideo BuiltIn command ``16``.
 
@@ -69,6 +71,12 @@ def build_modern_playback_list_v2_request(
         raise ValueError("playback-list query is invalid")
     if type(page_index) is not int or not 0 <= page_index <= 0xFFFFFFFF:
         raise ValueError("playback-list page index is invalid")
+    page_size = query.limit if count_per_page is None else count_per_page
+    if (
+        type(page_size) is not int
+        or not 1 <= page_size <= YOOSEE_PLAYBACK_MAX_PAGE_SIZE
+    ):
+        raise ValueError("Yoosee playback-list page size must be between 1 and 500")
     try:
         encoded_filter = filter_type.encode("ascii")
     except (AttributeError, UnicodeEncodeError) as exc:
@@ -81,7 +89,7 @@ def build_modern_playback_list_v2_request(
     struct.pack_into("<Q", payload, 1, epoch_milliseconds(query.start_utc))
     struct.pack_into("<Q", payload, 9, epoch_milliseconds(query.end_utc))
     struct.pack_into(">I", payload, 17, page_index)
-    struct.pack_into(">I", payload, 21, query.limit)
+    struct.pack_into(">I", payload, 21, page_size)
     payload[25 : 25 + len(encoded_filter)] = encoded_filter
     return bytes(payload)
 
@@ -158,7 +166,7 @@ def parse_modern_playback_list_v2_response(payload: bytes) -> ModernPlaybackPage
     item_count = struct.unpack_from("<I", payload, 13)[0]
     base_time_ms = struct.unpack_from("<Q", payload, 17)[0]
     type_count = payload[25]
-    if item_count > 200 or type_count > 64:
+    if item_count > YOOSEE_PLAYBACK_MAX_PAGE_SIZE or type_count > 64:
         raise ValueError("modern playback-list V2 response exceeds bounded counts")
     type_end = PLAYBACK_V2_RESPONSE_HEADER_SIZE + type_count * PLAYBACK_V2_TYPE_SIZE
     expected_size = type_end + item_count * PLAYBACK_V2_ITEM_SIZE

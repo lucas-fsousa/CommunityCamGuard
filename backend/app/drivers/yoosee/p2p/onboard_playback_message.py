@@ -37,6 +37,7 @@ def _build_list_body(
     query: OnboardRecordingQuery,
     page_index: int,
     protocol_version: int,
+    count_per_page: int | None = None,
 ) -> bytes:
     builders = {
         1: build_modern_playback_list_v1_request,
@@ -50,6 +51,14 @@ def _build_list_body(
         raise ValueError(
             "only recovered playback-list protocols V1 through V4 are supported"
         ) from exc
+    if count_per_page is not None:
+        if protocol_version != 2:
+            raise ValueError("a native page-size override is only certified for playback V2")
+        return build_modern_playback_list_v2_request(
+            query,
+            page_index=page_index,
+            count_per_page=count_per_page,
+        )
     return builder(query, page_index=page_index)
 
 
@@ -59,12 +68,13 @@ def build_onboard_playback_list_message(
     *,
     page_index: int = 0,
     protocol_version: int = 2,
+    count_per_page: int | None = None,
 ) -> bytes:
     """Build one recovered V1-V4 list message without a transport envelope."""
 
     return build_builtin_command(
         _command_for_protocol(protocol_version),
-        _build_list_body(query, page_index, protocol_version),
+        _build_list_body(query, page_index, protocol_version, count_per_page),
         timestamp_us=request_id,
     )
 

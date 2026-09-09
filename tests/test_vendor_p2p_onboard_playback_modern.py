@@ -46,6 +46,21 @@ def test_builds_recovered_v2_payload_for_builtin_command_16():
     }
 
 
+def test_builds_google_play_ui_page_size_without_expanding_generic_query_limit():
+    payload = build_modern_playback_list_v2_request(
+        _query(),
+        count_per_page=500,
+    )
+
+    assert unpack_modern_playback_list_v2_request(payload)["count_per_page"] == 500
+
+
+@pytest.mark.parametrize("page_size", (0, 501, True))
+def test_rejects_invalid_native_page_size_override(page_size):
+    with pytest.raises(ValueError, match="page size"):
+        build_modern_playback_list_v2_request(_query(), count_per_page=page_size)
+
+
 def test_builds_recovered_v1_payload_for_builtin_command_zero():
     payload = build_modern_playback_list_v1_request(_query(), page_index=3)
 
@@ -131,6 +146,30 @@ def test_v2_response_parser_fails_closed_on_bounds_types_and_duration():
     zero_duration[first_item_offset + 4 : first_item_offset + 8] = bytes(4)
     with pytest.raises(ValueError):
         parse_modern_playback_list_v2_response(bytes(zero_duration))
+
+
+def test_v2_response_parser_accepts_vendor_ui_bound_of_500_items():
+    header = bytearray(26)
+    header[0] = 2
+    header[1:5] = (-1).to_bytes(4, "little", signed=True)
+    header[13:17] = (500).to_bytes(4, "little")
+    header[17:25] = (1_788_264_000_000).to_bytes(8, "little")
+    header[25] = 1
+    native_type = b"scheduled\0".ljust(17, b"\0")
+    item = (1_000).to_bytes(4, "little") + (1_000).to_bytes(4, "little") + bytes([0])
+
+    page = parse_modern_playback_list_v2_response(bytes(header) + native_type + item * 500)
+
+    assert len(page.items) == 500
+
+
+def test_v2_response_parser_rejects_more_than_vendor_ui_bound():
+    header = bytearray(26)
+    header[0] = 2
+    header[13:17] = (501).to_bytes(4, "little")
+
+    with pytest.raises(ValueError, match="bounded counts"):
+        parse_modern_playback_list_v2_response(bytes(header))
 
 
 def _v1_response() -> bytes:
