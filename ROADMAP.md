@@ -81,6 +81,10 @@ during rendezvous and MTP opening and carried as an optional platform version; i
 additional traffic and remains unknown when the broker does not publish the frame. A bounded
 camera-3 route/MTP probe succeeded without AV or commands but produced no E4, proving that this
 profile cannot obtain the platform enum from those phases alone.
+Native `MessageMgr → iv_send_passthrough_msg → giot_eif_send_passthrough_msg →
+iv_gutes_add_send_pkt` analysis now fixes the brokered read carrier byte-for-byte. Production has a
+socket-free, command-allowlisted B9 codec for `0/15/16/18`; lifecycle, download, delete and SDK-error
+commands are rejected, and runtime listing remains gated pending one bounded camera-3 validation.
 
 | Priority | Item | Status |
 |---|---|---|
