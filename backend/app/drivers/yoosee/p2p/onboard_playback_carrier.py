@@ -13,7 +13,7 @@ from .onboard_playback_modern import (
 )
 from .onboard_playback_types import PLAYBACK_GET_RECORDING_TYPES_COMMAND
 from .stream_protocol import parse_builtin_command
-from .wire import finish_mode2, new_header, randomized_flags
+from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
 
 _READ_ONLY_COMMANDS: Final = frozenset(
     {
@@ -89,3 +89,74 @@ def unwrap_onboard_playback_carrier(
     message = frame[0x34:]
     parse_builtin_command(message)
     return message
+
+
+def is_onboard_playback_transport_ack(frame: bytes, *, expected_sequence: int) -> bool:
+    """Match the reliable 32-byte ACK for one outbound playback B9."""
+
+    if type(expected_sequence) is not int or not 0 <= expected_sequence <= 0xFFFFFFFF:
+        raise ValueError("onboard playback sequence is invalid")
+    if len(frame) != 0x20 or frame[0] not in (0x7E, 0x7F) or frame[1] != 0xB9:
+        return False
+    if struct.unpack_from("<H", frame, 2)[0] != len(frame):
+        return False
+    flags = struct.unpack_from("<I", frame, 0x14)[0]
+    return bool(flags & (1 << 20)) and struct.unpack_from("<I", frame, 0x0C)[0] == expected_sequence
+
+
+def is_onboard_playback_peer_receipt(
+    frame: bytes,
+    *,
+    expected_access_id: int,
+    expected_device_id: int,
+    expected_message_id: int,
+) -> bool:
+    """Match the camera's full BA receipt for one outbound playback B9."""
+
+    if len(frame) != 0x34 or frame[0] not in (0x7E, 0x7F) or frame[1] != 0xBA:
+        return False
+    if struct.unpack_from("<H", frame, 2)[0] != len(frame):
+        return False
+    if struct.unpack_from("<I", frame, 0x14)[0] & (1 << 20):
+        return False
+    return (
+        struct.unpack_from("<Q", frame, 0x1C)[0] == expected_access_id
+        and struct.unpack_from("<Q", frame, 0x24)[0] == expected_device_id
+        and struct.unpack_from("<I", frame, 0x2C)[0] == expected_message_id
+    )
+
+
+def build_onboard_playback_receipt(
+    node: CertifiedNode,
+    response: bytes,
+    sequence: int,
+    *,
+    expected_access_id: int,
+    expected_device_id: int,
+) -> bytes:
+    """Build the native BA receipt for one validated camera playback response."""
+
+    unwrap_onboard_playback_carrier(
+        response,
+        expected_access_id=expected_access_id,
+        expected_device_id=expected_device_id,
+    )
+    response_flags = struct.unpack_from("<I", response, 0x14)[0]
+    mode = (response_flags >> 16) & 3
+    extra = response_flags & (1 << 25) if mode == 1 else 0
+    frame = new_header(
+        0xBA,
+        0x34,
+        node.session_id,
+        sequence,
+        randomized_flags(mode=mode, proc=1, extra=extra),
+    )
+    frame[0] = 0x7E
+    struct.pack_into("<Q", frame, 0x1C, expected_device_id)
+    struct.pack_into("<Q", frame, 0x24, expected_access_id)
+    struct.pack_into("<I", frame, 0x2C, struct.unpack_from("<I", response, 0x2C)[0])
+    if mode == 2:
+        return finish_mode2(frame, node.session_key)
+    if mode == 1:
+        return finish_mode1(frame)
+    raise ValueError("onboard playback receipt requires an encrypted response")

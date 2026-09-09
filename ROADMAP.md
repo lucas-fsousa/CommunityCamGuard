@@ -84,7 +84,9 @@ profile cannot obtain the platform enum from those phases alone.
 Native `MessageMgr → iv_send_passthrough_msg → giot_eif_send_passthrough_msg →
 iv_gutes_add_send_pkt` analysis now fixes the brokered read carrier byte-for-byte. Production has a
 socket-free, command-allowlisted B9 codec for `0/15/16/18`; lifecycle, download, delete and SDK-error
-commands are rejected, and runtime listing remains gated pending one bounded camera-3 validation.
+commands are rejected. The full exchange now separately correlates the reliable B9 ACK, the BA peer
+receipt and the BuiltIn request ID, while runtime listing remains gated pending one bounded camera-3
+validation.
 
 | Priority | Item | Status |
 |---|---|---|

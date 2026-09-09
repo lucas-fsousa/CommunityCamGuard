@@ -8,6 +8,9 @@ from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.onboard_playback_carrier import (
     build_onboard_playback_carrier,
+    build_onboard_playback_receipt,
+    is_onboard_playback_peer_receipt,
+    is_onboard_playback_transport_ack,
     unwrap_onboard_playback_carrier,
 )
 from backend.app.drivers.yoosee.p2p.stream_protocol import build_builtin_command
@@ -50,11 +53,14 @@ def test_response_carrier_requires_selected_identities_and_application_frame() -
     struct.pack_into("<H", response, 0x30, len(message))
     response[0x34:] = message
 
-    assert unwrap_onboard_playback_carrier(
-        bytes(response),
-        expected_access_id=ACCESS_ID,
-        expected_device_id=DEVICE_ID,
-    ) == message
+    assert (
+        unwrap_onboard_playback_carrier(
+            bytes(response),
+            expected_access_id=ACCESS_ID,
+            expected_device_id=DEVICE_ID,
+        )
+        == message
+    )
 
     struct.pack_into("<I", response, 0x14, 1 << 20)
     with pytest.raises(ValueError, match="receipt"):
@@ -63,6 +69,72 @@ def test_response_carrier_requires_selected_identities_and_application_frame() -
             expected_access_id=ACCESS_ID,
             expected_device_id=DEVICE_ID,
         )
+
+
+def test_matches_only_the_correlated_reliable_transport_ack() -> None:
+    ack = bytearray(0x20)
+    ack[:2] = b"\x7e\xb9"
+    struct.pack_into("<H", ack, 2, len(ack))
+    struct.pack_into("<I", ack, 0x0C, 18)
+    struct.pack_into("<I", ack, 0x14, 1 << 20)
+
+    assert is_onboard_playback_transport_ack(bytes(ack), expected_sequence=18) is True
+    assert is_onboard_playback_transport_ack(bytes(ack), expected_sequence=19) is False
+    ack[1] = 0xBA
+    assert is_onboard_playback_transport_ack(bytes(ack), expected_sequence=18) is False
+
+
+def test_matches_only_the_correlated_full_peer_receipt() -> None:
+    receipt = bytearray(0x34)
+    receipt[:2] = b"\x7e\xba"
+    struct.pack_into("<H", receipt, 2, len(receipt))
+    struct.pack_into("<Q", receipt, 0x1C, ACCESS_ID)
+    struct.pack_into("<Q", receipt, 0x24, DEVICE_ID)
+    struct.pack_into("<I", receipt, 0x2C, 0x123456)
+
+    assert is_onboard_playback_peer_receipt(
+        bytes(receipt),
+        expected_access_id=ACCESS_ID,
+        expected_device_id=DEVICE_ID,
+        expected_message_id=0x123456,
+    )
+    assert not is_onboard_playback_peer_receipt(
+        bytes(receipt),
+        expected_access_id=ACCESS_ID,
+        expected_device_id=DEVICE_ID,
+        expected_message_id=0x123457,
+    )
+
+
+def test_builds_ba_receipt_by_reversing_validated_response_identities() -> None:
+    message = build_builtin_command(0, b"page", timestamp_us=7)
+    response = bytearray(0x34 + len(message))
+    response[:2] = b"\x7e\xb9"
+    struct.pack_into("<H", response, 2, len(response))
+    struct.pack_into("<I", response, 0x14, (2 << 16) | (1 << 18))
+    struct.pack_into("<Q", response, 0x1C, ACCESS_ID)
+    struct.pack_into("<Q", response, 0x24, DEVICE_ID)
+    struct.pack_into("<I", response, 0x2C, 0x123456)
+    struct.pack_into("<H", response, 0x30, len(message))
+    response[0x34:] = message
+
+    receipt = gute_mode2_decrypt(
+        build_onboard_playback_receipt(
+            NODE,
+            bytes(response),
+            19,
+            expected_access_id=ACCESS_ID,
+            expected_device_id=DEVICE_ID,
+        ),
+        NODE.session_key,
+    )
+
+    assert receipt[:2] == b"\x7e\xba"
+    assert len(receipt) == 0x34
+    assert struct.unpack_from("<I", receipt, 0x0C)[0] == 19
+    assert struct.unpack_from("<Q", receipt, 0x1C)[0] == DEVICE_ID
+    assert struct.unpack_from("<Q", receipt, 0x24)[0] == ACCESS_ID
+    assert struct.unpack_from("<I", receipt, 0x2C)[0] == 0x123456
 
 
 @pytest.mark.parametrize("command", [3, 4, 17, 19, 24, 28, 29, 0xFF])
