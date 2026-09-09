@@ -74,8 +74,9 @@ settings and reboot still use the vendor control stack (see ADR 0008).
 ### Proprietary-camera capability backlog
 
 Capability audit: enrollment-only gates still exist in Yoosee controls and P2P audio fallback.
-An offline tri-state property-evidence module is now tested; runtime catalogue/endpoint integration,
-durable evidence and profile invalidation remain pending. See
+Offline tri-state evidence and durable per-device/product/firmware storage are tested, including
+expiration, rule-revision invalidation and late-response rejection. Runtime collectors, profile
+migration and catalogue integration remain pending. See
 `docs/internal/yoosee-capability-evidence.md` for the migration sequence.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;

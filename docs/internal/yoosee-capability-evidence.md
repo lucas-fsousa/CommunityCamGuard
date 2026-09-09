@@ -29,6 +29,15 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Persistence checkpoint: `capability_store.py` now stores only sanitized per-feature states,
+bound to opaque camera ID, native device ID, product, firmware, observation/expiration times
+and rule revision. Missing, expired, future, mismatched and old-revision observations resolve
+to unknown. Older responses cannot overwrite newer observations. The store has no public
+write endpoint and is not yet populated by runtime collectors or used to enable controls.
+The generic control service already checks catalogue membership before API operations.
+Next implementation is the driver collector/profile migration, followed by catalogue filtering;
+the enrollment-only runtime gap remains open until those pieces are connected.
+
 1. Collect allowlisted read-only evidence and bind it to device identity, product, firmware,
    observation time and rule revision; keep secrets out of this record.
 2. Invalidate evidence on identity/firmware changes. Temporary read failures should distinguish
