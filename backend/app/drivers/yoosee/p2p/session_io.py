@@ -57,13 +57,19 @@ def acknowledge_reliable_node_frame(sock: socket.socket, node: CertifiedNode, fr
 
 
 def receive_datagrams(
-    sock: socket.socket, deadline: float
+    sock: socket.socket,
+    deadline: float,
+    *,
+    max_datagram_size: int = 4096,
 ) -> Iterator[tuple[bytes, tuple[str, int]]]:
     """Yield UDP datagrams until an absolute monotonic deadline expires."""
+
+    if type(max_datagram_size) is not int or not 512 <= max_datagram_size <= 65535:
+        raise ValueError("UDP receive size must be between 512 and 65535 bytes")
 
     while time.monotonic() < deadline:
         sock.settimeout(max(0.05, deadline - time.monotonic()))
         try:
-            yield sock.recvfrom(4096)
+            yield sock.recvfrom(max_datagram_size)
         except TimeoutError:
             return

@@ -93,6 +93,15 @@ receipt within the native ten-second window, but neither returned an application
 therefore proven; capability remains hidden until platform selection or actual firmware support is
 established without adjacent-version guessing.
 
+The 2026-09-09 bounded dual-route follow-up sent the same V2 request over LAN and broker:
+LAN returned ACK/BA and broker returned ACK, but the instrumented run observed no validated
+application envelope or SDK error. Playback receives now allow 32 KiB per datagram (the prior
+4 KiB buffer could truncate a native 500-item page); other receivers retain their default.
+Correlated BuiltIn error replies are retained as a numeric SDK error and acknowledged, instead
+of being swallowed as parser failures. These corrections improve diagnostics and do not certify
+SD playback. Next evidence required: the official SDK callback/wire trace for camera 3, or an
+authoritative firmware implementation. Further equivalent live retries add no evidence.
+
 | Priority | Item | Status |
 |---|---|---|
 | P1 | Evolve the Yoosee catalogue into an explicit per-model/firmware capability matrix as additional Yoosee hardware is added. The three current `IPC` units are verified; enrollment or Yoosee detection alone must never enable controls on a newly encountered model without probe/profile evidence | wip |

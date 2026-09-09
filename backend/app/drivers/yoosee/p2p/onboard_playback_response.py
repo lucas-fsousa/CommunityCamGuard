@@ -30,6 +30,14 @@ from .stream_protocol import parse_builtin_command
 _ResponseT = TypeVar("_ResponseT")
 
 
+class OnboardPlaybackSDKError(ValueError):
+    """Structured BuiltIn error returned by the IoTVideo message manager."""
+
+    def __init__(self, error_code: int) -> None:
+        self.error_code = error_code
+        super().__init__(f"onboard playback returned SDK error {error_code}")
+
+
 def _parse_correlated(
     message: bytes,
     request_id: int,
@@ -42,7 +50,14 @@ def _parse_correlated(
     if response.timestamp != request_id:
         raise ValueError("onboard playback response request ID does not match")
     if response.command == 0xFF:
-        raise ValueError("onboard playback returned an SDK error response")
+        if len(response.payload) != 8:
+            raise ValueError("onboard playback SDK error payload size is invalid")
+        # MessageMgr::_rcv_passthrough_cb masks the first native u32 to 16 bits
+        # before mapping it to the public ErrorInfo object. The second u32 is
+        # retained as opaque/reserved until an authoritative use is recovered.
+        raise OnboardPlaybackSDKError(
+            int.from_bytes(response.payload[:4], "little") & 0xFFFF
+        )
     try:
         parser = parsers[protocol_version]
     except KeyError as exc:

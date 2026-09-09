@@ -16,6 +16,7 @@ from backend.app.drivers.yoosee.p2p.onboard_playback_message import (
 )
 from backend.app.drivers.yoosee.p2p.onboard_playback_modern import ModernPlaybackPage
 from backend.app.drivers.yoosee.p2p.onboard_playback_response import (
+    OnboardPlaybackSDKError,
     parse_onboard_playback_date_response,
     parse_onboard_playback_list_response,
     parse_onboard_playback_recording_types_response,
@@ -171,9 +172,21 @@ def test_rejects_response_with_different_inner_request_id(parser):
 
 
 def test_rejects_sdk_error_response_before_operation_parser():
-    response = build_builtin_command(0xFF, bytes(8), timestamp_us=7)
+    response = build_builtin_command(
+        0xFF,
+        struct.pack("<II", 0x12345678, 0xAABBCCDD),
+        timestamp_us=7,
+    )
 
-    with pytest.raises(ValueError, match="SDK error response"):
+    with pytest.raises(OnboardPlaybackSDKError, match="SDK error 22136") as exc_info:
+        parse_onboard_playback_list_response(response, 7)
+    assert exc_info.value.error_code == 0x5678
+
+
+def test_rejects_malformed_sdk_error_response():
+    response = build_builtin_command(0xFF, bytes(4), timestamp_us=7)
+
+    with pytest.raises(ValueError, match="error payload size"):
         parse_onboard_playback_list_response(response, 7)
 
 
@@ -244,7 +257,7 @@ def test_certified_exchange_correlates_transport_peer_and_application_layers(mon
     monkeypatch.setattr(
         onboard_playback_session,
         "receive_datagrams",
-        lambda *_args: iter(received),
+        lambda *_args, **_kwargs: iter(received),
     )
     monkeypatch.setattr(onboard_playback_session, "decrypt_node_frame", lambda wire, _node: wire)
     monkeypatch.setattr(
@@ -268,6 +281,7 @@ def test_certified_exchange_correlates_transport_peer_and_application_layers(mon
         True,
         True,
         ModernPlaybackPage(0, 0, -1, ()),
+        None,
     )
     assert acknowledgements == [bytes(peer_receipt), response]
     assert len(sock.sent) == 2
@@ -287,7 +301,7 @@ def test_certified_exchange_ignores_uncorrelated_inner_response(monkeypatch):
     monkeypatch.setattr(
         onboard_playback_session,
         "receive_datagrams",
-        lambda *_args: iter(((response, node.address),)),
+        lambda *_args, **_kwargs: iter(((response, node.address),)),
     )
     monkeypatch.setattr(onboard_playback_session, "decrypt_node_frame", lambda wire, _node: wire)
 
@@ -305,10 +319,60 @@ def test_certified_exchange_ignores_uncorrelated_inner_response(monkeypatch):
     assert result.page is None
 
 
+def test_certified_exchange_surfaces_correlated_sdk_error(monkeypatch):
+    request_id = 100
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    device = OnlineDevice(7_443_576_841, 1, False, 1, bytes(16))
+    response = _b9_response(
+        build_builtin_command(
+            0xFF,
+            struct.pack("<II", 0xABCD5208, 0),
+            timestamp_us=request_id,
+        ),
+        access_id=123,
+        device_id=device.device_id,
+    )
+    sock = _FakeSocket()
+    acknowledgements: list[bytes] = []
+    monkeypatch.setattr(onboard_playback_session.secrets, "randbits", lambda _bits: request_id)
+    monkeypatch.setattr(onboard_playback_session.secrets, "randbelow", lambda _upper: 0)
+    monkeypatch.setattr(
+        onboard_playback_session,
+        "receive_datagrams",
+        lambda *_args, **_kwargs: iter(((response, node.address),)),
+    )
+    monkeypatch.setattr(onboard_playback_session, "decrypt_node_frame", lambda wire, _node: wire)
+    monkeypatch.setattr(
+        onboard_playback_session,
+        "acknowledge_reliable_node_frame",
+        lambda _sock, _node, frame: acknowledgements.append(frame) or True,
+    )
+
+    result = onboard_playback_session._exchange_certified_onboard_playback_list(
+        sock,  # type: ignore[arg-type]
+        node,
+        123,
+        device,
+        _query(),
+        18,
+        0.5,
+        retries=1,
+    )
+
+    assert result == onboard_playback_session.OnboardPlaybackListExchange(
+        False,
+        False,
+        None,
+        0x5208,
+    )
+    assert acknowledgements == [response]
+    assert len(sock.sent) == 2
+
+
 def test_certified_exchange_preserves_native_ten_second_response_window(monkeypatch):
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
     device = OnlineDevice(7_443_576_841, 1, False, 1, bytes(16))
-    receive_deadlines: list[float] = []
+    receive_calls: list[tuple[float, int]] = []
 
     monkeypatch.setattr(onboard_playback_session.time, "monotonic", lambda: 100.0)
     monkeypatch.setattr(onboard_playback_session.secrets, "randbits", lambda _bits: 1)
@@ -316,7 +380,10 @@ def test_certified_exchange_preserves_native_ten_second_response_window(monkeypa
     monkeypatch.setattr(
         onboard_playback_session,
         "receive_datagrams",
-        lambda _sock, deadline: receive_deadlines.append(deadline) or iter(()),
+        lambda _sock, deadline, *, max_datagram_size: receive_calls.append(
+            (deadline, max_datagram_size)
+        )
+        or iter(()),
     )
 
     onboard_playback_session._exchange_certified_onboard_playback_list(
@@ -331,4 +398,4 @@ def test_certified_exchange_preserves_native_ten_second_response_window(monkeypa
         deadline=120.0,
     )
 
-    assert receive_deadlines == [110.0]
+    assert receive_calls == [(110.0, 0x8000)]

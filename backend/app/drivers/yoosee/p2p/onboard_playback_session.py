@@ -21,11 +21,16 @@ from .onboard_playback_carrier import (
 )
 from .onboard_playback_message import build_onboard_playback_list_message
 from .onboard_playback_modern import ModernPlaybackPage
-from .onboard_playback_response import parse_onboard_playback_list_response
+from .onboard_playback_response import (
+    OnboardPlaybackSDKError,
+    parse_onboard_playback_list_response,
+)
 from .onboard_playback_transport import require_runtime_playback_read_certified
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 
 SDK_DEFAULT_RESPONSE_TIMEOUT_SECONDS = 10.0
+# Native messages reach 0x7800 bytes, plus their carrier/encryption overhead.
+PLAYBACK_MAX_DATAGRAM_SIZE = 0x8000
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +38,7 @@ class OnboardPlaybackListExchange:
     transport_acknowledged: bool
     peer_receipt_acknowledged: bool
     page: ModernPlaybackPage | None
+    sdk_error_code: int | None = None
 
 
 def _exchange_certified_onboard_playback_list(
@@ -88,6 +94,7 @@ def _exchange_certified_onboard_playback_list(
     transport_acknowledged = False
     peer_receipt_acknowledged = False
     page = None
+    sdk_error_code = None
     absolute_deadline = (
         deadline if deadline is not None else time.monotonic() + retries * bounded_timeout
     )
@@ -97,7 +104,11 @@ def _exchange_certified_onboard_playback_list(
             break
         sock.sendto(request, node.address)
         receive_until = min(time.monotonic() + bounded_timeout, absolute_deadline)
-        for wire, peer in receive_datagrams(sock, receive_until):
+        for wire, peer in receive_datagrams(
+            sock,
+            receive_until,
+            max_datagram_size=PLAYBACK_MAX_DATAGRAM_SIZE,
+        ):
             if peer != node.address:
                 continue
             plain = decrypt_node_frame(wire, node)
@@ -121,11 +132,16 @@ def _exchange_certified_onboard_playback_list(
                     expected_access_id=access_id,
                     expected_device_id=device.device_id,
                 )
+            except ValueError:
+                continue
+            try:
                 parsed_page = parse_onboard_playback_list_response(
                     response_message,
                     request_id,
                     protocol_version=protocol_version,
                 )
+            except OnboardPlaybackSDKError as exc:
+                sdk_error_code = exc.error_code
             except ValueError:
                 continue
             acknowledge_reliable_node_frame(sock, node, plain)
@@ -139,14 +155,16 @@ def _exchange_certified_onboard_playback_list(
                 ),
                 node.address,
             )
-            page = parsed_page
+            if sdk_error_code is None:
+                page = parsed_page
             break
-        if page is not None:
+        if page is not None or sdk_error_code is not None:
             break
     return OnboardPlaybackListExchange(
         transport_acknowledged,
         peer_receipt_acknowledged,
         page,
+        sdk_error_code,
     )
 
 
