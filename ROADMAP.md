@@ -93,6 +93,11 @@ receipt within the native ten-second window, but neither returned an application
 therefore proven; capability remains hidden until platform selection or actual firmware support is
 established without adjacent-version guessing.
 
+Static selector audit (2026-09-09) corrected ascending-order handling: the SDK promotes
+every ascending query to at least V3, even below the 49.71-day threshold. Descending daily
+queries still use V2 unless authoritative platform metadata selects V4. This fixes a
+compatibility defect but does not explain the previous descending-query timeout.
+
 The 2026-09-09 bounded dual-route follow-up sent the same V2 request over LAN and broker:
 LAN returned ACK/BA and broker returned ACK, but the instrumented run observed no validated
 application envelope or SDK error. Playback receives now allow 32 KiB per datagram (the prior

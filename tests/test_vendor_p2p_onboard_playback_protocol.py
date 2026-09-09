@@ -33,13 +33,14 @@ def test_native_selector_promotes_exact_long_window_boundary_to_v3():
     ) == 3
 
 
-def test_native_selector_does_not_promote_long_ascending_query_to_v3():
+@pytest.mark.parametrize("days", (1, 90))
+def test_native_selector_promotes_ascending_queries_to_v3(days):
     assert select_onboard_playback_protocol(
-        _query(timedelta(days=90)),
+        _query(timedelta(days=days)),
         requested_version=2,
         minimum_version=2,
         ascending_order=True,
-    ) == 2
+    ) == 3
 
 
 def test_native_selector_enforces_operation_minimum_and_proven_platform_v4():

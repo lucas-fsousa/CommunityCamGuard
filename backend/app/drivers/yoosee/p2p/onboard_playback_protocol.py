@@ -24,7 +24,7 @@ def select_onboard_playback_protocol(
     """Mirror the SDK's fail-closed V2/V3/V4 selection rule.
 
     File/date operations pass a minimum of V2 and recording-type windows pass V3. The native SDK
-    promotes a descending query spanning at least roughly 49.71 days from V1/V2 to V3. It then
+    promotes ascending queries and queries spanning at least roughly 49.71 days to V3. It then
     promotes V1-V3 to V4 only when its connection registry explicitly reports device platform 2.
 
     The broker inventory's ``new_platform`` bit is not treated as that platform enum: callers may
@@ -51,7 +51,7 @@ def select_onboard_playback_protocol(
         + elapsed.seconds * 1_000_000
         + elapsed.microseconds
     )
-    if not ascending_order and window_us >= _V3_WINDOW_THRESHOLD_US and selected < 3:
+    if (ascending_order or window_us >= _V3_WINDOW_THRESHOLD_US) and selected < 3:
         selected = 3
     if device_platform_version == 2 and selected <= 3:
         selected = 4
