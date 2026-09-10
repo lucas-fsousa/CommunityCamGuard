@@ -29,6 +29,28 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Atomic persistence checkpoint: `capability_snapshot_store` stores one complete row
+per opaque camera ID, with all identity dimensions and sanitized feature states.
+`begin` reserves a database-issued generation before network I/O and invalidates the
+previous snapshot. `save` conditionally publishes identity, evidence, receipt time,
+expiry and rule revision in one UPDATE, only for the latest generation and only once.
+An older-started job cannot win by finishing later. Failed refreshes remain unknown;
+missing features cannot inherit support from an older batch. Property t is never used
+for ordering or validity and is excluded from this persisted representation.
+
+`capability_refresh.refresh` now connects reservation, existing bounded collection and
+atomic publication. It is explicit/backend-only, not called by dashboard refresh or a
+scheduler. Validity must be chosen by its caller (positive, at most one day); this bound
+is a local cache policy, not proof of broker freshness. Exact backend identity, current
+rule revision and server receipt/expiry boundaries are required for lookup. Old per-feature
+`capability_store` rows are not imported: their flattened identity cannot certify these
+snapshots. The new driver store supersedes that prototype for the snapshot flow.
+Tests exercise inverted job completion, duplicate publication, batch rejection, failed
+refresh invalidation, expiry and all identity dimensions using isolated temporary databases.
+No production database, cameras or containers were touched. Next: validated operation
+profiles and controlled migration of catalogue/audio gates; do not equate property evidence
+with permission to execute or declare source cache freshness resolved.
+
 Snapshot checkpoint: `collect_snapshot` now connects the correlated collector to
 identity normalization and immutable, sanitized property evidence in a single batch.
 The server samples `collected_at` after collection. Raw JSON and credentials are not

@@ -92,6 +92,11 @@ the normalizer does not yet enable controls or populate the evidence store.
 one backend batch. Server receipt time is separate from APK property t (written from
 the phone clock on changes). Old t alone does not mean unsupported. Atomic snapshot
 persistence, collection ordering/expiry and catalogue/profile migration remain pending.
+Atomic snapshot persistence and explicit refresh are now implemented/tested: database-issued
+generation before I/O, one-shot conditional whole-snapshot publication, exact identity lookup,
+server-time expiry and failed-refresh invalidation. No scheduler/dashboard invocation yet.
+Remaining integration: validated operation profiles and deliberate catalogue/audio migration;
+property evidence alone is not execution certification or proof of source-cache freshness.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
