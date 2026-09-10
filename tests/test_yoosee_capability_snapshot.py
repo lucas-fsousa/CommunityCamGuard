@@ -104,7 +104,7 @@ def test_homologated_control_fields_do_not_infer_related_features(field, value, 
     reads[index] = replace(reads[index], value={"t": 100, "setVal": {field: value}})
     states = {item.feature: item.state for item in normalize(tuple(reads)).evidence}
     assert states[feature] == expected
-    assert "smart_protection_schedule" not in states
+    assert states["smart_protection_schedule"] == State.UNKNOWN
     assert "siren_pulse" not in states
 
 
@@ -124,3 +124,16 @@ def test_collector_wrapper_samples_backend_time_after_collection(monkeypatch):
     enrollment = P2PEnrollment(DEVICE, 1, bytes(64), None, "", "", CAMERA)
     snapshot = collector.collect_snapshot(enrollment)
     assert snapshot == normalize(batch(), collected_at=3000)
+
+
+def test_schedule_uses_only_successful_exact_guard_root_and_keeps_timestamp():
+    plan = {"start": {"hour": 22, "min": 0}, "end": {"hour": 6, "min": 0}, "weekdayEn": 127}
+    reads = list(batch())
+    reads[3] = replace(reads[3], value={"t": 100, "setVal": {"enable": 0, "plan": plan}})
+    snapshot = normalize(tuple(reads))
+    evidence = {item.feature: item for item in snapshot.evidence}
+    assert evidence["smart_protection_schedule"].state == State.SUPPORTED
+    assert evidence["smart_protection_schedule"].property_timestamp == 100
+    assert evidence["smart_protection"].state == State.SUPPORTED
+    reads[3] = replace(reads[3], error_code=20001)
+    assert normalize(tuple(reads)).evidence[-1].state == State.UNKNOWN

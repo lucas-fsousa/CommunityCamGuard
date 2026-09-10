@@ -127,6 +127,16 @@ read/write, and HTTP 200 for status. Deployed build: `b-2c117c71d5fa`.
 test was sent. Local operational scripts/proofs remain ignored. The migration implemented
 here is complete for these three test-unit controls, not for every Yoosee feature or camera.
 
+### Fourth migrated control: guard schedule
+
+The existing camera-3 schedule homologation (complete plan mask 127→126→127, successful
+readback/restoration) now has its own profile entry and source digest/locator. Independent
+structured evidence checks the complete plan, not just master enable. Its parser is shared
+with the production schedule operation; no inferred feature-specific wire commands were added.
+Snapshot rule revision 3 was verified with a fresh four-root read before activating schedule
+in the exact-unit rollout. HTTP smoke check confirms all four migrated controls, including
+weekly_schedule read/write. Build b-d5a1f44f01fe deployed; no new write to the camera occurred.
+
 ## Implemented from this audit
 
 The existing four-root collector already retrieves both relevant roots, so no extra

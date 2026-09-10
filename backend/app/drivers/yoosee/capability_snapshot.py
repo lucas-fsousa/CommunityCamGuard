@@ -6,7 +6,12 @@ import math
 import re
 from dataclasses import dataclass
 
-from .capability_evidence import EvidenceState, _integer, enum_property_evidence
+from .capability_evidence import (
+    EvidenceState,
+    _integer,
+    enum_property_evidence,
+    guard_schedule_evidence,
+)
 from .capability_identity import CapabilityIdentity, normalize_identity
 from .p2p.contracts import P2PPropertyRead
 
@@ -24,6 +29,16 @@ class CapabilitySnapshot:
     identity: CapabilityIdentity
     collected_at: float
     evidence: tuple[PropertyEvidence, ...]
+
+
+def _property(read: P2PPropertyRead | None) -> tuple[object, int | None]:
+    if read is None or type(read.error_code) is not int or read.error_code != 0:
+        return None, None
+    payload = read.value
+    timestamp = _integer(payload.get("t")) if isinstance(payload, dict) else None
+    if timestamp is None or not -1 <= timestamp <= 0x7FFFFFFF:
+        return None, None
+    return payload, timestamp
 
 
 def normalize_snapshot(
@@ -78,18 +93,7 @@ def normalize_snapshot(
         ("orientation", paths[2], "multiFlip", frozenset({1, 3}), frozenset({-1})),
         ("smart_protection", paths[3], "enable", frozenset({0, 1}), frozenset()),
     ):
-        property_read = reads.get(path)
-        payload = None
-        if (
-            property_read is not None
-            and type(property_read.error_code) is int
-            and property_read.error_code == 0
-        ):
-            payload = property_read.value
-        timestamp = _integer(payload.get("t")) if isinstance(payload, dict) else None
-        # APK uses a signed int. Preserve -1 as its unavailable sentinel, not a date.
-        if timestamp is None or not -1 <= timestamp <= 0x7FFFFFFF:
-            payload, timestamp = None, None
+        payload, timestamp = _property(reads.get(path))
         state = enum_property_evidence(
             payload,
             field=field,
@@ -97,4 +101,9 @@ def normalize_snapshot(
             unsupported_values=unsupported,
         )
         evidence.append(PropertyEvidence(feature, state, timestamp))
+    # Reuse the exact guard root, without a fifth network request.
+    payload, timestamp = _property(reads.get(paths[3]))
+    evidence.append(
+        PropertyEvidence("smart_protection_schedule", guard_schedule_evidence(payload), timestamp)
+    )
     return CapabilitySnapshot(camera_id, identity, collected_at, tuple(evidence))

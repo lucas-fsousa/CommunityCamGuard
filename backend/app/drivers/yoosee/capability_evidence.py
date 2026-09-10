@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from enum import StrEnum
 
+from .guard_plan import parse_guard_plan
+
 
 class EvidenceState(StrEnum):
     SUPPORTED = "supported"
@@ -57,3 +59,22 @@ def enum_property_evidence(
     if value in unsupported_values:
         return EvidenceState.UNSUPPORTED
     return EvidenceState.UNKNOWN
+
+
+def guard_schedule_evidence(observation: object) -> EvidenceState:
+    """Require the exact timestamped guard root and a complete setVal.plan.
+
+    Guard enable=0 is not absence of scheduling. Never search alternative nested
+    objects for a valid-looking plan when the requested property's plan is invalid.
+    """
+    if not isinstance(observation, dict):
+        return EvidenceState.UNKNOWN
+    timestamp = _integer(observation.get("t"))
+    if timestamp == -1:
+        return EvidenceState.UNSUPPORTED
+    if timestamp is None or not 0 < timestamp <= 0x7FFFFFFF:
+        return EvidenceState.UNKNOWN
+    values = observation.get("setVal")
+    if not isinstance(values, dict) or parse_guard_plan(values.get("plan")) is None:
+        return EvidenceState.UNKNOWN
+    return EvidenceState.SUPPORTED

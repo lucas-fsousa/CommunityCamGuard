@@ -10,7 +10,8 @@ import time
 from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
-from ...contracts import Weekday, WeeklySchedule
+from ...contracts import WeeklySchedule
+from ..guard_plan import WEEKDAY_BITS, parse_guard_plan
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
 from .model_session import exchange_model_read
@@ -19,15 +20,6 @@ from .wire import finish_mode2, new_header, randomized_flags
 
 SMART_PROTECTION_SCHEDULE_READ_PATH = "ProWritable.guardParm"
 SMART_PROTECTION_SCHEDULE_WRITE_PATH = "ProWritable.guardParm.setVal.plan"
-WEEKDAY_BITS: dict[Weekday, int] = {
-    "sun": 1 << 0,
-    "mon": 1 << 1,
-    "tue": 1 << 2,
-    "wed": 1 << 3,
-    "thu": 1 << 4,
-    "fri": 1 << 5,
-    "sat": 1 << 6,
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,31 +59,13 @@ def native_smart_protection_schedule(schedule: WeeklySchedule) -> dict[str, obje
     return {"start": _clock(schedule.start), "end": _clock(schedule.end), "weekdayEn": mask}
 
 
-def _parse_clock(value: object) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    hour = value.get("hour")
-    minute = value.get("min")
-    if type(hour) is not int or type(minute) is not int:
-        return None
-    if not 0 <= hour <= 23 or not 0 <= minute <= 59:
-        return None
-    return f"{hour:02d}:{minute:02d}"
-
-
 def extract_smart_protection_schedule(value: object) -> WeeklySchedule | None:
     """Extract only a complete, supported guard plan from a nested model response."""
 
     if not isinstance(value, dict):
         return None
     if {"start", "end", "weekdayEn"}.issubset(value):
-        start = _parse_clock(value.get("start"))
-        end = _parse_clock(value.get("end"))
-        mask = value.get("weekdayEn")
-        if start is None or end is None or type(mask) is not int or not 1 <= mask <= 0x7F:
-            return None
-        weekdays = tuple(day for day, bit in WEEKDAY_BITS.items() if mask & bit)
-        return WeeklySchedule(start, end, weekdays)
+        return parse_guard_plan(value)
     for key in ("plan", "setVal", "guardParm", "ProWritable"):
         if key in value:
             candidate = extract_smart_protection_schedule(value[key])

@@ -63,6 +63,7 @@ or wait on hardware/a human eye.
 | P2 | `CONTRIBUTING.md`: standards (ruff/mypy/pytest), PR flow, no-secrets rule, driver plug-in guide | done |
 | P2 | Infra: Dockerfile/compose/.dockerignore reviewed (stale "SKELETON" comment fixed, lean build context, cross-platform framing) | done |
 | P2 | Windows/Linux/macOS documented (Docker runs on all; WSL reframed as one Windows option, not a requirement). Left: actually test on native macOS/Windows | wip |
+| P2 | Homologate native **Linux ARM64**: build/start both Compose services without x86 emulation; test discovery, recording, live view, controls and two-way audio on real hardware. Current Python/go2rtc image manifests include ARM64, but the complete system has not been tested there. Measure multi-camera CPU/RAM/latency and validate board-specific video acceleration separately; CI build alone is not hardware homologation | todo |
 | P2 | Split the oversized `frontend/app.js` into semantic ES modules (`api/auth`, navigation/state, live cameras, camera management/provisioning, recordings), leaving the main file responsible only for boot/orchestration | done |
 
 ## Out of scope / parallel track
@@ -127,6 +128,10 @@ Runtime rollout deployed and authenticated HTTP-verified on build b-2c117c71d5fa
 recreated; go2rtc untouched. 89 focused tests, Ruff/mypy passed. Build context excludes temp/
 and used confirmed 512 MiB/one-CPU build caps. This completes the three-control test-unit
 migration; broader controls, audio and other-unit capability gates remain separate backlog.
+The test-unit weekly guard schedule is now the fourth migrated control: independently
+validated structured plan, shared pure parser, provenance-bound existing homologation and
+fresh read/HTTP verification. No schedule or guard setting changed. Build b-d5a1f44f01fe,
+96 focused tests passed; other cameras and unmigrated features remain unchanged.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

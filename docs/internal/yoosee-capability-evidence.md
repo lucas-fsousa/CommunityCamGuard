@@ -31,6 +31,21 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Guard-schedule migration completed: schedule support is now independently derived from
+the exact successful `guardParm.setVal.plan` plus valid root timestamp. The pure
+`guard_plan` parser is shared with production schedule reads, preventing validation
+drift. It checks integer hour/minute ranges and the nonzero Sunday-first seven-bit
+weekday mask, preserves local wall-clock/overnight/equal-endpoint semantics and never
+infers scheduling from guard enable. Invalid/missing plans stay unknown even if the
+master switch exists. No additional collector request was added.
+
+Snapshot rule revision 3 invalidates earlier evidence. Camera 3's already-documented
+complete-plan read/write/readback/restoration proof was added to its provenance-bound
+profile, then a fresh read and stored-preview check enabled this fourth migrated key.
+Authenticated HTTP catalogue now advertises `smart_protection_schedule` as readable/
+writable weekly_schedule. No schedule, guard, light or siren setting was changed.
+96 focused tests passed; only app was recreated, build `b-d5a1f44f01fe`; go2rtc unchanged.
+
 Runtime rollout: `capability_rollout` opts an exact identity and selected control keys
 into runtime enforcement. Only those keys are replaced/removed by `stored_catalog`;
 unmigrated controls and units keep their previous behavior. Current local opt-in is
