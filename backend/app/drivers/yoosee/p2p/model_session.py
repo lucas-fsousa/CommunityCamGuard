@@ -26,7 +26,7 @@ def exchange_model_read(
     *,
     retries: int = 3,
     deadline: float | None = None,
-    exact_reports_only: bool = False,
+    require_correlated_response: bool = False,
 ) -> ModelReadResult:
     """Read one allowlisted property; this function cannot construct writes or actions."""
 
@@ -60,12 +60,8 @@ def exchange_model_read(
             if report is not None:
                 destination, report_path, report_value = report
                 acknowledge_reliable_node_frame(sock, node, plain)
-                if exact_reports_only:
-                    # AA is an observation, not proof of a fresh request response.
-                    # Do not lose root timestamps by accepting a child/parent payload.
-                    if destination == device.device_id and report_path == path:
-                        error_code, value = 0, report_value
-                        break
+                if require_correlated_response:
+                    # Even an exact AA report may be unsolicited or stale.
                     continue
                 if destination is not None and destination != device.device_id:
                     continue
@@ -78,11 +74,11 @@ def exchange_model_read(
                     break
                 continue
             acknowledge_reliable_node_frame(sock, node, plain)
-            if exact_reports_only:
-                # B8 wire correlation is not yet established; same-device alone
-                # cannot distinguish a delayed reply to a different property.
+            if require_correlated_response and struct.unpack_from("<Q", plain, 4)[0] != (
+                node.session_id & 0xFFFFFFFFFFFFFFFF
+            ):
                 continue
-            parsed = parse_model_read_response(plain, device.device_id)
+            parsed = parse_model_read_response(plain, device.device_id, request_sequence=sequence)
             if parsed is not None:
                 error_code, value = parsed
                 break

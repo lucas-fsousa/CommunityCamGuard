@@ -35,10 +35,25 @@ def build_model_read(
     return finish_mode2(frame, node.session_key)
 
 
-def parse_model_read_response(frame: bytes, device_id: int) -> tuple[int, object | None] | None:
-    """Parse direct B8 or access-node cached AA GDM responses."""
-    if len(frame) < 0x26 or frame[1] not in (0xAA, 0xB8):
+def parse_model_read_response(
+    frame: bytes, device_id: int, *, request_sequence: int | None = None
+) -> tuple[int, object | None] | None:
+    """Parse B8; bit 21 makes offset 0x10 the originating request sequence.
+
+    AA has a different report layout and must never be decoded as B8.
+    """
+    if len(frame) < 0x26 or frame[1] != 0xB8:
         return None
+    if request_sequence is not None:
+        flags = struct.unpack_from("<I", frame, 0x14)[0]
+        if (
+            frame[0] not in (0x7E, 0x7F)
+            or struct.unpack_from("<H", frame, 2)[0] != len(frame)
+            or not flags & (1 << 21)
+            or flags & (1 << 20)
+            or struct.unpack_from("<I", frame, 0x10)[0] != (request_sequence & 0xFFFFFFFF)
+        ):
+            return None
     if struct.unpack_from("<Q", frame, 0x18)[0] != device_id:
         return None
     error_code = struct.unpack_from("<H", frame, 0x24)[0]

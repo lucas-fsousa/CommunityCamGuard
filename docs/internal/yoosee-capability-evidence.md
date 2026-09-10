@@ -35,19 +35,17 @@ linked camera identity, verifies the selected target and closes the socket on ex
 timeout/error stops the batch. It is explicit and not invoked by dashboard refreshes.
 It returns private observations only; it does not persist raw property values or enable controls.
 
-Before connecting collector to persistence/catalogue, audit GDM response correlation: current
-`exchange_model_read` can accept a direct reply by device ID without request/path correlation,
-and nested reports may omit the parent timestamp. Stopping at a timeout reduces one late-response
-case but is not sufficient proof against duplicate/unrelated same-device reports. Recover exact
-request correlation and reject ambiguous shapes before treating these reads as feature evidence.
-Then normalize authoritative product/version identity and implement the evidence/profile bridge.
+Before connecting collector to persistence/catalogue, validate correlated response shapes and
+cache timestamps, normalize authoritative product/version identity, then implement the
+evidence/profile bridge. Correlation alone must not certify freshness or physical support.
 
 ### Offline correlation checkpoint (2026-09-10)
 
-The collector now opts into `exact_reports_only`: only AA reports explicitly addressed to
-the selected device and naming the exact requested root are returned. Parent/child paths,
-missing destinations and direct B8 replies are not accepted in this mode. Root payloads
-retain their timestamps. Existing control reads retain their legacy report behavior.
+The collector now opts into `require_correlated_response`: B8 responses must match the
+selected device, session and originating request sequence. All AA reports are excluded,
+even exact-root reports, because they can be unsolicited. This supersedes the temporary
+`exact_reports_only` policy introduced in b9e22ac. Existing control reads retain their
+legacy AA behavior, but their direct B8 responses also require request correlation.
 Transport B7 ACKs must match the request sequence at offset `0x0c` in both modes.
 
 Native evidence: Google Play 6.45 arm64 `libiotvideomulti.so`,
@@ -56,17 +54,24 @@ Native evidence: Google Play 6.45 arm64 `libiotvideomulti.so`,
 `gat_on_rcvpkt_GATFRM_GetDevGdmDatResp` at `0x23fdfc` confirms device ID at
 `0x18`, data-present bit at `0x20`, status at `0x24`, length at `0x26`, JSON at
 `0x28`. Its callback receives offset `0x10` (`0x240044`), **not** offset `0x20`.
-Our wire codec uses `0x10` for checksum; the SDK's intervening header transformation
-must be traced before equating that internal callback ID with any wire field.
+The apparent checksum conflict is now resolved by the native response constructor:
+`iv_gute_init_frm_resp` (`0x1e6d78`) copies request `0x0c` into response `0x10`
+at `0x1e6dbc`–`0x1e6dc4`, then sets flag bit 21 at `0x1e6ddc`. It also copies
+the identity at `0x04` and sets subtype to request subtype + 1 (B7 → B8).
+`iv_gute_frm_rc5_decrypt` skips checksum validation when bit 21 is set
+(`0x1e4b84` for mode 1; `0x1e4ca0` for mode 2). No receive-side offset relocation
+is needed. `iv_gutes_on_rcvfrm_resp` compares this field to the pending request ID
+at `0x1e9b64` and checks the subtype pairing at `0x1e9b84`.
 
-This is conservative filtering, not completed request-response correlation. An exact
-AA report can still be unsolicited or stale. Do not persist it as fresh certification
-or enable controls from it. B8-only peers may time out in the collector; unknown is
-preferable to attributing another property's value to this root. Next step: trace the
-native receive/header normalization and pending-request lookup, then add wire-derived
-correlation fixtures before enabling the evidence/profile bridge. Tests cover old ACKs,
-wrong/missing destination, sibling/parent/child reports, uncorrelated B8 and preservation
-of an exact root's timestamp. No live camera calls or container rebuild were performed.
+The parser requires the response flag before interpreting `0x10` as a sequence; ACKs,
+invalid declared length and AA layouts cannot satisfy a correlated B8 read. Tests use
+synthetic mode-2 encrypted frames following these SDK offsets, not a newly captured
+camera exchange. They cover old ACKs, unsolicited exact/parent/child reports, wrong
+device/session/sequence, missing bit 21, truncated JSON, preserved timestamps and
+correlated errors without JSON. Matching a request does not prove cache freshness:
+the profile bridge still needs identity normalization and timestamp/shape validation.
+AA-only peers may time out in the collector; do not restore an ambiguous fallback.
+No live camera calls or container rebuild were performed.
 
 Persistence checkpoint: `capability_store.py` now stores only sanitized per-feature states,
 bound to opaque camera ID, native device ID, product, firmware, observation/expiration times

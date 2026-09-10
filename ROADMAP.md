@@ -79,11 +79,11 @@ expiration, rule-revision invalidation and late-response rejection. Runtime coll
 migration and catalogue integration remain pending. See
 `docs/internal/yoosee-capability-evidence.md` for the migration sequence.
 An explicit four-root, one-session collector now has offline cleanup/timeout tests. It is not
-automatically invoked. The collector now accepts only exact-root, explicitly device-addressed
-reports and rejects uncorrelated B8 replies; transport ACKs require matching sequence. Exact
-reports can still be stale: native header normalization/request lookup remains to be traced.
-Strict GDM response-to-property correlation and identity normalization are
-the next prerequisites before its observations can drive durable evidence and catalogue gates.
+automatically invoked. SDK response construction confirms bit 21 makes B8 offset 0x10 echo
+the B7 request sequence. The collector requires device/session/sequence-correlated B8 replies
+and excludes unsolicited AA reports; transport ACKs also require matching sequence. Synthetic
+encrypted-frame tests pass. Response shape/cache freshness validation and identity normalization
+remain prerequisites before observations can drive durable evidence and catalogue gates.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

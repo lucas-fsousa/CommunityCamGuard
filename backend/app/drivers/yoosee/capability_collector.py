@@ -26,8 +26,8 @@ CAPABILITY_PATHS = (
 def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
     """Read four fixed roots sequentially within one 20-second session budget.
 
-    Only explicitly device-addressed reports of the exact root are collected.
-    Reports are not proof of freshness; a timeout stops the batch. Raw observations are private
+    Only device/session/sequence-correlated B8 responses are collected, not AA reports.
+    Correlation does not prove cache freshness; a timeout stops the batch. Observations are private
     to the driver and deliberately excluded from logs and public responses.
     """
 
@@ -52,7 +52,7 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
                 1.0,
                 retries=1,
                 deadline=deadline,
-                exact_reports_only=True,
+                require_correlated_response=True,
             )
             observations.append(
                 P2PPropertyRead(

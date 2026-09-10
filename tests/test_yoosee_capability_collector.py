@@ -41,9 +41,18 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
     )
 
     def read(
-        _sock, _node, _target, path, sequence, timeout, *, retries, deadline, exact_reports_only
+        _sock,
+        _node,
+        _target,
+        path,
+        sequence,
+        timeout,
+        *,
+        retries,
+        deadline,
+        require_correlated_response,
     ):
-        assert exact_reports_only is True
+        assert require_correlated_response is True
         calls.append((path, sequence))
         assert timeout == 1.0 and retries == 1
         if failure == "exception":
