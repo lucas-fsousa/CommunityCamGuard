@@ -106,6 +106,10 @@ Orientation (1/3) and Smart Protection master (0/1) now have evidence rules usin
 collector roots; snapshot revision 2 invalidates older results. No production profiles imported:
 full per-unit identity/association reconciliation remains open. LAN RTSP audio proof must not
 be inherited by P2P fallback, and night mode 2 is not covered by the recorded 0/1 test.
+Bounded offline identity auditing now recovers complete historical identity for all three
+units from the original August 24 capture. Test-unit association was found read-only in the
+local DB; the other two were not returned there. No profile import or DB writes. Current
+identity/deployment association must still be verified before switching runtime gates.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

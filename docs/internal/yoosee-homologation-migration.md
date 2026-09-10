@@ -32,6 +32,32 @@ by copying another unit's identity or assuming the announced OTA version is inst
 Reconcile original saved identity payloads with the backend's current association before
 importing profiles; the summaries alone are insufficient. No runtime profile was installed.
 
+### Original capture reconciliation
+
+The bounded offline auditor `python -m scripts.audit_yoosee_identity` recovered the
+missing fields from `capture-iotvideo-20260824-025721.log`:
+
+| Source line | Historical software | Revision | Hardware field |
+|---|---|---|---|
+| 571 | 40.1.22 | 1 | Explicit empty string |
+| 588 | 40.1.22 | 1 | Explicit empty string |
+| 594 (test unit) | 40.1.14 | 1 | Explicit empty string |
+
+All three callbacks provide product/model/SDK as recorded above. A read-only lookup
+against local `data/ccg.db` associated the test unit with an opaque camera ID; the
+other two callbacks had no association returned by that database. This is a statement
+about the inspected file, not proof that all running deployments lack associations.
+The exact mapping remains in ignored research notes. No database rows were changed.
+
+The auditor consumes at most 32 MiB per explicit capture and 1 MiB per line, outputs
+only normalized identity, line/source and fingerprinted device IDs, and uses SQLite
+`mode=ro`. It does not recursively scan, import profiles, consult cameras or expose
+tokens. Historical callback adaptation into the pure normalizer is not authentication
+proof for a current session. Original per-unit identity gaps are now closed for this
+capture; current identity and deployment association still require reconciliation before
+runtime migration. The successful physical tests need not be repeated merely to fill
+these historical fields.
+
 ## Implemented from this audit
 
 The existing four-root collector already retrieves both relevant roots, so no extra
