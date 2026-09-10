@@ -26,8 +26,8 @@ CAPABILITY_PATHS = (
 def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
     """Read four fixed roots sequentially within one 20-second session budget.
 
-    A timeout stops the batch to prevent late uncorrelated replies from an earlier
-    read being attributed to the next property. The raw observations are private
+    Only explicitly device-addressed reports of the exact root are collected.
+    Reports are not proof of freshness; a timeout stops the batch. Raw observations are private
     to the driver and deliberately excluded from logs and public responses.
     """
 
@@ -44,7 +44,15 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
             if time.monotonic() >= deadline:
                 break
             result = exchange_model_read(
-                sock, node, target, path, sequence, 1.0, retries=1, deadline=deadline
+                sock,
+                node,
+                target,
+                path,
+                sequence,
+                1.0,
+                retries=1,
+                deadline=deadline,
+                exact_reports_only=True,
             )
             observations.append(
                 P2PPropertyRead(

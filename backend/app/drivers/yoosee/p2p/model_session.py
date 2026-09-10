@@ -26,6 +26,7 @@ def exchange_model_read(
     *,
     retries: int = 3,
     deadline: float | None = None,
+    exact_reports_only: bool = False,
 ) -> ModelReadResult:
     """Read one allowlisted property; this function cannot construct writes or actions."""
 
@@ -50,13 +51,22 @@ def exchange_model_read(
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
             if flags & (1 << 20):
-                if plain[1] == 0xB7:
+                if plain[1] == 0xB7 and struct.unpack_from("<I", plain, 0x0C)[0] == (
+                    sequence & 0xFFFFFFFF
+                ):
                     transport_acknowledged = True
                 continue
             report = parse_model_report(plain)
             if report is not None:
                 destination, report_path, report_value = report
                 acknowledge_reliable_node_frame(sock, node, plain)
+                if exact_reports_only:
+                    # AA is an observation, not proof of a fresh request response.
+                    # Do not lose root timestamps by accepting a child/parent payload.
+                    if destination == device.device_id and report_path == path:
+                        error_code, value = 0, report_value
+                        break
+                    continue
                 if destination is not None and destination != device.device_id:
                     continue
                 if (
@@ -67,8 +77,12 @@ def exchange_model_read(
                     error_code, value = 0, report_value
                     break
                 continue
-            parsed = parse_model_read_response(plain, device.device_id)
             acknowledge_reliable_node_frame(sock, node, plain)
+            if exact_reports_only:
+                # B8 wire correlation is not yet established; same-device alone
+                # cannot distinguish a delayed reply to a different property.
+                continue
+            parsed = parse_model_read_response(plain, device.device_id)
             if parsed is not None:
                 error_code, value = parsed
                 break

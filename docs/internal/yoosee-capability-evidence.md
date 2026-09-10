@@ -42,6 +42,32 @@ case but is not sufficient proof against duplicate/unrelated same-device reports
 request correlation and reject ambiguous shapes before treating these reads as feature evidence.
 Then normalize authoritative product/version identity and implement the evidence/profile bridge.
 
+### Offline correlation checkpoint (2026-09-10)
+
+The collector now opts into `exact_reports_only`: only AA reports explicitly addressed to
+the selected device and naming the exact requested root are returned. Parent/child paths,
+missing destinations and direct B8 replies are not accepted in this mode. Root payloads
+retain their timestamps. Existing control reads retain their legacy report behavior.
+Transport B7 ACKs must match the request sequence at offset `0x0c` in both modes.
+
+Native evidence: Google Play 6.45 arm64 `libiotvideomulti.so`,
+`giot_eif_get_gdm_data_object` at `0x274824` assigns the request sequence at
+`0x274a4c`; `giot_get_gdm_data_object_ack` compares offset `0x0c` at `0x273734`.
+`gat_on_rcvpkt_GATFRM_GetDevGdmDatResp` at `0x23fdfc` confirms device ID at
+`0x18`, data-present bit at `0x20`, status at `0x24`, length at `0x26`, JSON at
+`0x28`. Its callback receives offset `0x10` (`0x240044`), **not** offset `0x20`.
+Our wire codec uses `0x10` for checksum; the SDK's intervening header transformation
+must be traced before equating that internal callback ID with any wire field.
+
+This is conservative filtering, not completed request-response correlation. An exact
+AA report can still be unsolicited or stale. Do not persist it as fresh certification
+or enable controls from it. B8-only peers may time out in the collector; unknown is
+preferable to attributing another property's value to this root. Next step: trace the
+native receive/header normalization and pending-request lookup, then add wire-derived
+correlation fixtures before enabling the evidence/profile bridge. Tests cover old ACKs,
+wrong/missing destination, sibling/parent/child reports, uncorrelated B8 and preservation
+of an exact root's timestamp. No live camera calls or container rebuild were performed.
+
 Persistence checkpoint: `capability_store.py` now stores only sanitized per-feature states,
 bound to opaque camera ID, native device ID, product, firmware, observation/expiration times
 and rule revision. Missing, expired, future, mismatched and old-revision observations resolve
