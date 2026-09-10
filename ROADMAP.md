@@ -97,6 +97,10 @@ generation before I/O, one-shot conditional whole-snapshot publication, exact id
 server-time expiry and failed-refresh invalidation. No scheduler/dashboard invocation yet.
 Remaining integration: validated operation profiles and deliberate catalogue/audio migration;
 property evidence alone is not execution certification or proof of source-cache freshness.
+Exact-unit operation/option intersection and `controls.validated_catalog` migration preview
+are now tested against persisted snapshots. One DB query resolves all requested features.
+The default catalogue/audio gates remain legacy until recorded homologations are bound to
+complete identities and a trusted profile source is available; no production allowlist inferred.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

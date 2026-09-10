@@ -101,9 +101,18 @@ def save(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) ->
 def resolve(
     *, camera_id: str, identity: CapabilityIdentity, feature: str, now: float
 ) -> EvidenceState:
+    return resolve_features(camera_id=camera_id, identity=identity, features=(feature,), now=now)[
+        feature
+    ]
+
+
+def resolve_features(
+    *, camera_id: str, identity: CapabilityIdentity, features: tuple[str, ...], now: float
+) -> dict[str, EvidenceState]:
     """Resolve only against exact backend identity, valid server time and current rules."""
+    unknown = dict.fromkeys(features, EvidenceState.UNKNOWN)
     if not _time(now):
-        return EvidenceState.UNKNOWN
+        return unknown
     with connect() as conn:
         conn.execute(_SCHEMA)
         row = conn.execute(
@@ -113,10 +122,15 @@ def resolve(
             (camera_id, _identity(identity), now, now, RULE_REVISION),
         ).fetchone()
     if row is None:
-        return EvidenceState.UNKNOWN
+        return unknown
     try:
         values = json.loads(row["evidence"])
-        value = values.get(feature) if isinstance(values, dict) else None
-        return EvidenceState(value) if isinstance(value, str) else EvidenceState.UNKNOWN
+        if not isinstance(values, dict):
+            return unknown
+        for feature in features:
+            value = values.get(feature)
+            if isinstance(value, str):
+                unknown[feature] = EvidenceState(value)
+        return unknown
     except (ValueError, TypeError):
-        return EvidenceState.UNKNOWN
+        return dict.fromkeys(features, EvidenceState.UNKNOWN)

@@ -20,6 +20,9 @@ from ..contracts import (
     ControlValue,
     WeeklySchedule,
 )
+from . import capability_snapshot_store
+from .capability_identity import CapabilityIdentity
+from .capability_policy import ValidatedProfile, select_controls
 from .p2p import (
     NIGHT_VISION_VALUES,
     P2PProbeError,
@@ -101,6 +104,38 @@ def catalog(camera: Camera) -> tuple[ControlDescriptor, ...]:
     if not camera.camera_id or not p2p.has_enrollment_for_camera(camera.camera_id):
         return ()
     return _DESCRIPTORS
+
+
+def validated_catalog(
+    camera: Camera,
+    *,
+    identity: CapabilityIdentity,
+    profile: ValidatedProfile | None,
+    now: float,
+) -> tuple[ControlDescriptor, ...]:
+    """Backend migration preview: durable evidence intersected with exact-unit proofs.
+
+    No network, writes or client capability fields. Not yet the default catalogue;
+    existing homologation must be imported explicitly before switching runtime gates.
+    """
+    if not camera.camera_id:
+        return ()
+    enrollment = p2p.get_enrollment_for_camera(camera.camera_id)
+    if enrollment is None or enrollment.device_id != identity.device_id:
+        return ()
+    evidence = capability_snapshot_store.resolve_features(
+        camera_id=camera.camera_id,
+        identity=identity,
+        features=tuple(descriptor.key for descriptor in _DESCRIPTORS),
+        now=now,
+    )
+    return select_controls(
+        _DESCRIPTORS,
+        camera_id=camera.camera_id,
+        identity=identity,
+        profile=profile,
+        evidence=evidence,
+    )
 
 
 def _enrollment(camera: Camera) -> P2PEnrollment:

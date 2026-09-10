@@ -29,6 +29,24 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Operation-policy checkpoint: `capability_policy.select_controls` intersects exact-unit
+backend operation proofs with supported property evidence. Reads do not authorize writes;
+choice/action options are intersected with proven options. Duplicate proofs, mismatched
+identity, unknown/unsupported evidence and dynamic option enumeration without a dedicated
+validated flow are excluded. No production profiles were fabricated or inferred from brand,
+enrollment, firmware alone or generic client capability metadata.
+
+`controls.validated_catalog` provides a backend-only migration preview using the current
+enrollment association and durable evidence. `resolve_features` reads all feature states
+from one snapshot row in one query, avoiding mixed collection generations and repeated DB
+connections. Tests exercise the full preview with temporary persistence, expiry and changed
+enrollment, as well as per-operation/option restrictions. This preview does not yet replace
+`catalog`; existing dashboard controls and audio remain unchanged. Next step: inventory
+recorded homologations, bind proofs to complete identities and obtain a trusted backend
+profile source before switching the runtime catalogue. Audio needs its own transport proof;
+the two current property rules cannot certify it. Dynamic siren-resource options also remain
+outside this selector until their enumeration/selection proof is represented explicitly.
+
 Atomic persistence checkpoint: `capability_snapshot_store` stores one complete row
 per opaque camera ID, with all identity dimensions and sanitized feature states.
 `begin` reserves a database-issued generation before network I/O and invalidates the
