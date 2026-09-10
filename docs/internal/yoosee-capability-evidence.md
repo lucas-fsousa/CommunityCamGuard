@@ -29,6 +29,26 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Snapshot checkpoint: `collect_snapshot` now connects the correlated collector to
+identity normalization and immutable, sanitized property evidence in a single batch.
+The server samples `collected_at` after collection. Raw JSON and credentials are not
+retained in the snapshot; duplicate paths, foreign-device observations and incomplete
+identity invalidate it. Missing/failed feature reads stay unknown. Initial enum rules
+cover only night vision and cry detection, not sound/siren/SD transport certification.
+
+Timestamp finding: APK `device_setting/tdevice/soundandpicture/a.java` (lines 279,
+314) and `device_setting/tdevice/record/a.java` (255 onward) assign property `t`
+from `System.currentTimeMillis()/1000` when writing settings. It is therefore not
+evidence of when our server queried the camera. The snapshot preserves this signed
+integer separately; old positive timestamps do not imply unsupported hardware.
+`t=-1` keeps the existing unavailable interpretation and malformed/out-of-range
+timestamps yield unknown. No camera-clock timestamp is used as receipt/expiry time.
+This does not certify broker-cache freshness, nor an atomic camera-side view of
+four sequential properties. Persistence must use a complete exact-identity snapshot
+transaction and prevent old collection jobs overwriting newer jobs. Runtime catalogue
+integration, expiry policy and that transactional store remain pending; no public API
+or automatic collection has been enabled by this checkpoint.
+
 Identity checkpoint (2026-09-10): `capability_identity.normalize_identity` accepts
 only successful, authenticated, exact-path product/version observations belonging to
 the expected device. It preserves product ID, model, revision, firmware, SDK and

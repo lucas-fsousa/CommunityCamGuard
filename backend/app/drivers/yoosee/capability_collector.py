@@ -11,6 +11,7 @@ import socket
 import time
 
 from ...db.p2p import P2PEnrollment
+from .capability_snapshot import CapabilitySnapshot, normalize_snapshot
 from .p2p.camera_session import open_camera_session
 from .p2p.contracts import P2PProbeError, P2PPropertyRead
 from .p2p.model_session import exchange_model_read
@@ -21,6 +22,21 @@ CAPABILITY_PATHS = (
     "ProWritable.videoParm",
     "ProWritable.guardParm",
 )
+
+
+def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
+    """Explicit backend-only collection plus normalization; no persistence or grants.
+
+    The server samples receipt time after the bounded exchange, never from camera t.
+    No raw observations or credentials are retained in the returned snapshot.
+    """
+    observations = collect(enrollment)
+    return normalize_snapshot(
+        observations,
+        camera_id=enrollment.camera_id or "",
+        device_id=enrollment.device_id,
+        collected_at=time.time(),
+    )
 
 
 def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:

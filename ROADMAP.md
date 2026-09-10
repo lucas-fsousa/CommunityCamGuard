@@ -88,6 +88,10 @@ Identity normalization now has offline tests: exact-device product/version roots
 product ID/model/revision/firmware/SDK/hardware without family-wide assumptions. Snapshot
 validity, writable timestamp validation and atomic identity/evidence integration remain pending;
 the normalizer does not yet enable controls or populate the evidence store.
+`collect_snapshot` now links collection, exact identity and sanitized enum evidence in
+one backend batch. Server receipt time is separate from APK property t (written from
+the phone clock on changes). Old t alone does not mean unsupported. Atomic snapshot
+persistence, collection ordering/expiry and catalogue/profile migration remain pending.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
