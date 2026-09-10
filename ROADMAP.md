@@ -101,6 +101,11 @@ Exact-unit operation/option intersection and `controls.validated_catalog` migrat
 are now tested against persisted snapshots. One DB query resolves all requested features.
 The default catalogue/audio gates remain legacy until recorded homologations are bound to
 complete identities and a trusted profile source is available; no production allowlist inferred.
+Historical proof audit is recorded in `docs/internal/yoosee-homologation-migration.md`.
+Orientation (1/3) and Smart Protection master (0/1) now have evidence rules using existing
+collector roots; snapshot revision 2 invalidates older results. No production profiles imported:
+full per-unit identity/association reconciliation remains open. LAN RTSP audio proof must not
+be inherited by P2P fallback, and night mode 2 is not covered by the recorded 0/1 test.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

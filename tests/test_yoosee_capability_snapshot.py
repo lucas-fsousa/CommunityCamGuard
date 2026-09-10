@@ -83,6 +83,31 @@ def test_invalid_server_clock_is_not_accepted(clock):
     assert normalize(batch(), collected_at=clock) is None
 
 
+@pytest.mark.parametrize(
+    "field,value,feature,expected",
+    [
+        ("multiFlip", 1, "orientation", State.SUPPORTED),
+        ("multiFlip", 3, "orientation", State.SUPPORTED),
+        ("multiFlip", -1, "orientation", State.UNSUPPORTED),
+        ("multiFlip", 0, "orientation", State.UNKNOWN),
+        ("multiFlip", 2, "orientation", State.UNKNOWN),
+        ("multiFlip", True, "orientation", State.UNKNOWN),
+        ("enable", 0, "smart_protection", State.SUPPORTED),
+        ("enable", 1, "smart_protection", State.SUPPORTED),
+        ("enable", 20001, "smart_protection", State.UNKNOWN),
+        ("enable", False, "smart_protection", State.UNKNOWN),
+    ],
+)
+def test_homologated_control_fields_do_not_infer_related_features(field, value, feature, expected):
+    reads = list(batch())
+    index = 2 if field == "multiFlip" else 3
+    reads[index] = replace(reads[index], value={"t": 100, "setVal": {field: value}})
+    states = {item.feature: item.state for item in normalize(tuple(reads)).evidence}
+    assert states[feature] == expected
+    assert "smart_protection_schedule" not in states
+    assert "siren_pulse" not in states
+
+
 def test_collector_wrapper_samples_backend_time_after_collection(monkeypatch):
     calls = []
 

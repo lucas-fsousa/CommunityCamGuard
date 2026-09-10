@@ -29,6 +29,13 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Historical-proof audit: see `yoosee-homologation-migration.md`. Orientation and Smart
+Protection master evidence now use the already-collected video/guard roots; snapshot
+rule revision 2 invalidates older evidence. No extra network requests. The audit
+distinguishes proven night options 0/1 from mapped-only option 2, and physically proven
+LAN RTSP audio from the unproven P2P fallback. Complete per-unit identity/association
+reconciliation remains required before importing production operation profiles.
+
 Operation-policy checkpoint: `capability_policy.select_controls` intersects exact-unit
 backend operation proofs with supported property evidence. Reads do not authorize writes;
 choice/action options are intersected with proven options. Duplicate proofs, mismatched

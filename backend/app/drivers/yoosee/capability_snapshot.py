@@ -75,6 +75,8 @@ def normalize_snapshot(
     for feature, path, field, supported, unsupported in (
         ("night_vision", paths[2], "nightViewMode", frozenset({0, 1, 2}), frozenset()),
         ("cry_detection", paths[3], "cryDetectEn", frozenset({1, 2}), frozenset({0})),
+        ("orientation", paths[2], "multiFlip", frozenset({1, 3}), frozenset({-1})),
+        ("smart_protection", paths[3], "enable", frozenset({0, 1}), frozenset()),
     ):
         property_read = reads.get(path)
         payload = None

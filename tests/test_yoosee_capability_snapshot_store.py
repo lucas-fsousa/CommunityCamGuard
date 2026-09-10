@@ -72,7 +72,7 @@ def test_invalid_batch_is_not_partially_published_and_rules_invalidate(monkeypat
         store.save(invalid, generation=ticket, expires_at=200)
     assert resolve() == State.UNKNOWN
     assert store.save(SNAPSHOT, generation=ticket, expires_at=200)
-    monkeypatch.setattr(store, "RULE_REVISION", 2)
+    monkeypatch.setattr(store, "RULE_REVISION", store.RULE_REVISION + 1)
     assert resolve() == State.UNKNOWN
 
 
