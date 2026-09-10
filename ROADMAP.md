@@ -110,6 +110,10 @@ Bounded offline identity auditing now recovers complete historical identity for 
 units from the original August 24 capture. Test-unit association was found read-only in the
 local DB; the other two were not returned there. No profile import or DB writes. Current
 identity/deployment association must still be verified before switching runtime gates.
+Test-unit current identity/deployment association now verified: one bounded four-root read
+completed in 2.61 s with correlated B8 success and identity matching historical firmware
+40.1.14. No actions, credential renewal, media, DB writes or profile import. Next: bind
+historical test-unit operation proofs with provenance and migrate only that exact unit.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

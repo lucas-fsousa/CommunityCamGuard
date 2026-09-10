@@ -58,6 +58,28 @@ capture; current identity and deployment association still require reconciliatio
 runtime migration. The successful physical tests need not be repeated merely to fill
 these historical fields.
 
+### Current test-unit identity verified (2026-09-10)
+
+Container mount inspection confirmed `ccg-app` uses the repository's `data` directory;
+its effective DB path is `data/ccg.db`. One exact-test-unit read was then performed
+using the existing enrollment, without credential renewal, media allocation or actions.
+The four allowlisted roots completed in 2.61 seconds, each with transport ACK and
+correlated application success (`error=0`). The full identity matched the historical
+test-unit record: product/model/SDK above, revision 1, hardware empty, firmware 40.1.14.
+
+Normalized property evidence: night vision, orientation and Smart Protection supported;
+cry detection unsupported. Video/guard property timestamps were older than the server's
+receipt time, reinforcing why configuration timestamps are not receipt/expiry clocks.
+This is live validation of the correlated B8 collector and identity normalization, not
+a new physical write/audio test or proof that the broker bypassed its cache.
+
+No snapshot was persisted, no profile imported and no dashboard gate changed. Credentials
+were loaded through a read-only database connection and never printed. Exact local run
+details are kept in `re/notes/capability-identity-reconciliation.md`. Next implementation
+can bind the existing test-unit operation proofs to this now-matched exact identity;
+the other cameras remain outside test scope. Keep source provenance and distinguish
+the proven options and transports listed in the audit.
+
 ## Implemented from this audit
 
 The existing four-root collector already retrieves both relevant roots, so no extra
