@@ -75,6 +75,38 @@ def test_catalog_and_operations_are_dispatched_to_selected_driver(monkeypatch):
     assert written.value is False and written.changed is True
 
 
+def test_unadvertised_option_never_reaches_driver(monkeypatch):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+    monkeypatch.setattr(
+        selected,
+        "control_catalog",
+        lambda camera: (ControlDescriptor("mode", "choice", writable=True, options=("safe",)),),
+    )
+    calls = []
+    monkeypatch.setattr(selected, "write_control", lambda *args: calls.append(args))
+    with pytest.raises(Unsupported):
+        camera_controls.write_control(CAMERA_ID, "mode", "unproven")
+    assert calls == []
+
+
+def test_advertised_numeric_option_preserves_integer_driver_contract(monkeypatch):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+    monkeypatch.setattr(
+        selected,
+        "control_catalog",
+        lambda camera: (
+            ControlDescriptor("duration", "action", writable=True, options=("2", "5")),
+        ),
+    )
+    assert camera_controls.write_control(CAMERA_ID, "duration", 2).value == 2
+    with pytest.raises(Unsupported):
+        camera_controls.write_control(CAMERA_ID, "duration", True)
+
+
 def test_audio_message_is_driver_dispatched_under_the_same_camera_lock(monkeypatch):
     selected = FakeControlDriver()
     monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)

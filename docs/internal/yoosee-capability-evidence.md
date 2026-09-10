@@ -6,10 +6,12 @@ support. Model names such as IPC and a firmware version alone are not unique pro
 
 ## Current implementation gap
 
-`yoosee.controls.catalog` currently returns all descriptors after an enrollment check.
+`yoosee.controls.catalog` retains the legacy enrollment check for units/controls not
+explicitly migrated. The test unit's orientation/night/master controls now use the
+profile-and-evidence gate described below.
 `yoosee.audio.supported` also accepts enrollment as evidence for the P2P fallback.
-Neither rule constitutes per-feature certification. They remain unchanged in this
-checkpoint pending durable device evidence and migration of existing registered units.
+Enrollment alone is still not per-feature certification. Unmigrated controls/audio
+remain an explicit backlog, not a claim that the full capability migration is complete.
 
 ## Evidence interpretation
 
@@ -28,6 +30,25 @@ zero is an unsupported sentinel. Booleans must not be accepted as numeric switch
 Usable tfInfo does not prove file-list/playback support, which requires separate certification.
 
 ## Next integration steps
+
+Runtime rollout: `capability_rollout` opts an exact identity and selected control keys
+into runtime enforcement. Only those keys are replaced/removed by `stored_catalog`;
+unmigrated controls and units keep their previous behavior. Current local opt-in is
+camera 3 orientation, legacy night automatic/daytime, and Smart Protection master.
+The generic write service now also checks advertised static options (integer values
+match numeric option strings without changing the value passed to the driver).
+
+`capability_runtime` performs demand-driven refresh only for opted-in units: one daemon
+worker globally, no queue, at most one attempt per camera per five minutes, one-hour
+local evidence validity, existing 20-second read budget. Dashboard requests do not wait
+for it. A new collection invalidates old evidence; selected controls may temporarily be
+absent until the next successful snapshot. Errors stay unknown, never trigger token
+renewal, and logs contain only camera ID/error type. No consumer means no polling.
+This is a backend driver mechanism, not a vendor-specific hook in generic lifecycle code.
+
+Local activation performed one bounded refresh, verified all three stored-preview
+descriptors/options, then wrote the explicit rollout record. No camera write, audio,
+light or siren command was sent. No other unit was enrolled into this rollout.
 
 Historical-proof audit: see `yoosee-homologation-migration.md`. Orientation and Smart
 Protection master evidence now use the already-collected video/guard roots; snapshot

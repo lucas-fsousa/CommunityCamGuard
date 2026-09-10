@@ -102,6 +102,31 @@ camera action was performed in this registration step; only the new profile tabl
 was written locally. Next: collect/persist a fresh test-unit snapshot, verify the stored
 preview, then plan runtime transition without accidentally suppressing unrelated controls.
 
+### Controlled runtime rollout completed
+
+The test-unit profile's three controls are now explicitly opted in through the
+`yoosee_capability_rollout` record after a successful fresh collection and stored-preview
+check. The other five legacy controls and the other units were not migrated by this step.
+The default catalogue now uses the stored exact-unit profile and valid evidence for these
+selected keys. The generic API enforces advertised options as well, not just the UI.
+
+Evidence refresh is demand-driven and asynchronous with one worker/no queue, a five-minute
+attempt interval per unit and one-hour local validity. It uses only the bounded four-root
+read, without credential renewal or media/actions. Unknown evidence removes selected controls
+until a subsequent successful refresh; it never grants unsupported options. Full source-cache
+freshness and broader feature/audio migration remain separate limitations.
+
+Deployment: only `ccg-app` was rebuilt/recreated; `ccg-go2rtc` retained its start time.
+The build used a confirmed 512 MiB/one-CPU container limit. Added `temp/` to Docker exclusions
+(577 MiB of local material); resulting context was approximately 3.4 MB. No assertion is made
+that this alone explains previous WSL failures. Authenticated HTTP smoke check returned all
+three registered cameras, camera-3 normal/inverted and automatic/daytime options, guard-master
+read/write, and HTTP 200 for status. Deployed build: `b-2c117c71d5fa`.
+
+89 targeted tests passed, plus Ruff and mypy. No camera control write, sound, siren or light
+test was sent. Local operational scripts/proofs remain ignored. The migration implemented
+here is complete for these three test-unit controls, not for every Yoosee feature or camera.
+
 ## Implemented from this audit
 
 The existing four-root collector already retrieves both relevant roots, so no extra

@@ -63,7 +63,7 @@ def control_catalog(camera: Camera) -> dict[str, dict[str, object]]:
     return {descriptor.key: descriptor.public() for descriptor in descriptors}
 
 
-def _operation(camera: Camera, key: str, permission: str):
+def _operation(camera: Camera, key: str, permission: str, *, value: ControlValue | None = None):
     driver = drivers.for_camera(camera)
     descriptor = next(
         (item for item in driver.control_catalog(camera) if item.key == key),
@@ -71,6 +71,9 @@ def _operation(camera: Camera, key: str, permission: str):
     )
     if descriptor is None or not getattr(descriptor, permission):
         raise drivers.Unsupported(key)
+    option = str(value) if type(value) is int else value
+    if permission == "writable" and descriptor.options and option not in descriptor.options:
+        raise drivers.Unsupported("control option is not advertised by this driver")
     return driver
 
 
@@ -96,7 +99,7 @@ def control_options(camera_id: str, key: str) -> tuple[ControlOption, ...]:
 def write_control(camera_id: str, key: str, value: ControlValue) -> ControlResult:
     camera = _camera(camera_id)
     with _exclusive(camera_id):
-        return _operation(camera, key, "writable").write_control(camera, key, value)
+        return _operation(camera, key, "writable", value=value).write_control(camera, key, value)
 
 
 def send_audio_message(camera_id: str, pcm16le: bytes) -> AudioMessageResult:

@@ -7,6 +7,7 @@ HTTP and the generic application service never import them directly.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from ...db import p2p
@@ -103,7 +104,23 @@ def catalog(camera: Camera) -> tuple[ControlDescriptor, ...]:
 
     if not camera.camera_id or not p2p.has_enrollment_for_camera(camera.camera_id):
         return ()
-    return _DESCRIPTORS
+    from .capability_rollout import selected
+    from .capability_runtime import request_refresh
+
+    rollout = selected(camera.camera_id)
+    if rollout is None:
+        return _DESCRIPTORS
+    identity, managed = rollout
+    validated = {
+        item.key: item for item in stored_catalog(camera, identity=identity, now=time.time())
+    }
+    # Refresh is asynchronous and never renews login or allocates camera media.
+    request_refresh(camera.camera_id, identity.device_id)
+    return tuple(
+        validated[item.key] if item.key in managed else item
+        for item in _DESCRIPTORS
+        if item.key not in managed or item.key in validated
+    )
 
 
 def stored_catalog(

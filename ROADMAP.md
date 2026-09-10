@@ -118,6 +118,15 @@ Exact test-unit profile is now registered locally with hashed proof references: 
 normal/inverted, night automatic/daytime, and guard master read/write. Backend profile store
 and stored-catalog preview are tested; default dashboard gates remain unchanged. Next: fresh
 persisted evidence and stored-preview verification before a deliberate runtime transition.
+Camera-3 three-control rollout is now activated after successful fresh snapshot/preview:
+orientation, night automatic/daytime and guard master use exact profile + evidence at runtime.
+API rejects unadvertised options. Other units/controls/audio remain legacy explicitly.
+Refresh is demand-driven, single-worker, five-minute backoff/one-hour evidence validity;
+no media/actions/token renewal. Remaining migration needs other feature evidence/proofs.
+Runtime rollout deployed and authenticated HTTP-verified on build b-2c117c71d5fa. Only app
+recreated; go2rtc untouched. 89 focused tests, Ruff/mypy passed. Build context excludes temp/
+and used confirmed 512 MiB/one-CPU build caps. This completes the three-control test-unit
+migration; broader controls, audio and other-unit capability gates remain separate backlog.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

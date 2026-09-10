@@ -21,6 +21,7 @@ FEEDBACK.md
 # Local tooling / workspaces not needed to build the app
 re/
 tmp/
+temp/
 scripts/
 docs/
 tests/
