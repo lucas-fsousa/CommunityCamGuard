@@ -84,6 +84,10 @@ the B7 request sequence. The collector requires device/session/sequence-correlat
 and excludes unsolicited AA reports; transport ACKs also require matching sequence. Synthetic
 encrypted-frame tests pass. Response shape/cache freshness validation and identity normalization
 remain prerequisites before observations can drive durable evidence and catalogue gates.
+Identity normalization now has offline tests: exact-device product/version roots preserve
+product ID/model/revision/firmware/SDK/hardware without family-wide assumptions. Snapshot
+validity, writable timestamp validation and atomic identity/evidence integration remain pending;
+the normalizer does not yet enable controls or populate the evidence store.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

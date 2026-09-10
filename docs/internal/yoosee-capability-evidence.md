@@ -29,6 +29,26 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Identity checkpoint (2026-09-10): `capability_identity.normalize_identity` accepts
+only successful, authenticated, exact-path product/version observations belonging to
+the expected device. It preserves product ID, model, revision, firmware, SDK and
+hardware separately in an immutable value. Empty hardware version is a known valid
+shape; missing hardware/version fields remain unknown. Decimal string/integer product
+IDs normalize equally, but floats, booleans, alternate representations, control
+characters and partial roots are rejected. Transport ACK is not required when the
+application response succeeded.
+
+Schema evidence: decompiled `com.jwkj.t_saas.bean.ProConst.ProductInfo/VersionInfo`
+(6.36 APK) and existing identity observations in `re/notes/thing-model.md`. These
+ProConst roots contain plain fields, not `setVal`/`t` envelopes. `revisionUtc` must
+not be mistaken for collection time. No family-wide model/firmware equivalence is
+inferred. This pure normalizer must receive the correlated collector's output;
+an `authenticated` boolean on an arbitrary/client-created DTO is not provenance.
+It is not yet wired to persistence/catalogue. Tests are synthetic, not new live
+homologation. Next: define the backend snapshot/validity boundary, validate writable
+property timestamps without assuming a camera clock is trustworthy, and bind exact
+identity to evidence atomically. Do not flatten this identity into a model-only key.
+
 Collection checkpoint: `capability_collector.collect` now reads only product/version/video/guard
 roots in one brokered session, one attempt per root, with a 20-second deadline. It requires
 linked camera identity, verifies the selected target and closes the socket on exceptions. A
