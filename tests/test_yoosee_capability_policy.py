@@ -95,6 +95,15 @@ def test_catalog_preview_uses_persisted_evidence_and_current_enrollment(monkeypa
     assert store.save(snapshot, generation=store.begin(CAMERA), expires_at=200)
     assert tuple(item.key for item in preview()) == ("night_vision",)
     assert preview()[0].options == (option,)
+    from backend.app.drivers.yoosee import capability_profiles
+
+    assert controls.stored_catalog(camera, identity=IDENTITY, now=150) == ()
+    capability_profiles.register(
+        profile,
+        sources={"night_vision": "sha256:" + "a" * 64 + " test.md#night"},
+        reviewed_at=100,
+    )
+    assert controls.stored_catalog(camera, identity=IDENTITY, now=150) == preview()
     assert preview(now=200) == ()
     enrollment.device_id = "different"
     assert preview() == ()

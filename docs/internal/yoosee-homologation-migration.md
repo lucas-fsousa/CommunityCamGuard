@@ -80,6 +80,28 @@ can bind the existing test-unit operation proofs to this now-matched exact ident
 the other cameras remain outside test scope. Keep source provenance and distinguish
 the proven options and transports listed in the audit.
 
+### Exact test-unit proof registration
+
+`capability_profiles` now stores backend-reviewed per-unit profiles atomically with
+source digest/locator per operation, complete identity, review time and rule revision.
+Older/equal-time reviews cannot overwrite newer ones; lookup requires exact identity
+and excludes future reviews. References are audit provenance, not a substitute for
+human physical confirmation. No public registration endpoint or brand allowlist exists.
+
+After rechecking the local enrollment association, the test unit's reviewed historical
+profile was registered in the local application database. Only these operations were
+included: orientation write (`normal`, `inverted`), night-vision write (`automatic`,
+`daytime`), Smart Protection master read/write. Sources are the hashed CAPABILITY-MAP
+and smart-protection-schedule notes; exact operational data stays in ignored RE files.
+No night option 2, siren, audio, schedule or other camera was registered by this step.
+
+`controls.stored_catalog` connects this profile source to the evidence-backed migration
+preview. The default catalogue still does not invoke it. Registration itself enables
+nothing: the preview requires a valid separately collected snapshot. No live read or
+camera action was performed in this registration step; only the new profile table/row
+was written locally. Next: collect/persist a fresh test-unit snapshot, verify the stored
+preview, then plan runtime transition without accidentally suppressing unrelated controls.
+
 ## Implemented from this audit
 
 The existing four-root collector already retrieves both relevant roots, so no extra

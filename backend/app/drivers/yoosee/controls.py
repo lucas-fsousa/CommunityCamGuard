@@ -106,6 +106,18 @@ def catalog(camera: Camera) -> tuple[ControlDescriptor, ...]:
     return _DESCRIPTORS
 
 
+def stored_catalog(
+    camera: Camera, *, identity: CapabilityIdentity, now: float
+) -> tuple[ControlDescriptor, ...]:
+    """Preview using backend-registered proofs, never a frontend-supplied profile."""
+    from .capability_profiles import load
+
+    if not camera.camera_id:
+        return ()
+    profile = load(camera_id=camera.camera_id, identity=identity, now=now)
+    return validated_catalog(camera, identity=identity, profile=profile, now=now)
+
+
 def validated_catalog(
     camera: Camera,
     *,

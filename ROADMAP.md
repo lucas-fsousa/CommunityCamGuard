@@ -114,6 +114,10 @@ Test-unit current identity/deployment association now verified: one bounded four
 completed in 2.61 s with correlated B8 success and identity matching historical firmware
 40.1.14. No actions, credential renewal, media, DB writes or profile import. Next: bind
 historical test-unit operation proofs with provenance and migrate only that exact unit.
+Exact test-unit profile is now registered locally with hashed proof references: orientation
+normal/inverted, night automatic/daytime, and guard master read/write. Backend profile store
+and stored-catalog preview are tested; default dashboard gates remain unchanged. Next: fresh
+persisted evidence and stored-preview verification before a deliberate runtime transition.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
