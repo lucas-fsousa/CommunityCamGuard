@@ -78,6 +78,9 @@ Offline tri-state evidence and durable per-device/product/firmware storage are t
 expiration, rule-revision invalidation and late-response rejection. Runtime collectors, profile
 migration and catalogue integration remain pending. See
 `docs/internal/yoosee-capability-evidence.md` for the migration sequence.
+An explicit four-root, one-session collector now has offline cleanup/timeout tests. It is not
+automatically invoked. Strict GDM response-to-property correlation and identity normalization are
+the next prerequisites before its observations can drive durable evidence and catalogue gates.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

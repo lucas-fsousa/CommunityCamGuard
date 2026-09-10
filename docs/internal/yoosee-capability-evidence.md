@@ -29,6 +29,19 @@ Usable tfInfo does not prove file-list/playback support, which requires separate
 
 ## Next integration steps
 
+Collection checkpoint: `capability_collector.collect` now reads only product/version/video/guard
+roots in one brokered session, one attempt per root, with a 20-second deadline. It requires
+linked camera identity, verifies the selected target and closes the socket on exceptions. A
+timeout/error stops the batch. It is explicit and not invoked by dashboard refreshes.
+It returns private observations only; it does not persist raw property values or enable controls.
+
+Before connecting collector to persistence/catalogue, audit GDM response correlation: current
+`exchange_model_read` can accept a direct reply by device ID without request/path correlation,
+and nested reports may omit the parent timestamp. Stopping at a timeout reduces one late-response
+case but is not sufficient proof against duplicate/unrelated same-device reports. Recover exact
+request correlation and reject ambiguous shapes before treating these reads as feature evidence.
+Then normalize authoritative product/version identity and implement the evidence/profile bridge.
+
 Persistence checkpoint: `capability_store.py` now stores only sanitized per-feature states,
 bound to opaque camera ID, native device ID, product, firmware, observation/expiration times
 and rule revision. Missing, expired, future, mismatched and old-revision observations resolve
