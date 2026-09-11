@@ -24,7 +24,7 @@ or wait on hardware/a human eye.
 | P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
 | P0 | **HD transport hardening** — prefer WebRTC; bounded/recoverable MSE queue; no 0.1× live playback fallback | done |
 | P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
-| P0 | **Single camera connection + local fan-out**: recording and preloaded H.264 share one RTSP producer; SD is downscaled locally; runtime verified one port-554 session/camera | done |
+| P0 | **Single camera connection + local fan-out**: recording and on-demand H.264 qualities share one RTSP producer; SD reads the base directly, without keeping an unused HD encoder alive. No live preload; same-quality viewers share an encoder; different qualities coexist only while consumed. See ADR 0005 | done |
 | P0 | **Frozen-player auto-recovery**: hybrid watchdog distinguishes client stall from local producer stall; only the latter cycles that camera's local preload | done³ |
 | — | **Invariant:** recording always uses the base (main) feed at full quality (`-c:v copy`), decoupled from the live quality selector — guard tests lock it | done |
 | P2 | **Hardware acceleration** (`live_hwaccel`: vaapi/cuda/v4l2m2m/…) — plumbing + tests done | done¹ |

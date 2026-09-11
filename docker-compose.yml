@@ -18,9 +18,10 @@ services:
       - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro   # generated from the registry by the app
     restart: unless-stopped
     # See the `app` service below for why these caps exist. go2rtc's ceiling is driven by the
-    # per-viewed-camera `_web` transcode (~140 MB each, measured), NOT by idle usage (~8 MB) —
+    # consumed live-quality transcodes, NOT by idle usage (~8 MB) —
     # sizing it off an idle reading would OOM-kill the transcodes as soon as a few cameras are
-    # watched at once, killing the live players. 1g covers roughly six simultaneous viewers.
+    # watched at once, killing the live players. Tabs sharing a quality share its encoder;
+    # different qualities consume separate encoders. HD measurements are around 190 MB each.
     mem_limit: 1g
     memswap_limit: 1g
     logging:

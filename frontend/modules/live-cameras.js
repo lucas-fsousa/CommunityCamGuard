@@ -634,8 +634,8 @@ function qualityControls(cam) {
 }
 
 // Restart a single camera's player. A lightweight replacement is enough for view/quality changes;
-// an explicit recovery also cycles the server's local H.264 producer so an upstream backlog cannot
-// survive this action the way it survives F5. Neither path reconnects the base camera/recorder feed.
+// an explicit recovery also allows the server relay to detach and release the unused producer.
+// Other viewers keep their shared producer. Neither path reconnects the base camera/recorder feed.
 async function refreshPlayer(cameraId, btn, restartProducer = false) {
   const cam = state.cameras.find((candidate) => candidate.id === cameraId);
   const t = cam ? tiles.get(cam.mac) : null;
@@ -644,8 +644,8 @@ async function refreshPlayer(cameraId, btn, restartProducer = false) {
   try {
     if (restartProducer) {
       const old = t.el.firstChild;
-      // Detach the browser before asking the server to cycle its preload; otherwise this consumer
-      // would keep the old FFmpeg producer alive and the recovery would be a no-op.
+      // Detach before waiting for server-side release. No preload should resurrect an unused
+      // quality variant; the replacement player alone requests the desired producer.
       if (old && old.tagName === "CAM-PLAYER" && typeof old.dispose === "function") old.dispose();
       const placeholder = suspendedFrame();
       if (old) old.replaceWith(placeholder); else t.el.prepend(placeholder);

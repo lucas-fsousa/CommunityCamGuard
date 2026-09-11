@@ -1419,3 +1419,20 @@ restart request while replacing itself, so that transport condition is accepted 
 replacement API answers; unrelated transport errors still fail closed. Live repair restored all
 nine opaque base/HD/web streams and all three recorder processes. See the startup invariant added
 to ADR `docs/internal/0025-opaque-media-and-recorder-runtime-identity.md`.
+
+## 40. Live encoders follow consumers, not permanent preloads (2026-09-10)
+
+Eight FFmpeg processes for three cameras exposed wasted work: three recorders, three permanently
+preloaded HD encoders and two SD encoders reading HD. Choosing SD therefore increased server cost.
+This supersedes the preload/HD-to-SD lifecycle described in the historical §34 addenda.
+
+Both variants now read the shared base restream directly and start only on demand. The last
+consumer disconnect releases that quality's encoder. Identical-quality viewers share it; different
+qualities coexist only with actual consumers, aside from brief asynchronous switch teardown.
+Recording still copies the base video independently. SD retains wall-clock and audio-clock repair.
+Explicit recovery never adds a preload and does not forcibly stop another viewer's encoder.
+Cold starts can wait for a camera keyframe; the existing 45-second startup grace remains.
+
+The native lifecycle is implemented by go2rtc's
+[consumer removal and producer stop](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/stream.go).
+See [ADR 0005](internal/0005-live-view-transcode-and-codec-ceiling.md) for the current policy.

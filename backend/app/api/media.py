@@ -17,7 +17,7 @@ from starlette.websockets import WebSocketState
 from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
-from ..media import go2rtc, quality
+from ..media import quality
 from ..services.camera_runtime import resolve_camera, resync_services
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -109,7 +109,7 @@ def media_client_events() -> list[dict]:
 
 @router.post("/media/recover/{camera_id}", dependencies=[Depends(require_auth)])
 def media_recover(camera_id: str, request: Request) -> dict:
-    """Restart one camera's local H.264 producer, never its RTSP/recording producer."""
+    """Release detached live producers, never the RTSP/recording producer or other viewers."""
 
     try:
         camera = resolve_camera(camera_id)
@@ -120,7 +120,7 @@ def media_recover(camera_id: str, request: Request) -> dict:
     media = getattr(request.app.state, "media", None)
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
-    if not media.restart_preload(go2rtc.hd_stream_id(camera.camera_id)):
+    if not media.release_live_producers(camera.camera_id):
         raise HTTPException(status_code=502, detail="local stream recovery failed")
     return {"ok": True}
 

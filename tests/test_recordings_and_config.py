@@ -425,7 +425,7 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     streams = go2rtc.build_config(cameras=[silent, audible])["streams"]
     # The live variant is about **video**, not audio: the browser cannot play these cameras'
     # HEVC, so even a silent camera needs an H.264 one. Audio only adds the AAC track.
-    # HD is transcoded once from the base stream and preloaded; SD is a local derivative of HD.
+    # Each quality is transcoded on demand directly from the shared base stream.
     silent_main_raw = _raw(hd=True, has_audio=False)
     silent_sub_raw = _raw(hd=False, has_audio=False)
     main_raw = _raw(hd=True)
@@ -433,12 +433,12 @@ def test_go2rtc_web_variant_exists_for_every_camera_audio_only_changes_the_track
     silent_id, audible_id = silent.camera_id, audible.camera_id
     assert streams[silent_id] == "rtsp://admin@10.0.0.1:554/onvif1"  # recording
     assert streams[f"{silent_id}_hd"] == (f"ffmpeg:{silent_id}#async#video=h264{silent_main_raw}")
-    assert streams[f"{silent_id}_web"] == (f"ffmpeg:{silent_id}_hd#video=h264_sd{silent_sub_raw}")
+    assert streams[f"{silent_id}_web"] == (f"ffmpeg:{silent_id}#async#video=h264_sd{silent_sub_raw}")
     assert streams[f"{audible_id}_hd"] == (
         f"ffmpeg:{audible_id}#async#video=h264#audio=aac#audio=opus{main_raw}"
     )
     assert (
-        streams[f"{audible_id}_web"] == f"ffmpeg:{audible_id}_hd"
+        streams[f"{audible_id}_web"] == f"ffmpeg:{audible_id}#async"
         f"#video=h264_sd#audio=aac#audio=opus{sub_raw}"
     )
 
@@ -459,7 +459,7 @@ def test_go2rtc_variants_never_open_the_camera_substream():
     assert f"{sid}_sub" not in streams
     assert "onvif2" not in repr(streams)
     assert streams[f"{sid}_hd"].startswith(f"ffmpeg:{sid}#async#video=h264")
-    assert streams[f"{sid}_web"].startswith(f"ffmpeg:{sid}_hd#video=h264_sd")
+    assert streams[f"{sid}_web"].startswith(f"ffmpeg:{sid}#async#video=h264_sd")
 
 
 def test_substream_url_none_when_camera_has_one_path():
@@ -546,8 +546,8 @@ def test_reindexing_legacy_directory_preserves_owner_after_native_rekey():
     assert item["mac"] == "aabbccddee01"
 
 
-def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():
-    """A single shared H.264 producer is hot before browsers connect, for all cameras."""
+def test_go2rtc_variants_are_independent_and_not_preloaded():
+    """Only consumed qualities run; SD never holds an unused HD encoder alive."""
     dual = _camera(
         "aa:bb:cc:00:00:05",
         stream_path="/onvif1",
@@ -567,10 +567,10 @@ def test_go2rtc_hd_variant_exists_and_is_preloaded_for_every_camera():
         f"#video=h264#audio=aac#audio=opus{_raw(hd=True)}"
     )
     assert f"{single.camera_id}_hd" in streams
-    assert cfg["preload"] == {
-        f"{dual.camera_id}_hd": "video&audio",
-        f"{single.camera_id}_hd": "video&audio",
-    }
+    assert cfg["preload"] == {}
+    for cam in (dual, single):
+        assert streams[f"{cam.camera_id}_web"].startswith(f"ffmpeg:{cam.camera_id}#async#")
+        assert f"ffmpeg:{cam.camera_id}_hd" not in streams[f"{cam.camera_id}_web"]
 
 
 def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(monkeypatch):
@@ -600,7 +600,9 @@ def test_live_transcodes_use_the_final_codec_template_for_frame_rate_and_gop(mon
     assert f"{sid}_live" not in streams
     assert f"ffmpeg:{sid}#async#video=h264" in streams[f"{sid}_hd"]
     assert "-af aresample=async=1:first_pts=0" in streams[f"{sid}_hd"]
-    assert cfg["preload"][f"{sid}_hd"] == "video&audio"
+    assert cfg["preload"] == {}
+    assert "#async" in streams[f"{sid}_web"]
+    assert "-af aresample=async=1:first_pts=0" in streams[f"{sid}_web"]
     assert "nobuffer" not in cfg["ffmpeg"]["rtsp"]
     assert "low_delay" not in cfg["ffmpeg"]["rtsp"]
     assert cfg["ffmpeg"]["rtsp"].endswith("-rtsp_flags prefer_tcp -i {input}")

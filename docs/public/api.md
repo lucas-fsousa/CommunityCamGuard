@@ -350,7 +350,7 @@ scanning is available, so this remains a capability-based fallback rather than t
 | GET | `/api/media/activity` | Per-stream `{video_packets, consumers}` — liveness for a client freeze watchdog (a watched stream whose video packets stop advancing is frozen upstream). |
 | POST | `/api/media/client-event` | Bounded live-player transition snapshot for diagnostics (details below). |
 | GET | `/api/media/client-events` | Last 200 browser transition snapshots from this server process. |
-| POST | `/api/media/recover/{camera_id}` | Cycle one camera's local preloaded H.264 producer after a confirmed stall. The shared camera RTSP/recording producer is not restarted. |
+| POST | `/api/media/recover/{camera_id}` | After detaching the player, release legacy live preloads and allow relay teardown. Reconnection starts only the requested quality; other viewers and the shared camera RTSP/recording producer are not restarted. |
 | POST | `/api/media/restart` | Regenerate go2rtc config and restart it (after registry changes). |
 
 `GET /api/media/streams` returns:

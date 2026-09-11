@@ -118,36 +118,67 @@ def test_media_client_event_accepts_legacy_mac_but_stores_public_id():
     assert media_routes.media_client_events()[-1]["camera_id"] == camera.camera_id
 
 
-def test_restart_preload_cycles_only_requested_local_stream(monkeypatch):
+def test_recovery_releases_both_variants_without_starting_unused_encoder(monkeypatch):
     calls = []
 
     def open_(request, timeout=None):
         method = request.get_method() if hasattr(request, "get_method") else "GET"
         url = request.full_url if hasattr(request, "full_url") else request
         calls.append((method, url))
-        if method == "PUT":
-            raise go2rtc.urllib.error.HTTPError(url, 500, "go2rtc quirk", {}, None)
         if method == "GET":
-            return _Resp(json.dumps({"cam_x_hd": {"query": "video&audio"}}).encode())
+            return _Resp(json.dumps({f"{cam.camera_id}_hd": {},
+                                     f"{cam.camera_id}_web": {}}).encode())
         return _Resp()
 
     monkeypatch.setattr(go2rtc.urllib.request, "urlopen", open_)
     monkeypatch.setattr(go2rtc.time, "sleep", lambda _seconds: None)
-    assert go2rtc.Go2rtc(manage=False).restart_preload("cam_x_hd") is True
-    assert [method for method, _ in calls] == ["DELETE", "PUT", "GET"]
-    assert all("cam_x_hd" in url for _, url in calls[:2])
+    registry.init_db()
+    cam = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    assert go2rtc.Go2rtc(manage=False).release_live_producers(cam.camera_id) is True
+    assert [method for method, _ in calls] == ["GET", "DELETE", "DELETE"]
+    assert calls[1][1].endswith(f"/api/preload?src={cam.camera_id}_hd")
+    assert calls[2][1].endswith(f"/api/preload?src={cam.camera_id}_web")
 
 
-def test_media_recover_targets_hd_preload_not_camera_source():
+def test_recovery_without_preloads_never_creates_a_producer(monkeypatch):
+    calls = []
+
+    def open_(url, timeout=None):
+        calls.append(url)
+        return _Resp(b"{}")
+
+    monkeypatch.setattr(go2rtc.urllib.request, "urlopen", open_)
+    registry.init_db()
+    cam = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    assert go2rtc.Go2rtc(manage=False).release_live_producers(
+        cam.camera_id, disconnect_grace=0,
+    ) is True
+    assert len(calls) == 1
+    assert calls[0].endswith("/api/preload")
+
+
+def test_recovery_reports_unavailable_media_engine(monkeypatch):
+    def open_(*args, **kwargs):
+        raise OSError("unavailable")
+
+    monkeypatch.setattr(go2rtc.urllib.request, "urlopen", open_)
+    registry.init_db()
+    cam = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    assert go2rtc.Go2rtc(manage=False).release_live_producers(
+        cam.camera_id, disconnect_grace=0,
+    ) is False
+
+
+def test_media_recover_releases_local_variants_not_camera_source():
     registry.init_db()
     cam = registry.upsert_camera(
         "aa:bb:cc:dd:ee:01", last_ip="10.0.0.5", stream_path="/onvif1"
     )
     restarted = []
-    media = SimpleNamespace(restart_preload=lambda sid: restarted.append(sid) or True)
+    media = SimpleNamespace(release_live_producers=lambda sid: restarted.append(sid) or True)
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))
     assert media_routes.media_recover(cam.camera_id, req) == {"ok": True}
-    assert restarted == [go2rtc.hd_stream_id(cam.camera_id)]
+    assert restarted == [cam.camera_id]
 
 
 # --- rule: recording always uses the base (main) feed, at full quality --------------
