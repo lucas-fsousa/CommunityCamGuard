@@ -150,6 +150,13 @@ proofs pinned to semantic key plus native-resource identity digest. Enumeration 
 all entries; replaced slots/custom additions cannot inherit permission. Runtime gates are unchanged.
 Remaining: original resource-ID proof audit, durable profile provenance, validated observation
 collection and shared enumeration/pre-write enforcement. See `docs/internal/yoosee-dynamic-resource-proofs.md`.
+Dynamic resource proof storage is now implemented separately from static profiles: mandatory
+expiry, exact identity/revision, per-selection provenance, bounded/revalidated JSON and atomic
+newer-review replacement. Revocation survives expiry and cannot be undone by older reviews.
+The reviewed historical summaries prove reversible selection but omit native resource IDs;
+no production resource grants were imported from names/logical keys. Remaining: bind original
+native identities or record a fresh exact-resource proof, then integrate validated observations
+and enforce the same selection intersection in enumeration and pre-write resolution.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
