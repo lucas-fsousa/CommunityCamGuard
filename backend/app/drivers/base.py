@@ -117,6 +117,14 @@ class CameraDriver:
     label: str = "Generic RTSP"
     rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
     transport: str = "auto"  # media-layer hint: auto | tcp | udp
+
+    def unavailable_control(self, camera: Camera, key: str) -> None:
+        """Explain an absent descriptor; never authorize it or perform camera I/O.
+
+        Drivers may raise ControlNotReady for temporary missing evidence instead.
+        """
+        raise Unsupported(key)
+
     def onboarding(self) -> OnboardingPort | None:
         """Return this family onboarding port, when factory enrollment is implemented."""
 

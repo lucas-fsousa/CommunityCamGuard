@@ -31,6 +31,23 @@ def resolve(**kwargs):
     )
 
 
+def test_current_snapshot_is_only_a_hint_and_never_survives_invalidation(monkeypatch):
+    def current(**kwargs):
+        return store.is_current(**({"camera_id": CAMERA, "identity": IDENTITY, "now": 150} | kwargs))
+
+    assert not current()
+    assert store.save(SNAPSHOT, generation=store.begin(CAMERA), expires_at=200)
+    assert current()
+    for now in (99, 200, True, float("nan")):
+        assert not current(now=now)
+    assert not current(identity=replace(IDENTITY, firmware="changed"))
+    monkeypatch.setattr(store, "RULE_REVISION", store.RULE_REVISION + 1)
+    assert not current()
+    monkeypatch.undo()
+    store.begin(CAMERA)
+    assert not current()
+
+
 def test_newer_started_job_wins_even_if_older_finishes_later():
     old = store.begin(CAMERA)
     new = store.begin(CAMERA)

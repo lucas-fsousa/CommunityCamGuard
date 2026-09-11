@@ -115,7 +115,10 @@ def catalog(camera: Camera) -> tuple[ControlDescriptor, ...]:
         item.key: item for item in stored_catalog(camera, identity=identity, now=time.time())
     }
     # Refresh is asynchronous and never renews login or allocates camera media.
-    request_refresh(camera.camera_id, identity.device_id)
+    if not capability_snapshot_store.is_current(
+        camera_id=camera.camera_id, identity=identity, now=time.time(),
+    ):
+        request_refresh(camera.camera_id, identity.device_id)
     return tuple(
         validated[item.key] if item.key in managed else item
         for item in _DESCRIPTORS

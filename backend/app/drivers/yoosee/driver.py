@@ -77,6 +77,11 @@ class YooseeDriver(CameraDriver):
     def control_catalog(self, camera: Camera) -> tuple[ControlDescriptor, ...]:
         return controls.catalog(camera)
 
+    def unavailable_control(self, camera: Camera, key: str) -> None:
+        from .capability_availability import unavailable_control
+
+        unavailable_control(camera, key)
+
     def read_control(self, camera: Camera, key: str) -> ControlResult:
         return controls.read(camera, key)
 

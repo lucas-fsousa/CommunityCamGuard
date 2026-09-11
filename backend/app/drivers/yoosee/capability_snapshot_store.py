@@ -106,13 +106,15 @@ def resolve(
     ]
 
 
-def resolve_features(
-    *, camera_id: str, identity: CapabilityIdentity, features: tuple[str, ...], now: float
-) -> dict[str, EvidenceState]:
-    """Resolve only against exact backend identity, valid server time and current rules."""
-    unknown = dict.fromkeys(features, EvidenceState.UNKNOWN)
+def is_current(*, camera_id: str, identity: CapabilityIdentity, now: float) -> bool:
+    """Fresh complete storage is a scheduling hint, never an operation grant."""
+    return _load(camera_id=camera_id, identity=identity, now=now) is not None
+
+
+def _load(*, camera_id: str, identity: CapabilityIdentity,
+          now: float) -> dict[str, EvidenceState] | None:
     if not _time(now):
-        return unknown
+        return None
     with connect() as conn:
         conn.execute(_SCHEMA)
         row = conn.execute(
@@ -122,15 +124,22 @@ def resolve_features(
             (camera_id, _identity(identity), now, now, RULE_REVISION),
         ).fetchone()
     if row is None:
-        return unknown
+        return None
     try:
         values = json.loads(row["evidence"])
         if not isinstance(values, dict):
-            return unknown
-        for feature in features:
-            value = values.get(feature)
-            if isinstance(value, str):
-                unknown[feature] = EvidenceState(value)
+            return None
+        return {key: EvidenceState(value) for key, value in values.items()}
+    except (ValueError, TypeError, RecursionError):
+        return None
+
+
+def resolve_features(
+    *, camera_id: str, identity: CapabilityIdentity, features: tuple[str, ...], now: float
+) -> dict[str, EvidenceState]:
+    """Resolve only against exact backend identity, valid server time and current rules."""
+    unknown = dict.fromkeys(features, EvidenceState.UNKNOWN)
+    values = _load(camera_id=camera_id, identity=identity, now=now)
+    if values is None:
         return unknown
-    except (ValueError, TypeError):
-        return dict.fromkeys(features, EvidenceState.UNKNOWN)
+    return {feature: values.get(feature, EvidenceState.UNKNOWN) for feature in features}

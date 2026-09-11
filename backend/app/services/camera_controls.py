@@ -69,7 +69,10 @@ def _operation(camera: Camera, key: str, permission: str, *, value: ControlValue
         (item for item in driver.control_catalog(camera) if item.key == key),
         None,
     )
-    if descriptor is None or not getattr(descriptor, permission):
+    if descriptor is None:
+        driver.unavailable_control(camera, key)
+        raise drivers.Unsupported(key)
+    if not getattr(descriptor, permission):
         raise drivers.Unsupported(key)
     option = str(value) if type(value) is int else value
     if permission == "writable" and descriptor.options and option not in descriptor.options:
@@ -91,7 +94,10 @@ def control_options(camera_id: str, key: str) -> tuple[ControlOption, ...]:
             (item for item in driver.control_catalog(camera) if item.key == key),
             None,
         )
-        if descriptor is None or descriptor.kind != "choice" or not descriptor.dynamic_options:
+        if descriptor is None:
+            driver.unavailable_control(camera, key)
+            raise drivers.Unsupported(key)
+        if descriptor.kind != "choice" or not descriptor.dynamic_options:
             raise drivers.Unsupported(key)
         return driver.control_options(camera, key)
 

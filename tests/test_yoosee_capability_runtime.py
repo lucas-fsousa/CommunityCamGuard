@@ -56,11 +56,15 @@ def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):
         generation=snapshots.begin(CAMERA),
         expires_at=200,
     )
+    requested.clear()
     current = {item.key: item for item in controls.catalog(camera)}
     assert current["night_vision"].options == ("automatic", "daytime")
     assert all(current[item.key] == item for item in legacy if item.key != "night_vision")
     assert controls.catalog(SimpleNamespace(camera_id="cam_" + "2" * 24)) == legacy
-    assert requested and all(args == (CAMERA, IDENTITY.device_id) for args in requested)
+    assert requested == []  # fresh durable evidence must survive a dashboard request/restart
+    monkeypatch.setattr(controls.time, "time", lambda: 200)
+    assert "night_vision" not in {item.key for item in controls.catalog(camera)}
+    assert requested == [(CAMERA, IDENTITY.device_id)]
 
 
 def test_refresh_is_bounded_single_worker_with_backoff(monkeypatch):

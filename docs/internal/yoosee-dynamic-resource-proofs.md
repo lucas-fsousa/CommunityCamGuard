@@ -2,6 +2,33 @@
 
 Status: exact-resource listing/selection enforcement deployed and explicitly enabled on camera 3.
 
+## Capability refresh availability — 2026-09-11
+
+The unnecessary startup refresh is fixed: catalogue requests check the durable snapshot's exact
+identity, rule revision and server-time validity before scheduling collection. Valid snapshots
+survive process restarts and dashboard requests. This uses the existing one-hour receipt TTL;
+the five-minute runtime interval remains a failed/missing-evidence retry backoff, not a reason to
+erase valid evidence. There is no stale-while-revalidate permission or TTL extension. Expiry,
+identity/revision mismatch and explicit `begin()` still invalidate evidence immediately. Actual
+collection failure leaves controls blocked. Profiles/revocation continue to be checked independently.
+
+The generic driver contract now has `unavailable_control`, an explanation-only hook for an absent
+descriptor. Default drivers retain Unsupported/HTTP 501. Yoosee distinguishes unknown evidence
+for an explicitly migrated, matching enrolled unit using ControlNotReady/HTTP 409 and a retry-later
+message. Explicit unsupported evidence, unregistered keys and missing proofs with supported evidence
+remain 501. Read, write and option-list routes never execute an absent control, even if a custom
+driver's explanation hook incorrectly returns. Camera listings still omit unproven descriptors.
+No vendor-specific checks were added to the core service or frontend; no automatic write retries.
+
+Validation: 341 focused tests and the complete 1,293-test suite passed, plus Ruff and mypy
+(155 source files). Build `b-6e7a6288af81` was deployed with the same bounded app-only build;
+the media container was not restarted and neither container reported an OOM kill.
+The first read-only smoke attempt found an actually expired snapshot and stopped. A normal
+dashboard request triggered the bounded capability read; after publication, three dashboard
+requests preserved the same database generation and the advertised alarm control. No option
+enumeration, camera writes or playback were invoked by this smoke test. Reproduction helper:
+ignored `re/verify_camera3_refresh_stability.py` (requires a fresh snapshot).
+
 ## Runtime enforcement — 2026-09-11
 
 `alarm_resource_controls.py` now applies the same intersection to dynamic option listing and
@@ -27,9 +54,8 @@ physical selection evidence; the new enforcement has automated write-path regres
 Build `b-14c9a2bbd7e4` was deployed by recreating only the app. The media container's start time
 did not change; neither container reported an OOM kill. Build limits: 512 MiB and one CPU.
 
-Known follow-up: the first options request returned 501 while the demand-driven capability
-refresh invalidated the prior snapshot; after refresh, the same request succeeded. Improve the
-refresh/temporary-unavailability UX without retaining stale permissions across identity changes.
+Observed before the availability fix above: the first options request returned 501 while the demand-driven capability
+refresh invalidated the prior snapshot; after refresh, the same request succeeded.
 Remaining migration includes siren/intercom gates and additional exact-unit proofs; enumeration
 alone must never certify an untested resource or another camera/model.
 

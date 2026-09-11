@@ -9,6 +9,7 @@ from backend.app.drivers.base import CameraDriver, Unsupported
 from backend.app.drivers.contracts import (
     AudioMessageResult,
     ControlDescriptor,
+    ControlNotReady,
     ControlOption,
     ControlResult,
 )
@@ -51,6 +52,28 @@ def _camera(driver="fake-control"):
         camera_id=CAMERA_ID,
         capabilities={"driver": driver},
     )
+
+
+@pytest.mark.parametrize("operation", ["read", "write", "options"])
+@pytest.mark.parametrize("temporary", [True, False])
+def test_absent_descriptor_remains_blocked_even_if_explanation_hook_returns(monkeypatch, operation, temporary):
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    monkeypatch.setattr(registry, "get_camera_by_id", lambda camera_id: _camera())
+    monkeypatch.setattr(selected, "control_catalog", lambda camera: ())
+
+    def explain(camera, key):
+        if temporary:
+            raise ControlNotReady("evidence unavailable")
+
+    monkeypatch.setattr(selected, "unavailable_control", explain)
+    with pytest.raises(ControlNotReady if temporary else Unsupported):
+        if operation == "write":
+            camera_controls.write_control(CAMERA_ID, "white_light", True)
+        elif operation == "read":
+            camera_controls.read_control(CAMERA_ID, "white_light")
+        else:
+            camera_controls.control_options(CAMERA_ID, "white_light")
 
 
 def test_catalog_and_operations_are_dispatched_to_selected_driver(monkeypatch):

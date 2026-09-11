@@ -167,8 +167,12 @@ pre-write resolution share strict fresh catalogue/proof intersection, rechecking
 expiry after I/O. Correlated preflight/readback compares full native resource identity, not only
 the logical slot. The production HTTP list returned only the two proven effects, without playback.
 299 focused tests passed; app-only build `b-14c9a2bbd7e4` left the media service running.
-Next: migrate remaining siren/intercom gates and improve the temporary control-unavailability
-response during evidence refresh (one startup options request returned 501 before refresh finished).
+The redundant startup refresh is fixed: valid exact-identity snapshots retain their existing TTL
+instead of being invalidated on dashboard requests. Truly missing/expired evidence stays blocked;
+a generic driver explanation hook maps temporary Yoosee evidence absence to HTTP 409 rather than
+claiming unsupported hardware (501). No stale grants or automatic write retries. 341 focused tests
+cover scheduling, invalidation and read/write/options dispatch. Next: migrate remaining
+siren/intercom gates; physically validate only camera 3 when needed.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
