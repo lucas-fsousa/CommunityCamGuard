@@ -16,7 +16,7 @@ from .capability_evidence import EvidenceState
 from .capability_identity import CapabilityIdentity
 from .capability_snapshot import CapabilitySnapshot
 
-RULE_REVISION = 3
+RULE_REVISION = 4
 _SCHEMA = """CREATE TABLE IF NOT EXISTS yoosee_capability_snapshots (
     camera_id TEXT PRIMARY KEY,
     generation INTEGER NOT NULL,

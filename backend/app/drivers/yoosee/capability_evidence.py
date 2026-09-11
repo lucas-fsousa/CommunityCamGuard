@@ -19,6 +19,17 @@ class EvidenceState(StrEnum):
     UNKNOWN = "unknown"
 
 
+# One fixed allowlist shared by collection and normalization. Never accept arbitrary
+# writable roots from a caller. The last root adds speaker-volume evidence only.
+CAPABILITY_PATHS = (
+    "ProConst._productInfo",
+    "ProConst._versionInfo",
+    "ProWritable.videoParm",
+    "ProWritable.guardParm",
+    "ProWritable.volume",
+)
+
+
 def _integer(value: object) -> int | None:
     if type(value) is int:
         return value
@@ -76,5 +87,25 @@ def guard_schedule_evidence(observation: object) -> EvidenceState:
         return EvidenceState.UNKNOWN
     values = observation.get("setVal")
     if not isinstance(values, dict) or parse_guard_plan(values.get("plan")) is None:
+        return EvidenceState.UNKNOWN
+    return EvidenceState.SUPPORTED
+
+
+def speaker_volume_evidence(observation: object) -> EvidenceState:
+    """Exact scalar volume property; mute is supported, not an absent speaker.
+
+    Do not recursively search nested fields: a timestamp, unrelated setting or
+    legacy envelope must not masquerade as a valid 0..10 raw speaker volume.
+    This proves neither talkback nor any particular writable volume option.
+    """
+    if not isinstance(observation, dict):
+        return EvidenceState.UNKNOWN
+    timestamp = _integer(observation.get("t"))
+    if timestamp == -1:
+        return EvidenceState.UNSUPPORTED
+    if timestamp is None or not 0 < timestamp <= 0x7FFFFFFF:
+        return EvidenceState.UNKNOWN
+    raw = observation.get("setVal")
+    if type(raw) is not int or not 0 <= raw <= 10:
         return EvidenceState.UNKNOWN
     return EvidenceState.SUPPORTED

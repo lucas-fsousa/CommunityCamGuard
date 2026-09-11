@@ -7,10 +7,12 @@ import re
 from dataclasses import dataclass
 
 from .capability_evidence import (
+    CAPABILITY_PATHS,
     EvidenceState,
     _integer,
     enum_property_evidence,
     guard_schedule_evidence,
+    speaker_volume_evidence,
 )
 from .capability_identity import CapabilityIdentity, normalize_identity
 from .p2p.contracts import P2PPropertyRead
@@ -61,12 +63,7 @@ def normalize_snapshot(
         or collected_at <= 0
     ):
         return None
-    paths = (
-        "ProConst._productInfo",
-        "ProConst._versionInfo",
-        "ProWritable.videoParm",
-        "ProWritable.guardParm",
-    )
+    paths = CAPABILITY_PATHS
     if len(observations) > len(paths):
         return None
     reads: dict[str, P2PPropertyRead] = {}
@@ -106,4 +103,6 @@ def normalize_snapshot(
     evidence.append(
         PropertyEvidence("smart_protection_schedule", guard_schedule_evidence(payload), timestamp)
     )
+    payload, timestamp = _property(reads.get(paths[4]))
+    evidence.append(PropertyEvidence("speaker_volume", speaker_volume_evidence(payload), timestamp))
     return CapabilitySnapshot(camera_id, identity, collected_at, tuple(evidence))

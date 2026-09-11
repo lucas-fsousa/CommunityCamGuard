@@ -7,7 +7,7 @@ support. Model names such as IPC and a firmware version alone are not unique pro
 ## Current implementation gap
 
 `yoosee.controls.catalog` retains the legacy enrollment check for units/controls not
-explicitly migrated. The test unit's orientation/night/master controls now use the
+explicitly migrated. The test unit's orientation/night/master/schedule/volume controls use the
 profile-and-evidence gate described below.
 `yoosee.audio.supported` also accepts enrollment as evidence for the P2P fallback.
 Enrollment alone is still not per-feature certification. Unmigrated controls/audio
@@ -15,7 +15,7 @@ remain an explicit backlog, not a claim that the full capability migration is co
 
 ## Evidence interpretation
 
-`capability_evidence.py` is an offline building block, not yet a runtime gate.
+`capability_evidence.py` contains pure rules consumed by the runtime gate for migrated controls.
 
 | Observation | Interpretation |
 |---|---|
@@ -30,6 +30,22 @@ zero is an unsupported sentinel. Booleans must not be accepted as numeric switch
 Usable tfInfo does not prove file-list/playback support, which requires separate certification.
 
 ## Next integration steps
+
+Speaker-volume migration completed (2026-09-10): the fixed collector now reads a fifth root,
+`ProWritable.volume`, within the same single-session 20-second deadline, one attempt per root.
+Collection and normalization share one allowlist. Exact timestamped scalar `setVal` integers
+0..10 are evidence; zero is mute, not absence. Booleans, strings, float/nested values, missing
+or failed reads stay unknown; timestamp -1 denotes unavailable. No inference about talkback,
+microphone, siren or writable positions follows from a volume observation.
+
+Snapshot rule revision **4** invalidates prior snapshots. The exact camera-3 profile binds the
+recorded raw 7→10→7 and canonical 75→50→75 percent tests to hashed source provenance. Only
+50/75/100 percent writes and volume read are certified; 0/25 remain unhomologated, not declared
+unsupported hardware. A fresh five-root snapshot and stored-catalogue preview succeeded before
+activating this fifth key. Authenticated HTTP confirmed the restricted options. Other units and
+unmigrated controls/audio remain legacy. No volume write, audio or media session was sent.
+
+Historical steps below describe their state at the time, not additional current blockers.
 
 Guard-schedule migration completed: schedule support is now independently derived from
 the exact successful `guardParm.setVal.plan` plus valid root timestamp. The pure

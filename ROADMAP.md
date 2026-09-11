@@ -132,6 +132,12 @@ The test-unit weekly guard schedule is now the fourth migrated control: independ
 validated structured plan, shared pure parser, provenance-bound existing homologation and
 fresh read/HTTP verification. No schedule or guard setting changed. Build b-d5a1f44f01fe,
 96 focused tests passed; other cameras and unmigrated features remain unchanged.
+Speaker volume is now the fifth migrated camera-3 control: a successful exact scalar property
+read plus existing per-unit readback/restoration proofs allow read and 50/75/100 percent writes.
+0/25 remain unhomologated. One fifth allowlisted read was added without changing the 20-second
+session budget; snapshot revision 4 invalidates previous evidence. Fresh snapshot, stored preview
+and authenticated HTTP catalogue succeeded without playing audio or changing volume. Other units,
+white light/siren/dynamic alarm catalogue and audio capability migrations remain separate work.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

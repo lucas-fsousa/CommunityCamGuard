@@ -11,17 +11,11 @@ import socket
 import time
 
 from ...db.p2p import P2PEnrollment
+from .capability_evidence import CAPABILITY_PATHS
 from .capability_snapshot import CapabilitySnapshot, normalize_snapshot
 from .p2p.camera_session import open_camera_session
 from .p2p.contracts import P2PProbeError, P2PPropertyRead
 from .p2p.model_session import exchange_model_read
-
-CAPABILITY_PATHS = (
-    "ProConst._productInfo",
-    "ProConst._versionInfo",
-    "ProWritable.videoParm",
-    "ProWritable.guardParm",
-)
 
 
 def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
@@ -40,7 +34,7 @@ def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
 
 
 def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
-    """Read four fixed roots sequentially within one 20-second session budget.
+    """Read five fixed roots sequentially within one unchanged 20-second session budget.
 
     Only device/session/sequence-correlated B8 responses are collected, not AA reports.
     Correlation does not prove cache freshness; a timeout stops the batch. Observations are private

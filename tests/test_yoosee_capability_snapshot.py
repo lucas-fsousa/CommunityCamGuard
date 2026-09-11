@@ -18,6 +18,7 @@ def batch():
         {"swVer": "40.1.22", "sdkVer": "16.20.16355", "hwVer": ""},
         {"t": 100, "setVal": {"nightViewMode": 0}},
         {"t": 101, "setVal": {"cryDetectEn": 0}},
+        {"t": 102, "setVal": 7},
     )
     return tuple(
         P2PPropertyRead(DEVICE, path, True, False, False, 0, value)
@@ -136,4 +137,5 @@ def test_schedule_uses_only_successful_exact_guard_root_and_keeps_timestamp():
     assert evidence["smart_protection_schedule"].property_timestamp == 100
     assert evidence["smart_protection"].state == State.SUPPORTED
     reads[3] = replace(reads[3], error_code=20001)
-    assert normalize(tuple(reads)).evidence[-1].state == State.UNKNOWN
+    states = {item.feature: item.state for item in normalize(tuple(reads)).evidence}
+    assert states["smart_protection_schedule"] == State.UNKNOWN

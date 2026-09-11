@@ -12,7 +12,7 @@ Operational identifiers and credentials remain in ignored RE material.
 | Smart Protection master | Test unit `1 → 0 → 1`, D3 success and B7 readback | Independent from siren, detection and schedule |
 | Smart Protection schedule | Test unit weekday mask `127 → 126 → 127`, complete plan restored | Master support does not prove schedule; needs its own structured evidence |
 | Night vision | Test unit 40.1.14 `0 → 1 → 0`, readback | Proven options `automatic`/`daytime`; `night` (2) is mapped, not proven by this recorded test |
-| Speaker volume | Garage raw `10 → 7 → 10`, readback | Does not certify every UI volume option or every unit |
+| Speaker volume | Garage raw `10 → 7 → 10`; test unit raw `7 → 10 → 7` plus canonical percent `75 → 50 → 75`, ACK/error-zero/readback/restoration | Test-unit writes 50/75/100 percent only; 0/25 remain unhomologated, not unsupported |
 | Two-way audio | User physically passed message and hold-to-speak on all three units | Successful route was proprietary LAN RTSP; do not transfer proof to P2P fallback |
 | Alarm resources | Catalogue query and selection contract documented | Dynamic enumeration/selection requires a separate proof representation |
 
@@ -138,6 +138,24 @@ in the exact-unit rollout. HTTP smoke check confirms all four migrated controls,
 weekly_schedule read/write. Build b-d5a1f44f01fe deployed; no new write to the camera occurred.
 
 ## Implemented from this audit
+
+### Fifth migrated control: speaker volume (2026-09-10)
+
+Audit recovered the additional exact test-unit proofs in CAPABILITY-MAP and cameras-local
+production-validation notes. The consolidated source is hashed into the local operation profile.
+No other camera's successful write is inherited. The profile permits read and only 50/75/100
+percent write options; the generic API already enforces this same advertised intersection.
+
+The collector adds only `ProWritable.volume` after the existing four roots, preserving one
+session, one attempt per root, stop-on-error and the total 20-second deadline. Scalar evidence
+requires the exact timestamped `setVal` 0..10, not recursive compatibility extraction.
+Snapshot revision 4 and a successful fresh five-root snapshot/preview precede opt-in. HTTP
+verification confirmed five migrated controls and the three allowed volume positions.
+The media service was not restarted; only the application image/container was replaced using
+512 MiB/one-CPU build limits. No new physical sound, volume write or camera setting change.
+Deployment build: `b-0ae9d59cdceb`. 123 focused tests, Ruff and mypy (151 source files) passed.
+
+### Historical initial evidence rules
 
 The existing four-root collector already retrieves both relevant roots, so no extra
 network requests are needed for orientation and Smart Protection master evidence:

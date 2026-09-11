@@ -66,12 +66,12 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
             collector.collect(ENROLLMENT)
     else:
         observations = collector.collect(ENROLLMENT)
-        assert len(observations) == (4 if failure is None else 1)
+        assert len(observations) == (5 if failure is None else 1)
     assert opened == closed and len(opened) == 1
     expected = collector.CAPABILITY_PATHS if failure is None else collector.CAPABILITY_PATHS[:1]
     assert [path for path, _sequence in calls] == list(expected)
     if failure is None:
-        assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2]
+        assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2, 3]
 
 
 def test_requires_linked_identity_before_network(monkeypatch):
