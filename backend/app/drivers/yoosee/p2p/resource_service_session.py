@@ -73,6 +73,7 @@ def exchange_alarm_voice_catalog(
     retries: int = 3,
     deadline: float | None = None,
     decompressor: PayloadDecompressor | None = decompress_level2,
+    require_correlated_response: bool = False,
 ) -> AlarmVoiceCatalogResult:
     """Execute only the fixed read-only catalogue request against one authenticated node."""
 
@@ -101,6 +102,9 @@ def exchange_alarm_voice_catalog(
             if wire[:2] == b"\x70\x01":
                 try:
                     fragment = decode_fragment_packet(wire)
+                    # This outer ID groups transport fragments; live responses prove it is
+                    # not the access-node session ID. Authenticate/correlate the INNER frame
+                    # after bounded reassembly, not this unauthenticated grouping field.
                     sock.sendto(build_fragment_ack(fragment), node.address)
                     fragments_received += 1
                     reassembled = fragments.add(fragment)
@@ -113,9 +117,22 @@ def exchange_alarm_voice_catalog(
             if plain is None or len(plain) < 0x18:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
+            if require_correlated_response and (
+                ((flags >> 16) & 3) != 2
+                or struct.unpack_from("<Q", plain, 4)[0] != node.session_id
+            ):
+                continue
             if flags & (1 << 20):
-                if plain[1] == 0xC0:
+                if plain[1] == 0xC0 and (
+                    not require_correlated_response
+                    or struct.unpack_from("<I", plain, 0x0C)[0] == (sequence & 0xFFFFFFFF)
+                ):
                     transport_acknowledged = True
+                continue
+            if require_correlated_response and plain[1] == 0xC1 and (
+                struct.unpack_from("<I", plain, 0x10)[0] != (sequence & 0xFFFFFFFF)
+            ):
+                # Reject a stale reply before expanding its compressed body.
                 continue
             try:
                 expanded, needs_decoder = _expand_compressed_frame(plain, decompressor)
@@ -130,7 +147,10 @@ def exchange_alarm_voice_catalog(
             acknowledge_reliable_node_frame(sock, node, expanded)
             if parsed is None:
                 continue
-            _incoming_id, status_code, payload = parsed
+            incoming_id, candidate_status, candidate_payload = parsed
+            if require_correlated_response and incoming_id != (sequence & 0xFFFFFFFF):
+                continue
+            status_code, payload = candidate_status, candidate_payload
             break
         if status_code is not None or compression_required:
             break

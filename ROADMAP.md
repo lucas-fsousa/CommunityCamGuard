@@ -157,6 +157,12 @@ The reviewed historical summaries prove reversible selection but omit native res
 no production resource grants were imported from names/logical keys. Remaining: bind original
 native identities or record a fresh exact-resource proof, then integrate validated observations
 and enforce the same selection intersection in enumeration and pre-write resolution.
+Fresh camera-3 silent validation now binds the missing native identities: Zumbido 1→Zumbido 2→
+Zumbido 1, ACK/error zero and independent correlated B7 exact-ID/full-state restoration. Two
+resource proofs were registered locally with 30-day expiry and verified against a fresh catalogue;
+no playback action or other camera was involved. Strict C0/C1 mode now correlates inner encrypted
+session/request after bounded fragment reassembly and rejects partial/misclassified catalogues.
+Runtime dynamic gates remain unchanged; next is shared fresh enumeration/pre-write enforcement.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

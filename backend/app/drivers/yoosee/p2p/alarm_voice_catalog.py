@@ -53,6 +53,7 @@ def read_camera_alarm_voice_catalog(
     language: str = "pt-BR",
     timeout: float = 1.5,
     total_timeout: float = 30.0,
+    require_correlated_response: bool = False,
 ) -> P2PAlarmVoiceCatalog:
     """Read system and custom type-4 resources without selecting or playing any of them."""
 
@@ -61,12 +62,14 @@ def read_camera_alarm_voice_catalog(
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", 0))
     try:
-        node, _target, sequence = open_camera_session(
+        node, target, sequence = open_camera_session(
             sock,
             enrollment,
             bounded_timeout,
             deadline,
         )
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("alarm catalogue session device identity mismatch")
         system_result = exchange_alarm_voice_catalog(
             sock,
             node,
@@ -78,6 +81,7 @@ def read_camera_alarm_voice_catalog(
             sequence,
             bounded_timeout,
             deadline=deadline,
+            require_correlated_response=require_correlated_response,
         )
         system = _decode_response(system_result.payload, system_result.status_code)
         custom_result = exchange_alarm_voice_catalog(
@@ -91,8 +95,16 @@ def read_camera_alarm_voice_catalog(
             (sequence + 1) & 0xFFFFFFFF,
             bounded_timeout,
             deadline=deadline,
+            require_correlated_response=require_correlated_response,
         )
         custom = _decode_response(custom_result.payload, custom_result.status_code)
+        if require_correlated_response and (
+            system.reported_total != len(system.resources)
+            or custom.reported_total != len(custom.resources)
+            or any(not resource.system for resource in system.resources)
+            or any(resource.system for resource in custom.resources)
+        ):
+            raise P2PProbeError("alarm catalogue is incomplete or has conflicting source types")
     except P2PProbeError:
         raise
     except (OSError, TypeError, ValueError) as exc:

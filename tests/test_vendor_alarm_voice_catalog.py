@@ -59,7 +59,8 @@ class FakeSocket:
         self.closed = True
 
 
-def test_catalog_orchestrator_reads_both_sources_and_exposes_only_sanitized_options(monkeypatch):
+@pytest.mark.parametrize("strict", [False, True])
+def test_catalog_orchestrator_reads_both_sources_and_exposes_only_sanitized_options(monkeypatch, strict):
     FakeSocket.instances.clear()
     calls: list[tuple[dict[str, object], int]] = []
     responses = iter(
@@ -76,12 +77,15 @@ def test_catalog_orchestrator_reads_both_sources_and_exposes_only_sanitized_opti
     )
 
     def exchange(_sock, _node, query, sequence, _timeout, **_kwargs):
+        assert _kwargs["require_correlated_response"] is strict
         calls.append((query, sequence))
         return next(responses)
 
     monkeypatch.setattr(alarm_voice_catalog, "exchange_alarm_voice_catalog", exchange)
 
-    result = alarm_voice_catalog.read_camera_alarm_voice_catalog(ENROLLMENT, language="pt-BR")
+    result = alarm_voice_catalog.read_camera_alarm_voice_catalog(
+        ENROLLMENT, language="pt-BR", require_correlated_response=strict,
+    )
 
     assert result.device_id == ENROLLMENT.device_id
     assert result.system_total == 1
@@ -152,4 +156,35 @@ def test_catalog_orchestrator_rejects_cross_source_key_conflicts(monkeypatch):
     )
 
     with pytest.raises(P2PProbeError, match="conflicting"):
+        alarm_voice_catalog.read_camera_alarm_voice_catalog(ENROLLMENT)
+
+
+@pytest.mark.parametrize("wrong_source", [False, True])
+def test_strict_catalogue_rejects_incomplete_or_misclassified_pages(monkeypatch, wrong_source):
+    system = json.loads(_payload(system=not wrong_source, number=1))
+    if not wrong_source:
+        system["data"]["total"] = 2
+    responses = iter((
+        AlarmVoiceCatalogResult(True, 0, json.dumps(system).encode(), False, 1),
+        AlarmVoiceCatalogResult(True, 0, _payload(system=False, number=7), False, 1),
+    ))
+    monkeypatch.setattr(alarm_voice_catalog.socket, "socket", FakeSocket)
+    monkeypatch.setattr(alarm_voice_catalog, "open_camera_session", lambda *_: (NODE, DEVICE, 10))
+    monkeypatch.setattr(alarm_voice_catalog, "exchange_alarm_voice_catalog",
+                        lambda *a, **kw: next(responses))
+    with pytest.raises(P2PProbeError, match="incomplete"):
+        alarm_voice_catalog.read_camera_alarm_voice_catalog(
+            ENROLLMENT, require_correlated_response=True,
+        )
+
+
+def test_wrong_session_target_is_rejected_before_catalogue_request(monkeypatch):
+    from dataclasses import replace
+    monkeypatch.setattr(alarm_voice_catalog.socket, "socket", FakeSocket)
+    monkeypatch.setattr(alarm_voice_catalog, "open_camera_session",
+                        lambda *_: (NODE, replace(DEVICE, device_id=999), 10))
+    def forbidden(*args, **kwargs):
+        raise AssertionError("catalogue query must not be sent")
+    monkeypatch.setattr(alarm_voice_catalog, "exchange_alarm_voice_catalog", forbidden)
+    with pytest.raises(P2PProbeError, match="identity mismatch"):
         alarm_voice_catalog.read_camera_alarm_voice_catalog(ENROLLMENT)

@@ -1,6 +1,39 @@
 # Yoosee dynamic-resource proof boundary
 
-Status: offline foundation implemented; no runtime rollout or camera action.
+Status: exact-resource proofs registered locally; runtime catalogue migration remains pending.
+
+## Native identities bound by fresh silent validation — 2026-09-11
+
+Camera 3 was revalidated using its complete ProConst identity and fresh catalogue. A controlled
+selection changed Zumbido 1 to Zumbido 2 and restored Zumbido 1 in unconditional cleanup. Both
+writes returned ACK/error zero. Independent **correlated B7** reads compared full `resFile.setVal`
+against the expected native ID and then the complete original state, not just the logical slot.
+No siren action/audio playback/light/reboot was invoked. Only camera 3 was contacted.
+
+The two native-resource identity digests and source provenance are now registered in the local
+backend resource-profile table with explicit 30-day expiry. A subsequent fresh strict catalogue
+intersected with the persisted profile to return exactly those two options. Bip, Latido and custom
+resources were not certified. Operational IDs, digests and the exact execution record stay in
+ignored `re/notes/alarm-resource-identity-homologation.md`; the bounded repeatable harness is
+`re/homologate_camera3_alarm_resources.py` and defaults to read-only unless `--execute` is passed.
+
+### Catalogue correlation correction
+
+An explicit strict mode was added to the C0/C1 reader. It requires encrypted mode 2, matching
+access-node session and C1 request correlation; transport ACK sequence is checked separately.
+Stale C1 replies are rejected before decompression. The account resource service is not a
+device-specific capability claim: the per-device selection proof remains necessary.
+
+Live diagnostics established that the **outer fragmentation identity is not the node session**.
+An initial experimental check incorrectly dropped those fragments; it was removed before any
+deployment. The existing bounded reassembler groups them, then the inner encrypted packet is
+session/request-correlated. Strict system/custom catalogues also require complete reported counts
+and correct source classifications. Partial/filtered pages cannot be labelled complete.
+
+The strict path was live-verified for system and custom queries; compatibility mode remains the
+default for unmigrated callers. No container rebuild/restart or public gate change was needed.
+64 focused tests, Ruff and mypy (153 source files) passed. The next step is connecting fresh
+observations and the stored profile to both enumeration and pre-write enforcement before rollout.
 
 ## Durable backend proof storage — 2026-09-11
 
@@ -52,10 +85,10 @@ No signed URLs/tokens are retained by the existing sanitized `AlarmVoiceResource
 
 ## Remaining runtime integration
 
-1. Audit original exact-unit resource IDs for the recorded reversible selection and retain source
-   provenance; labels such as “Zumbido 1” alone are not identity proof.
+1. Exact-unit resource identities are now bound by a fresh reversible validation with provenance;
+   labels alone were not used to import historical grants.
 2. Durable resource-specific profile storage is implemented with revision, exact identity,
-   source hashes and revocation/expiry protection; importing reviewed production proofs remains.
+   source hashes and revocation/expiry protection; the two camera-3 proofs are registered locally.
 3. Produce authenticated/complete observations only from validated catalogue exchanges; choose
    bounded refresh/TTL without introducing cloud/media polling or unbounded fragment retention.
 4. Filter both displayed options and fresh pre-write resolution through the same intersection.
