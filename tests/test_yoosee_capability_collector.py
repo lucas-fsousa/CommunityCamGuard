@@ -74,15 +74,15 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
             collector.collect(ENROLLMENT)
     else:
         observations = collector.collect(ENROLLMENT)
-        assert len(observations) == (5 if failure is None else 1)
+        assert len(observations) == (6 if failure is None else 1)
     assert opened == closed and len(opened) == 1
     expected = collector.CAPABILITY_PATHS if failure is None else collector.CAPABILITY_PATHS[:1]
     assert [path for path, _sequence in calls] == list(expected)
     if failure is None:
-        assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2, 3]
+        assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2, 3, 4]
         args, kwargs = light_calls[0]
         assert len(light_calls) == 1 and args[0] is opened[0]
-        assert args[4] is None and args[5] == 4
+        assert args[4] is None and args[5] == 5
         assert kwargs["require_correlated_response"] is True and kwargs["retries"] == 1
     else:
         assert not light_calls

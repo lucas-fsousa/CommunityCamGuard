@@ -11,6 +11,7 @@ import math
 from enum import StrEnum
 
 from .guard_plan import parse_guard_plan
+from .p2p.alarm_voice import alarm_voice_logical_number
 
 
 class EvidenceState(StrEnum):
@@ -27,6 +28,7 @@ CAPABILITY_PATHS = (
     "ProWritable.videoParm",
     "ProWritable.guardParm",
     "ProWritable.volume",
+    "ProWritable.resFile",
 )
 
 
@@ -107,5 +109,24 @@ def speaker_volume_evidence(observation: object) -> EvidenceState:
         return EvidenceState.UNKNOWN
     raw = observation.get("setVal")
     if type(raw) is not int or not 0 <= raw <= 10:
+        return EvidenceState.UNKNOWN
+    return EvidenceState.SUPPORTED
+
+
+def alarm_resource_evidence(observation: object) -> EvidenceState:
+    """Resource selection support is distinct from enumeration and siren playback."""
+    if not isinstance(observation, dict):
+        return EvidenceState.UNKNOWN
+    timestamp = _integer(observation.get("t"))
+    if timestamp == -1:
+        return EvidenceState.UNSUPPORTED
+    if timestamp is None or not 0 < timestamp <= 0x7FFFFFFF:
+        return EvidenceState.UNKNOWN
+    value = observation.get("setVal")
+    if not isinstance(value, dict) or type(value.get("supportFunc")) is not int:
+        return EvidenceState.UNKNOWN
+    if value["supportFunc"] == 0:
+        return EvidenceState.UNSUPPORTED
+    if value["supportFunc"] not in (1, 2, 3) or alarm_voice_logical_number(value.get("resId")) is None:
         return EvidenceState.UNKNOWN
     return EvidenceState.SUPPORTED

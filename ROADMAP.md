@@ -162,7 +162,13 @@ Zumbido 1, ACK/error zero and independent correlated B7 exact-ID/full-state rest
 resource proofs were registered locally with 30-day expiry and verified against a fresh catalogue;
 no playback action or other camera was involved. Strict C0/C1 mode now correlates inner encrypted
 session/request after bounded fragment reassembly and rejects partial/misclassified catalogues.
-Runtime dynamic gates remain unchanged; next is shared fresh enumeration/pre-write enforcement.
+Runtime dynamic enforcement is now deployed and explicitly enabled only on camera 3: listing and
+pre-write resolution share strict fresh catalogue/proof intersection, rechecking revocation and
+expiry after I/O. Correlated preflight/readback compares full native resource identity, not only
+the logical slot. The production HTTP list returned only the two proven effects, without playback.
+299 focused tests passed; app-only build `b-14c9a2bbd7e4` left the media service running.
+Next: migrate remaining siren/intercom gates and improve the temporary control-unavailability
+response during evidence refresh (one startup options request returned 501 before refresh finished).
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and

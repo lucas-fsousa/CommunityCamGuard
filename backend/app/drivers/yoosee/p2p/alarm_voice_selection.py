@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import socket
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ....db.p2p import P2PEnrollment
 from .alarm_voice import AlarmVoiceResource, alarm_voice_logical_number
@@ -26,6 +26,7 @@ ALARM_VOICE_WRITE_PATH = "ProWritable.resFile.setVal.resId"
 class AlarmVoiceSelectionState:
     logical_number: int
     support_state: int
+    resource_id: str | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,16 +41,24 @@ class P2PAlarmVoiceWrite:
     verified: bool
 
 
-def extract_alarm_voice_selection(value: object) -> AlarmVoiceSelectionState | None:
+def extract_alarm_voice_selection(value: object, *, exact: bool = False) -> AlarmVoiceSelectionState | None:
     """Extract the current type-4 selection and explicit support state from ``resFile``."""
 
     if not isinstance(value, dict):
         return None
+    if exact:
+        if type(value.get("t")) is not int or not 0 < value["t"] <= 0x7FFFFFFF:
+            return None
+        value = value.get("setVal")
+        if not isinstance(value, dict):
+            return None
     resource_id = value.get("resId")
     support = value.get("supportFunc")
     logical_number = alarm_voice_logical_number(resource_id)
     if logical_number is not None and type(support) is int and support in (1, 2, 3):
-        return AlarmVoiceSelectionState(logical_number, support)
+        return AlarmVoiceSelectionState(logical_number, support, resource_id)
+    if exact:
+        return None
     for key in ("setVal", "resFile", "ProWritable"):
         if key in value:
             candidate = extract_alarm_voice_selection(value[key])
@@ -117,6 +126,7 @@ def set_camera_alarm_voice_resource(
     *,
     timeout: float = 1.5,
     total_timeout: float = 30.0,
+    require_exact_resource: bool = False,
 ) -> P2PAlarmVoiceWrite:
     """Select a validated resource with preflight and logical-number readback."""
 
@@ -128,6 +138,8 @@ def set_camera_alarm_voice_resource(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("alarm selection session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -136,11 +148,13 @@ def set_camera_alarm_voice_resource(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=require_exact_resource,
         )
-        previous = extract_alarm_voice_selection(preflight.value)
+        previous = extract_alarm_voice_selection(preflight.value, exact=require_exact_resource)
         if preflight.error_code != 0 or previous is None:
             raise P2PProbeError("alarm-voice preflight returned no supported type-4 selection")
-        if previous.logical_number == resource.logical_number:
+        if (previous.resource_id == resource.resource_id if require_exact_resource
+                else previous.logical_number == resource.logical_number):
             return P2PAlarmVoiceWrite(
                 enrollment.device_id,
                 resource.key,
@@ -178,12 +192,14 @@ def set_camera_alarm_voice_resource(
                 min(bounded_timeout, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=require_exact_resource,
             )
-            current = extract_alarm_voice_selection(readback.value)
+            current = extract_alarm_voice_selection(readback.value, exact=require_exact_resource)
             if (
                 readback.error_code == 0
                 and current is not None
                 and current.logical_number == resource.logical_number
+                and (not require_exact_resource or current.resource_id == resource.resource_id)
             ):
                 verified = True
                 break

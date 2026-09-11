@@ -88,7 +88,8 @@ def test_selection_extractor_requires_support_and_type_four_id():
     )
 
 
-def test_selection_requires_preflight_and_logical_readback(monkeypatch):
+@pytest.mark.parametrize("exact", [False, True])
+def test_selection_requires_preflight_and_logical_readback(monkeypatch, exact):
     enrollment = _enrollment()
     resource = _resource(7)
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
@@ -110,13 +111,14 @@ def test_selection_requires_preflight_and_logical_readback(monkeypatch):
     )
     reads = iter(
         (
-            ModelReadResult(True, 0, {"setVal": {"supportFunc": 2, "resId": _resource_id(4)}}),
-            ModelReadResult(True, 0, {"setVal": {"supportFunc": 2, "resId": _resource_id(4)}}),
-            ModelReadResult(True, 0, {"setVal": {"supportFunc": 2, "resId": _resource_id(7, 99)}}),
+            ModelReadResult(True, 0, {"t": 12, "setVal": {"supportFunc": 2, "resId": _resource_id(7 if exact else 4, 99)}}),
+            ModelReadResult(True, 0, {"t": 12, "setVal": {"supportFunc": 2, "resId": _resource_id(7 if exact else 4, 99)}}),
+            ModelReadResult(True, 0, {"t": 12, "setVal": {"supportFunc": 2, "resId": _resource_id(7, 10 if exact else 99)}}),
         )
     )
 
     def fake_read(_sock, _node, _device, _path, sequence, _timeout, **_kwargs):
+        assert _kwargs["require_correlated_response"] is exact
         calls.append(("read", sequence))
         return next(reads)
 
@@ -128,7 +130,7 @@ def test_selection_requires_preflight_and_logical_readback(monkeypatch):
     monkeypatch.setattr(alarm_voice_selection, "exchange_alarm_voice_selection_write", fake_write)
     monkeypatch.setattr(alarm_voice_selection.time, "sleep", lambda _seconds: None)
 
-    result = alarm_voice_selection.set_camera_alarm_voice_resource(enrollment, resource)
+    result = alarm_voice_selection.set_camera_alarm_voice_resource(enrollment, resource, require_exact_resource=exact)
 
     assert calls == [
         ("bind", ("", 0)),
@@ -138,7 +140,7 @@ def test_selection_requires_preflight_and_logical_readback(monkeypatch):
         ("read", 43),
         ("close",),
     ]
-    assert result.previous_logical_number == 4
+    assert result.previous_logical_number == (7 if exact else 4)
     assert result.requested_logical_number == 7
     assert result.verified is True
 

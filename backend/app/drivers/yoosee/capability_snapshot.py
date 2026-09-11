@@ -10,6 +10,7 @@ from .capability_evidence import (
     CAPABILITY_PATHS,
     EvidenceState,
     _integer,
+    alarm_resource_evidence,
     enum_property_evidence,
     guard_schedule_evidence,
     speaker_volume_evidence,
@@ -112,6 +113,8 @@ def normalize_snapshot(
     )
     payload, timestamp = _property(reads.get(paths[4]))
     evidence.append(PropertyEvidence("speaker_volume", speaker_volume_evidence(payload), timestamp))
+    payload, timestamp = _property(reads.get(paths[5]))
+    evidence.append(PropertyEvidence("alarm_voice", alarm_resource_evidence(payload), timestamp))
     # This is a correlated type-12 application reply, not a timestamped model property.
     # OFF is a valid binary state. Neither transport ACK alone nor indicator/schedule fields
     # prove this distinct manual floodlight control.

@@ -19,6 +19,7 @@ def batch():
         {"t": 100, "setVal": {"nightViewMode": 0}},
         {"t": 101, "setVal": {"cryDetectEn": 0}},
         {"t": 102, "setVal": 7},
+        {"t": 103, "setVal": {"supportFunc": 0}},
     )
     return tuple(
         P2PPropertyRead(DEVICE, path, True, False, False, 0, value)

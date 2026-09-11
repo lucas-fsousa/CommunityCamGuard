@@ -158,13 +158,17 @@ def validated_catalog(
         features=tuple(descriptor.key for descriptor in _DESCRIPTORS),
         now=now,
     )
-    return select_controls(
+    static = select_controls(
         _DESCRIPTORS,
         camera_id=camera.camera_id,
         identity=identity,
         profile=profile,
         evidence=evidence,
     )
+    from .alarm_resource_controls import descriptor
+
+    dynamic = descriptor(camera.camera_id, identity, now=now, evidence=evidence[ALARM_VOICE])
+    return static + ((dynamic,) if dynamic is not None else ())
 
 
 def _enrollment(camera: Camera) -> P2PEnrollment:
@@ -249,10 +253,14 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
     if key != ALARM_VOICE:
         raise Unsupported(key)
     try:
-        catalog_result = run_with_fresh_access(
-            _enrollment(camera),
-            read_camera_alarm_voice_catalog,
-        )
+        from . import alarm_resource_controls
+
+        if alarm_resource_controls.managed(camera.camera_id):
+            resources = alarm_resource_controls.options(_enrollment(camera))
+        else:
+            resources = run_with_fresh_access(
+                _enrollment(camera), read_camera_alarm_voice_catalog,
+            ).resources
         return tuple(
             ControlOption(
                 resource.key,
@@ -260,7 +268,7 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
                 "system" if resource.system else "custom",
                 f"{resource.duration_ms / 1000:g} s" if resource.duration_ms is not None else None,
             )
-            for resource in catalog_result.resources
+            for resource in resources
         )
     except (P2PProbeError, ValueError) as exc:
         raise ControlOperationError(str(exc)) from exc
@@ -397,17 +405,18 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
         if key == ALARM_VOICE:
             if not isinstance(value, str):
                 raise ValueError("alarm voice must be a semantic option key")
-            catalog_result = run_with_fresh_access(
-                enrollment,
-                read_camera_alarm_voice_catalog,
-            )
-            resource = catalog_result.find(value)
-            if resource is None:
-                raise ValueError("alarm voice is not present in the fresh camera catalogue")
-            voice_result = run_with_fresh_access(
-                enrollment,
-                lambda selected: set_camera_alarm_voice_resource(selected, resource),
-            )
+            from . import alarm_resource_controls
+
+            if alarm_resource_controls.managed(camera.camera_id):
+                voice_result = alarm_resource_controls.select(enrollment, value)
+            else:
+                catalog_result = run_with_fresh_access(enrollment, read_camera_alarm_voice_catalog)
+                resource = catalog_result.find(value)
+                if resource is None:
+                    raise ValueError("alarm voice is not present in the fresh camera catalogue")
+                voice_result = run_with_fresh_access(
+                    enrollment, lambda selected: set_camera_alarm_voice_resource(selected, resource),
+                )
             return ControlResult(
                 key=key,
                 value=voice_result.option_key,

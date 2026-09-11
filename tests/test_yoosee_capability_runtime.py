@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from backend.app.drivers.yoosee import capability_profiles as profiles
 from backend.app.drivers.yoosee import capability_rollout as rollout
 from backend.app.drivers.yoosee import capability_runtime as runtime
@@ -17,6 +19,16 @@ PROFILE = ValidatedProfile(
     IDENTITY,
     (OperationProof("night_vision", writable=True, options=frozenset({"automatic", "daytime"})),),
 )
+
+
+def test_dynamic_rollout_is_explicit_and_does_not_grant_unknown_controls():
+    rollout.activate(PROFILE)
+    assert rollout.selected(CAMERA) == (IDENTITY, frozenset({"night_vision"}))
+    rollout.activate(PROFILE, resource_controls=frozenset({"alarm_voice"}))
+    assert rollout.selected(CAMERA) == (IDENTITY, frozenset({"night_vision", "alarm_voice"}))
+    with pytest.raises(ValueError, match="unknown dynamic"):
+        rollout.activate(PROFILE, resource_controls=frozenset({"unknown"}))
+    assert rollout.selected(CAMERA)[1] == frozenset({"night_vision", "alarm_voice"})
 
 
 def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):

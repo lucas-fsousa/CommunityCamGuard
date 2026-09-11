@@ -14,10 +14,12 @@ _SCHEMA = """CREATE TABLE IF NOT EXISTS yoosee_capability_rollout (
 )"""
 
 
-def activate(profile: ValidatedProfile) -> None:
+def activate(profile: ValidatedProfile, *, resource_controls: frozenset[str] = frozenset()) -> None:
     """Explicitly opt selected registered proofs into runtime enforcement."""
     if not profile.operations:
         raise ValueError("rollout requires selected operations")
+    if resource_controls - {"alarm_voice"}:
+        raise ValueError("unknown dynamic resource control")
     with connect() as conn:
         conn.execute(_SCHEMA)
         conn.execute(
@@ -26,7 +28,7 @@ def activate(profile: ValidatedProfile) -> None:
             (
                 profile.camera_id,
                 json.dumps(asdict(profile.identity), sort_keys=True),
-                json.dumps(sorted({item.key for item in profile.operations})),
+                json.dumps(sorted({item.key for item in profile.operations} | resource_controls)),
             ),
         )
 

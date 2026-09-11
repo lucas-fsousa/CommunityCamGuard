@@ -35,7 +35,7 @@ def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
 
 
 def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
-    """Read five fixed roots sequentially within one unchanged 20-second session budget.
+    """Read six fixed roots and optional lamp status within one 20-second session budget.
 
     Only device/session/sequence-correlated B8 responses are collected, not AA reports.
     Correlation does not prove cache freshness; a timeout stops the batch. Observations are private
@@ -80,7 +80,7 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead | P2PWhiteLightS
                 break
             sequence = (sequence + 1) & 0xFFFFFFFF
         else:
-            # Only after all five model reads succeed, reuse this same session for one
+            # Only after all model reads succeed, reuse this same session for one
             # allowlisted type-12 status read. Never call type 11 or brightness type 20/21.
             if time.monotonic() < deadline:
                 try:

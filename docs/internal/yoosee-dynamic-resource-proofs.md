@@ -1,6 +1,42 @@
 # Yoosee dynamic-resource proof boundary
 
-Status: exact-resource proofs registered locally; runtime catalogue migration remains pending.
+Status: exact-resource listing/selection enforcement deployed and explicitly enabled on camera 3.
+
+## Runtime enforcement — 2026-09-11
+
+`alarm_resource_controls.py` now applies the same intersection to dynamic option listing and
+fresh pre-write resolution. Each request obtains a strict correlated, complete C0/C1 catalogue;
+there is no background catalogue polling or reusable browser authorization. Profile expiry,
+revocation and capability evidence are checked again after network I/O. The selection path holds
+the existing per-device mutex across resolution and write. Raw resource IDs remain driver-private.
+
+The capability collector now reads six fixed roots in its existing bounded session, including
+`ProWritable.resFile`. Explicit support and a valid current type-4 ID are required; unknown data
+does not enable selection. Snapshot rule revision 6 invalidates older evidence. Dynamic descriptors
+use a separate resource profile, not fabricated static operation proofs. Rollout is explicitly
+per-camera/per-control; other units retain their previous behavior.
+
+Migrated selection additionally requires correlated B7 preflight/readback and full native-ID
+equality, including idempotence. A replacement resource in the same logical slot cannot be
+mistaken for the certified selection. Legacy callers retain logical-slot compatibility.
+
+Camera 3 was refreshed and opted in. An authenticated production HTTP listing returned exactly
+Zumbido 1 and Zumbido 2; neither Bip nor Latido was offered. This deployment check was read-only,
+with no playback, siren, light or reboot commands. The prior reversible proof below remains the
+physical selection evidence; the new enforcement has automated write-path regression coverage.
+Build `b-14c9a2bbd7e4` was deployed by recreating only the app. The media container's start time
+did not change; neither container reported an OOM kill. Build limits: 512 MiB and one CPU.
+
+Known follow-up: the first options request returned 501 while the demand-driven capability
+refresh invalidated the prior snapshot; after refresh, the same request succeeded. Improve the
+refresh/temporary-unavailability UX without retaining stale permissions across identity changes.
+Remaining migration includes siren/intercom gates and additional exact-unit proofs; enumeration
+alone must never certify an untested resource or another camera/model.
+
+Validation: 299 focused tests, Ruff and mypy (154 source files). Ignored operational helpers are
+`re/activate_camera3_capability_rollout.py` and `re/verify_camera3_alarm_options_http.py`.
+
+The sections below record the earlier milestones and their then-current boundaries.
 
 ## Native identities bound by fresh silent validation — 2026-09-11
 
