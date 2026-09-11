@@ -16,6 +16,7 @@ from .capability_evidence import (
 )
 from .capability_identity import CapabilityIdentity, normalize_identity
 from .p2p.contracts import P2PPropertyRead
+from .p2p.white_light import P2PWhiteLightState
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ def _property(read: P2PPropertyRead | None) -> tuple[object, int | None]:
 
 
 def normalize_snapshot(
-    observations: tuple[P2PPropertyRead, ...],
+    observations: tuple[P2PPropertyRead | P2PWhiteLightState, ...],
     *,
     camera_id: str,
     device_id: str,
@@ -64,10 +65,16 @@ def normalize_snapshot(
     ):
         return None
     paths = CAPABILITY_PATHS
-    if len(observations) > len(paths):
+    if len(observations) > len(paths) + 1:
         return None
     reads: dict[str, P2PPropertyRead] = {}
+    light: P2PWhiteLightState | None = None
     for read in observations:
+        if isinstance(read, P2PWhiteLightState):
+            if light is not None or read.device_id != device_id or read.authenticated is not True:
+                return None
+            light = read
+            continue
         if (
             read.device_id != device_id
             or read.authenticated is not True
@@ -105,4 +112,10 @@ def normalize_snapshot(
     )
     payload, timestamp = _property(reads.get(paths[4]))
     evidence.append(PropertyEvidence("speaker_volume", speaker_volume_evidence(payload), timestamp))
+    # This is a correlated type-12 application reply, not a timestamped model property.
+    # OFF is a valid binary state. Neither transport ACK alone nor indicator/schedule fields
+    # prove this distinct manual floodlight control.
+    state = (EvidenceState.SUPPORTED if light is not None and type(light.enabled) is bool
+             else EvidenceState.UNKNOWN)
+    evidence.append(PropertyEvidence("white_light", state, None))
     return CapabilitySnapshot(camera_id, identity, collected_at, tuple(evidence))

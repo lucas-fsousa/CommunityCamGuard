@@ -187,7 +187,16 @@ def read(camera: Camera, key: str) -> ControlResult:
     try:
         enrollment = _enrollment(camera)
         if key == WHITE_LIGHT:
-            result = run_with_fresh_access(enrollment, read_camera_white_light)
+            from .capability_rollout import selected
+
+            rollout = selected(camera.camera_id)
+            if rollout is not None and WHITE_LIGHT in rollout[1]:
+                result = run_with_fresh_access(
+                    enrollment,
+                    lambda access: read_camera_white_light(access, require_correlated_response=True),
+                )
+            else:
+                result = run_with_fresh_access(enrollment, read_camera_white_light)
             return ControlResult(
                 key=key,
                 value=result.enabled,

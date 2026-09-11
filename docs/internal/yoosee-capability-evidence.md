@@ -7,7 +7,7 @@ support. Model names such as IPC and a firmware version alone are not unique pro
 ## Current implementation gap
 
 `yoosee.controls.catalog` retains the legacy enrollment check for units/controls not
-explicitly migrated. The test unit's orientation/night/master/schedule/volume controls use the
+explicitly migrated. The test unit's orientation/night/master/schedule/volume/floodlight controls use the
 profile-and-evidence gate described below.
 `yoosee.audio.supported` also accepts enrollment as evidence for the P2P fallback.
 Enrollment alone is still not per-feature certification. Unmigrated controls/audio
@@ -30,6 +30,23 @@ zero is an unsupported sentinel. Booleans must not be accepted as numeric switch
 Usable tfInfo does not prove file-list/playback support, which requires separate certification.
 
 ## Next integration steps
+
+Manual floodlight evidence (2026-09-10): the collector reuses its single session for one type-12
+read after all five model reads succeed, within the unchanged 20-second deadline. It never sends
+type 11 (actuation), type 20/21 (brightness), siren, or media traffic. This reply is not a model
+property: its sanitized typed observation has no property timestamp. Binary OFF and ON both
+prove state support; missing/invalid state or application error remains unknown.
+
+Strict reads bind encrypted mode-2 replies to access-node session, source device, destination
+account and the passthrough request ID. Reliable ACK sequence is checked separately; ACK/BA
+without application state cannot enable the feature. The old exchange discarded the request ID.
+Legacy exchange compatibility remains available for unmigrated paths; migrated dashboard reads
+and capability collection explicitly require strict matching. No change to type-11 write framing
+or new physical write homologation is claimed by this step.
+
+Snapshot revision **5** invalidates older evidence. Manual floodlight proof is distinct from
+indicator LEDs, automatic lighting schedule and brightness. Historical exact-camera-3 0→1→0
+homologation is the source for binary read/write permission, never a model-wide inference.
 
 Speaker-volume migration completed (2026-09-10): the fixed collector now reads a fifth root,
 `ProWritable.volume`, within the same single-session 20-second deadline, one attempt per root.

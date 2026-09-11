@@ -8,6 +8,7 @@ from backend.app.drivers.yoosee.p2p.contracts import (
     OnlineDevice,
     P2PProbeError,
 )
+from backend.app.drivers.yoosee.p2p.white_light import WhiteLightExchange
 
 ENROLLMENT = P2PEnrollment("1234567890", 1, bytes(64), None, "", "", "cam_" + "1" * 24)
 
@@ -61,6 +62,13 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
         return ModelReadResult(True, code, {})
 
     monkeypatch.setattr(collector, "exchange_model_read", read)
+    light_calls = []
+
+    def light_read(*args, **kwargs):
+        light_calls.append((args, kwargs))
+        return WhiteLightExchange(False, False, None)
+
+    monkeypatch.setattr(collector, "exchange_white_light", light_read)
     if failure == "exception":
         with pytest.raises(OSError):
             collector.collect(ENROLLMENT)
@@ -72,6 +80,12 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
     assert [path for path, _sequence in calls] == list(expected)
     if failure is None:
         assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2, 3]
+        args, kwargs = light_calls[0]
+        assert len(light_calls) == 1 and args[0] is opened[0]
+        assert args[4] is None and args[5] == 4
+        assert kwargs["require_correlated_response"] is True and kwargs["retries"] == 1
+    else:
+        assert not light_calls
 
 
 def test_requires_linked_identity_before_network(monkeypatch):

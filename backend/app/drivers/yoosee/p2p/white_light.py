@@ -113,7 +113,8 @@ def parse_white_light_response(
         value = json.loads(payload[8:].decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
-    if not isinstance(value, dict) or value.get("type") != expected_type:
+    if (not isinstance(value, dict) or type(value.get("type")) is not int
+            or value.get("type") != expected_type):
         return None
     return struct.unpack_from("<I", payload, 4)[0], value
 
@@ -122,6 +123,8 @@ def extract_white_light_state(response: dict[str, object] | None) -> bool | None
     """Extract the selected model's binary lamp state from a type-12 response."""
 
     if response is None or response.get("type") != 12:
+        return None
+    if "err" in response and (type(response["err"]) is not int or response["err"] != 0):
         return None
     data = response.get("data")
     if not isinstance(data, dict):
@@ -169,6 +172,7 @@ def exchange_white_light(
     *,
     retries: int = 3,
     deadline: float | None = None,
+    require_correlated_response: bool = False,
 ) -> WhiteLightExchange:
     """Exchange only a typed floodlight state read or ON/OFF command."""
 
@@ -177,6 +181,7 @@ def exchange_white_light(
     if retries < 1:
         raise ValueError("white-light retries must be positive")
     message_id = secrets.randbits(31)
+    request_id = secrets.randbits(32)
     request = build_white_light_request(
         node,
         access_id,
@@ -184,7 +189,7 @@ def exchange_white_light(
         enabled,
         sequence,
         message_id,
-        secrets.randbits(32),
+        request_id,
     )
     expected_type = 12 if enabled is None else 11
     transport_acknowledged = False
@@ -204,7 +209,14 @@ def exchange_white_light(
             if plain is None:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
+            if require_correlated_response and (
+                ((flags >> 16) & 3) != 2
+                or struct.unpack_from("<Q", plain, 4)[0] != node.session_id
+            ):
+                continue
             if flags & (1 << 20):
+                if struct.unpack_from("<I", plain, 0x0C)[0] != (sequence & 0xFFFFFFFF):
+                    continue
                 if plain[1] == 0xB9:
                     transport_acknowledged = True
                 elif plain[1] == 0xBA:
@@ -217,6 +229,12 @@ def exchange_white_light(
                 continue
             parsed = parse_white_light_response(plain, expected_type)
             if parsed is None:
+                continue
+            if require_correlated_response and (
+                parsed[0] != request_id
+                or struct.unpack_from("<Q", plain, 0x1C)[0] != access_id
+                or struct.unpack_from("<Q", plain, 0x24)[0] != device.device_id
+            ):
                 continue
             acknowledge_reliable_node_frame(sock, node, plain)
             sock.sendto(
@@ -243,6 +261,7 @@ def read_camera_white_light(
     *,
     timeout: float = 1.5,
     total_timeout: float = 25.0,
+    require_correlated_response: bool = False,
 ) -> P2PWhiteLightState:
     """Read the selected camera's floodlight state without exposing passthrough JSON."""
 
@@ -252,6 +271,8 @@ def read_camera_white_light(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("white-light session device identity mismatch")
         result = exchange_white_light(
             sock,
             node,
@@ -261,6 +282,7 @@ def read_camera_white_light(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=require_correlated_response,
         )
         enabled = extract_white_light_state(result.response)
         if enabled is None:

@@ -16,6 +16,7 @@ from .capability_snapshot import CapabilitySnapshot, normalize_snapshot
 from .p2p.camera_session import open_camera_session
 from .p2p.contracts import P2PProbeError, P2PPropertyRead
 from .p2p.model_session import exchange_model_read
+from .p2p.white_light import P2PWhiteLightState, exchange_white_light, extract_white_light_state
 
 
 def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
@@ -33,7 +34,7 @@ def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
     )
 
 
-def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
+def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
     """Read five fixed roots sequentially within one unchanged 20-second session budget.
 
     Only device/session/sequence-correlated B8 responses are collected, not AA reports.
@@ -44,7 +45,7 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
     if not enrollment.camera_id:
         raise P2PProbeError("capability collection requires a linked camera identity")
     deadline = time.monotonic() + 20.0
-    observations: list[P2PPropertyRead] = []
+    observations: list[P2PPropertyRead | P2PWhiteLightState] = []
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("", 0))
         node, target, sequence = open_camera_session(sock, enrollment, 1.0, deadline)
@@ -78,4 +79,23 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead, ...]:
             if result.error_code != 0:
                 break
             sequence = (sequence + 1) & 0xFFFFFFFF
+        else:
+            # Only after all five model reads succeed, reuse this same session for one
+            # allowlisted type-12 status read. Never call type 11 or brightness type 20/21.
+            if time.monotonic() < deadline:
+                try:
+                    light = exchange_white_light(
+                        sock, node, enrollment.access_id, target, None, sequence, 1.0,
+                        retries=1, deadline=deadline, require_correlated_response=True,
+                    )
+                    enabled = extract_white_light_state(light.response)
+                    if enabled is not None:
+                        observations.append(P2PWhiteLightState(
+                            enrollment.device_id, enabled, True, False,
+                            light.transport_acknowledged, light.peer_receipt_acknowledged,
+                        ))
+                except OSError:
+                    # Optional read failure must not discard valid model evidence; absence
+                    # normalizes to unknown and cannot grant the floodlight capability.
+                    pass
     return tuple(observations)

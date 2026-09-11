@@ -13,6 +13,7 @@ Operational identifiers and credentials remain in ignored RE material.
 | Smart Protection schedule | Test unit weekday mask `127 → 126 → 127`, complete plan restored | Master support does not prove schedule; needs its own structured evidence |
 | Night vision | Test unit 40.1.14 `0 → 1 → 0`, readback | Proven options `automatic`/`daytime`; `night` (2) is mapped, not proven by this recorded test |
 | Speaker volume | Garage raw `10 → 7 → 10`; test unit raw `7 → 10 → 7` plus canonical percent `75 → 50 → 75`, ACK/error-zero/readback/restoration | Test-unit writes 50/75/100 percent only; 0/25 remain unhomologated, not unsupported |
+| Manual floodlight | Exact camera-3 reversible `0 → 1 → 0`, readback/restoration, recorded in CAPABILITY-MAP | Binary manual control only; not brightness, indicator LED or scheduled output |
 | Two-way audio | User physically passed message and hold-to-speak on all three units | Successful route was proprietary LAN RTSP; do not transfer proof to P2P fallback |
 | Alarm resources | Catalogue query and selection contract documented | Dynamic enumeration/selection requires a separate proof representation |
 
@@ -154,6 +155,27 @@ verification confirmed five migrated controls and the three allowed volume posit
 The media service was not restarted; only the application image/container was replaced using
 512 MiB/one-CPU build limits. No new physical sound, volume write or camera setting change.
 Deployment build: `b-0ae9d59cdceb`. 123 focused tests, Ruff and mypy (151 source files) passed.
+
+### Sixth-control migration: manual floodlight (2026-09-10)
+
+Before promoting manual floodlight evidence, the type-12 reader was hardened: optional strict
+matching checks encrypted mode 2, session, endpoint device/account and request ID, while ACK
+sequence is independently verified. Encrypted socket-free tests reject stale/foreign replies,
+plaintext, wrong type and error-bearing states. One bounded strict camera-3 read succeeded without
+changing the lamp. This mode is selected only for migrated dashboard reads and capability probes;
+unmigrated units retain compatibility behaviour. Type-11 write exchange was not re-homologated.
+
+The collector now adds one read-only type-12 exchange after the five fixed model roots in the
+same session/deadline. A typed binary state is normalized separately, without inventing a model
+timestamp or inferring manual control from autoWhiteLight/indicatorLight. Optional read failure
+leaves floodlight unknown without discarding valid model evidence. Rule revision is 5.
+
+Fresh combined snapshot/preview succeeded, the sixth exact-unit key was activated locally, and
+authenticated HTTP confirmed the binary readable/writable catalogue entry. A separate GET of
+the canonical `white_light` endpoint returned verified/authenticated state with no change. All
+three cameras remained online/recording; go2rtc retained its start time. No lamp/siren/audio or
+other configuration write was performed. Only the application container was recreated.
+Deployed build `b-bc076543f2de`; 94 focused tests, Ruff and mypy (151 source files) passed.
 
 ### Historical initial evidence rules
 

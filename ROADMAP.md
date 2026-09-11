@@ -138,6 +138,12 @@ read plus existing per-unit readback/restoration proofs allow read and 50/75/100
 session budget; snapshot revision 4 invalidates previous evidence. Fresh snapshot, stored preview
 and authenticated HTTP catalogue succeeded without playing audio or changing volume. Other units,
 white light/siren/dynamic alarm catalogue and audio capability migrations remain separate work.
+Manual floodlight is now the sixth migrated camera-3 control. Its type-12 read is correlated
+to encrypted session/device/account/request ID; transport receipts alone do not grant support.
+One status-only exchange shares the existing five-root collector's session and 20-second budget.
+Snapshot revision 5, fresh preview and authenticated HTTP catalogue/read passed using the existing
+exact-unit reversible 0→1→0 proof. No lamp action was repeated. Brightness, indicator LEDs and
+automatic lighting remain distinct capabilities. Siren/dynamic alarm/audio migrations remain open.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
