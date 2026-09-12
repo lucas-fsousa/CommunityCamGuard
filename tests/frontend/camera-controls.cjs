@@ -28,6 +28,13 @@ class Element {
   click() { if (!this.disabled) return this.dispatch("click"); }
   focus() { document.activeElement = this; }
   get options() { return this.children; }
+  get selectedIndex() { return this.children.findIndex((node) => node.selected); }
+  set selectedIndex(index) { this.children.forEach((node, i) => { node.selected = i === index; }); }
+  get value() { return this.tagName === "select" ? this.children[this.selectedIndex]?.value || "" : this._value; }
+  set value(value) {
+    if (this.tagName === "select") this.selectedIndex = this.children.findIndex((node) => node.value === value);
+    else this._value = value;
+  }
   get isConnected() { return this === document.body || Boolean(this.parent?.isConnected); }
   querySelectorAll() {
     return walk(this).filter((node) => ["button", "select"].includes(node.tagName) && !node.disabled);
@@ -113,7 +120,8 @@ const cameraControls = load("camera-controls.js", {
   // Reopening uses a fresh catalogue, not the original tile's capabilities.
   state.cameras = [{ ...cam, audio_messages: true, audio_streams: true, controls: {
     speaker_volume: { kind: "choice", writable: true, options: ["50", "75"] },
-    night_vision: { kind: "choice", writable: true, options: ["automatic"] },
+    night_vision: { kind: "choice", writable: true, options: ["automatic", "daytime"] },
+    siren_pulse: { kind: "action", writable: true, options: ["2"] },
   } }];
   await trigger.click();
   shell = document.body.children.at(-1);
@@ -122,7 +130,7 @@ const cameraControls = load("camera-controls.js", {
   const volume = walk(shell).find((item) => item.dataset.controlKey === "speaker_volume");
   assert.deepEqual(volume.options.map((item) => item.value), ["", "50", "75"]);
   const night = walk(shell).find((item) => item.dataset.controlKey === "night_vision");
-  assert.deepEqual(night.options.map((item) => item.value), ["", "automatic"]);
+  assert.deepEqual(night.options.map((item) => item.value), ["", "automatic", "daytime"]);
   volume.value = "50";
   let complete;
   pending = new Promise((resolve) => { complete = resolve; });
@@ -131,11 +139,12 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(status.classList.contains("applying"), true);
   assert.equal(status.textContent, "control.applying");
   assert.equal(volume.disabled, true);
-  complete({});
+  complete({ verified: true, value: 50 });
   await applying;
   pending = null;
   assert.equal(status.classList.contains("applying"), false);
   assert.equal(volume.disabled, false);
+  assert.equal(volume.value, "50");
   assert.equal(requests.length, 1);
   assert.equal(requests[0][0], "/cameras/cam_test/controls/speaker_volume");
   assert.equal(requests[0][1].body, '{"value":50}');
@@ -148,6 +157,27 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(status.classList.contains("applying"), false);
   assert.equal(status.classList.contains("error"), true);
   assert.equal(volume.disabled, false);
+  assert.equal(volume.value, "");
+  night.value = "daytime";
+  pending = Promise.resolve({ verified: true, value: "daytime" });
+  await night.dispatch("change");
+  assert.equal(night.value, "daytime");
+  assert.equal(status.textContent, "control.applied");
+  for (const result of [{ verified: false, value: "automatic" }, { verified: true, value: "daytime" }, {}]) {
+    night.value = "automatic";
+    pending = Promise.resolve(result);
+    await night.dispatch("change");
+    assert.equal(night.value, "");
+    assert.equal(status.classList.contains("error"), true);
+    assert.equal(status.classList.contains("applying"), false);
+    assert.equal(night.disabled, false);
+  }
+  const siren = walk(shell).find((item) => item.dataset.controlKey === "siren_pulse");
+  siren.value = "2";
+  pending = Promise.resolve({ verified: true, value: 2 });
+  await siren.dispatch("change");
+  assert.equal(siren.value, "");
+  pending = null;
   let navigated = false;
   nav.addEventListener("click", () => { navigated = true; });
   await walk(shell).find((item) => item.textContent === "panel.openRecordings").click();

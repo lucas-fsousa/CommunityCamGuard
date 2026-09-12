@@ -53,6 +53,24 @@ App and media container start times remained unchanged. No camera command was se
 Follow-ups: visual/mobile review, richer backend capability-unavailability reasons, SD UI when the
 driver listing is homologated, and additional semantic widgets as drivers implement them.
 
+## Selector reset regression — 2026-09-12
+
+The night-vision selector unconditionally reset to its group label after every request.
+That label was not the current night/IR mode. Persistent controls now retain the requested
+selection only when the backend returns `verified: true` and the matching semantic value.
+Missing confirmation, mismatched values and request errors clear the selection and show an
+error instead of claiming success. Momentary actions still reset after completion. This is
+last-confirmed state for the open widget, not a live-state subscription or persisted cache;
+reopening the panel does not query the camera automatically.
+
+The retained access log shows a camera-3 night-vision PUT returning HTTP 200 at
+2026-09-12T14:00:10Z. This does not independently prove the physical image mode changed;
+the UI defect is confirmed, but a physical failure must not be ruled out on that basis.
+No mode/light write was replayed for this fix. Lightweight DOM tests now model native
+select value/index behavior and cover retained daytime/volume values, absent/mismatched
+confirmation, errors, spinner cleanup and momentary-action reset. All 16 frontend Python
+tests and the standalone Node DOM harness passed without starting a browser.
+
 ## Applying feedback and failed-light diagnostics — 2026-09-12
 
 Writes now display a prominent spinner with localized text (“Aplicando modificação na câmera…” /

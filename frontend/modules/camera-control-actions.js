@@ -183,29 +183,36 @@ export function controlWidgets(cam, status) {
       select.append(el("option", { value, textContent: label }));
     }
     select.disabled = select.options.length <= 1;
+    let confirmed = "";
     select.addEventListener("click", (event) => event.stopPropagation());
     select.addEventListener("change", async (event) => {
       event.stopPropagation();
       if (!select.value) return;
       const selected = select.value;
       if (confirmFor && !confirmFor(selected)) {
-        select.selectedIndex = 0;
+        select.value = confirmed;
         return;
       }
       select.disabled = true;
       applying(status);
       try {
-        await api(`/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`, {
+        const result = await api(`/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`, {
           method: "PUT",
           body: JSON.stringify({ value: valueFor(selected) }),
         });
+        if (result?.verified !== true || result.value !== valueFor(selected)) {
+          throw new Error(t("control.unconfirmed"));
+        }
+        // Actions are momentary; settings retain only the server-confirmed value.
+        confirmed = available[controlKey]?.kind === "action" ? "" : selected;
         status.textContent = success || t("control.applied");
       } catch (error) {
+        confirmed = "";
         status.classList.add("error");
         status.textContent = t("control.failed", { msg: error.message });
       } finally {
         finishApplying(status);
-        select.selectedIndex = 0;
+        select.value = confirmed;
         select.disabled = false;
       }
     });
