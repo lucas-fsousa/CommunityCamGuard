@@ -73,6 +73,23 @@ tests and the standalone Node DOM harness passed without starting a browser.
 
 ## Applying feedback and failed-light diagnostics — 2026-09-12
 
+Follow-up retained logs at 14:35:38Z identify the camera-3 white-light 502 as
+`write_reply_missing`; night-vision calls at 14:35:52Z and 14:36:05Z returned HTTP 200.
+The missing reply does not establish rejection or physical success. Previously the driver
+raised immediately without reading the resulting state. It now attempts bounded read-only
+verification in the same session and existing total deadline, with strict session/request/device
+correlation when resolving a missing write reply. The write is still sent once only. Explicit
+rejections remain errors; absent/mismatching readback remains an unknown-outcome error.
+A successful recovery logs `resolved_by_correlated_read` without credentials or payloads.
+This fixes premature failure handling, not the as-yet unproven cause of the missing reply.
+34 focused tests passed, including lost reply with/without confirmed state, no command replay,
+and existing wire-correlation cases. No live light action was replayed for diagnosis.
+The complete Python suite (excluding the separately executed Node harness), Node DOM harness,
+ruff and mypy passed. Deployed as build `b-f2630e80ad10`: legacy Docker build capped at
+512 MiB/no extra swap/one CPU, only app recreated at 18:48:02Z. Startup and build endpoint passed;
+go2rtc retained its September 11 start time and both containers reported OOMKilled=false.
+Live recovery remains unverified until a user-triggered operation; no silent success fallback.
+
 Writes now display a prominent spinner with localized text (“Aplicando modificação na câmera…” /
 “Applying changes to the camera…”). Static selectors, weekly schedules and alarm-sound selection
 share that feedback. The active input remains disabled during its request; the spinner is removed

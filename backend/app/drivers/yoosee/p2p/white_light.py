@@ -332,6 +332,8 @@ def set_camera_white_light(
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
         stage = "preflight"
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("white-light session device identity mismatch")
         preflight = exchange_white_light(
             sock,
             node,
@@ -370,16 +372,16 @@ def set_camera_white_light(
             deadline=deadline,
         )
         error = write.response.get("err") if write.response is not None else None
-        if write.response is None:
-            stage = "write_reply_missing"
-            raise P2PProbeError("camera did not acknowledge the white-light change; outcome is unknown")
-        if type(error) is not int or error != 0:
+        reply_missing = write.response is None
+        if not reply_missing and (type(error) is not int or error != 0):
             stage = "write_rejected"
             raise P2PProbeError("camera rejected the white-light change")
 
         verified = False
-        stage = "readback_unconfirmed"
+        stage = "write_reply_missing" if reply_missing else "readback_unconfirmed"
         for attempt in range(5):
+            if time.monotonic() >= deadline:
+                break
             if attempt:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -395,12 +397,20 @@ def set_camera_white_light(
                 min(2.0, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                # A lost write reply is ambiguous, not rejection. Only a fresh,
+                # exact-session/request/device read may resolve that ambiguity.
+                require_correlated_response=reply_missing,
             )
             if extract_white_light_state(readback.response) is enabled:
                 verified = True
                 break
         if not verified:
+            if reply_missing:
+                raise P2PProbeError("camera did not acknowledge the white-light change; outcome is unknown")
             raise P2PProbeError("camera did not confirm the white-light change")
+        if reply_missing:
+            log.info("white_light write_reply_missing resolved_by_correlated_read camera=%s",
+                     enrollment.camera_id or "unlinked")
     except P2PProbeError:
         _write_failure(enrollment.camera_id, stage, error)
         raise

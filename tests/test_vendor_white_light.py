@@ -207,3 +207,40 @@ def test_failure_logs_only_sanitized_stage_without_replaying_write(monkeypatch, 
     assert f"stage={stage}" in caplog.text
     assert "DO_NOT_LOG_TOKEN" not in caplog.text
     assert len(writes) <= 1
+
+
+@pytest.mark.parametrize("confirmed", [True, False])
+def test_missing_write_reply_requires_correlated_readback_without_replay(monkeypatch, confirmed):
+    from types import SimpleNamespace
+
+    node = transport.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
+    target = transport.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    closed = []
+    sock = SimpleNamespace(bind=lambda _: None, close=lambda: closed.append(True))
+    monkeypatch.setattr(white_light.socket, "socket", lambda *args: sock)
+    monkeypatch.setattr(white_light, "open_camera_session", lambda *args: (node, target, 8))
+    monkeypatch.setattr(white_light.time, "sleep", lambda _: None)
+    calls = []
+
+    def exchange(*args, **kwargs):
+        calls.append(args[4])
+        if args[4] is not None:
+            assert kwargs["retries"] == 1
+            return white_light.WhiteLightExchange(False, False, None)
+        if len(calls) > 1:
+            assert kwargs["require_correlated_response"] is True
+            assert kwargs["retries"] == 1
+        value = int(confirmed and len(calls) > 1)
+        return white_light.WhiteLightExchange(True, True, {"type": 12, "data": {"whiteLightStatus": value}})
+
+    monkeypatch.setattr(white_light, "exchange_white_light", exchange)
+    if confirmed:
+        result = white_light.set_camera_white_light(_enrollment(), True)
+        assert result.verified and result.enabled
+        assert not result.transport_acknowledged
+    else:
+        with pytest.raises(transport.P2PProbeError, match="outcome is unknown"):
+            white_light.set_camera_white_light(_enrollment(), True)
+    assert calls.count(True) == 1
+    assert len(calls) <= 7
+    assert closed == [True]
