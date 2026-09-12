@@ -3,6 +3,35 @@
 Status: staged implementation, 2026-09-12. Production PTZ remains ONVIF and video remains RTSP.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
+## Bounded ownership and prepared route increment
+
+`p2p/ptz_motion.py` now owns one non-renewable 100–500 ms gesture, with thread-safe early STOP,
+single-use/reentrancy protection and no START acknowledgement wait before the RELEASE deadline.
+An attempted START is recorded before the socket call: even a send exception forbids movement
+fallback. Cancellation before START closes the route without movement or fallback. Cleanup tries
+only RELEASE, up to three times within a separate two-second budget, then closes the route.
+Results distinguish delivery confirmation from physical motor state. Nonblocking/deadline behavior
+is part of the adapter contract; process death or network loss cannot guarantee physical STOP.
+
+`PtzOwners` provides bounded no-queue reservations (four by default, at most eight), including
+same-camera exclusion, to acquire before establishing any route. It does not spawn worker threads.
+The future session service must hold a reservation through preparation, movement and cleanup.
+
+`p2p/ptz_route.py` implements the prepared UDP adapter: fixed node/device/direction and immutable
+START/RELEASE packets, nonblocking sends, identical RELEASE retransmission, no reconnect and
+idempotent socket close. Receipt collection is bounded by deadline, 64 packets and 4 KiB frames;
+checks include peer, encrypted node session and release-specific correlation. START receipts do
+not confirm RELEASE. An explicit application error overrides prior success within the bounded
+observation window. Strict reliable-queue rewriting compatibility remains unproven live.
+
+59 focused protocol/owner/route tests passed with fake clocks and synthetic sockets, covering
+early cancellation, ambiguous START, failed RELEASE, bounded retry, close failure, duplicate
+ownership, stale receipts and explicit error precedence. No camera movement or container update
+was needed to establish these boundaries. These modules are not wired into driver/API routes.
+Next: exact-unit route preparation and live RELEASE-only correlation check, followed by a short
+camera-3-only gesture with cleanup. Continuous browser gestures require a separate lease/heartbeat
+contract; do not redirect the current 450 ms ONVIF repeat loop to this adapter.
+
 ## Independent driver decisions
 
 Transport preference is per device/model/firmware **and feature**, never global brand selection.
