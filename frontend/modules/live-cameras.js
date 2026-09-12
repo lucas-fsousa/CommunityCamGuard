@@ -148,9 +148,9 @@ function camBar(cam) {
   // A single compact row: identity on the left, controls on the right. Keeping it one line is what
   // keeps the footer small (the go2rtc player already adds its own control strip above us).
   const actions = el("span", { className: "bar-actions" });
+  if (caps.ptz) actions.append(ptzControls(cam));
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
   actions.append(zoomControls(cam), reload, cameraControls(cam, {
-    movement: caps.ptz ? ptzControls(cam) : null,
     maintenance: [probe, del],
   }));
   return el("div", { className: "bar" },

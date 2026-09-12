@@ -144,6 +144,10 @@ def test_push_to_talk_ui_streams_exact_frames_only_while_held():
 
 def test_camera_operations_address_api_by_opaque_id():
     live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
+    panel = (Path(__file__).parents[1] / "frontend" / "modules" / "camera-controls.js").read_text()
+    assert "if (caps.ptz) actions.append(ptzControls(cam))" in live
+    assert "extras.movement" not in panel
+    assert '"panel.movement"' not in panel
 
     for endpoint in ("ptz", "probe"):
         assert f"encodeURIComponent(cam.mac)}}/{endpoint}" not in live

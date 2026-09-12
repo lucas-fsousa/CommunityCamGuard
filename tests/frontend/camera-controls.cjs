@@ -70,7 +70,7 @@ const cameraControls = load("camera-controls.js", {
   await trigger.click();
   let shell = document.body.children.at(-1);
   assert.equal(walk(shell).filter((item) => item.tagName === "h3").length, 5);
-  assert.equal(walk(shell).filter((item) => item.disabled).length, 12);
+  assert.equal(walk(shell).filter((item) => item.disabled).length, 11);
   assert.equal(audioButtons, 0);
   assert.equal(requests.length, 0);
   assert.equal(app.inert, true);

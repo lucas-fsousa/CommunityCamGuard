@@ -7,7 +7,7 @@ import { pushToTalkButton } from "ccg/push-to-talk";
 
 const GROUPS = [
   ["image", [["orientation", "control.orientation"], ["night_vision", "control.nightVision"],
-    ["white_light", "control.whiteLight"], ["movement", "panel.movement"]]],
+    ["white_light", "control.whiteLight"]]],
   ["audio", [["audio_messages", "intercom.open"], ["audio_streams", "talk.open"],
     ["speaker_volume", "control.speakerVolume"]]],
   ["security", [["smart_protection", "control.smartProtection"],
@@ -48,7 +48,6 @@ export function cameraControls(camera, extras = {}) {
       .map((widget) => [widget.dataset.controlKey, widget]));
     if (cam.audio_messages) widgets.set("audio_messages", labeledButton(audioMessageButton(cam), "intercom.open"));
     if (cam.audio_streams) widgets.set("audio_streams", labeledButton(pushToTalkButton(cam), "talk.open"));
-    if (cam.capabilities?.ptz && extras.movement) widgets.set("movement", extras.movement);
 
     const close = el("button", { className: "icon-btn", type: "button", textContent: "×", title: t("scan.close") });
     close.setAttribute("aria-label", t("scan.close"));

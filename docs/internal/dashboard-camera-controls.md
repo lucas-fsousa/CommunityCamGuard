@@ -1,8 +1,9 @@
 # Camera control panel — 2026-09-12
 
-The live tile keeps quality, digital zoom and player recovery shortcuts plus one **Camera controls**
-button. PTZ, audio, security and maintenance no longer compete for space in the tile footer.
-The responsive side panel groups image/movement, audio/communication, security/alerts,
+The live tile keeps PTZ (only when supported), quality, digital zoom and player recovery shortcuts
+plus one **Camera controls** button. PTZ stays outside the overlay so the operator can position
+the camera while seeing the video. Audio, security and maintenance stay in the panel.
+The responsive side panel groups image, audio/communication, security/alerts,
 recordings/storage and maintenance. It uses the camera's friendly name and a scrollable body;
 status feedback remains outside that scroll area.
 
