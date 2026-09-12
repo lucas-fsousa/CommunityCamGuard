@@ -24,6 +24,8 @@ or wait on hardware/a human eye.
 | P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
 | P0 | **HD transport hardening** — prefer WebRTC; bounded/recoverable MSE queue; no 0.1× live playback fallback | done |
 | P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
+| P1 | Grouped per-camera control panel: image, audio, security, storage and maintenance; disabled placeholders with honest capability explanations, driver-filtered options, focus/scroll lifecycle and filtered server-recordings navigation. Separate semantic modules; see `docs/internal/dashboard-camera-controls.md` | done |
+| P2 | Visually review the new control panel on desktop/mobile; enrich disabled-state reasons when the backend exposes them, and connect SD recordings only after driver homologation | todo |
 | P0 | **Single camera connection + local fan-out**: recording and on-demand H.264 qualities share one RTSP producer; SD reads the base directly, without keeping an unused HD encoder alive. No live preload; same-quality viewers share an encoder; different qualities coexist only while consumed. See ADR 0005 | done |
 | P0 | **Frozen-player auto-recovery**: hybrid watchdog distinguishes client stall from local producer stall; only the latter cycles that camera's local preload | done³ |
 | — | **Invariant:** recording always uses the base (main) feed at full quality (`-c:v copy`), decoupled from the live quality selector — guard tests lock it | done |

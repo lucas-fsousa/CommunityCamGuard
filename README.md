@@ -50,7 +50,9 @@ scans) and **only enable in the UI the features the camera actually supports** â
 out, two-way audio (mic), digital outputs (LED / "anti-thief" siren). Driver selection identifies
 the component responsible for that camera; it never grants every feature implemented for the whole
 brand. The selected driver returns a catalogue for the exact model/firmware instance, and the
-dashboard renders only that catalogue. Unknown support fails closed.
+dashboard enables only that catalogue. The **Camera controls** panel groups image, audio,
+security, storage and maintenance; unreleased functions may appear as explained disabled
+placeholders, never as a claim of hardware support. Unknown support fails closed.
 
 ## Architecture
 
