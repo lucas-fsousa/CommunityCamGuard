@@ -3,6 +3,29 @@
 Status: staged implementation, 2026-09-12. Production PTZ remains ONVIF and video remains RTSP.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
+## Exact-unit preparation increment — 2026-09-12
+
+`p2p/ptz_prepare.py` prepares the experimental route using the existing brokered control session,
+without allocating a direct-media link or sending START/RELEASE. It checks the enrolled opaque
+camera association and reviewed device identity before opening the socket, then performs three
+single-attempt correlated reads: product identity, version identity and current PTZ-axis evidence.
+An exact product/model/revision/firmware/SDK/hardware mismatch stops before the axis read.
+Only the requested, advertised axis can yield a prepared route. The total preparation budget is
+finite and capped at 20 seconds; failure closes the socket, success transfers ownership to the
+caller. Packet sequence allocation also handles 32-bit wraparound.
+
+18 new fake-session tests cover ownership transfer, invalid budgets, cross-camera association,
+identity mismatch, wrong/offline targets, failed/boolean error codes, unavailable axes, exhausted
+handshake/final-read deadlines and constructor/handshake cleanup. Together with the existing
+protocol/motion/route suite: 77 tests. Ruff and mypy (160 source files) passed. No live camera
+commands, browser, build or container restart were used for this increment.
+
+This is **not** a production capability grant: the future service must acquire `PtzOwners` before
+preparation, retain ownership through cleanup and consume the route immediately, with cancellation
+and operation-proof checks. Expected identity must come from reviewed backend evidence, never a
+client payload. Pending: live RELEASE-only correlation, controlled camera-3 gesture/STOP proof,
+then integration with the driver and browser lease semantics. No native fallback policy activated.
+
 ## Bounded ownership and prepared route increment
 
 `p2p/ptz_motion.py` now owns one non-renewable 100–500 ms gesture, with thread-safe early STOP,
@@ -28,7 +51,7 @@ observation window. Strict reliable-queue rewriting compatibility remains unprov
 early cancellation, ambiguous START, failed RELEASE, bounded retry, close failure, duplicate
 ownership, stale receipts and explicit error precedence. No camera movement or container update
 was needed to establish these boundaries. These modules are not wired into driver/API routes.
-Next: exact-unit route preparation and live RELEASE-only correlation check, followed by a short
+Exact-unit route preparation is now implemented above. Next: live RELEASE-only correlation check, followed by a short
 camera-3-only gesture with cleanup. Continuous browser gestures require a separate lease/heartbeat
 contract; do not redirect the current 450 ms ONVIF repeat loop to this adapter.
 
@@ -100,6 +123,6 @@ Do not replace healthy production RTSP or claim LAN-only until those measurement
 
 32 socket-free codec tests cover direction/press types, bitfields, encrypted wire payload,
 session/device/request mismatch, delivery versus application response, truncation and bounds.
-Next: implement and test the bounded native PTZ session owner, establish live receipt correlation,
+Bounded owner, route and preparation are implemented/tested offline. Next: establish live receipt correlation,
 then homologate a short camera-3-only gesture and STOP recovery before making it preferred.
 No container restart or production driver switch in this increment.
