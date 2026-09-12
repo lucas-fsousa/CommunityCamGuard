@@ -173,3 +173,37 @@ def test_change_is_idempotent_and_invalid_values_open_no_network(monkeypatch):
     )
     with pytest.raises(ValueError, match="boolean"):
         white_light.set_camera_white_light(enrollment, 1)
+
+
+@pytest.mark.parametrize("stage", ["session", "preflight", "write_reply_missing", "write_rejected", "readback_unconfirmed"])
+def test_failure_logs_only_sanitized_stage_without_replaying_write(monkeypatch, caplog, stage):
+    from types import SimpleNamespace
+
+    node = transport.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
+    target = transport.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    sock = SimpleNamespace(bind=lambda _: None, close=lambda: None)
+    monkeypatch.setattr(white_light.socket, "socket", lambda *args: sock)
+
+    def session(*args):
+        if stage == "session":
+            raise transport.P2PProbeError("DO_NOT_LOG_TOKEN")
+        return node, target, 8
+
+    writes = []
+
+    def exchange(*args, **kwargs):
+        if args[4] is None:
+            value = None if stage == "preflight" else {"type": 12, "data": {"whiteLightStatus": 0}}
+        else:
+            writes.append(args[4])
+            value = None if stage == "write_reply_missing" else {"type": 11, "err": 7 if stage == "write_rejected" else 0}
+        return white_light.WhiteLightExchange(True, True, value)
+
+    monkeypatch.setattr(white_light, "open_camera_session", session)
+    monkeypatch.setattr(white_light, "exchange_white_light", exchange)
+    monkeypatch.setattr(white_light.time, "sleep", lambda _: None)
+    with pytest.raises(transport.P2PProbeError):
+        white_light.set_camera_white_light(_enrollment(), True)
+    assert f"stage={stage}" in caplog.text
+    assert "DO_NOT_LOG_TOKEN" not in caplog.text
+    assert len(writes) <= 1

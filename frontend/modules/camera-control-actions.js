@@ -7,6 +7,18 @@ import { api, el } from "ccg/core";
 // skips the write when the camera is already in that state.
 const PROTECTION_WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
+function applying(status) {
+  status.classList.remove("error");
+  status.classList.add("applying");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  status.textContent = t("control.applying");
+}
+
+function finishApplying(status) {
+  status.classList.remove("applying");
+}
+
 async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
   trigger.disabled = true;
   status.classList.remove("error");
@@ -57,8 +69,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
         return;
       }
       apply.disabled = true;
-      modalStatus.classList.remove("error");
-      modalStatus.textContent = t("control.applying");
+      applying(modalStatus);
       try {
         await api(
           `/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`,
@@ -70,6 +81,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
         modalStatus.classList.add("error");
         modalStatus.textContent = t("control.failed", { msg: error.message });
       } finally {
+        finishApplying(modalStatus);
         apply.disabled = false;
       }
     });
@@ -126,8 +138,7 @@ async function openProtectionSchedule(cam, status, trigger) {
         return;
       }
       save.disabled = true;
-      modalStatus.classList.remove("error");
-      modalStatus.textContent = t("control.applying");
+      applying(modalStatus);
       try {
         await api(
           `/cameras/${encodeURIComponent(cam.id)}/controls/smart_protection_schedule`,
@@ -141,6 +152,7 @@ async function openProtectionSchedule(cam, status, trigger) {
         modalStatus.classList.add("error");
         modalStatus.textContent = t("control.failed", { msg: error.message });
       } finally {
+        finishApplying(modalStatus);
         save.disabled = false;
       }
     });
@@ -181,8 +193,7 @@ export function controlWidgets(cam, status) {
         return;
       }
       select.disabled = true;
-      status.classList.remove("error");
-      status.textContent = t("control.applying");
+      applying(status);
       try {
         await api(`/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`, {
           method: "PUT",
@@ -193,6 +204,7 @@ export function controlWidgets(cam, status) {
         status.classList.add("error");
         status.textContent = t("control.failed", { msg: error.message });
       } finally {
+        finishApplying(status);
         select.selectedIndex = 0;
         select.disabled = false;
       }

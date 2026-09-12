@@ -7,6 +7,7 @@ binary type 11 ON/OFF state, always for the exact device in a durable P2P enroll
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import socket
 import struct
@@ -18,6 +19,14 @@ from .camera_session import open_camera_session
 from .contracts import CertifiedNode, OnlineDevice, P2PProbeError
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame, receive_datagrams
 from .wire import finish_mode1, finish_mode2, new_header, randomized_flags
+
+log = logging.getLogger(__name__)
+
+
+def _write_failure(camera_id: str | None, stage: str, error: object = None) -> None:
+    """Sanitized stage diagnostics, never payloads, tokens, addresses or target values."""
+    log.warning("white_light operation_failed camera=%s stage=%s native_error=%s",
+                camera_id or "unlinked", stage, error if type(error) is int else "unknown")
 
 _PASSTHROUGH_REQUEST_PREFIX = b"\x01\xff\x00\x00"
 # Camera 3 (firmware 40.1.14) uses 0 in the response direction byte. Older captures and units use
@@ -318,8 +327,11 @@ def set_camera_white_light(
     deadline = time.monotonic() + max(10.0, min(float(total_timeout), 40.0))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", 0))
+    stage = "session"
+    error: object = None
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        stage = "preflight"
         preflight = exchange_white_light(
             sock,
             node,
@@ -345,6 +357,7 @@ def set_camera_white_light(
             )
 
         # Actuation is intentionally never retried: a lost response must not duplicate a command.
+        stage = "write_exchange"
         write = exchange_white_light(
             sock,
             node,
@@ -357,10 +370,15 @@ def set_camera_white_light(
             deadline=deadline,
         )
         error = write.response.get("err") if write.response is not None else None
+        if write.response is None:
+            stage = "write_reply_missing"
+            raise P2PProbeError("camera did not acknowledge the white-light change; outcome is unknown")
         if type(error) is not int or error != 0:
+            stage = "write_rejected"
             raise P2PProbeError("camera rejected the white-light change")
 
         verified = False
+        stage = "readback_unconfirmed"
         for attempt in range(5):
             if attempt:
                 remaining = deadline - time.monotonic()
@@ -384,8 +402,10 @@ def set_camera_white_light(
         if not verified:
             raise P2PProbeError("camera did not confirm the white-light change")
     except P2PProbeError:
+        _write_failure(enrollment.camera_id, stage, error)
         raise
     except (OSError, ValueError) as exc:
+        _write_failure(enrollment.camera_id, stage + "_transport_or_decode", error)
         raise P2PProbeError("P2P white-light change failed") from exc
     finally:
         sock.close()

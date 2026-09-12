@@ -7,7 +7,11 @@ class Element {
   constructor(tag) {
     this.tagName = tag; this.children = []; this.dataset = {}; this.events = {};
     this.style = {}; this.inert = false; this.attributes = {}; this.disabled = false;
-    this.classList = { add() {}, remove() {}, contains: (name) => (this.className || "").split(" ").includes(name) };
+    this.classList = {
+      add: (name) => { this.className = [...new Set((this.className || "").split(" ").concat(name))].join(" "); },
+      remove: (name) => { this.className = (this.className || "").split(" ").filter((value) => value !== name).join(" "); },
+      contains: (name) => (this.className || "").split(" ").includes(name),
+    };
   }
   append(...nodes) {
     for (const node of nodes) { node.remove?.(); node.parent = this; this.children.push(node); }
@@ -45,7 +49,8 @@ global.MutationObserver = class {
 };
 const state = { cameras: [], rec: {} };
 const requests = [];
-const api = async (...args) => { requests.push(args); return {}; };
+let pending = null;
+const api = async (...args) => { requests.push(args); return pending ? await pending : {}; };
 const t = (key) => key;
 function load(file, bindings, exported) {
   const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
@@ -119,10 +124,30 @@ const cameraControls = load("camera-controls.js", {
   const night = walk(shell).find((item) => item.dataset.controlKey === "night_vision");
   assert.deepEqual(night.options.map((item) => item.value), ["", "automatic"]);
   volume.value = "50";
-  await volume.dispatch("change");
+  let complete;
+  pending = new Promise((resolve) => { complete = resolve; });
+  const applying = volume.dispatch("change");
+  const status = walk(shell).find((item) => item.classList.contains("camera-control-status"));
+  assert.equal(status.classList.contains("applying"), true);
+  assert.equal(status.textContent, "control.applying");
+  assert.equal(volume.disabled, true);
+  complete({});
+  await applying;
+  pending = null;
+  assert.equal(status.classList.contains("applying"), false);
+  assert.equal(volume.disabled, false);
   assert.equal(requests.length, 1);
   assert.equal(requests[0][0], "/cameras/cam_test/controls/speaker_volume");
   assert.equal(requests[0][1].body, '{"value":50}');
+  let fail;
+  pending = new Promise((resolve, reject) => { fail = reject; });
+  const failing = volume.dispatch("change");
+  fail(new Error("test failure"));
+  await failing;
+  pending = null;
+  assert.equal(status.classList.contains("applying"), false);
+  assert.equal(status.classList.contains("error"), true);
+  assert.equal(volume.disabled, false);
   let navigated = false;
   nav.addEventListener("click", () => { navigated = true; });
   await walk(shell).find((item) => item.textContent === "panel.openRecordings").click();

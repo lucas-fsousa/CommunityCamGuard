@@ -52,3 +52,32 @@ App and media container start times remained unchanged. No camera command was se
 
 Follow-ups: visual/mobile review, richer backend capability-unavailability reasons, SD UI when the
 driver listing is homologated, and additional semantic widgets as drivers implement them.
+
+## Applying feedback and failed-light diagnostics — 2026-09-12
+
+Writes now display a prominent spinner with localized text (“Aplicando modificação na câmera…” /
+“Applying changes to the camera…”). Static selectors, weekly schedules and alarm-sound selection
+share that feedback. The active input remains disabled during its request; the spinner is removed
+in cleanup on success or error. Existing success/error text remains; there is no automatic retry.
+Reduced-motion preference disables spinner rotation without hiding the status message.
+
+Read-only audit of retained app-container access logs found white-light PUT failures (502) at
+04:35:23Z, 04:35:36Z and 04:35:52Z, interleaved with a 200 at 04:35:40Z on September 12.
+Orientation/night-vision/volume requests in the same window returned 200. This is HTTP evidence,
+not independent physical confirmation. The old logs have no response bodies or protocol-stage
+diagnostic, so they cannot establish whether these failures were preflight, write or readback.
+The host clock was already beyond that window; a short `--since` filter missed the events.
+The old `data/app.log` is not the active container log.
+
+The floodlight writer now logs only the opaque camera ID, a fixed phase label and integer native
+error (or unknown): session, preflight, write exchange, missing reply, rejection or unconfirmed
+readback. It never logs credentials, IPs, payloads or requested values. Missing write replies are
+reported as unknown outcome, not falsely as camera rejection. This improves future diagnosis;
+it does not claim to fix or retrospectively identify the recorded failures. No camera writes
+were repeated during investigation. Tests verify phases, redaction and single-shot writes.
+
+Deployed as `b-ca458ed9dafe` with a 512 MiB / one-CPU build and app-only recreation; go2rtc kept
+its original start time and neither container reported OOM. The image passed an isolated
+network-disabled import/OpenAPI smoke check before deployment. Validation: 1,384 tests under
+the Python address-space bound plus the separate 64 MiB Node DOM harness, Ruff and mypy
+(159 source files). Native PTZ ownership/route modules are included but remain unregistered.
