@@ -52,7 +52,8 @@ def test_siren_response_and_state_parsers_are_strict():
     assert siren.extract_siren_state(True) is None
 
 
-def test_bounded_siren_pulse_uses_single_on_and_unconditional_off(monkeypatch):
+@pytest.mark.parametrize("strict", [False, True])
+def test_bounded_siren_pulse_uses_single_on_and_unconditional_off(monkeypatch, strict):
     enrollment = _enrollment()
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     target = OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -69,20 +70,25 @@ def test_bounded_siren_pulse_uses_single_on_and_unconditional_off(monkeypatch):
     monkeypatch.setattr(siren, "open_camera_session", lambda *_args: (node, target, 40))
     reads = iter(
         (
-            ModelReadResult(True, 0, {"stVal": 1}),
-            ModelReadResult(True, 0, {"stVal": 1}),
+            ModelReadResult(True, 0, {"stVal": 1, "t": 123}),
+            ModelReadResult(True, 0, {"stVal": 1, "t": 123}),
         )
     )
-    monkeypatch.setattr(siren, "exchange_model_read", lambda *_args, **_kwargs: next(reads))
+    def read(*args, **kwargs):
+        assert kwargs["require_correlated_response"] is strict
+        return next(reads)
+
+    monkeypatch.setattr(siren, "exchange_model_read", read)
 
     def fake_action(_sock, _node, access_id, device, enabled, sequence, _timeout, **kwargs):
+        assert kwargs["require_correlated_response"] is strict
         calls.append(("action", access_id, device.device_id, enabled, sequence, kwargs["retries"]))
         return siren.SirenActionExchange(True, 0)
 
     monkeypatch.setattr(siren, "exchange_siren_action", fake_action)
     monkeypatch.setattr(siren.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
 
-    result = siren.pulse_camera_siren(enrollment, 2)
+    result = siren.pulse_camera_siren(enrollment, 2, require_correlated_response=strict)
 
     assert calls == [
         ("bind", ("", 0)),
@@ -96,7 +102,11 @@ def test_bounded_siren_pulse_uses_single_on_and_unconditional_off(monkeypatch):
     assert result.final_off_confirmed is True
 
 
-def test_siren_preflight_refuses_to_send_when_off_is_not_confirmed(monkeypatch):
+@pytest.mark.parametrize("value", [
+    {"stVal": 2, "t": 123}, {"stVal": 1}, {"stVal": 0, "t": 1},
+    {"nested": {"stVal": 1, "t": 123}}, {"stVal": 1, "t": -1},
+])
+def test_siren_preflight_refuses_to_send_when_off_is_not_confirmed(monkeypatch, value):
     enrollment = _enrollment()
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     target = OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -113,7 +123,7 @@ def test_siren_preflight_refuses_to_send_when_off_is_not_confirmed(monkeypatch):
     monkeypatch.setattr(
         siren,
         "exchange_model_read",
-        lambda *_args, **_kwargs: ModelReadResult(True, 0, {"stVal": 2}),
+        lambda *_args, **_kwargs: ModelReadResult(True, 0, value),
     )
     monkeypatch.setattr(
         siren,
@@ -122,10 +132,11 @@ def test_siren_preflight_refuses_to_send_when_off_is_not_confirmed(monkeypatch):
     )
 
     with pytest.raises(P2PProbeError, match="confirmed OFF preflight"):
-        siren.pulse_camera_siren(enrollment, 2)
+        siren.pulse_camera_siren(enrollment, 2, require_correlated_response=True)
 
 
-def test_failed_siren_enable_still_sends_off(monkeypatch):
+@pytest.mark.parametrize("strict", [False, True])
+def test_failed_siren_enable_still_sends_off(monkeypatch, strict):
     enrollment = _enrollment()
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     target = OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -143,10 +154,11 @@ def test_failed_siren_enable_still_sends_off(monkeypatch):
     monkeypatch.setattr(
         siren,
         "exchange_model_read",
-        lambda *_args, **_kwargs: ModelReadResult(True, 0, {"stVal": 1}),
+        lambda *_args, **_kwargs: ModelReadResult(True, 0, {"stVal": 1, "t": 123}),
     )
 
     def fake_action(*_args, **_kwargs):
+        assert _kwargs["require_correlated_response"] is strict
         enabled = _args[4]
         actions.append(enabled)
         return siren.SirenActionExchange(True, 7 if enabled else 0)
@@ -154,7 +166,7 @@ def test_failed_siren_enable_still_sends_off(monkeypatch):
     monkeypatch.setattr(siren, "exchange_siren_action", fake_action)
 
     with pytest.raises(P2PProbeError, match="activation"):
-        siren.pulse_camera_siren(enrollment, 2)
+        siren.pulse_camera_siren(enrollment, 2, require_correlated_response=strict)
 
     assert actions == [True, False]
 

@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass
 
 from ....db.p2p import P2PEnrollment
+from ..siren_evidence import siren_state
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, OnlineDevice, P2PProbeError
 from .model_session import exchange_model_read
@@ -125,6 +126,7 @@ def exchange_siren_action(
     *,
     retries: int,
     deadline: float | None = None,
+    require_correlated_response: bool = False,
 ) -> SirenActionExchange:
     """Send one fixed siren action and await its correlated AD response."""
 
@@ -157,8 +159,14 @@ def exchange_siren_action(
             if plain is None:
                 continue
             flags = struct.unpack_from("<I", plain, 0x14)[0]
+            if require_correlated_response and (
+                ((flags >> 16) & 3) != 2
+                or struct.unpack_from("<Q", plain, 4)[0] != node.session_id
+            ):
+                continue
             if flags & (1 << 20):
-                if plain[1] == 0xAC:
+                if plain[1] == 0xAC and (not require_correlated_response or
+                        struct.unpack_from("<I", plain, 0x0C)[0] == (sequence & 0xFFFFFFFF)):
                     transport_acknowledged = True
                 continue
             candidate = parse_siren_action_response(plain, message_id)
@@ -178,6 +186,8 @@ def _confirm_off(
     sequence: int,
     timeout: float,
     deadline: float,
+    *,
+    require_correlated_response: bool = False,
 ) -> bool:
     for attempt in range(5):
         if attempt:
@@ -194,8 +204,10 @@ def _confirm_off(
             min(timeout, max(0.5, deadline - time.monotonic())),
             retries=1,
             deadline=deadline,
+            require_correlated_response=require_correlated_response,
         )
-        if result.error_code == 0 and extract_siren_state(result.value) == SIREN_OFF:
+        state = siren_state(result.value) if require_correlated_response else extract_siren_state(result.value)
+        if result.error_code == 0 and state == SIREN_OFF:
             return True
     return False
 
@@ -206,6 +218,7 @@ def pulse_camera_siren(
     *,
     timeout: float = 1.5,
     total_timeout: float = 35.0,
+    require_correlated_response: bool = False,
 ) -> P2PSirenPulse:
     """Emit one bounded pulse after an OFF preflight and always send an explicit OFF afterward."""
 
@@ -220,6 +233,8 @@ def pulse_camera_siren(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("siren session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -229,8 +244,10 @@ def pulse_camera_siren(
             min(5.0, max(0.5, deadline - time.monotonic())),
             retries=1,
             deadline=deadline,
+            require_correlated_response=require_correlated_response,
         )
-        if preflight.error_code != 0 or extract_siren_state(preflight.value) != SIREN_OFF:
+        state = siren_state(preflight.value) if require_correlated_response else extract_siren_state(preflight.value)
+        if preflight.error_code != 0 or state != SIREN_OFF:
             raise P2PProbeError("siren pulse requires a confirmed OFF preflight")
         if deadline - time.monotonic() < duration_seconds + 6.0:
             raise P2PProbeError("siren pulse has insufficient time budget for guaranteed cleanup")
@@ -249,6 +266,7 @@ def pulse_camera_siren(
                 bounded_timeout,
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=require_correlated_response,
             )
             if enabled.error_code != 0:
                 raise P2PProbeError("camera did not accept the siren activation")
@@ -267,6 +285,7 @@ def pulse_camera_siren(
                 bounded_timeout,
                 retries=3,
                 deadline=cleanup_deadline,
+                require_correlated_response=require_correlated_response,
             )
             final_off_confirmed = _confirm_off(
                 sock,
@@ -275,6 +294,7 @@ def pulse_camera_siren(
                 (sequence + 0x30) & 0xFFFFFFFF,
                 bounded_timeout,
                 cleanup_deadline,
+                require_correlated_response=require_correlated_response,
             )
         if disabled.error_code != 0 or not final_off_confirmed:
             raise P2PProbeError("camera did not confirm the final siren OFF state")

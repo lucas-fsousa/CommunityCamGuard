@@ -173,6 +173,13 @@ a generic driver explanation hook maps temporary Yoosee evidence absence to HTTP
 claiming unsupported hardware (501). No stale grants or automatic write retries. 341 focused tests
 cover scheduling, invalidation and read/write/options dispatch. Next: migrate remaining
 siren/intercom gates; physically validate only camera 3 when needed.
+Siren migration now has an offline strict boundary: exact timestamped `Action.expelCtrl.stVal`,
+correlated B7 preflight/readback, encrypted session/message-correlated AC/AD and sequence-matched
+ACKs. Single ON and unconditional OFF cleanup remain covered. It is opt-in and not yet enabled
+in runtime rollout; no new sound or camera test was performed. Next is a harmless camera-3 state
+read with exact identity, then a bounded strict pulse before registering operation proofs.
+Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
+evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 
 Yoosee SD playback handshake invariant: native action `2` is the initiator-side ACCEPT;
 action `6` is the subsequent START reply. Session acceptance must observe action `2` and
