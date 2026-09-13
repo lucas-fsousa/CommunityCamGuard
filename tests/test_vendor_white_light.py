@@ -77,7 +77,8 @@ def test_response_rejects_unobserved_passthrough_envelope():
     assert white_light.parse_white_light_response(bytes(response), 12) is None
 
 
-def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
+@pytest.mark.parametrize("base_sequence", [40, 0xFFFFFFFE])
+def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch, base_sequence):
     enrollment = _enrollment()
     node = transport.CertifiedNode(("192.0.2.10", 19800), 1, bytes(32), 2)
     target = transport.OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -91,7 +92,7 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
             calls.append(("close",))
 
     monkeypatch.setattr(white_light.socket, "socket", lambda *_args, **_kwargs: FakeSocket())
-    monkeypatch.setattr(white_light, "open_camera_session", lambda *_args: (node, target, 40))
+    monkeypatch.setattr(white_light, "open_camera_session", lambda *_args: (node, target, base_sequence))
     replies = iter(
         (
             white_light.WhiteLightExchange(
@@ -107,7 +108,14 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
         )
     )
 
+    used_sequences = set()
+
     def fake_exchange(_sock, _node, access_id, device, enabled, sequence, _timeout, **kwargs):
+        # Include possible BA receipt IDs, not just the B9 command itself.
+        assert sequence not in used_sequences, "command reused an earlier receipt sequence"
+        reserved = {(sequence + i) & 0xFFFFFFFF for i in range(1 + kwargs.get("retries", 3))}
+        assert used_sequences.isdisjoint(reserved)
+        used_sequences.update(reserved)
         calls.append(
             (
                 "exchange",
@@ -127,10 +135,10 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch):
 
     assert calls == [
         ("bind", ("", 0)),
-        ("exchange", 123, 7000000002, None, 40, None),
-        ("exchange", 123, 7000000002, True, 41, 1),
-        ("exchange", 123, 7000000002, None, 42, 1),
-        ("exchange", 123, 7000000002, None, 43, 1),
+        ("exchange", 123, 7000000002, None, base_sequence, None),
+        ("exchange", 123, 7000000002, True, (base_sequence + 4) & 0xFFFFFFFF, 1),
+        ("exchange", 123, 7000000002, None, (base_sequence + 8) & 0xFFFFFFFF, 1),
+        ("exchange", 123, 7000000002, None, (base_sequence + 12) & 0xFFFFFFFF, 1),
         ("close",),
     ]
     assert result.previous_enabled is False

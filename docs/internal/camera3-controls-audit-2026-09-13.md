@@ -1,5 +1,30 @@
 # Camera 3 control audit — 2026-09-13
 
+## User confirmations and floodlight follow-up
+
+After this audit, the user physically confirmed orientation, push-to-talk, recorded voice and
+siren pulse. Night vision remains pending a nighttime test. Floodlight was physically NOK.
+PTZ, relative speaker loudness, schedule enforcement and each selected alarm sound have not
+received separate physical confirmations; the original evidence table below is preserved.
+
+The floodlight driver reused the preflight BA receipt sequence for the subsequent B9 write:
+preflight at N sent a receipt at N+1, then ON also used N+1. Readbacks could overlap receipts
+too. The proven RE harness uses separated sequence ranges. Production now reserves four IDs
+per exchange (one request plus up to three receipt offsets), including 32-bit wraparound.
+It does not change the type-11 payload, loosen reply validation or retry actuation.
+
+Exact-camera host retest with the corrected code passed OFF→ON→OFF with write verification
+and independent strictly correlated ON/OFF reads. This strongly supports duplicate sequence
+handling as the failure mechanism; no broker-side trace is available to prove internal discard.
+Physical confirmation of the corrected light is still needed. Regression tests reject overlap
+between commands and possible receipt IDs, including wraparound.
+
+Deployed HTTP retest at 16:37:11–16:37:19 UTC also passed OFF→ON→OFF, with both writes
+returning 200/verified and independent strictly correlated GETs matching. Final light state OFF.
+Build `b-9ec1ba7fa584`; only app recreated, go2rtc not restarted. Build was capped at 512 MiB
+and one CPU. Full Python suite, separate Node DOM harness, ruff and mypy passed; frontend
+layout-contract test was also run after addition. User physical light confirmation remains pending.
+
 User authorized real tests of all camera controls. Only the dedicated camera 3 was targeted.
 Scope: all eight advertised semantic controls, both advertised intercom modes and standard PTZ.
 Not a certification for other units, models or firmware. Exact enrolled identity was checked

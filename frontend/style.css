@@ -214,11 +214,14 @@ header {
 }
 .camera-panel-trigger { border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
   background: var(--panel-2); color: var(--text); font-size: 12px; white-space: nowrap; }
-.camera-panel-shell { position: fixed; inset: 0; z-index: 9; display: flex; justify-content: flex-end;
-  background: rgba(0,0,0,.45); }
-.camera-panel { width: min(460px, 100%); height: 100%; box-sizing: border-box; display: flex;
+.camera-panel-shell { position: fixed; inset: 0; z-index: 9; display: flex; justify-content: center;
+  align-items: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+  max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box;
+  background: rgba(0,0,0,.6); }
+.camera-panel { width: min(640px, 100%); max-height: 100%; max-height: min(820px, calc(100dvh - 32px)); box-sizing: border-box; display: flex;
   flex-direction: column; min-height: 0; background: var(--panel); color: var(--text);
-  border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0,0,0,.3); }
+  border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 70px rgba(0,0,0,.4); }
+.camera-panel-head, .camera-panel-hint, .camera-panel-status { flex-shrink: 0; }
 .camera-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 20px 20px 12px; }
 .camera-panel-head h2 { margin: 4px 0 0; font-size: 20px; overflow-wrap: anywhere; }
@@ -230,10 +233,10 @@ header {
 .control-section h3 { margin: 0 0 12px; font-size: 13px; color: var(--accent); }
 .control-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr);
   gap: 14px; align-items: center; padding: 9px 0; }
-.control-row-label { display: grid; gap: 5px; font-size: 12px; }
+.control-row-label { display: grid; gap: 5px; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
 .control-row-label strong { font-weight: 500; }
 .control-row-label small { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.control-row > button, .control-row > select { width: 100%; min-height: 40px; font-size: 12px;
+.control-row > button, .control-row > select { width: 100%; min-width: 0; min-height: 44px; font-size: 14px;
   border: 1px solid var(--line); border-radius: 6px; padding: 8px; white-space: normal; }
 .control-row.unavailable > button { cursor: not-allowed; color: var(--muted); background: var(--panel-2); }
 .camera-panel-status { padding: 12px 20px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
@@ -244,6 +247,8 @@ header {
   .bar { gap: 5px; padding: 6px; }
   .bar-actions { gap: 4px; }
   .camera-panel-head, .camera-panel-body { padding-left: 16px; padding-right: 16px; }
+  .control-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 0; }
+  .control-row > select { font-size: 16px; }
 }
 .protection-schedule-modal { width: min(520px, 92vw); display: grid; gap: 14px; }
 .protection-schedule-modal .compact { margin: 0; }

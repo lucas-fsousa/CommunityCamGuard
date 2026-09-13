@@ -29,6 +29,10 @@ def _write_failure(camera_id: str | None, stage: str, error: object = None) -> N
                 camera_id or "unlinked", stage, error if type(error) is int else "unknown")
 
 _PASSTHROUGH_REQUEST_PREFIX = b"\x01\xff\x00\x00"
+# An exchange with up to three attempts can emit a BA receipt at sequence+1..3.
+# Reserve those IDs before the next command; a duplicate sequence can be discarded
+# by the node even when its packet family differs (BA receipt versus B9 write).
+_EXCHANGE_SEQUENCE_STRIDE = 4
 # Camera 3 (firmware 40.1.14) uses 0 in the response direction byte. Older captures and units use
 # the echoed 0xff form, so accept exactly these two observed envelopes and no generic passthrough.
 _PASSTHROUGH_RESPONSE_PREFIXES = frozenset(
@@ -366,7 +370,7 @@ def set_camera_white_light(
             enrollment.access_id,
             target,
             enabled,
-            (sequence + 1) & 0xFFFFFFFF,
+            (sequence + _EXCHANGE_SEQUENCE_STRIDE) & 0xFFFFFFFF,
             min(5.0, max(0.5, deadline - time.monotonic())),
             retries=1,
             deadline=deadline,
@@ -393,7 +397,7 @@ def set_camera_white_light(
                 enrollment.access_id,
                 target,
                 None,
-                (sequence + 2 + attempt) & 0xFFFFFFFF,
+                (sequence + (2 + attempt) * _EXCHANGE_SEQUENCE_STRIDE) & 0xFFFFFFFF,
                 min(2.0, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,

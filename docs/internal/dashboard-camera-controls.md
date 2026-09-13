@@ -1,5 +1,21 @@
 # Camera control panel — 2026-09-12
 
+## Centered responsive popup — 2026-09-13
+
+The panel is now centered rather than a right-hand drawer, with a maximum 640px width,
+dynamic-viewport height limit, rounded border and internal body scrolling. Header/close/status
+remain outside the scrolling body. Small screens stack each label above its control; touch
+targets are at least 44px and mobile selects use 16px text. Safe-area padding is retained.
+Backdrop dismissal remains disabled, close uses X, background remains inert, focus is restored,
+and nested dialogs keep their existing lifecycle. PTZ remains outside the panel.
+
+English/Portuguese names now distinguish selecting a siren sound from sounding the siren:
+“Select siren sound” / “Selecionar sirene”, “Sound the siren” / “Acionar sirene”,
+“Set protection hours” / “Definir horários da proteção”, “Hold to speak” / “Segurar para falar”.
+Panel guidance uses user-facing language instead of implementation details. Driver capability
+gating is unchanged. Static layout contracts and the DOM lifecycle harness passed; actual
+mobile-browser visual review remains pending (no browser/emulator was started on WSL).
+
 The live tile keeps PTZ (only when supported), quality, digital zoom and player recovery shortcuts
 plus one **Camera controls** button. PTZ stays outside the overlay so the operator can position
 the camera while seeing the video. Audio, security and maintenance stay in the panel.

@@ -299,3 +299,18 @@ def test_build_endpoint_is_public_no_store_and_returns_content_id():
     body = json.loads(response.body)
     assert body["version"].startswith("b-")
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_camera_panel_has_centered_bounded_mobile_layout_and_clear_labels():
+    frontend = Path(__file__).parents[1] / "frontend"
+    css = (frontend / "style.css").read_text()
+    shell = css.split(".camera-panel-shell {", 1)[1].split("}", 1)[0]
+    panel = css.split(".camera-panel {", 1)[1].split("}", 1)[0]
+    body = css.split(".camera-panel-body {", 1)[1].split("}", 1)[0]
+    assert "justify-content: center" in shell and "align-items: center" in shell
+    assert "100dvh" in panel and "max-height" in panel
+    assert "overflow-y: auto" in body and "min-height: 0" in body
+    assert ".control-row { grid-template-columns: minmax(0, 1fr);" in css
+    labels = (frontend / "i18n.js").read_text()
+    assert '"control.alarmVoiceOpen": "Selecionar sirene"' in labels
+    assert '"control.alarmVoiceOpen": "Select siren sound"' in labels
