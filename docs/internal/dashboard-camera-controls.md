@@ -55,6 +55,22 @@ driver listing is homologated, and additional semantic widgets as drivers implem
 
 ## Selector reset regression — 2026-09-12
 
+### Nested write confirmation — 2026-09-13
+
+The alarm-voice choice and weekly protection schedule dialogs now require verified semantic
+readback too; HTTP 200 alone no longer closes the dialog with a success message. Choice keys
+must match exactly. Schedules must match start/end and the complete weekday set, accepting
+server-normalized ordering but rejecting duplicate or missing days. Submitted inputs are frozen
+until completion and duplicate submit events do not send additional requests. Network failures
+and missing/mismatched confirmation keep the dialog open, display the existing localized error
+and restore editable inputs/spinner state. Close remains available and does not cancel a sent
+camera command. No action was sent to a camera to implement or test this behavior.
+
+DOM regression cases cover both dialogs with confirmed/unconfirmed/mismatching replies and
+network errors, duplicate submits, cleanup and schedule weekday normalization. Recent bounded
+container-log review contained no control calls, so floodlight live recovery remains unverified.
+Frontend bind mount serves the change without container restart.
+
 The night-vision selector unconditionally reset to its group label after every request.
 That label was not the current night/IR mode. Persistent controls now retain the requested
 selection only when the backend returns `verified: true` and the matching semantic value.

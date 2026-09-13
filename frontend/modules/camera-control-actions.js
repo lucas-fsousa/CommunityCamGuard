@@ -63,18 +63,25 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
     const overlay = el("div", { className: "modal" }, card);
     close.addEventListener("click", () => overlay.remove());
     apply.addEventListener("click", async () => {
+      if (apply.disabled) return;
       if (!select.value) {
         modalStatus.classList.add("error");
         modalStatus.textContent = strings.required;
         return;
       }
       apply.disabled = true;
+      const requested = select.value;
+      select.disabled = true;
       applying(modalStatus);
       try {
-        await api(
+        const result = await api(
           `/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`,
-          { method: "PUT", body: JSON.stringify({ value: select.value }) },
+          { method: "PUT", body: JSON.stringify({ value: requested }) },
         );
+        if (result?.verified !== true || result.value !== requested) {
+          throw new Error(t("control.unconfirmed"));
+        }
+        status.classList.remove("error");
         status.textContent = t("control.applied");
         overlay.remove();
       } catch (error) {
@@ -83,6 +90,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
       } finally {
         finishApplying(modalStatus);
         apply.disabled = false;
+        select.disabled = false;
       }
     });
     document.body.append(overlay);
@@ -131,6 +139,7 @@ async function openProtectionSchedule(cam, status, trigger) {
     const overlay = el("div", { className: "modal" }, card);
     close.addEventListener("click", () => overlay.remove());
     save.addEventListener("click", async () => {
+      if (save.disabled) return;
       const weekdays = dayInputs.filter((item) => item.input.checked).map((item) => item.day);
       if (!start.value || !end.value || !weekdays.length) {
         modalStatus.classList.add("error");
@@ -138,14 +147,24 @@ async function openProtectionSchedule(cam, status, trigger) {
         return;
       }
       save.disabled = true;
+      const requested = { start: start.value, end: end.value, weekdays };
+      const inputs = [start, end, ...dayInputs.map((item) => item.input)];
+      inputs.forEach((input) => { input.disabled = true; });
       applying(modalStatus);
       try {
-        await api(
+        const result = await api(
           `/cameras/${encodeURIComponent(cam.id)}/controls/smart_protection_schedule`,
-          { method: "PUT", body: JSON.stringify({ value: {
-            start: start.value, end: end.value, weekdays,
-          } }) },
+          { method: "PUT", body: JSON.stringify({ value: requested }) },
         );
+        const confirmed = result?.value;
+        if (result?.verified !== true || confirmed?.start !== requested.start
+            || confirmed?.end !== requested.end || !Array.isArray(confirmed?.weekdays)
+            || confirmed.weekdays.length !== weekdays.length
+            || new Set(confirmed.weekdays).size !== weekdays.length
+            || !weekdays.every((day) => confirmed.weekdays.includes(day))) {
+          throw new Error(t("control.unconfirmed"));
+        }
+        status.classList.remove("error");
         status.textContent = t("control.applied");
         overlay.remove();
       } catch (error) {
@@ -154,6 +173,7 @@ async function openProtectionSchedule(cam, status, trigger) {
       } finally {
         finishApplying(modalStatus);
         save.disabled = false;
+        inputs.forEach((input) => { input.disabled = false; });
       }
     });
     document.body.append(overlay);

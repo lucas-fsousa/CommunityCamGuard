@@ -179,6 +179,71 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(siren.value, "");
   pending = null;
   let navigated = false;
+  // Nested configuration dialogs must not mistake HTTP success for confirmed state.
+  const choiceDialog = load("camera-control-actions.js", { el, api, t }, "openDynamicChoice");
+  const scheduleDialog = load("camera-control-actions.js", { el, api, t }, "openProtectionSchedule");
+  const dialogTrigger = el("button");
+  document.body.append(dialogTrigger);
+  const feedback = el("small");
+  const strings = { loading: "loading", empty: "empty", placeholder: "choose", apply: "apply",
+    title: "title", hint: "hint", required: "required" };
+  for (const response of [new Error("network"), {}, { verified: false, value: "tone" },
+    { verified: true, value: "other" }, { verified: true, value: "tone" }]) {
+    pending = Promise.resolve({ options: [{ value: "tone", label: "Tone" }] });
+    await choiceDialog(cam, "alarm_voice", feedback, dialogTrigger, strings);
+    const overlay = document.body.children.at(-1);
+    const select = walk(overlay).find((node) => node.tagName === "select");
+    const apply = walk(overlay).find((node) => node.textContent === "apply");
+    select.value = "tone";
+    let finish;
+    pending = new Promise((resolve, reject) => { finish = (value) => value instanceof Error ? reject(value) : resolve(value); });
+    const writing = apply.click();
+    assert.equal(select.disabled, true);
+    const beforeDuplicate = requests.length;
+    await apply.dispatch("click");
+    assert.equal(requests.length, beforeDuplicate);
+    finish(response);
+    await writing;
+    assert.equal(select.disabled, false);
+    assert.equal(apply.disabled, false);
+    assert.equal(overlay.isConnected, !(response.verified === true && response.value === "tone"));
+    if (overlay.isConnected) {
+      assert(walk(overlay).some((node) => node.classList.contains("error")));
+      assert(!walk(overlay).some((node) => node.classList.contains("applying")));
+      await walk(overlay).find((node) => node.textContent === "×").click();
+    }
+  }
+  const schedule = { start: "08:00", end: "18:00", weekdays: ["mon", "tue"] };
+  for (const response of [new Error("network"), {}, { verified: false, value: schedule },
+    { verified: true, value: { ...schedule, end: "19:00" } },
+    { verified: true, value: { ...schedule, weekdays: ["mon", "mon"] } },
+    { verified: true, value: { ...schedule, weekdays: ["tue", "mon"] } }]) {
+    pending = Promise.resolve({ value: schedule });
+    await scheduleDialog(cam, feedback, dialogTrigger);
+    const overlay = document.body.children.at(-1);
+    const inputs = walk(overlay).filter((node) => node.tagName === "input");
+    const save = walk(overlay).find((node) => node.textContent === "control.scheduleSave");
+    let finish;
+    pending = new Promise((resolve, reject) => { finish = (value) => value instanceof Error ? reject(value) : resolve(value); });
+    const writing = save.click();
+    assert(inputs.every((input) => input.disabled));
+    const beforeDuplicate = requests.length;
+    await save.dispatch("click");
+    assert.equal(requests.length, beforeDuplicate);
+    finish(response);
+    await writing;
+    assert(inputs.every((input) => !input.disabled));
+    assert.equal(save.disabled, false);
+    const success = response.value?.weekdays[0] === "tue";
+    assert.equal(overlay.isConnected, !success);
+    if (overlay.isConnected) {
+      assert(walk(overlay).some((node) => node.classList.contains("error")));
+      assert(!walk(overlay).some((node) => node.classList.contains("applying")));
+      await walk(overlay).find((node) => node.textContent === "×").click();
+    }
+  }
+  dialogTrigger.remove();
+  pending = null;
   nav.addEventListener("click", () => { navigated = true; });
   await walk(shell).find((item) => item.textContent === "panel.openRecordings").click();
   assert.equal(state.rec.cameraId, cam.id);

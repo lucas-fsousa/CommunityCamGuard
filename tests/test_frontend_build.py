@@ -89,7 +89,8 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
     assert "available.alarm_voice?.dynamic_options" in live
     assert 'openDynamicChoice(cam, "alarm_voice"' in live
     assert "/controls/${encodeURIComponent(controlKey)}/options`" in live
-    assert "JSON.stringify({ value: select.value })" in live
+    assert "const requested = select.value" in live
+    assert "JSON.stringify({ value: requested })" in live
     assert "/controls/${encodeURIComponent(controlKey)}`" in live
     assert "JSON.stringify({ value: valueFor(selected) })" in live
     assert "/vendor-controls/" not in live
