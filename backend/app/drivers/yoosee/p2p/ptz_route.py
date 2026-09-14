@@ -27,12 +27,16 @@ class _ReplyIdentity(TypedDict):
 
 class NativePtzRoute:
     def __init__(self, sock: socket.socket, node: CertifiedNode, *, access_id: int,
-                 device_id: int, direction: str, sequence: int) -> None:
+                 device_id: int, direction: str, sequence: int,
+                 allowed_directions: frozenset[str] | None = None) -> None:
         self._sock = sock
         self._node = node
         self._access_id = access_id
         self._device_id = device_id
         self._direction = direction
+        self._allowed_directions = allowed_directions or frozenset({direction})
+        if direction not in self._allowed_directions:
+            raise ValueError("PTZ direction was not verified for this route")
         self._started = False
         self._closed = False
         self._released = False
@@ -103,13 +107,17 @@ class NativePtzRoute:
         # A later explicit error in this observation window beats earlier receipts/success.
         return not self._error and (self._application or (self._transport and self._peer))
 
-    def renew(self) -> NativePtzRoute:
+    def renew(self, direction: str | None = None) -> NativePtzRoute:
         """Transfer one clean stopped socket to fresh request IDs and sequences."""
         if self._closed or not self._released or not self._confirmed or self._error:
             raise RuntimeError("only a confirmed stopped PTZ route can be renewed")
+        direction = self._direction if direction is None else direction
+        if direction not in self._allowed_directions:
+            raise ValueError("PTZ direction was not verified for this route")
         route = NativePtzRoute(self._sock, self._node, access_id=self._access_id,
-                               device_id=self._device_id, direction=self._direction,
-                               sequence=self._receipt_sequence)
+                               device_id=self._device_id, direction=direction,
+                               sequence=self._receipt_sequence,
+                               allowed_directions=self._allowed_directions)
         self._closed = True  # socket ownership transferred, not duplicated
         return route
 

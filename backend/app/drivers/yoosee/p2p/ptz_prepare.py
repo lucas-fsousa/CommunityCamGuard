@@ -20,7 +20,8 @@ from .ptz_route import NativePtzRoute
 
 
 def prepare_ptz_route(enrollment: P2PEnrollment, expected: CapabilityIdentity, *,
-                      camera_id: str, direction: str, budget: float = 20) -> NativePtzRoute:
+                      camera_id: str, direction: str, budget: float = 20,
+                      reviewed_directions: frozenset[str] | None = None) -> NativePtzRoute:
     """Return an owned socket after three fresh correlated reads; never send PTZ.
 
     Consume immediately under the same reservation. No retries of preparation,
@@ -31,6 +32,9 @@ def prepare_ptz_route(enrollment: P2PEnrollment, expected: CapabilityIdentity, *
         raise ValueError("native PTZ requires the reviewed camera and direction")
     if type(budget) not in (int, float) or not math.isfinite(budget) or not 1 <= budget <= 20:
         raise ValueError("native PTZ preparation budget must be 1..20 seconds")
+    reviewed = reviewed_directions if reviewed_directions is not None else frozenset({direction})
+    if direction not in reviewed or reviewed - DIRECTIONS.keys():
+        raise ValueError("PTZ direction is not in the reviewed profile")
     deadline = time.monotonic() + budget
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -57,7 +61,9 @@ def prepare_ptz_route(enrollment: P2PEnrollment, expected: CapabilityIdentity, *
         if not direction_supported(reads[2].value, direction):
             raise P2PProbeError("native PTZ direction lacks current axis evidence")
         return NativePtzRoute(sock, node, access_id=enrollment.access_id, device_id=target.device_id,
-                              direction=direction, sequence=(sequence + 3) & 0xFFFFFFFF)
+                              direction=direction, sequence=(sequence + 3) & 0xFFFFFFFF,
+                              allowed_directions=frozenset(
+                                  d for d in reviewed if direction_supported(reads[2].value, d)))
     except BaseException:
         sock.close()
         raise

@@ -32,7 +32,7 @@ def prepared(monkeypatch):
     monkeypatch.setattr(native_ptz, "PtzMotion", Motion)
     monkeypatch.setattr(native_ptz.p2p, "get_enrollment_for_camera", lambda _: SimpleNamespace(
         device_id=IDENTITY.device_id, access_id=1, access_token=b"test"))
-    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(acquire=lambda key, prepare: prepare()))
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(acquire=lambda key, prepare, **kw: prepare()))
     def prepare(*args, **kwargs):
         state.prepared += 1
         assert kwargs["camera_id"] == CAMERA.camera_id
@@ -113,3 +113,19 @@ def test_policy_persists_exact_unit_and_direction_only():
     assert native_ptz_policy.selected(CAMERA.camera_id) == PROFILE
     assert native_ptz_policy.selected("cam_" + "b" * 24) is None
     assert native_ptz_policy.selected(CAMERA.camera_id).identity != replace(IDENTITY, firmware="changed")
+
+
+def test_all_reviewed_directions_use_native_without_granting_other_camera(monkeypatch):
+    profile = native_ptz_policy.PtzProfile(IDENTITY, frozenset({"left", "right", "up", "down"}))
+    monkeypatch.setattr(native_ptz_policy, "selected",
+                        lambda cid: profile if cid == CAMERA.camera_id else None)
+    calls = []
+    monkeypatch.setattr(native_ptz, "step", lambda cam, direction, *args: calls.append(direction) or True)
+    from backend.app.control import ptz
+    monkeypatch.setattr(ptz, "move", lambda *args: calls.append("standard") or True)
+    driver = YooseeDriver()
+    for direction in ("left", "right", "up", "down"):
+        assert driver.ptz(CAMERA, direction, "step")
+    other = SimpleNamespace(camera_id="cam_" + "b" * 24)
+    assert driver.ptz(other, "up", "step")
+    assert calls == ["left", "right", "up", "down", "standard"]

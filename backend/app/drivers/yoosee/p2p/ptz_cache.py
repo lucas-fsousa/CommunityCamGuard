@@ -21,14 +21,16 @@ class _Idle:
 class PtzRouteCache:
     """At most four idle sockets, 8s idle/20s absolute lifetime including preparation.
 
-    Key must bind camera, direction, reviewed profile and current credentials.
+    Key must bind camera, reviewed profile and current credentials. Direction changes
+    are permitted only within the axes verified when the route was prepared.
     Caller retains per-camera ownership throughout acquire/use/return.
     """
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._idle: dict[tuple[object, ...], _Idle] = {}
 
-    def acquire(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute]) -> CachedPtzRoute:
+    def acquire(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute],
+                *, direction: str | None = None) -> CachedPtzRoute:
         with self._lock:
             idle = self._idle.pop(key, None)
         now = time.monotonic()
@@ -36,7 +38,8 @@ class PtzRouteCache:
             idle.timer.cancel()
             if now - idle.created < 20 and now < idle.expires:
                 try:
-                    return CachedPtzRoute(self, key, idle.route.renew(), idle.created, True)
+                    renewed = idle.route.renew() if direction is None else idle.route.renew(direction)
+                    return CachedPtzRoute(self, key, renewed, idle.created, True)
                 except BaseException as exc:
                     idle.route.close()
                     if isinstance(exc, Exception):

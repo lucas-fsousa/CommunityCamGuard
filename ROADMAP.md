@@ -6,6 +6,13 @@ Living document: backlog, priorities and milestones. Technical detail and ration
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
 
+PTZ update (2026-09-14): camera 3 now uses reviewed native left/right/up/down with
+confirmed-stopped session reuse across directions. Dashboard API validation passed
+all four; warm alternating actions took 391–411 ms end-to-end. User physical/visual
+validation remains pending, as does rollout to other exact units. Cold setup still
+adds latency. See `docs/internal/native-transport-preference.md` for current scope;
+earlier right-only milestones below describe the previous stage.
+
 ---
 
 ## Milestone M1 — Live video quality (Feature 1)  ⟶ CORE DONE

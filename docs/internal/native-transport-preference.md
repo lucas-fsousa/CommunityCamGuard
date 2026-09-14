@@ -3,6 +3,43 @@
 Status: staged implementation. Video remains RTSP; native PTZ has an exact-unit finite-step opt-in.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
+## Four-direction camera-3 rollout — 2026-09-14
+
+Supersedes the right-only rollout described in the historical sections below. The
+reported asymmetry was real: only `right` belonged to the camera-3 native profile;
+the other buttons still selected finite ONVIF movement. The cache was also keyed by
+direction, forcing another session setup when switching arrows.
+
+The reviewed profile for **camera 3 only** now contains left/right/up/down. A fresh
+exact-identity/axis preflight and RELEASE-only sequence confirmed delivery in all
+four directions before bounded movement testing. No other unit's profile changed.
+The driver continues to decide support/transport per camera, not by dashboard brand
+assumptions or a default enabled for every Yoosee model.
+
+Stopped-session reuse now keys camera + exact identity + reviewed directions +
+current credentials. Preparation intersects the reviewed directions with the fresh
+axis evidence; renewal rejects any other direction. Each renewed gesture has a new
+START/RELEASE pair and fresh request identities, after the previous RELEASE was
+confirmed. The 8s idle/20s absolute expiry, bounded cache, per-camera ownership and
+200ms movement lease remain unchanged. No simultaneous motion or START retries.
+
+Build `b-2a919087dad5`: four authenticated dashboard API steps, one each in order
+left/right/up/down, all HTTP 200. Native logs (not just HTTP) confirmed START and
+RELEASE delivery, `errors=none`, no ONVIF fallback:
+
+| Direction | Session reused | Prepare | Native total | HTTP total |
+|---|---|---|---|---|
+| Left | no | 1958 ms | 2320 ms | 2336 ms |
+| Right | yes | 1 ms | 403 ms | 411 ms |
+| Up | yes | 14 ms | 383 ms | 391 ms |
+| Down | yes | 2 ms | 400 ms | 405 ms |
+
+These timings include the finite movement and STOP confirmation, not measured
+motor start latency. A first action after session expiry still pays setup cost.
+User visual confirmation of new-direction fluidity and physical stopping remains
+pending; protocol receipts cannot prove motor behavior. No lamp/sound/reset tests.
+Full Python suite, Ruff, mypy and focused cross-direction regression tests passed.
+
 ## Short stopped-session reuse and input latency — 2026-09-14
 
 The initial finite-step integration rebuilt the session and three correlated preflight reads

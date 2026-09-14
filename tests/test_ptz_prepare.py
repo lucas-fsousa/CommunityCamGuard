@@ -48,9 +48,18 @@ def test_only_three_correlated_reads_transfer_socket_ownership(prepared):
     route = prepare()
     assert prepared.closed == 0
     assert [seq for _, seq in prepared.paths] == [0xFFFFFFFE, 0xFFFFFFFF, 0]
-    assert prepared.constructed == [dict(access_id=42, device_id=123456, direction="left", sequence=1)]
+    assert prepared.constructed == [dict(access_id=42, device_id=123456, direction="left", sequence=1,
+                                         allowed_directions=frozenset({"left"}))]
     route.close()
     assert prepared.closed == 1
+
+
+@pytest.mark.parametrize("axis,expected", [(7, {"left", "right", "up", "down"}),
+                                           (3, {"left", "right"})])
+def test_reuse_axes_intersect_current_evidence_and_reviewed_profile(prepared, axis, expected):
+    prepared.values[2]["stVal"]["ptzInfo"]["id0_status"] = axis
+    prepare(reviewed_directions=frozenset({"left", "right", "up", "down"}))
+    assert prepared.constructed[0]["allowed_directions"] == frozenset(expected)
 
 
 @pytest.mark.parametrize("budget", [0, 21, True, float("nan"), float("inf")])

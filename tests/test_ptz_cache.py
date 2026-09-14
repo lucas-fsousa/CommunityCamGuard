@@ -12,8 +12,9 @@ class Route:
         self.renewed = 0
     def close(self):
         self.closed += 1
-    def renew(self):
+    def renew(self, direction=None):
         self.renewed += 1
+        self.renewed_direction = direction
         return Route()
     def send_start(self):
         pass
@@ -55,6 +56,18 @@ def test_only_confirmed_stopped_session_is_reused(pool):
     assert next_lease.reused and state.prepares == 1
     next_lease.close()  # unused/cancelled session cannot enter the cache
     assert next_lease.route.closed == 1
+
+
+def test_direction_change_reuses_only_stopped_session(pool):
+    cache, state = pool
+    first = cache.acquire(("camera", "reviewed-profile", "credentials"), state.prepare,
+                          direction="right")
+    first.confirmed = True
+    first.close()
+    second = cache.acquire(first.key, state.prepare, direction="up")
+    assert second.reused and state.prepares == 1
+    assert first.route.renewed_direction == "up"
+    second.close()
 
 
 @pytest.mark.parametrize("advance", [9, 21])

@@ -42,10 +42,11 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
         if entry is None or entry.device_id != profile.identity.device_id:
             raise ControlNotReady("native PTZ enrollment requires review")
         try:
-            key = (camera.camera_id, direction, profile.identity, profile.directions,
+            key = (camera.camera_id, profile.identity, profile.directions,
                    entry.access_id, entry.access_token)
             route = _routes.acquire(key, lambda: prepare_ptz_route(
-                entry, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12))
+                entry, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12,
+                reviewed_directions=profile.directions), direction=direction)
         except P2PProbeError:
             # No START has been constructed/sent by preparation. Only this failure
             # boundary may consider a standard finite-step fallback.
@@ -56,8 +57,8 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
             return fallback()
         ready = time.monotonic()
         result = motion.run(route)
-        log.warning("native_ptz camera=%s start_attempted=%s release_confirmed=%s errors=%s reused=%s prepare_ms=%d total_ms=%d",
-                 camera.camera_id, result.start_attempted, result.release_delivery_confirmed,
+        log.warning("native_ptz camera=%s direction=%s start_attempted=%s release_confirmed=%s errors=%s reused=%s prepare_ms=%d total_ms=%d",
+                 camera.camera_id, direction, result.start_attempted, result.release_delivery_confirmed,
                  ",".join(result.error_types) or "none", route.reused,
                  int((ready-started)*1000), int((time.monotonic()-started)*1000))
         if result.cancelled and not result.start_attempted:

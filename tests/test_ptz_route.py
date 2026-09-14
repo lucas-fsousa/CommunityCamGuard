@@ -127,6 +127,31 @@ def test_renew_transfers_socket_with_new_motion_identity(prepared):
     assert sock.closed == 1
 
 
+def test_renew_cannot_grant_unverified_direction(prepared):
+    route, sock = prepared
+    route.send_release()
+    sock.incoming.extend((packet(ack=True), packet(kind=0xBA)))
+    assert route.confirm_release(deadline=101)
+    with pytest.raises(ValueError, match="not verified"):
+        route.renew("up")
+    assert not route._closed
+
+
+def test_renew_changes_direction_within_verified_axes(prepared):
+    route, sock = prepared
+    route._allowed_directions = frozenset({"right", "left", "up", "down"})
+    route.send_release()
+    sock.incoming.extend((packet(ack=True), packet(kind=0xBA)))
+    assert route.confirm_release(deadline=101)
+    fresh = route.renew("up")
+    assert fresh._direction == "up" and fresh._sock is sock
+    assert fresh._allowed_directions == route._allowed_directions
+    assert route._closed and not fresh._closed
+    fresh.send_start()
+    assert sock.sent[-1][0] != route._start
+    fresh.close()
+
+
 @pytest.mark.parametrize("error", [0, 7])
 def test_application_reply_gets_peer_receipt_without_reusing_motion_sequence(prepared, error):
     route, sock = prepared
