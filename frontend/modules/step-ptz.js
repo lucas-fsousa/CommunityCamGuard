@@ -3,7 +3,7 @@ import { api, el } from "ccg/core";
 import { t } from "ccg/i18n";
 
 export function finitePtzControls(cam) {
-  const status = el("small", { className: "camera-control-status" });
+  const status = el("small", { className: "ptz-feedback" });
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
   let busy = false;
@@ -16,8 +16,10 @@ export function finitePtzControls(cam) {
       if (busy) return;
       busy = true;
       buttons.forEach((item) => { item.disabled = true; });
+      button.setAttribute("aria-busy", "true");
+      button.classList.add("ptz-pending");
       status.classList.remove("error");
-      status.textContent = t("ptz.moving");
+      status.textContent = "";
       try {
         const result = await api(`/cameras/${encodeURIComponent(cam.id)}/ptz`, {
           method: "POST", body: JSON.stringify({ action: "step", direction }),
@@ -29,6 +31,8 @@ export function finitePtzControls(cam) {
         status.textContent = t("control.failed", { msg: error.message });
       } finally {
         busy = false;
+        button.setAttribute("aria-busy", "false");
+        button.classList.remove("ptz-pending");
         buttons.forEach((item) => { item.disabled = false; });
       }
     });

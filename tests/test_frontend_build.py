@@ -314,3 +314,15 @@ def test_camera_panel_has_centered_bounded_mobile_layout_and_clear_labels():
     labels = (frontend / "i18n.js").read_text()
     assert '"control.alarmVoiceOpen": "Selecionar sirene"' in labels
     assert '"control.alarmVoiceOpen": "Select siren sound"' in labels
+
+
+def test_finite_ptz_feedback_never_adds_inline_loading_text():
+    frontend = Path(__file__).parents[1] / "frontend"
+    source = (frontend / "modules" / "step-ptz.js").read_text()
+    css = (frontend / "style.css").read_text()
+    assert 't("ptz.moving")' not in source
+    assert 'className: "ptz-feedback"' in source
+    feedback = css.split(".ptz-feedback {", 1)[1].split("}", 1)[0]
+    error = css.split(".ptz-feedback.error {", 1)[1].split("}", 1)[0]
+    assert "position: absolute" in feedback
+    assert "position: fixed" in error and "100vw - 32px" in error

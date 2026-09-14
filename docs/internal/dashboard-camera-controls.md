@@ -2,6 +2,14 @@
 
 ## Driver-advertised finite PTZ — 2026-09-14
 
+Feedback correction after user testing: pending requests no longer insert preparation text into
+the arrow bar. The selected arrow has a fixed-size inset highlight and `aria-busy`, with duplicate
+clicks still blocked. Errors remain accessible through a live status region but render as a
+viewport-bounded fixed notice, outside the bar's layout. This changes presentation only: it does
+not reuse the P2P session, reduce setup latency or widen right-only native certification.
+DOM tests cover empty pending text/highlight cleanup/error recovery; CSS contracts ensure the
+status never occupies inline space. No camera commands or container restart for this UI fix.
+
 PTZ remains outside this popup. The new generic `ptz_interaction` field selects finite clicks
 only where a driver advertises them. The exact camera-3 opt-in now sends one step per click,
 with disabled arrows and visible status until completion, no hold-repeat timer and no client

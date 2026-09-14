@@ -261,6 +261,10 @@ const cameraControls = load("camera-controls.js", {
   const beforeStep = requests.length;
   const moving = arrowButtons[3].click();
   assert(arrowButtons.every((node) => node.disabled));
+  assert.equal(ptzStatus.textContent, "");
+  assert.equal(ptzStatus.className, "ptz-feedback");
+  assert(arrowButtons[3].classList.contains("ptz-pending"));
+  assert.equal(arrowButtons[3].attributes["aria-busy"], "true");
   await arrowButtons[0].dispatch("click");
   assert.equal(requests.length, beforeStep + 1);
   assert.equal(requests.at(-1)[1].body, '{"action":"step","direction":"right"}');
@@ -268,9 +272,12 @@ const cameraControls = load("camera-controls.js", {
   await moving;
   assert(arrowButtons.every((node) => !node.disabled));
   assert.equal(ptzStatus.textContent, "");
+  assert(!arrowButtons[3].classList.contains("ptz-pending"));
+  assert.equal(arrowButtons[3].attributes["aria-busy"], "false");
   pending = Promise.resolve({ ok: false });
   await arrowButtons[3].click();
   assert(ptzStatus.classList.contains("error"));
+  assert(!arrowButtons[3].classList.contains("ptz-pending"));
   assert(arrowButtons.every((node) => !node.disabled));
   assert(!arrowButtons.some((node) => node.events.pointerdown));
   pending = null;
