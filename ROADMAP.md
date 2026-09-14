@@ -10,6 +10,11 @@ Status: `todo` · `wip` · `done` · `blocked`.
 
 ## Milestone M1 — Live video quality (Feature 1)  ⟶ CORE DONE
 
+DHCP recovery (2026-09-14): automatic bounded MAC rediscovery and manual-scan media
+resync implemented; see `docs/internal/dhcp-address-recovery.md`. Follow-ups: identity
+audit of apparently healthy reassigned IPs; driver-specific discovery for cameras
+without a known MAC; targeted source replacement without whole-media reload.
+
 Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the
 camera's maximum resolution; Auto/SD are explicit user choices for weaker hosts. Diagnostic
 reference: `docs/DECISIONS.md §34`. Core delivered

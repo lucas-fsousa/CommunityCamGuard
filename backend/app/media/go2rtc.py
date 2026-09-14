@@ -300,7 +300,8 @@ class Go2rtc:
             self.start(cameras)
         else:
             self.write_config(cameras)
-            self.reload_external()
+            if not self.reload_external():
+                raise RuntimeError("external media configuration reload failed")
 
     def stream_activity(self) -> dict[str, dict]:
         """Per-stream liveness for the freeze watchdog: ``{stream_id: {video_packets, consumers}}``.

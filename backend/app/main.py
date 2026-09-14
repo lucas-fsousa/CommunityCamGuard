@@ -43,6 +43,7 @@ from .recording.playback import Warmer
 from .recording.recorder import Recorder
 from .recording.retention import RetentionCleaner
 from .recording.storage import StorageMonitor
+from .services.address_recovery import AddressRecovery
 
 
 @asynccontextmanager
@@ -57,11 +58,13 @@ async def lifespan(app: FastAPI):
     storage = StorageMonitor(rec)
     retention = RetentionCleaner()
     warmer = Warmer()
+    address_recovery = AddressRecovery(media, rec)
     app.state.media = media
     app.state.rec = rec
     app.state.storage = storage
     app.state.retention = retention
     app.state.warmer = warmer
+    app.state.address_recovery = address_recovery
     app.state.startup_error = None
 
     if settings.autostart_services:
@@ -83,10 +86,12 @@ async def lifespan(app: FastAPI):
             warmer.start()  # opt-in: pre-transcode recent segments for instant playback
         except Exception as exc:  # missing binary, etc. — keep the API usable
             app.state.startup_error = str(exc)
+        address_recovery.start()
 
     try:
         yield
     finally:
+        address_recovery.stop()
         warmer.stop()
         retention.stop()
         storage.stop()

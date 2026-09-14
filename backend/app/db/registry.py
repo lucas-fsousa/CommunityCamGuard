@@ -211,6 +211,17 @@ def _row_to_camera(row: sqlite3.Row) -> Camera:
 
 # --- CRUD --------------------------------------------------------------------------
 
+def refresh_address(camera: Camera, ip: str) -> bool:
+    """CAS a discovered address; never resurrect deleted or concurrently edited cameras."""
+    with connect() as connection:
+        result = connection.execute(
+            "UPDATE cameras SET last_ip=?, updated_at=? "
+            "WHERE camera_id=? AND mac=? AND last_ip=?",
+            (ip, _now(), camera.camera_id, camera.mac, camera.last_ip),
+        )
+        return result.rowcount == 1
+
+
 def list_cameras() -> list[Camera]:
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM cameras ORDER BY name, mac").fetchall()
