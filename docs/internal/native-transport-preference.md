@@ -3,6 +3,19 @@
 Status: staged implementation. Video remains RTSP; native PTZ has an exact-unit finite-step opt-in.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
+## User validation and next increment — 2026-09-14
+
+After deployment `b-2a919087dad5`, the user confirmed “perfeito. Validado … PTZ ok”.
+The four-direction camera-3 finite-step/drag experience is now physically validated;
+this supersedes pending visual confirmation below. Other units and continuous-hold
+semantics are not implicitly homologated.
+
+Next native-video increment: `kcp_receive.py` and `media_receive.py` implement
+bounded, socket-free message assembly and a pinned-peer MTP input/ACK adapter.
+They are **not wired into existing intercom, AV initialization or production video**.
+Current RTSP recording/live view and validated two-way audio remain unchanged.
+See [native-media-receive.md](native-media-receive.md) for evidence, limits and next tests.
+
 ## Four-direction camera-3 rollout — 2026-09-14
 
 Supersedes the right-only rollout described in the historical sections below. The

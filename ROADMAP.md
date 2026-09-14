@@ -6,10 +6,9 @@ Living document: backlog, priorities and milestones. Technical detail and ration
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
 
-PTZ update (2026-09-14): camera 3 now uses reviewed native left/right/up/down with
-confirmed-stopped session reuse across directions. Dashboard API validation passed
-all four; warm alternating actions took 391–411 ms end-to-end. User physical/visual
-validation remains pending, as does rollout to other exact units. Cold setup still
+PTZ update (2026-09-14): **user physically validated all four directions and fluidity
+on camera 3**. Dashboard API validation also passed all four; warm alternating
+actions took 391–411 ms end-to-end. Rollout to other exact units remains separate. Cold setup still
 adds latency. See `docs/internal/native-transport-preference.md` for current scope;
 earlier right-only milestones below describe the previous stage.
 
@@ -34,7 +33,7 @@ or wait on hardware/a human eye.
 | P0 | **Quality levels** model (`low`/`medium`/`high`/`max`) mapping source→bitrate (`media/quality.py`) | done |
 | P0 | `live_quality` setting (default `max`) + unit tests (`test_quality.py`, `build_config` wiring) | done |
 | P1 | **Per-camera quality selector** in the UI — Auto/HD/SD dropdown (client-side/instant) + endpoint exposes quality | done |
-| P1 | Prefer homologated native driver transports per camera/feature, retaining RTSP/ONVIF fallback. PTZ: fixed type-2 codec, fresh camera-3 axis evidence, bounded gesture ownership, nonblocking route and exact-unit correlated route preparation implemented/tested offline; live correlation, motion/STOP and browser lease integration pending. Native media then requires continuous reception, bounded local fan-out and measured latency/resource/recording comparison before replacing RTSP. No movement fallback after an ambiguous START. See `docs/internal/native-transport-preference.md` | wip |
+| P1 | Prefer homologated native driver transports per camera/feature, retaining RTSP/ONVIF fallback. Camera-3 native finite-step PTZ and click/drag are physically validated in all four directions. Native media still requires continuous reception, bounded local fan-out and measured latency/resource/recording comparison before replacing RTSP. No movement fallback after an ambiguous START. See `docs/internal/native-transport-preference.md` | wip |
 | P0 | **HD transport hardening** — prefer WebRTC; bounded/recoverable MSE queue; no 0.1× live playback fallback | done |
 | P1 | **Control polish** (feedback): quality dropdown, PTZ D-pad, borders on all buttons, taller bar | done |
 | P1 | Grouped per-camera control panel: image, audio, security, storage and maintenance; disabled placeholders with honest capability explanations, driver-filtered options, focus/scroll lifecycle and filtered server-recordings navigation. Separate semantic modules; see `docs/internal/dashboard-camera-controls.md` | done |
@@ -43,11 +42,13 @@ or wait on hardware/a human eye.
 | P1 | Fix night-vision/settings selectors returning to the group label after writes: retain only backend-confirmed semantic values; unconfirmed/error outcomes remain unknown. DOM regression coverage includes real select value/index semantics. Physical mode verification remains separate from this UI fix | done |
 | P1 | Require verified semantic responses in alarm-voice and weekly protection dialogs too; freeze submitted inputs, reject duplicate submits, keep failures visible and editable instead of closing on HTTP 200 alone | done |
 | P1 | Fix floodlight request/receipt sequence reuse: reserve disjoint sequence ranges, retain bounded readback/no actuation replay. Camera-3 host and deployed HTTP OFF→ON→OFF now pass with independent reads; user physical confirmation of this correction remains pending. See `docs/internal/camera3-controls-audit-2026-09-13.md` | wip |
-| P1 | Camera-3 live control audit: user confirmed orientation, push-to-talk, recorded voice and siren pulse. Night vision awaits nighttime validation. PTZ physical movement, relative volume, schedule enforcement and individual alarm sounds remain separate confirmation items; do not infer them from API success | wip |
+| P1 | Camera-3 live control audit: user confirmed orientation, push-to-talk, recorded voice, siren pulse and four-direction native PTZ. Night vision awaits nighttime validation. Relative volume, schedule enforcement and individual alarm sounds remain separate confirmation items; do not infer them from API success | wip |
 | P1 | Center camera controls in a responsive popup with internal scrolling, fixed close/status areas and mobile-stacked touch controls; clarify siren selection/activation and protection schedule labels in English/Portuguese. DOM/static tests passed; mobile visual review pending | done |
 | P1 | Diagnose intermittent white-light 502 failures: phase logs plus live comparison identified overlapping B9/BA sequences; corrected driver passed exact-unit host and HTTP roundtrips. Physical light confirmation remains tracked separately; no automatic actuation replay | done |
-| P1 | Native PTZ: user confirmed rightward 200ms movement and prompt STOP on camera 3. Exact-unit/right-only opt-in, shared camera operation lock, automatic release and no fallback after attempted START integrated. Other directions retain ONVIF; all-direction proof and continuous native browser leases remain pending. Short session reuse is tracked below | wip |
-| P1 | PTZ latency/input: short stopped-session reuse (8s idle/20s absolute, at most four idle sockets), new request identities, faster confirmed-reply drain and safe timing logs implemented. RELEASE-only cold/warm preparation measured 2671ms/1ms. Camera-3 pad now supports click/drag without movement backlog. End-to-end fluidity, other native directions and continuous native hold remain to validate | wip |
+| P1 | Native finite-step PTZ on camera 3: all four directions, automatic release, per-camera ownership and no fallback after attempted START. User physically validated the result. No automatic rollout to other units | done |
+| P1 | PTZ latency/input: stopped-session reuse across reviewed directions (8s idle/20s absolute, four idle sockets max), fresh request identities and click/drag pad without movement backlog. Camera-3 fluidity physically validated; warm alternating HTTP actions 391–411 ms | done |
+| P2 | Evaluate continuous native hold and reduced cold-start PTZ latency separately; do not weaken finite gesture/STOP safety or infer support on other cameras | todo |
+| P1 | Native video receive path: bounded KCP reordering/message assembly and pinned-peer MTP ACK adapter implemented and tested offline. Still isolated from working intercom/RTSP. Next: bounded capture replay, message-mode/stream framing proof, codec/keyframe/timestamp parsing and single-producer handoff validation | wip |
 | P0 | **Single camera connection + local fan-out**: recording and on-demand H.264 qualities share one RTSP producer; SD reads the base directly, without keeping an unused HD encoder alive. No live preload; same-quality viewers share an encoder; different qualities coexist only while consumed. See ADR 0005 | done |
 | P0 | **Frozen-player auto-recovery**: hybrid watchdog distinguishes client stall from local producer stall; only the latter cycles that camera's local preload | done³ |
 | — | **Invariant:** recording always uses the base (main) feed at full quality (`-c:v copy`), decoupled from the live quality selector — guard tests lock it | done |

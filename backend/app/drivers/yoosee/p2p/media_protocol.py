@@ -160,12 +160,15 @@ def build_kcp_ack(
     timestamp: int,
     *,
     unacknowledged: int,
+    window: int = 0x100,
 ) -> bytes:
+    if type(window) is not int or not 0 <= window <= 0xFFFF:
+        raise ValueError("invalid KCP receive window")
     segment = KCP_HEADER.pack(
         conv & 0xFFFFFFFF,
         KCP_ACK,
         0,
-        0x100,
+        window,
         timestamp & 0xFFFFFFFF,
         sequence & 0xFFFFFFFF,
         unacknowledged & 0xFFFFFFFF,
