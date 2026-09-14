@@ -109,3 +109,46 @@ individual video frames. Current recording/intercom paths remain untouched.
 Twelve new synthetic-PCAP tests cover byte order/microsecond/nanosecond clocks,
 reordered records, missing start, terminal-gap reporting, malformed/truncated lengths,
 IP-fragment rejection and sanitized output. They need no external capture files.
+
+## Cookie-correlated offline decoding — 2026-09-14
+
+`scripts/captured_media.py` extends the same bounded replay, without production
+imports or runtime changes. It accepts exact 177-byte direct mode-1 A4 envelopes
+only after declared length, mode, checksum, option layout and 24-bit link validation.
+Bindings include both complete UDP endpoints and the link ID; the conversation's
+high direction bit is masked only for that lookup. Conflicting keys for the same
+binding remain ambiguous, never last-writer-wins. Up to 16 bindings are retained.
+
+Only a complete 76-byte type-3 AV message with matching call ID establishes the
+per-flow cookie association. Type-4 complete TLVs with captured flags 1/2 can then
+use the existing RC5/6 cookie decoder. Missing/mismatched/changed associations skip
+decryption. Cookies and call IDs have no diagnostic repr and are absent from reports.
+This is historical protocol correlation, **not cryptographic authentication**.
+
+Inspection retains only the first 28 decoded bytes, even across multiple TLVs, for
+the existing V1 encoding-header parser. It never searches arbitrary plaintext for
+a plausible header, saves decoded media, logs audio/video, or assumes a TLV is a
+video frame. Consistent codec metadata is a useful decoding check, not a playback test.
+
+Captured results:
+
+| Flow | Decoded complete media TLVs | Decoded bytes | Encoding header |
+|---|---|---|---|
+| flow5 | 2,837 | 1,518,843 | 640×360, 15 fps |
+| flow9 | 235 before the same missing-sequence deadline | 231,650 | 1920×1080, 15 fps |
+| flow2 | 0 (24 skipped: no correlated key) | 0 | none inferred |
+
+Both headers report video codec ID 5 and audio codec ID 4, option 2, mono, 16-bit,
+16 kHz, 1,024-sample frames. These are recorded header fields, not an independent
+decoder validation or a guarantee of observed playback rate/resolution. No keys
+from another session were tried on flow2, and flow9 still stops at the original gap.
+
+Ten new synthetic tests cover endpoint/link/checksum binding, ambiguous-key refusal,
+call-ID mismatch, missing controls, changed key, unsupported flags, wrong-cookie
+header failure and a header split across complete TLVs. Next: interpret bounded
+StreamPipe records after the header, establish complete frame boundaries/timestamps,
+then validate codec access units. No live test or container rebuild in this increment.
+
+Validation: full Python suite and focused replay/correlation tests passed, as did
+Ruff and mypy for the offline modules. Full historical decoding measured 1.59 s
+and peak RSS 50,972 KiB under 256 MiB address-space / 30 CPU-s limits.

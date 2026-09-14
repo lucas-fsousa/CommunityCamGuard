@@ -16,6 +16,7 @@ from backend.app.drivers.yoosee.p2p.kcp_receive import KcpReceiver, ReceiveError
 from backend.app.drivers.yoosee.p2p.media_protocol import KCP_PUSH, parse_kcp_segments
 from backend.app.drivers.yoosee.p2p.media_receive import MediaReceiver
 
+from .captured_media import CallingKey, CapturedMedia, CapturedSessions
 from .pcap_input import packets, udp
 
 MAX_FLOWS = 16
@@ -33,8 +34,9 @@ class Flow:
         )
         self.types: Counter[int] = Counter()
         self.length_mismatches = 0
+        self.media = CapturedMedia()
 
-    def consume(self, now: float, wire: bytes, peer: tuple[str, int]) -> None:
+    def consume(self, now: float, wire: bytes, peer: tuple[str, int], key: CallingKey | None = None) -> None:
         self.now = now
         segments = parse_kcp_segments(wire)
         for segment in segments:
@@ -60,6 +62,7 @@ class Flow:
         self.report["peak_buffer_bytes"] = max(self.report["peak_buffer_bytes"], buffered)
         self.report["gap_observations"] += int(bool(buffered))
         for message in result.messages:
+            self.media.consume(message, key)
             self.report["messages"] += 1
             self.report["message_bytes"] += len(message)
             if len(message) >= 4 and struct.unpack_from("<H", message, 2)[0] == len(message):
@@ -72,12 +75,14 @@ class Flow:
         self.report["next_sequence"] = self.receiver.receiver.next_sequence
         self.report["tlv_types"] = dict(sorted(self.types.items()))
         self.report["tlv_length_mismatches"] = self.length_mismatches
+        self.report["media"] = self.media.report
         self.receiver.receiver.close()
         return self.report
 
 
 def replay(path: Path) -> dict:
     flows: dict[tuple, Flow] = {}
+    sessions = CapturedSessions()
     records = valid = malformed = 0
     for now, raw in packets(path):
         records += 1
@@ -85,6 +90,7 @@ def replay(path: Path) -> dict:
         if parsed is None:
             continue
         peer, destination, wire = parsed
+        sessions.observe(peer, destination, wire)
         if wire[:2] != b"\xc0\x10":
             continue
         try:
@@ -100,7 +106,7 @@ def replay(path: Path) -> dict:
                 if len(flows) >= MAX_FLOWS:
                     raise ValueError("PCAP exceeds 16 directional KCP flows")
                 flows[key] = Flow(f"flow{len(flows)+1}", peer, conv, now)
-            flows[key].consume(now, wire, peer)
+            flows[key].consume(now, wire, peer, sessions.lookup(peer, destination, conv))
     return dict(records=records, valid_mtp_datagrams=valid, malformed_mtp_datagrams=malformed,
                 flows=[flow.finish() for flow in flows.values()])
 
