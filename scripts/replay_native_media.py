@@ -76,6 +76,7 @@ class Flow:
         self.report["tlv_types"] = dict(sorted(self.types.items()))
         self.report["tlv_length_mismatches"] = self.length_mismatches
         self.report["media"] = self.media.report
+        self.report["media"]["records"] = self.media.frames.finish()
         self.receiver.receiver.close()
         return self.report
 

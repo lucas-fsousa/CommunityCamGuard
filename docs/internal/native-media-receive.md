@@ -152,3 +152,66 @@ then validate codec access units. No live test or container rebuild in this incr
 Validation: full Python suite and focused replay/correlation tests passed, as did
 Ruff and mypy for the offline modules. Full historical decoding measured 1.59 s
 and peak RSS 50,972 KiB under 256 MiB address-space / 30 CPU-s limits.
+
+## Incremental V1 record boundaries and raw timestamps — 2026-09-14
+
+Added `p2p/v1_receive.py`, used only by offline `scripts/captured_frames.py`.
+The production stream/intercom paths remain unchanged. The parser consumes decoded
+bytes incrementally across TLVs and emits complete records, never partial frames
+or a guess found by scanning payload for the magic value.
+
+The historical RE `re/mtp_stream.py::build_v1_audio_packet` documented the AV layout.
+This increment independently inspected just `trans_proto_v1::unpacking_avdata`
+at `0x144a74` (1,488 bytes) in the existing 2,363,696-byte
+`re/extracted/libiotvideomulti.so`, using the symbol-aware disassembler with
+256 MiB address-space / 20 CPU-s limits. It confirms:
+
+| Offset | Meaning |
+|---|---|
+| 0 | V1 magic, four bytes |
+| 4 | Record marker; this parser permits observed AV values 0/8 and encoding headers |
+| 6 | u16 audio frame count |
+| 8 | u32 trailing video payload size |
+| 12 | u64 video timestamp |
+| 20 | u64 shared audio-record timestamp |
+| 28 | u16 audio-size descriptors, then audio bodies, then video body |
+
+Native instructions at `0x144b24` read the audio count from header+6;
+`0x144cd0` adds video length from header+8 to summed audio sizes before committing;
+`0x144d70` loads the audio timestamp from header+20 and `0x144e68` loads video time
+from header+12. Audio payloads are consumed before the trailing video payload.
+No broad APK decompilation, SDK execution or camera connection was needed.
+
+Bounds: 65,535-byte feed chunks, 256 audio descriptors, 1 MiB declared record size;
+retained bytes never exceed one record plus one input chunk. A completed record is
+copied into bounded output; callers must consume/release it, not accumulate frames.
+Unsupported record classes or invalid lengths close/clear the parser. No implicit
+resynchronization, codec decoding, timestamp conversion or format-wide capability
+grant. The live owner will still need a no-progress timeout for an incomplete record.
+
+Historical replay now yielded:
+
+| Flow | Encoding headers | Audio frames / bytes | Video payloads / bytes | Tail bytes |
+|---|---|---|---|---|
+| flow5 (640×360) | 1 | 1,172 / 308,200 | 1,137 / 1,152,719 | 0 |
+| flow9 (1920×1080, before KCP gap) | 1 | 3 / 806 | 3 / 230,670 | 0 |
+
+Neither stream produced a record-boundary error or raw timestamp regression.
+Flow5 consecutive audio-record deltas were 59,000–69,000 ticks; video deltas were
+49,000–150,000 ticks. Flow9 audio deltas were exactly 64,000; video 50,000–100,000.
+Microseconds are consistent with the recovered header (1,024 samples / 16 kHz =
+64 ms) and existing sender contract, but this parser preserves raw u64 values.
+It does not interpret them as UTC, infer a date, or claim a constant observed FPS.
+Grouped audio frames share a record timestamp; per-frame pacing is separate work.
+
+Seventeen new tests cover byte-by-byte/chunked input, multiple records, headers,
+partial audio tables/video bodies, magic inside payload, unknown records, oversized
+lengths, closed receivers, relative timestamp diagnostics and incomplete capture tails.
+Next: validate elementary audio/video payloads with a bounded independent decoder,
+establish codec configuration/keyframe transitions and only then design live fan-out.
+
+Validation: 39 focused framing/correlation/replay tests passed; Ruff and mypy passed.
+The full historical replay retained peak RSS 51,724 KiB under the existing 256 MiB
+address-space cap. This run took 20.16 s wall time while the host was also busy;
+it is not a production decoding performance benchmark. No browser, native SDK
+execution, container rebuild, new media session or camera action occurred.

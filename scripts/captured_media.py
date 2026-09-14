@@ -15,6 +15,8 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import (
     unpack_v1_encoding_header,
 )
 
+from .captured_frames import CapturedFrames
+
 Endpoint = tuple[str, int]
 
 
@@ -64,6 +66,7 @@ class CapturedSessions:
 class CapturedMedia:
     def __init__(self) -> None:
         self._binding: CallingKey | None = None
+        self.frames = CapturedFrames()
         self._prefix = bytearray()
         self._invalid = False
         self.report: dict = dict(call_correlated=False, decoded_messages=0, decoded_bytes=0,
@@ -86,6 +89,7 @@ class CapturedMedia:
             self.report["skipped_media"] += 1
             return
         payload = decrypt_media_tlv(message, key.cookie)
+        self.frames.consume(payload)
         self.report["decoded_messages"] += 1
         self.report["decoded_bytes"] += len(payload)
         if len(self._prefix) < 28:
