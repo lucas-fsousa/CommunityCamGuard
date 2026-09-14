@@ -62,3 +62,50 @@ No browser, emulator, camera session, container rebuild or runtime switch was us
 This increment deliberately does not modify the working AV/intercom receive path:
 safe migration must preserve state end-to-end and be separately homologated. The
 MTP checksum and endpoint matching are not cryptographic media authentication.
+
+## Historical capture replay — 2026-09-14
+
+Implemented `scripts/pcap_input.py` (streaming classic PCAP/RAW IPv4 reader) and
+`scripts/replay_native_media.py` (sanitized receive-only replay). Run from the repo:
+
+```sh
+prlimit --as=268435456 --cpu=30 -- .venv/bin/python -m scripts.replay_native_media re/pcapdroid/pcap.pcap
+```
+
+No network, persistent output, payload/credential dumps or address logging. The
+report labels conversations `flow1` etc. It keeps up to 16 directional conversations,
+reads at most 64 MiB/100,000 records and rejects oversized packet declarations before
+allocation. Only classic RAW-IPv4 PCAP is supported, not Ethernet/PCAPNG/IP fragments.
+The capture remains git-ignored; no private packet fixture was committed.
+
+Existing 4,443,195-byte capture:
+
+| Observation | Result |
+|---|---|
+| Input records | 12,436 |
+| Valid MTP datagrams / invalid MTP datagrams | 7,222 / 0 |
+| Directional PUSH conversations | 10, all containing sequence zero |
+| Conversations without receiver failure | 9; no retained tail bytes |
+| Largest successful conversation | 2,838 messages, 1,530,267 bytes; 11 buffered observations |
+| Duplicate filtering example | 27 PUSH observations → 25 messages |
+| Nonzero KCP fragment counters | 0 (fragment assembly remains synthetic-test evidence) |
+| Emitted message TLV lengths | All matched the declared 16-bit length |
+| Terminal failure | flow9: missing sequence 236, two-second assembly deadline |
+| Largest observed buffered payload before failure | 119,161 bytes, subsequently cleared |
+| Offline process measurement | 0.67 s, peak RSS 51,280 KiB; 256 MiB address-space / 30 CPU-s limits |
+
+The blocked sequence in flow9 does not appear later in that captured direction.
+This proves a gap **in the capture**, not whether the cause was network loss,
+capture loss, sender behavior, or an ACK problem in the vendor app. No deadline or
+memory limit was raised to hide it; the receiver did not skip to an arbitrary later
+sequence. The capture contains traffic for older devices, not a fresh camera-3
+homologation. Playback/codec correctness and live recovery remain unproven.
+
+This completes the initial transport replay step for the observed unfragmented
+TLV traffic. Next is session-cookie correlation and complete-message decryption,
+followed by bounded StreamPipe/frame parsing. TLV messages are not assumed to be
+individual video frames. Current recording/intercom paths remain untouched.
+
+Twelve new synthetic-PCAP tests cover byte order/microsecond/nanosecond clocks,
+reordered records, missing start, terminal-gap reporting, malformed/truncated lengths,
+IP-fragment rejection and sanitized output. They need no external capture files.
