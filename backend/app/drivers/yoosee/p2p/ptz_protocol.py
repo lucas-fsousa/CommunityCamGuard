@@ -51,6 +51,25 @@ class PtzReply:
     error_code: int | None = None
 
 
+def build_ptz_receipt(frame: bytes, node: CertifiedNode, sequence: int) -> bytes:
+    """BA receipt for a full, already correlated PTZ B9 reply (never a motion command).
+
+    Caller must first validate peer, decryption and parse_ptz_reply correlation.
+    This acknowledges receipt even of an application error, not physical STOP.
+    """
+    if (len(frame) < 0x3C or frame[1] != 0xB9 or frame[0] != 0x7E
+            or struct.unpack_from("<Q", frame, 4)[0] != node.session_id):
+        raise ValueError("PTZ receipt requires a full same-session B9 response")
+    flags = struct.unpack_from("<I", frame, 0x14)[0]
+    if (flags >> 16) & 3 != 2 or flags & (1 << 20):
+        raise ValueError("PTZ receipt requires an encrypted application response")
+    receipt = new_header(0xBA, 0x34, node.session_id, sequence, randomized_flags(mode=2, proc=1))
+    receipt[0] = 0x7E
+    destination, source, message = struct.unpack_from("<QQI", frame, 0x1C)
+    struct.pack_into("<QQI", receipt, 0x1C, source, destination, message)
+    return finish_mode2(receipt, node.session_key)
+
+
 def parse_ptz_reply(frame: bytes, *, node: CertifiedNode, access_id: int, device_id: int,
                     sequence: int, message_id: int, request_id: int) -> PtzReply | None:
     """Parse decrypted mode-2 replies only after caller verifies UDP peer/decryption.

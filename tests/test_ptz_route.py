@@ -1,10 +1,12 @@
 """Prepared native route tests with synthetic UDP; never contact a camera."""
+import struct
 from collections import deque
 from types import SimpleNamespace
 
 import pytest
 
 from backend.app.drivers.yoosee.p2p import ptz_route
+from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2
 from tests.test_ptz_protocol import NODE, reply
 
@@ -104,3 +106,20 @@ def test_release_only_prevents_later_start(prepared):
     route.send_release()
     with pytest.raises(RuntimeError):
         route.send_start()
+
+
+@pytest.mark.parametrize("error", [0, 7])
+def test_application_reply_gets_peer_receipt_without_reusing_motion_sequence(prepared, error):
+    route, sock = prepared
+    route.send_release()
+    sock.incoming.extend((packet(value={"type": 2, "err": error}), packet(value={"type": 2, "err": error})))
+    assert route.confirm_release(deadline=101) is (error == 0)
+    receipts = []
+    for wire, peer in sock.sent:
+        assert peer == NODE.address
+        plain = gute_mode2_decrypt(wire, NODE.session_key)
+        if plain[1] == 0xBA and not struct.unpack_from("<I", plain, 0x14)[0] & (1 << 20):
+            receipts.append(plain)
+    assert [struct.unpack_from("<I", frame, 0x0C)[0] for frame in receipts] == [20, 21]
+    for frame in receipts:
+        assert struct.unpack_from("<QQI", frame, 0x1C) == (456, 123, 101)

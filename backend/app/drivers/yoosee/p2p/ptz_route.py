@@ -12,7 +12,7 @@ import time
 from typing import TypedDict
 
 from .contracts import CertifiedNode
-from .ptz_protocol import build_ptz_request, parse_ptz_reply
+from .ptz_protocol import build_ptz_receipt, build_ptz_request, parse_ptz_reply
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame
 
 
@@ -43,6 +43,7 @@ class NativePtzRoute:
                                 sequence=(sequence + 1) & 0xFFFFFFFF,
                                 message_id=secrets.randbits(31), request_id=secrets.randbits(32))
         self._release = build_ptz_request(**self._release_ids, direction=direction, pressed=False)
+        self._receipt_sequence = (sequence + 2) & 0xFFFFFFFF
         sock.setblocking(False)
 
     def send_start(self) -> None:
@@ -87,6 +88,11 @@ class NativePtzRoute:
                 self._error |= response.error_code != 0
                 self._application |= response.error_code == 0
             acknowledge_reliable_node_frame(self._sock, self._node, plain)
+            if response.error_code is not None:
+                # Allocate before send: an ambiguous failure must not reuse an ID.
+                sequence = self._receipt_sequence
+                self._receipt_sequence = (sequence + 1) & 0xFFFFFFFF
+                self._sock.sendto(build_ptz_receipt(plain, self._node, sequence), self._node.address)
         # A later explicit error in this observation window beats earlier receipts/success.
         return not self._error and (self._application or (self._transport and self._peer))
 

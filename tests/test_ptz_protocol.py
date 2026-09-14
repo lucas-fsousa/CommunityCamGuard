@@ -9,6 +9,7 @@ from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.ptz_protocol import (
     DIRECTIONS,
     PtzReply,
+    build_ptz_receipt,
     build_ptz_request,
     direction_supported,
     parse_ptz_reply,
@@ -70,6 +71,12 @@ def test_delivery_and_application_results_remain_distinct():
     assert parse_ptz_reply(b"", **ARGS) is None
     assert parse_ptz_reply(reply()[:0x35], **ARGS) is None
     assert parse_ptz_reply(reply() + bytes(4096), **ARGS) is None
+
+
+@pytest.mark.parametrize("frame", [b"", reply(kind=0xBA), reply(session=10), reply(mode=0), reply(ack=True)])
+def test_peer_receipt_rejects_wrong_envelope(frame):
+    with pytest.raises(ValueError):
+        build_ptz_receipt(frame, NODE, 20)
 
 
 @pytest.mark.parametrize("status,directions", [(7, set(DIRECTIONS)), (3, {"left", "right"}),
