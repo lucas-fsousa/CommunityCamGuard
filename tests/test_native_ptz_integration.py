@@ -30,13 +30,15 @@ def prepared(monkeypatch):
                 return MotionResult(False, True, 0, False, ())
             return state.outcome
     monkeypatch.setattr(native_ptz, "PtzMotion", Motion)
-    monkeypatch.setattr(native_ptz.p2p, "get_enrollment_for_camera", lambda _: SimpleNamespace(device_id=IDENTITY.device_id))
+    monkeypatch.setattr(native_ptz.p2p, "get_enrollment_for_camera", lambda _: SimpleNamespace(
+        device_id=IDENTITY.device_id, access_id=1, access_token=b"test"))
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(acquire=lambda key, prepare: prepare()))
     def prepare(*args, **kwargs):
         state.prepared += 1
         assert kwargs["camera_id"] == CAMERA.camera_id
         assert kwargs["direction"] == "right"
         assert kwargs["budget"] == 12
-        return object()
+        return SimpleNamespace(reused=False)
     monkeypatch.setattr(native_ptz, "prepare_ptz_route", prepare)
     def fallback():
         state.fallback += 1
@@ -77,7 +79,7 @@ def test_stop_during_preparation_cancels_and_no_duplicate_session(prepared, monk
         with pytest.raises(ControlNotReady):
             native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
         native_ptz.stop(CAMERA.camera_id)
-        return object()
+        return SimpleNamespace(reused=False)
     monkeypatch.setattr(native_ptz, "prepare_ptz_route", prepare)
     assert not native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
     assert prepared.fallback == 0

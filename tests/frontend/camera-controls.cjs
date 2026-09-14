@@ -260,7 +260,7 @@ const cameraControls = load("camera-controls.js", {
   pending = new Promise((resolve) => { finishStep = resolve; });
   const beforeStep = requests.length;
   const moving = arrowButtons[3].click();
-  assert(arrowButtons.every((node) => node.disabled));
+  assert(arrowButtons.every((node) => !node.disabled)); // keep pointer tracking active
   assert.equal(ptzStatus.textContent, "");
   assert.equal(ptzStatus.className, "ptz-feedback");
   assert(arrowButtons[3].classList.contains("ptz-pending"));
@@ -271,7 +271,7 @@ const cameraControls = load("camera-controls.js", {
   finishStep({ ok: true });
   await moving;
   assert(arrowButtons.every((node) => !node.disabled));
-  assert.equal(ptzStatus.textContent, "");
+  assert.equal(ptzStatus.textContent, "ptz.busy"); // rejected click was not silently lost
   assert(!arrowButtons[3].classList.contains("ptz-pending"));
   assert.equal(arrowButtons[3].attributes["aria-busy"], "false");
   pending = Promise.resolve({ ok: false });
@@ -280,6 +280,24 @@ const cameraControls = load("camera-controls.js", {
   assert(!arrowButtons[3].classList.contains("ptz-pending"));
   assert(arrowButtons.every((node) => !node.disabled));
   assert(!arrowButtons.some((node) => node.events.pointerdown));
+  assert(arrows.events.pointerdown && arrows.events.pointermove);
+  document.body.append(arrows);
+  arrows.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 });
+  const beforeDrag = requests.length;
+  pending = new Promise((resolve) => { finishStep = resolve; });
+  await arrows.dispatch("pointerdown", { pointerId: 1, button: 0, clientX: 50, clientY: 50, target: arrowButtons[4] });
+  assert.equal(requests.length, beforeDrag);
+  await arrows.dispatch("pointermove", { pointerId: 1, clientX: 90, clientY: 50 });
+  assert.equal(requests.length, beforeDrag + 1);
+  await arrows.dispatch("pointermove", { pointerId: 1, clientX: 50, clientY: 10 });
+  assert.equal(requests.length, beforeDrag + 1); // direction change is not queued
+  await arrows.dispatch("pointerup", { pointerId: 1 });
+  assert.equal(requests.length, beforeDrag + 2);
+  assert.equal(requests.at(-1)[1].body, '{"action":"stop"}');
+  finishStep({ ok: true });
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  assert.equal(requests.length, beforeDrag + 2); // release prevents another direction
+  arrows.remove();
   pending = null;
   console.log("Finite PTZ contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

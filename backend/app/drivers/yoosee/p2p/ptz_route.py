@@ -30,6 +30,9 @@ class NativePtzRoute:
                  device_id: int, direction: str, sequence: int) -> None:
         self._sock = sock
         self._node = node
+        self._access_id = access_id
+        self._device_id = device_id
+        self._direction = direction
         self._started = False
         self._closed = False
         self._released = False
@@ -37,6 +40,7 @@ class NativePtzRoute:
         self._peer = False
         self._application = False
         self._error = False
+        self._confirmed = False
         self._start = build_ptz_request(node, access_id, device_id, direction, pressed=True, sequence=sequence,
                                         message_id=secrets.randbits(31), request_id=secrets.randbits(32))
         self._release_ids: _ReplyIdentity = dict(node=node, access_id=access_id, device_id=device_id,
@@ -64,7 +68,9 @@ class NativePtzRoute:
             return False
         # Deadline AND packet-count bounds: unrelated traffic cannot create an unbounded loop.
         for _ in range(64):
-            remaining = min(0.5, deadline - time.monotonic())
+            # Once delivery is confirmed, drain immediately arriving contradictory
+            # replies, but do not stall every gesture for another half second.
+            remaining = min(0.02 if self._confirmed else 0.5, deadline - time.monotonic())
             if remaining <= 0:
                 break
             readable, _, _ = select.select([self._sock], [], [], remaining)
@@ -87,6 +93,7 @@ class NativePtzRoute:
             if response.error_code is not None:
                 self._error |= response.error_code != 0
                 self._application |= response.error_code == 0
+            self._confirmed = not self._error and (self._application or (self._transport and self._peer))
             acknowledge_reliable_node_frame(self._sock, self._node, plain)
             if response.error_code is not None:
                 # Allocate before send: an ambiguous failure must not reuse an ID.
@@ -95,6 +102,16 @@ class NativePtzRoute:
                 self._sock.sendto(build_ptz_receipt(plain, self._node, sequence), self._node.address)
         # A later explicit error in this observation window beats earlier receipts/success.
         return not self._error and (self._application or (self._transport and self._peer))
+
+    def renew(self) -> NativePtzRoute:
+        """Transfer one clean stopped socket to fresh request IDs and sequences."""
+        if self._closed or not self._released or not self._confirmed or self._error:
+            raise RuntimeError("only a confirmed stopped PTZ route can be renewed")
+        route = NativePtzRoute(self._sock, self._node, access_id=self._access_id,
+                               device_id=self._device_id, direction=self._direction,
+                               sequence=self._receipt_sequence)
+        self._closed = True  # socket ownership transferred, not duplicated
+        return route
 
     def close(self) -> None:
         if not self._closed:

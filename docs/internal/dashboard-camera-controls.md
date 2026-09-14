@@ -1,5 +1,17 @@
 # Camera control panel — 2026-09-12
 
+## Directional pad and drag — 2026-09-14
+
+The finite-step PTZ UI is now a cross-shaped pad over the lower-left video area, outside the
+control popup and outside the footer's layout flow. A center handle supports mouse/touch drag;
+arrows retain ordinary and keyboard clicks. Pointer capture, dead zone, release/cancel/blur and
+8-second gesture limit bound repetition. Only the current drag direction is used after an
+in-flight request; old positions are never queued. Pending highlight remains fixed-size.
+Busy clicks report rejection instead of being swallowed by disabled buttons. Backend session
+reuse removes repeated setup for short bursts; first use/expiry still requires setup.
+The pad currently applies to driver-advertised finite interaction (camera 3); legacy hold controls
+on the other units are unchanged. No physical all-direction native approval is implied.
+
 ## Driver-advertised finite PTZ — 2026-09-14
 
 Feedback correction after user testing: pending requests no longer insert preparation text into

@@ -175,6 +175,18 @@ header {
   border-radius: 6px; touch-action: none; user-select: none; -webkit-user-select: none;
   display: inline-flex; align-items: center; justify-content: center; }
 .ptz-mini:hover { border-color: var(--accent); }
+.ptz-pad { display: inline-grid; grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 28px);
+  gap: 2px; touch-action: none; user-select: none; flex-shrink: 0; position: absolute;
+  left: 10px; bottom: calc(100% + 10px); padding: 6px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--panel); box-shadow: 0 3px 12px rgba(0,0,0,.25); }
+.ptz-pad [data-direction="up"] { grid-area: 1 / 2; }
+.ptz-pad [data-direction="left"] { grid-area: 2 / 1; }
+.ptz-pad [data-direction="right"] { grid-area: 2 / 3; }
+.ptz-pad [data-direction="down"] { grid-area: 3 / 2; }
+.ptz-handle { grid-area: 2 / 2; border: 1px solid var(--line); border-radius: 50%;
+  color: var(--muted); background: var(--panel-2); cursor: grab; padding: 0; }
+.ptz-handle:active { cursor: grabbing; }
+@media (pointer: coarse) { .ptz-pad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); } }
 .ptz-mini.ptz-pending { box-shadow: inset 0 0 0 1px var(--accent); }
 .ptz-feedback { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip-path: inset(50%); }

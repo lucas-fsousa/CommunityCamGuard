@@ -35,7 +35,7 @@ class Socket:
 
 @pytest.fixture
 def prepared(monkeypatch):
-    ids = iter((100, 200, 101, 201))
+    ids = iter((100, 200, 101, 201, 102, 202, 103, 203))
     monkeypatch.setattr(ptz_route, "secrets", SimpleNamespace(randbits=lambda _: next(ids)))
     monkeypatch.setattr(ptz_route.time, "monotonic", lambda: 100)
     sock = Socket()
@@ -106,6 +106,25 @@ def test_release_only_prevents_later_start(prepared):
     route.send_release()
     with pytest.raises(RuntimeError):
         route.send_start()
+
+
+def test_renew_transfers_socket_with_new_motion_identity(prepared):
+    route, sock = prepared
+    with pytest.raises(RuntimeError):
+        route.renew()
+    route.send_release()
+    sock.incoming.extend((packet(ack=True), packet(kind=0xBA)))
+    assert route.confirm_release(deadline=101)
+    fresh = route.renew()
+    route.close()
+    assert sock.closed == 0
+    fresh.send_release()
+    plain = gute_mode2_decrypt(sock.sent[-1][0], NODE.session_key)
+    assert struct.unpack_from("<I", plain, 0x0C)[0] == 21
+    assert struct.unpack_from("<I", plain, 0x2C)[0] == 103
+    assert struct.unpack_from("<I", plain, 0x38)[0] == 203
+    fresh.close()
+    assert sock.closed == 1
 
 
 @pytest.mark.parametrize("error", [0, 7])

@@ -3,6 +3,52 @@
 Status: staged implementation. Video remains RTSP; native PTZ has an exact-unit finite-step opt-in.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
+## Short stopped-session reuse and input latency — 2026-09-14
+
+The initial finite-step integration rebuilt the session and three correlated preflight reads
+on every click. The UI disabled all arrows during that wait, swallowing additional clicks before
+HTTP. Retained HTTP logs showed success responses but no durations; they alone could not prove
+movement or quantify that setup cost. Native diagnostics now log preparation/total milliseconds,
+reuse and release result without payloads or credentials.
+
+`p2p/ptz_cache.py` retains only a clean, confirmed-stopped route: maximum four idle sockets,
+8-second idle expiry and 20-second absolute age including preparation. No keepalive, background
+movement or unbounded session pool. Keys include exact camera/direction/profile/current access
+credentials. Failed or unconfirmed gestures close rather than cache the route. Cancellation
+before movement also closes it. After expiry or credential change, preparation runs again;
+identity/axis evidence is reused only within this short absolute window, not indefinitely.
+Timers release idle sockets; checkout also enforces expiry if timer execution was delayed.
+
+Renewal transfers exclusive socket ownership to a new single-use gesture with new request IDs
+and non-overlapping sequences. Stale replies cannot confirm another gesture. After confirmed
+delivery, the adapter drains immediately arriving replies with a 20ms quiet wait instead of
+waiting an extra 500ms on every success. Explicit errors observed during that window still win;
+this does not prove that no later packet could contain an error or that the motor physically stopped.
+
+Live camera-3 RELEASE-only comparison (no START): cold preparation **2671ms**, total **2936ms**;
+reused preparation **1ms**, total **203ms**, both delivery-confirmed. These are protocol timings,
+not a click-to-motion or video-latency benchmark. Reproduction and sanitized evidence are ignored:
+`re/verify_camera3_ptz_cached_release.py`, `temp/camera3-ptz-cache-release-20260914.json`.
+The first click after idle expiry can still wait for preparation. Native right-only scope remains.
+
+Frontend now uses a directional pad with pointer capture, ordinary/keyboard clicks and active
+drag direction tracking. A center dead zone pauses repetition; release, capture loss, blur, hidden
+document and an 8-second cap stop repeats. Drag release while a request is in flight also sends
+STOP to cancel/shorten native work. Requests are serialized and rate-limited; there is no backlog
+of pointer positions. A busy ordinary click explicitly reports that it was not queued instead of
+silently disappearing. The already committed step remains bounded by the server; a STOP request
+can race with network delivery and is not a universal guarantee of zero movement after release.
+
+This is repeated finite steps while dragging, **not** the vendor app's continuous native gesture.
+Other directions still use ONVIF; no support was inferred or granted. Physical fluidity and
+mobile rendering await operator validation; no browser/emulator or movement test was run here.
+
+Published build `b-a558a3408d30`. App started normally at 2026-09-14T12:50:37Z; compose update
+used `--no-deps --no-build app`. Both app/go2rtc reported running and OOMKilled=false. Build
+limited to 512 MiB and one CPU. Full Python suite, separate Node DOM tests, ruff/mypy passed;
+additional cache tests cover non-renewable absolute expiry and late timer ownership. No new
+native direction was activated and no motion was replayed during deployment.
+
 ## Dashboard finite-step integration
 
 The user physically confirmed the single camera-3 rightward 200ms gesture and its prompt STOP
@@ -31,8 +77,8 @@ Stale clients sending START to an opted-in camera are rejected, not converted in
 native motion. `step-ptz.js` is separate from live-player code. PTZ stays outside the control popup.
 
 This is not continuous hold/heartbeat integration and does not claim lower click latency:
-each gesture currently establishes a fresh session. Prepared-session reuse, all-direction
-homologation and continuous browser leases remain later work. No extra movement is needed merely
+the initial version established a fresh session on each gesture (short reuse is now described above).
+All-direction homologation and continuous native browser leases remain later work. No extra movement is needed merely
 to activate the reviewed profile; deployed HTTP catalogue checks are read-only.
 
 Rollout completed September 14: build `b-33e3e8dbc83b`, exact camera-3 identity freshly verified
