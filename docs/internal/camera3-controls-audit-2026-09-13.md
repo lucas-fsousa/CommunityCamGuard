@@ -7,6 +7,11 @@ siren pulse. Night vision remains pending a nighttime test. Floodlight was physi
 PTZ, relative speaker loudness, schedule enforcement and each selected alarm sound have not
 received separate physical confirmations; the original evidence table below is preserved.
 
+Later update: the user also physically confirmed native PTZ **rightward 200ms movement and
+prompt STOP**. Only that direction has native motion proof; the prior four-direction ONVIF
+HTTP checks must not be upgraded to physical/native approval. The September 14 dashboard rollout
+uses native right steps on this exact unit and standard finite steps for other directions.
+
 The floodlight driver reused the preflight BA receipt sequence for the subsequent B9 write:
 preflight at N sent a receipt at N+1, then ON also used N+1. Readbacks could overlap receipts
 too. The proven RE harness uses separated sequence ranges. Production now reserves four IDs

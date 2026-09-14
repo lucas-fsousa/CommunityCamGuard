@@ -24,6 +24,7 @@
     "ccg/i18n": moduleUrl("/i18n.js"),
     "ccg/live": moduleUrl("/modules/live-cameras.js"),
     "ccg/camera-controls": moduleUrl("/modules/camera-controls.js"),
+    "ccg/step-ptz": moduleUrl("/modules/step-ptz.js"),
     "ccg/control-actions": moduleUrl("/modules/camera-control-actions.js"),
     "ccg/cameras": moduleUrl("/modules/camera-management.js"),
     "ccg/audio-message": moduleUrl("/modules/audio-message.js"),

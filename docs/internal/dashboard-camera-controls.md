@@ -1,5 +1,15 @@
 # Camera control panel — 2026-09-12
 
+## Driver-advertised finite PTZ — 2026-09-14
+
+PTZ remains outside this popup. The new generic `ptz_interaction` field selects finite clicks
+only where a driver advertises them. The exact camera-3 opt-in now sends one step per click,
+with disabled arrows and visible status until completion, no hold-repeat timer and no client
+transport selection/retry. English/Portuguese tooltips explain the changed interaction.
+Other cameras retain their existing hold controls. Keyboard-generated button clicks also work
+for finite PTZ. Physical rightward 200ms/STOP was user-confirmed; other directions on camera 3
+still use standard ONVIF finite steps, not unproven native commands.
+
 ## Centered responsive popup — 2026-09-13
 
 The panel is now centered rather than a right-hand drawer, with a maximum 640px width,

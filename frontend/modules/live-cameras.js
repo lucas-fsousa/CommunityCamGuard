@@ -1,6 +1,7 @@
 import { t } from "ccg/i18n";
 import { $, api, el, state, svgIcon } from "ccg/core";
 import { cameraControls } from "ccg/camera-controls";
+import { finitePtzControls } from "ccg/step-ptz";
 
 let reloadCameras = async () => {};
 let refreshView = () => {};
@@ -64,6 +65,7 @@ export function capBadges(cam) {
 const PTZ_REPEAT_MS = 450;   // ~= the camera's step duration; its effective max pan rate
 
 function ptzControls(cam) {
+  if (cam.ptz_interaction === "step") return finitePtzControls(cam);
   let held = null, timer = null, safety = null;
   const send = (action, direction) =>
     api(`/cameras/${encodeURIComponent(cam.id)}/ptz`, {

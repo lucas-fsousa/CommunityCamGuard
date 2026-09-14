@@ -66,6 +66,10 @@ class PtzMotion:
     def stop(self) -> None:
         self._stop.set()
 
+    @property
+    def cancelled(self) -> bool:
+        return self._stop.is_set()
+
     def run(self, route: PreparedPtzRoute) -> MotionResult:
         with self._lock:
             if self._used:

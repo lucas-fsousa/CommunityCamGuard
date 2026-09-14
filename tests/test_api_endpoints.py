@@ -141,6 +141,16 @@ def test_ptz_rejected_is_502(monkeypatch):
     assert ei.value.status_code == 502
 
 
+def test_ptz_does_not_queue_behind_other_camera_controls_but_stop_can_pass(monkeypatch):
+    camera = _seed_camera()
+    monkeypatch.setattr(camera_routes.drivers, "for_camera", lambda cam: FakeDriver(ptz_result=True))
+    with camera_routes._exclusive(camera.camera_id):
+        with pytest.raises(HTTPException) as error:
+            camera_routes.ptz_move(camera.camera_id, camera_routes.PtzIn(direction="right", action="step"))
+        assert error.value.status_code == 409
+        assert camera_routes.ptz_move(camera.camera_id, camera_routes.PtzIn(action="stop"))["ok"]
+
+
 # --- reboot -------------------------------------------------------------------------
 
 

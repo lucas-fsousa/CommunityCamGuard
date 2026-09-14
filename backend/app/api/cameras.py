@@ -11,6 +11,7 @@ from .. import drivers
 from ..auth import require_auth
 from ..db import registry
 from ..discovery import rtsp
+from ..services.camera_controls import ControlBusy, _exclusive
 from ..services.camera_runtime import (
     probe_and_store,
     resolve_camera,
@@ -122,11 +123,17 @@ def ptz_move(camera_id: str, body: PtzIn) -> dict:
     if camera is None:
         raise HTTPException(status_code=404, detail="camera not found")
     try:
-        ok = drivers.for_camera(camera).ptz(
-            camera,
-            body.direction,
-            (body.action or "step").lower(),
-        )
+        action = (body.action or "step").lower()
+        driver = drivers.for_camera(camera)
+        if action == "stop":
+            ok = driver.ptz(camera, body.direction, action)
+        else:
+            with _exclusive(camera.camera_id):
+                ok = driver.ptz(camera, body.direction, action)
+    except (ControlBusy, drivers.ControlNotReady) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except drivers.ControlOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except drivers.Unsupported as exc:
         raise HTTPException(status_code=501, detail="this camera doesn't support PTZ") from exc
     except ValueError as exc:

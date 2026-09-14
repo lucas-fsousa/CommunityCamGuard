@@ -242,6 +242,10 @@ class CameraDriver:
         raise Unsupported("audio_stream")
 
     # --- controls (default: unsupported) -----------------------------------------------
+    def ptz_interaction(self, camera: Camera) -> str:
+        """Semantic browser interaction; selected drivers may require finite clicks."""
+        return "hold"
+
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:
         """Pan/tilt. ``action`` = ``start``/``stop`` (press-and-hold) or ``step`` (one nudge).
 

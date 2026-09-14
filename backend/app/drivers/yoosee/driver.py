@@ -67,7 +67,26 @@ class YooseeDriver(CameraDriver):
             caps.firmware = info.get("firmware", "")
         caps.stream_paths = media.stream_paths(ip)
 
+    def ptz_interaction(self, camera: Camera) -> str:
+        from .native_ptz_policy import selected
+
+        return "step" if selected(camera.camera_id) is not None else "hold"
+
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:
+        from . import native_ptz
+        from .native_ptz_policy import selected
+
+        profile = selected(camera.camera_id)
+        if profile is not None:
+            if action == "stop":
+                return native_ptz.stop(camera.camera_id)
+            if action != "step":
+                raise ValueError("this camera requires one PTZ step per click; refresh the dashboard")
+            direction = (direction or "").strip().lower()
+            ptz.velocity_for(direction)
+            if direction in profile.directions:
+                return native_ptz.step(camera, direction, profile, lambda: ptz.move(camera, direction))
+            return ptz.move(camera, direction)
         if action == "stop":
             return ptz.halt(camera)
         if action == "start":

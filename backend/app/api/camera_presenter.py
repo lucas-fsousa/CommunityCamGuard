@@ -27,6 +27,7 @@ def camera_out(camera: registry.Camera) -> dict:
         "last_ip": camera.last_ip,
         "vendor": camera.vendor,
         "capabilities": camera.capabilities,
+        "ptz_interaction": driver.ptz_interaction(camera),
         "has_audio": bool(camera.capabilities.get("has_audio")),
         "stream_id": go2rtc.stream_id(camera.camera_id),
         "web_stream_id": go2rtc.web_stream_id(camera.camera_id),

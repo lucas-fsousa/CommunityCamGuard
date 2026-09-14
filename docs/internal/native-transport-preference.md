@@ -1,7 +1,46 @@
 # Native transport preference with standard fallback
 
-Status: staged implementation, 2026-09-12. Production PTZ remains ONVIF and video remains RTSP.
+Status: staged implementation. Video remains RTSP; native PTZ has an exact-unit finite-step opt-in.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
+
+## Dashboard finite-step integration
+
+The user physically confirmed the single camera-3 rightward 200ms gesture and its prompt STOP
+(test started at 2026-09-14T02:50:11Z). This confirms **right only**, not every axis or model.
+
+`native_ptz_policy.py` stores an internal per-camera opt-in with the full reviewed identity and
+proven directions. No public activation API or brand-wide defaults. Initial rollout is camera 3,
+right only. `native_ptz.py` owns one non-renewable 200ms gesture after fresh identity/axis preflight,
+retains the same route for RELEASE and rejects concurrent native jobs (at most four globally).
+API movement dispatch also shares the existing camera control/audio lock and fails busy rather
+than queuing. STOP bypasses that lock to cancel preparation or shorten the active native lease.
+These in-memory locks assume the current single-process application, not a multi-worker cluster.
+
+Preparation has a 12-second budget. If it fails with a protocol/preflight error before START,
+an uncancelled operation can use one standard finite ONVIF step. Missing/mismatched enrollment
+is rejected for review. After attempted native START, uncertainty/failed RELEASE is an error:
+no ONVIF retry, reconnect or repeated START. Process death/network loss cannot guarantee physical
+STOP; the server timer is not a hardware watchdog. Cancellation of a committed standard fallback
+does not shorten its existing finite pulse.
+
+Generic driver method `ptz_interaction` tells the browser `step` or existing `hold`. No vendor IDs,
+protocol choice or firmware guessing in the frontend. For opted-in camera 3 the UI sends one
+`step` per click, disables its arrows until the request completes and shows pending/errors.
+Other directions still use finite ONVIF steps; other cameras retain their existing hold behavior.
+Stale clients sending START to an opted-in camera are rejected, not converted into repeating
+native motion. `step-ptz.js` is separate from live-player code. PTZ stays outside the control popup.
+
+This is not continuous hold/heartbeat integration and does not claim lower click latency:
+each gesture currently establishes a fresh session. Prepared-session reuse, all-direction
+homologation and continuous browser leases remain later work. No extra movement is needed merely
+to activate the reviewed profile; deployed HTTP catalogue checks are read-only.
+
+Rollout completed September 14: build `b-33e3e8dbc83b`, exact camera-3 identity freshly verified
+before internal activation. Authenticated HTTP catalogue reports `ptz_interaction=step` for
+camera 3 and unchanged `hold` for both other units; the new module returns HTTP 200. No movement
+was replayed to test deployment. Full Python suite plus separate lightweight Node DOM tests,
+ruff and mypy passed; an additional API regression verifies busy rejection and STOP bypass.
+Build capped at 512 MiB/one CPU; only app recreated, go2rtc retained its existing process.
 
 ## Native RELEASE delivery check — September 13 local / September 14 UTC
 
@@ -22,8 +61,8 @@ success, and RELEASE retransmissions retain their original packet identity.
 Regression tests cover positive/error reply receipts, reversed routing, distinct sequences and
 invalid envelopes. Ignored reproduction: `re/verify_camera3_native_ptz_release.py`; sanitized
 result: `temp/camera3-native-ptz-release-20260913.json`. Host-only code, no container restart.
-Next: controlled short camera-3 gesture with physical observation and cleanup, then browser
-lease/driver integration. Do not switch the existing ONVIF repeat loop to native START.
+The subsequent short gesture was physically confirmed and finite-step integration is described
+above. Continuous browser leases remain pending; do not repeat native START via the ONVIF loop.
 
 ## Exact-unit preparation increment — 2026-09-12
 
