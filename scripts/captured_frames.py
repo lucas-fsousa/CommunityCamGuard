@@ -1,10 +1,13 @@
 """Content-free summary of bounded V1 records; raw timestamps are never logged."""
 
-from backend.app.drivers.yoosee.p2p.v1_receive import V1Receiver
+from collections.abc import Callable
+
+from backend.app.drivers.yoosee.p2p.v1_receive import V1Receiver, V1Record
 
 
 class CapturedFrames:
-    def __init__(self) -> None:
+    def __init__(self, on_record: Callable[[V1Record], None] | None = None) -> None:
+        self.on_record = on_record
         self.receiver = V1Receiver()
         self.previous: dict[str, int] = {}
         self.report: dict = dict(headers=0, audio_frames=0, video_frames=0,
@@ -22,6 +25,8 @@ class CapturedFrames:
             self.report["error"] = str(exc)
             return
         for record in records:
+            if self.on_record is not None:
+                self.on_record(record)
             if record.encoding is not None:
                 self.report["headers"] += 1
                 continue

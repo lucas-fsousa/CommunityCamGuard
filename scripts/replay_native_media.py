@@ -10,11 +10,14 @@ import argparse
 import json
 import struct
 from collections import Counter
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
 from backend.app.drivers.yoosee.p2p.kcp_receive import KcpReceiver, ReceiveError
 from backend.app.drivers.yoosee.p2p.media_protocol import KCP_PUSH, parse_kcp_segments
 from backend.app.drivers.yoosee.p2p.media_receive import MediaReceiver
+from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 
 from .captured_media import CallingKey, CapturedMedia, CapturedSessions
 from .pcap_input import packets, udp
@@ -23,7 +26,8 @@ MAX_FLOWS = 16
 
 
 class Flow:
-    def __init__(self, label: str, peer: tuple[str, int], conv: int, now: float) -> None:
+    def __init__(self, label: str, peer: tuple[str, int], conv: int, now: float,
+                 on_record: Callable[[V1Record], None] | None = None) -> None:
         self.now = now
         self.receiver = MediaReceiver(peer, KcpReceiver(conv, clock=lambda: self.now))
         self.report: dict = dict(
@@ -34,7 +38,7 @@ class Flow:
         )
         self.types: Counter[int] = Counter()
         self.length_mismatches = 0
-        self.media = CapturedMedia()
+        self.media = CapturedMedia(on_record)
 
     def consume(self, now: float, wire: bytes, peer: tuple[str, int], key: CallingKey | None = None) -> None:
         self.now = now
@@ -81,7 +85,7 @@ class Flow:
         return self.report
 
 
-def replay(path: Path) -> dict:
+def replay(path: Path, on_record: Callable[[str, V1Record], None] | None = None) -> dict:
     flows: dict[tuple, Flow] = {}
     sessions = CapturedSessions()
     records = valid = malformed = 0
@@ -106,7 +110,9 @@ def replay(path: Path) -> dict:
             if key not in flows:
                 if len(flows) >= MAX_FLOWS:
                     raise ValueError("PCAP exceeds 16 directional KCP flows")
-                flows[key] = Flow(f"flow{len(flows)+1}", peer, conv, now)
+                label = f"flow{len(flows)+1}"
+                flows[key] = Flow(label, peer, conv, now,
+                                  partial(on_record, label) if on_record is not None else None)
             flows[key].consume(now, wire, peer, sessions.lookup(peer, destination, conv))
     return dict(records=records, valid_mtp_datagrams=valid, malformed_mtp_datagrams=malformed,
                 flows=[flow.finish() for flow in flows.values()])

@@ -7,6 +7,7 @@ Secrets and decoded audio/video are never returned, logged or written to disk.
 from __future__ import annotations
 
 import struct
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_decrypt, gute_mode1_xor_checksum
@@ -14,6 +15,7 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import (
     decrypt_media_tlv,
     unpack_v1_encoding_header,
 )
+from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 
 from .captured_frames import CapturedFrames
 
@@ -64,9 +66,9 @@ class CapturedSessions:
 
 
 class CapturedMedia:
-    def __init__(self) -> None:
+    def __init__(self, on_record: Callable[[V1Record], None] | None = None) -> None:
         self._binding: CallingKey | None = None
-        self.frames = CapturedFrames()
+        self.frames = CapturedFrames(on_record)
         self._prefix = bytearray()
         self._invalid = False
         self.report: dict = dict(call_correlated=False, decoded_messages=0, decoded_bytes=0,

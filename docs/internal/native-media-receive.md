@@ -215,3 +215,52 @@ The full historical replay retained peak RSS 51,724 KiB under the existing 256 M
 address-space cap. This run took 20.16 s wall time while the host was also busy;
 it is not a production decoding performance benchmark. No browser, native SDK
 execution, container rebuild, new media session or camera action occurred.
+
+## Independent elementary decoder validation — 2026-09-14
+
+Added `scripts/validate_native_decode.py`: an explicit flow/kind callback collects
+up to 8 MiB of elementary payload in memory from complete, cookie-correlated V1
+records. Requires the initial encoding header and rejects configuration changes.
+No media files, camera connections or audio playback. Missing/unmapped codecs and
+empty samples fail before spawning a decoder. The default replay remains content-free.
+
+For each selected sample, FFprobe counts decoded frames and reports whitelisted
+codec/geometry/audio metadata, then FFmpeg runs strict `-xerror -err_detect explode`
+decoding to the null sink. Processes run sequentially, decoder/filter threading is
+limited to one, pipe is the only enabled input protocol, and each process has
+512 MiB address-space, 30 CPU-s, 64-FD and 45-second wall limits. No parallel decoder
+jobs were launched. The sample memory budget is separate from decoder memory.
+
+Reproduce one check at a time:
+
+```sh
+prlimit --as=536870912 --cpu=60 -- .venv/bin/python -m scripts.validate_native_decode re/pcapdroid/pcap.pcap --flow flow5 --kind video
+```
+
+Change `--kind` to `audio`, or select `flow9` to validate only its recovered prefix.
+Output contains counts/metadata/errors, never raw decoded bytes, keys or addresses.
+Strict-decoder, header or frame-count mismatch produces nonzero CLI status.
+
+| Historical sample | Input / independently decoded frames | Independent codec/format | Strict decode |
+|---|---|---|---|
+| flow5 video | 1,137 / 1,137 | HEVC, 640×360 | passed |
+| flow5 audio | 1,172 / 1,172 | AAC, mono, 16 kHz | passed |
+| flow9 video prefix | 3 / 3 | HEVC, 1920×1080 | passed |
+| flow9 audio prefix | 3 / 3 | AAC, mono, 16 kHz | passed |
+
+Formats match their V1 encoding headers. Both flow9 reports still explicitly carry
+`KCP assembly deadline exceeded`; successful prefix decoding is not successful
+whole-flow recovery. There were no V1 record errors or incomplete V1 tail bytes.
+Raw elementary pipes do not preserve the proprietary timestamps: this test proves
+codec payload validity, not playback timing, A/V sync or live end-to-end latency.
+It is historical evidence only, not native live-stream homologation on camera 3.
+
+Ten socket-free/subprocess-mocked regression tests cover sample limits, isolation,
+missing/changing headers, explicit resource/protocol limits, timeout/probe failure,
+metadata sanitization and decoder/format/count mismatches. Next: configuration and
+keyframe transitions, reconnect at decodable boundaries, then a bounded native
+receive lifecycle and single-source handoff. Production RTSP/intercom are unchanged.
+
+The full Python suite, 49 focused offline tests, Ruff, mypy for the four touched
+analysis modules, and standalone Node panel/PTZ contracts passed. No container
+rebuild or live camera test was performed for this increment.
