@@ -62,6 +62,14 @@ class AvReceiver:
         return self._transport.phase
 
     @property
+    def accepted(self) -> bool:
+        return self._accepted
+
+    @property
+    def peer_started(self) -> bool:
+        return self._started
+
+    @property
     def buffered_bytes(self) -> int:
         control_bytes = self._control.receiver.buffered_bytes if self._control is not None else 0
         return self._transport.buffered_bytes + self._parser.buffered_bytes + control_bytes

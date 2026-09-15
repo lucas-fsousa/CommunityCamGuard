@@ -39,6 +39,10 @@ actions, timestamp wrap and coalesced ACK segments. No packet was sent to a came
 
 ## Remaining integration
 
+Update: the socket-free composition is now implemented and synthetically tested in
+[native-av-handshake.md](native-av-handshake.md). Live socket integration remains
+pending; this does not change production intercom.
+
 The future owner must coordinate this sender with `AvReceiver`, gate outbound
 START on correlated ACCEPT (not merely INIT's transport ACK), preserve independent
 send/receive sequence spaces, and handle bounded cross-channel reordering. It must
