@@ -47,7 +47,9 @@ a 512 MiB address-space cap. Ruff, Mypy (180 files) and the frontend toast/panel
 contracts passed. The previously
 reported full-suite native crash is not resolved by this focused verification.
 
-Next: bounded camera-3-only socket adapter, with cancellation/cleanup and no change
-to the production RTSP source. Reconnect, pacing, A/V synchronization and eventual
+The bounded socket adapter is now implemented and simulated separately; see
+[native-av-probe.md](native-av-probe.md). Camera-3 live reception and remote teardown
+validation remain pending, with no change to the production RTSP source.
+Reconnect, pacing, A/V synchronization and eventual
 single-producer handoff remain separate milestones. No build/restart is needed for
 this offline-only change. Capture files and credentials remain ignored/private.

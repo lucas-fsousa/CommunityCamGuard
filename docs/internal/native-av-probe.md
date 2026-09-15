@@ -1,0 +1,56 @@
+# Bounded native AV socket adapter — 2026-09-15
+
+`p2p/av_probe.py` adds `probe_av_socket()` around the existing socket-free handshake.
+It consumes one exclusively owned socket on an already authenticated, freshly
+opened/metered direct route. It does not discover cameras, load credentials, reserve
+a camera, initialize another AV session or register a production driver capability.
+The caller must enforce exact camera identity, exclusive reservation and unused AV
+sequence spaces before transferring ownership. Route preparation is outside this
+function's deadline and must receive a separate bound in the eventual caller.
+
+## Resource and failure contract
+
+- Maximum ten seconds, with socket operations limited to 50 ms and cancellation
+  checks before sends, after reception and between iterations.
+- At most 10,000 received datagrams, 8 MiB received and 2 MiB transmitted. Noise
+  and foreign traffic count toward receive budgets; no unbounded drain loop.
+- Receive buffer is 2,048 bytes to detect/truncate oversize MTP traffic above the
+  protocol's 2,047-byte limit. Oversize packets are discarded, never parsed as a
+  valid prefix. Byte accounting measures returned bytes, not truncated wire bytes.
+- Only INIT, START and transport ACKs are sent. No audio payload, microphone,
+  PTZ, siren, lighting, decoder, file writer, worker or media-output queue exists.
+- Record counts are consumed per batch. Only aggregate counters are returned;
+  existing bounded handshake/KCP/V1 retention remains in force.
+- Socket and handshake state are closed on success, invalid arguments, cancellation,
+  protocol/budget failures and network errors. No reconnect or ambiguous-send retry.
+  Network exceptions are sanitized rather than exposing endpoints.
+- Success requires negotiation/header readiness and at least one video record;
+  it does not establish playable decoding, keyframe readiness or A/V synchronization.
+
+## Validation and actual scope
+
+Nineteen fake-socket cases cover reordered media, exact outgoing control families,
+invalid durations/routes, send/receive failure, partial sends, silence, cancellation,
+three traffic budgets, foreign/oversize/non-MTP input, flood limits, and cleanup of
+retained protocol state. The fake socket drives the real handshake and parsers.
+The selected Python regression group totals 153 tests; Ruff and backend Mypy
+(180 files) also pass. Tests run serially with a 512 MiB address-space cap.
+
+**No socket was opened against any camera in this milestone.** No container build,
+service restart or production stream change occurred. Existing RTSP and recording
+paths are untouched. There is no live CLI/API entry point yet.
+
+## Before the camera-3 experiment
+
+1. Add bounded AV CLOSE ownership/receipt correlation using the correct next
+   outgoing sequence. The current reliable primitive handles sequence-zero INIT
+   and START only; do not reuse it blindly for CLOSE or copy the legacy scalar
+   receive-sequence handoff. Local socket cleanup is not remote teardown proof.
+2. Review whether the short probe needs meter/keepalive replies. The current adapter
+   ignores non-KCP traffic rather than guessing response fields.
+3. Wire fresh authenticated route preparation under the camera-3 identity/reservation
+   guard, with total preparation deadline and sanitized output. Never borrow the
+   production stream/intercom socket or run an old AV initializer first.
+4. Perform one short, bounded camera-3 run and record actual readiness, record counts,
+   teardown evidence and effects on existing RTSP. Do not infer firmware support
+   or enable native streaming from simulated success.

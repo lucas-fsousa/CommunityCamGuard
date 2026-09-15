@@ -45,8 +45,9 @@ peer, and terminal cancellation/cleanup. Tests do not act on a real camera.
 START arriving before ACCEPT across the independent channels now uses the bounded
 ciphertext queue described in [native-av-reorder.md](native-av-reorder.md). The historical paired replay
 and earlier codec validations remain separate evidence, not proof of this owner's
-live handshake or physical camera interoperability. Next: a short camera-3-only
-socket adapter experiment before any source switch.
+live handshake or physical camera interoperability. The bounded socket adapter is
+now simulated in [native-av-probe.md](native-av-probe.md); remote teardown and the
+camera-3 live experiment remain pending before any source switch.
 
 Regression verification: 126 selected handshake/send/receive/V1/existing media-session
 tests passed under a 512 MiB address-space cap. Ruff, Mypy (178 source files) and the
