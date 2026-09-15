@@ -7,7 +7,8 @@ import pytest
 from backend.app.drivers.contracts import ControlNotReady, ControlOperationError
 from backend.app.drivers.yoosee import native_ptz, native_ptz_policy
 from backend.app.drivers.yoosee.driver import YooseeDriver
-from backend.app.drivers.yoosee.p2p.contracts import P2PProbeError
+from backend.app.drivers.yoosee.p2p import renewal
+from backend.app.drivers.yoosee.p2p.contracts import InitInfoRejectedError, P2PProbeError
 from backend.app.drivers.yoosee.p2p.ptz_motion import MotionResult
 from tests.test_ptz_prepare import IDENTITY
 
@@ -31,7 +32,8 @@ def prepared(monkeypatch):
             return state.outcome
     monkeypatch.setattr(native_ptz, "PtzMotion", Motion)
     monkeypatch.setattr(native_ptz.p2p, "get_enrollment_for_camera", lambda _: SimpleNamespace(
-        device_id=IDENTITY.device_id, access_id=1, access_token=b"test"))
+        device_id=IDENTITY.device_id, camera_id=CAMERA.camera_id,
+        access_id=1, access_token=b"test", dev_token="test-device"))
     monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(acquire=lambda key, prepare, **kw: prepare()))
     def prepare(*args, **kwargs):
         state.prepared += 1
@@ -51,6 +53,67 @@ def prepared(monkeypatch):
 def test_success_does_not_fallback(prepared):
     assert native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
     assert (prepared.runs, prepared.fallback) == (1, 0)
+
+
+@pytest.mark.parametrize("case", ["success", "second_rejection", "cancelled", "wrong_camera"])
+def test_preflight_renewal_rekeys_cache_and_never_replays_movement(prepared, monkeypatch, case):
+    old = native_ptz.p2p.get_enrollment_for_camera(CAMERA.camera_id)
+    fresh = SimpleNamespace(**{**vars(old), "access_id": 2, "access_token": b"fresh"})
+    if case == "wrong_camera":
+        fresh.camera_id = "cam_" + "b" * 24
+    keys, attempts = [], []
+    def acquire(key, prepare, **kwargs):
+        keys.append(key)
+        return prepare()
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(acquire=acquire))
+    def prepare(entry, *args, **kwargs):
+        attempts.append(entry.access_token)
+        if entry.access_token == old.access_token or case == "second_rejection":
+            raise InitInfoRejectedError(0x216B)
+        return SimpleNamespace(reused=False)
+    monkeypatch.setattr(native_ptz, "prepare_ptz_route", prepare)
+    def current(_):
+        if case == "cancelled":
+            native_ptz.stop(CAMERA.camera_id)
+        return fresh
+    monkeypatch.setattr(renewal.p2p, "get_enrollment", current)
+    # Simulate credentials refreshed by another operation; do not contact cloud.
+    monkeypatch.setattr(renewal.account_store, "get_account",
+                        lambda: pytest.fail("duplicate credential refresh"))
+    if case == "wrong_camera":
+        with pytest.raises(ControlNotReady):
+            native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+    else:
+        assert native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn) is (case != "cancelled")
+    assert prepared.runs == int(case == "success")
+    assert prepared.fallback == int(case == "second_rejection")
+    if case in ("success", "second_rejection"):
+        assert attempts == [b"test", b"fresh"]
+        assert keys[0] != keys[1]
+        assert keys[1][-3:] == (2, b"fresh", "test-device")
+    else:
+        assert attempts == [b"test"]
+
+
+def test_non_expiry_preflight_rejection_does_not_refresh(prepared, monkeypatch):
+    def prepare(*args, **kwargs):
+        raise InitInfoRejectedError(123)
+    monkeypatch.setattr(native_ptz, "prepare_ptz_route", prepare)
+    monkeypatch.setattr(renewal.p2p, "get_enrollment", lambda _: pytest.fail("unexpected renewal"))
+    assert native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+    assert prepared.runs == 0 and prepared.fallback == 1
+
+
+def test_even_stale_error_after_motion_boundary_cannot_refresh(prepared, monkeypatch):
+    calls = []
+    def run(self, route):
+        calls.append("movement")
+        raise InitInfoRejectedError(0x216B)
+    monkeypatch.setattr(native_ptz.PtzMotion, "run", run)
+    monkeypatch.setattr(renewal.p2p, "get_enrollment", lambda _: pytest.fail("movement retry"))
+    with pytest.raises(InitInfoRejectedError):
+        native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+    assert calls == ["movement"] and prepared.fallback == 0
 
 
 @pytest.mark.parametrize("outcome", [MotionResult(True, False, 3, False, ()),

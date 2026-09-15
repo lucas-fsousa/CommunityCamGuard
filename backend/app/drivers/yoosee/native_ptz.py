@@ -7,13 +7,15 @@ import time
 from collections.abc import Callable
 
 from ...db import p2p
+from ...db.p2p import P2PEnrollment
 from ...db.registry import Camera
 from ..contracts import ControlNotReady, ControlOperationError
 from .native_ptz_policy import PtzProfile
 from .p2p.contracts import P2PProbeError
-from .p2p.ptz_cache import PtzRouteCache
+from .p2p.ptz_cache import CachedPtzRoute, PtzRouteCache
 from .p2p.ptz_motion import PtzBusy, PtzMotion
 from .p2p.ptz_prepare import prepare_ptz_route
+from .p2p.renewal import run_with_fresh_access
 
 log = logging.getLogger(__name__)
 _guard = threading.Lock()
@@ -42,11 +44,19 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
         if entry is None or entry.device_id != profile.identity.device_id:
             raise ControlNotReady("native PTZ enrollment requires review")
         try:
-            key = (camera.camera_id, profile.identity, profile.directions,
-                   entry.access_id, entry.access_token)
-            route = _routes.acquire(key, lambda: prepare_ptz_route(
-                entry, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12,
-                reviewed_directions=profile.directions), direction=direction)
+            def acquire(current: P2PEnrollment) -> CachedPtzRoute:
+                # Renewal wraps preparation only: never put motion.run inside it.
+                if current.camera_id != camera.camera_id or current.device_id != profile.identity.device_id:
+                    raise ControlNotReady("native PTZ renewed enrollment requires review")
+                if motion.cancelled:
+                    raise P2PProbeError("native PTZ preparation was cancelled")
+                key = (camera.camera_id, profile.identity, profile.directions,
+                       current.access_id, current.access_token, current.dev_token)
+                return _routes.acquire(key, lambda: prepare_ptz_route(
+                    current, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12,
+                    reviewed_directions=profile.directions), direction=direction)
+
+            route = run_with_fresh_access(entry, acquire)
         except P2PProbeError:
             # No START has been constructed/sent by preparation. Only this failure
             # boundary may consider a standard finite-step fallback.
