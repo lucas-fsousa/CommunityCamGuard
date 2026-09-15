@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import struct
 
+import pytest
+
 from backend.app.drivers.yoosee.p2p import rendezvous_session
 from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode, OnlineDevice
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
@@ -181,3 +183,25 @@ def test_route_close_sends_once_and_accepts_transport_ack(monkeypatch):
         0.1,
     )
     assert sent == [(b"hangup", node.address)]
+
+
+@pytest.mark.parametrize("fault", [None, "session", "sequence", "mode", "short"])
+def test_strict_route_release_requires_matching_receipt(monkeypatch, fault):
+    node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
+    device = OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    ack = bytearray(32)
+    ack[1] = 0xB9
+    struct.pack_into("<Q", ack, 4, 10 if fault == "session" else 9)
+    struct.pack_into("<I", ack, 12, 19 if fault == "sequence" else 18)
+    struct.pack_into("<I", ack, 20, (1 << 20) | ((1 if fault == "mode" else 2) << 16))
+    class Socket:
+        def sendto(self, *args):
+            pass
+    monkeypatch.setattr(rendezvous_session, "build_route_hangup", lambda *args: b"hangup")
+    monkeypatch.setattr(rendezvous_session, "receive_datagrams",
+                        lambda *args: iter([(b"ack", node.address)]))
+    monkeypatch.setattr(rendezvous_session, "decrypt_node_frame",
+                        lambda *args: bytes(ack[:10] if fault == "short" else ack))
+    assert rendezvous_session.close_device_route(
+        Socket(), node, 123, device, 42, 18, 0.1, require_correlated_ack=True
+    ) is (fault is None)

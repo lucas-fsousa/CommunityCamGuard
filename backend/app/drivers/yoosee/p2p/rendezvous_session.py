@@ -40,16 +40,20 @@ def call_device(
     deadline: float | None = None,
     request_user_data: bytes | None = None,
     connection_type: int | None = None,
+    attempt: CallingAttempt | None = None,
 ) -> CallingResult:
     """Broker and prove a direct NAT path without opening media or sending a command."""
 
     if retries < 1:
         raise ValueError("calling retries must be positive")
-    attempt = CallingAttempt(
+    attempt = attempt or CallingAttempt(
         link_id=secrets.randbelow(0xFFFFFF) + 1,
         call_id=secrets.randbits(32),
         cookie=secrets.token_bytes(8),
     )
+    if (not 0 < attempt.link_id <= 0xFFFFFF or not 0 <= attempt.call_id <= 0xFFFFFFFF
+            or not isinstance(attempt.cookie, bytes) or len(attempt.cookie) != 8):
+        raise ValueError("invalid calling attempt")
     local_ip = local_route_ip(node.address)
     local_port = sock.getsockname()[1]
     node_acknowledged = False
@@ -148,6 +152,8 @@ def close_device_route(
     link_id: int,
     sequence: int,
     timeout: float,
+    *,
+    require_correlated_ack: bool = False,
 ) -> bool:
     """Send one idempotent native hangup and report its transport acknowledgement.
 
@@ -167,11 +173,14 @@ def close_device_route(
         if peer != node.address:
             continue
         plain = decrypt_node_frame(wire, node)
-        if plain is None:
+        if plain is None or len(plain) < 24:
             continue
         flags = struct.unpack_from("<I", plain, 0x14)[0]
         if flags & (1 << 20):
-            if plain[1] == 0xB9:
+            if plain[1] == 0xB9 and (not require_correlated_ack or (
+                    struct.unpack_from("<Q", plain, 4)[0] == node.session_id
+                    and struct.unpack_from("<I", plain, 0x0C)[0] == (sequence & 0xFFFFFFFF)
+                    and ((flags >> 16) & 3) == 2)):
                 return True
             continue
         acknowledge_reliable_node_frame(sock, node, plain)

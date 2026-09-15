@@ -159,3 +159,14 @@ def test_protocol_state_is_cleared_along_with_socket_on_cancellation(monkeypatch
         run(sock, cancelled=lambda: sock.now >= 0.004)
     assert sock.closed and len(sessions) == 1
     assert sessions[0].closed and sessions[0].buffered_bytes == 0
+
+
+@pytest.mark.parametrize("mode", ["normal", "receive_error"])
+def test_outer_route_owner_can_retain_socket_for_b9_cleanup(mode):
+    sock = FakeSocket(mode)
+    if mode == "normal":
+        assert run(sock, duration=0.5, close_socket=False).close_acknowledged
+    else:
+        with pytest.raises(ReceiveError):
+            run(sock, close_socket=False)
+    assert not sock.closed

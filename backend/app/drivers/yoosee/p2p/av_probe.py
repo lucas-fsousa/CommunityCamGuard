@@ -2,7 +2,8 @@
 
 No discovery, decoder, retained media, intercom, production registration or retry.
 Caller must reserve the exact camera and open/meter a fresh route without consuming
-any AV sequence space. Socket ownership transfers on entry, even on invalid input.
+any AV sequence space. By default socket ownership transfers on entry, even on
+invalid input. An enclosing route owner may retain it for B9 cleanup explicitly.
 """
 
 from __future__ import annotations
@@ -45,12 +46,14 @@ def probe_av_socket(
     duration: float = 10.0,
     cancelled: Callable[[], bool] = lambda: False,
     clock: Callable[[], float] = time.monotonic,
+    close_socket: bool = True,
 ) -> AvProbeResult:
     """Receive for <=10 seconds, plus <=2 seconds for CLOSE transport receipt.
 
     Result readiness is negotiation/header readiness, not decoder validation.
     Unsupported routing/meter traffic is ignored, not acknowledged speculatively.
     Closing the socket is local cleanup, not proof of a peer-side AV teardown.
+    With close_socket=False, the enclosing owner must close it on every exit.
     """
     handshake: AvHandshake | None = None
     try:
@@ -128,4 +131,5 @@ def probe_av_socket(
             if handshake is not None:
                 handshake.close()
         finally:
-            sock.close()
+            if close_socket:
+                sock.close()

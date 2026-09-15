@@ -46,9 +46,10 @@ All 168 selected tests passed, alongside Ruff and Mypy (180 backend source files
 using serial, memory-capped Python checks. This is not full-suite approval or live
 camera interoperability evidence.
 
-Before live camera-3 validation, review meter responses and wire the exact-camera
-reservation plus fresh authenticated route preparation. The route owner must also
-use the existing distinct brokered B9 hangup (`rendezvous_session.py`) in cleanup:
+Fresh route preparation and B9 cleanup are now implemented and simulated in
+[native-av-route.md](native-av-route.md). Before live camera-3 validation, review
+meter responses and wire the internal invocation to the camera-operation reservation.
+The owner uses the distinct brokered B9 hangup (`rendezvous_session.py`) in cleanup:
 AV CLOSE receipt and local socket closure do **not** replace P2P route release.
 Do not borrow the production RTSP/intercom socket or grant native-video capability
 based on these simulated tests.

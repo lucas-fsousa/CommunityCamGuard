@@ -6,7 +6,8 @@ opened/metered direct route. It does not discover cameras, load credentials, res
 a camera, initialize another AV session or register a production driver capability.
 The caller must enforce exact camera identity, exclusive reservation and unused AV
 sequence spaces before transferring ownership. Route preparation is outside this
-function's deadline and must receive a separate bound in the eventual caller.
+function's deadline; the new outer owner is described in
+[native-av-route.md](native-av-route.md).
 
 ## Resource and failure contract
 
@@ -21,9 +22,11 @@ function's deadline and must receive a separate bound in the eventual caller.
   PTZ, siren, lighting, decoder, file writer, worker or media-output queue exists.
 - Record counts are consumed per batch. Only aggregate counters are returned;
   existing bounded handshake/KCP/V1 retention remains in force.
-- Socket and handshake state are closed on success, invalid arguments, cancellation,
+- By default socket and handshake state are closed on success, invalid arguments, cancellation,
   protocol/budget failures and network errors. No reconnect or ambiguous-send retry.
   Network exceptions are sanitized rather than exposing endpoints.
+  With `close_socket=False`, only handshake state is closed here; the outer route
+  owner must release and close the socket on every exit.
 - Success requires negotiation/header readiness, at least one video record and
   CLOSE transport receipt (not semantic teardown proof);
   it does not establish playable decoding, keyframe readiness or A/V synchronization.
@@ -44,13 +47,13 @@ paths are untouched. There is no live CLI/API entry point yet.
 ## Before the camera-3 experiment
 
 1. AV CLOSE ownership/receipt correlation is now implemented and simulated; see
-   [native-av-close.md](native-av-close.md). The surrounding route owner still
-   needs distinct brokered B9 hangup cleanup; CLOSE is not route teardown proof.
+   [native-av-close.md](native-av-close.md). B9 cleanup is now composed and tested
+   in [native-av-route.md](native-av-route.md); neither receipt is physical proof.
 2. Review whether the short probe needs meter/keepalive replies. The current adapter
    ignores non-KCP traffic rather than guessing response fields.
-3. Wire fresh authenticated route preparation under the camera-3 identity/reservation
-   guard, with total preparation deadline and sanitized output. Never borrow the
-   production stream/intercom socket or run an old AV initializer first.
+3. Bind the implemented fresh route owner to an internal camera-3-only invocation
+   under the application's camera-operation reservation. Never borrow the production
+   stream/intercom socket or run an old AV initializer first.
 4. Perform one short, bounded camera-3 run and record actual readiness, record counts,
    teardown evidence and effects on existing RTSP. Do not infer firmware support
    or enable native streaming from simulated success.
