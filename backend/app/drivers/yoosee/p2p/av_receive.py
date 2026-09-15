@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from .av_pending import PendingAv
 from .kcp_receive import KcpReceiver, ReceiveError
 from .media_receive import MediaReceiver
 from .receive_lifecycle import ReceiveLifecycle
@@ -31,10 +32,10 @@ class AvReceiver:
 
     Single-channel mode requires ACCEPT and an encoding header. Paired mode requires
     ACCEPT on the high-bit conversation, then START and encoding on the base one.
-    Sequence spaces remain independent. No payload queue persists; the caller
-    consumes each returned batch immediately. Unknown command payloads are counted,
-    never interpreted as acceptance or successful command execution.
-"""
+    Sequence spaces remain independent. Early START/media wait in a small ciphertext
+    queue until ACCEPT; the caller consumes returned batches immediately. Unknown
+    commands are counted, never interpreted as acceptance or command success.
+    """
 
     def __init__(self, peer: tuple[str, int], conv: int, call_id: int, cookie: bytes, *,
                  control_conv: int | None = None,
@@ -53,6 +54,7 @@ class AvReceiver:
         self._cookie = cookie
         self._transport = ReceiveLifecycle(peer, conv, clock=clock)
         self._parser = V1Receiver()
+        self._pending = PendingAv(clock)
         self._accepted = False
         self._started = False
         self._encoding: V1EncodingHeader | None = None
@@ -72,11 +74,13 @@ class AvReceiver:
     @property
     def buffered_bytes(self) -> int:
         control_bytes = self._control.receiver.buffered_bytes if self._control is not None else 0
-        return self._transport.buffered_bytes + self._parser.buffered_bytes + control_bytes
+        return (self._transport.buffered_bytes + self._parser.buffered_bytes
+                + control_bytes + self._pending.buffered_bytes)
 
     def close(self) -> None:
         self._transport.close()
         self._parser.close()
+        self._pending.clear()
         if self._control is not None:
             self._control.receiver.close()
         self._cookie = b""
@@ -88,6 +92,7 @@ class AvReceiver:
     def poll(self) -> None:
         try:
             self._transport.poll()
+            self._pending.poll()
             if self._control is not None:
                 self._control.receiver.expire()
         except ReceiveError:
@@ -103,6 +108,13 @@ class AvReceiver:
     def _message(self, message: bytes) -> tuple[V1Record, ...]:
         if len(message) < 4 or struct.unpack_from("<H", message, 2)[0] != len(message):
             raise ValueError("invalid AV envelope")
+        if self._control is not None and not self._accepted:
+            if not self._pending.buffered_bytes or message[0] == 3:
+                self._check_control(message, 6)
+            elif message[0] != 4 or message[1] not in (1, 2):
+                raise ValueError("unexpected pre-accept AV message")
+            self._pending.append(message)
+            return ()
         if message[0] == 3:
             self._check_control(message, 2 if self._control is None else 6)
             if self._control is None:
@@ -145,6 +157,9 @@ class AvReceiver:
                     self._accepted = True
             batch = self._transport.receive(wire, peer)
             records: list[V1Record] = []
+            if self._accepted:
+                for message in self._pending.take():
+                    records.extend(self._message(message))
             for message in batch.messages:
                 records.extend(self._message(message))
             return AvReceiveBatch(control_acks + batch.acknowledgements, tuple(records), unhandled)

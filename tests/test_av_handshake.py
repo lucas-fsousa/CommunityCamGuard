@@ -89,15 +89,15 @@ def test_receipts_without_media_do_not_establish_readiness():
     assert s.closed
 
 
-@pytest.mark.parametrize("fault", ["wrong_call", "start_before_accept", "bad_media"])
+@pytest.mark.parametrize("fault", ["wrong_call", "media_before_start", "bad_media"])
 def test_protocol_failure_closes_senders_and_parser(fault):
     s = session()
     s.due()
     with pytest.raises(ReceiveError):
         if fault == "wrong_call":
             s.receive(packet(0, 0, control(124), conv=CONTROL), PEER)
-        elif fault == "start_before_accept":
-            s.receive(packet(0, 0, start()), PEER)
+        elif fault == "media_before_start":
+            s.receive(packet(0, 0, media(header())), PEER)
         else:
             s.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
             s.receive(packet(0, 0, start()), PEER)

@@ -24,8 +24,8 @@ space, ACK/UNA and fragment assembly. Control inactivity alone is not media
 inactivity; a missing control fragment still has the original two-second deadline.
 
 Activation requires matching ACCEPT on control, matching START on media and a
-complete encoding header. START before ACCEPT fails closed, including reordered
-cross-channel arrivals; bounded cross-channel reorder handling is **not implemented**.
+complete encoding header. START before ACCEPT now waits in a bounded ciphertext
+queue; see [native-av-reorder.md](native-av-reorder.md) for limits and validation.
 Media cannot masquerade as control or reuse its acceptance sequence number.
 Failure in either channel clears both plus the V1 parser. Caller-owned sockets
 still must be closed by the caller. No INIT or outgoing START is sent here.
@@ -35,7 +35,8 @@ conversation are counted as `unhandled_commands`, not decoded, queued or treated
 as command success. They do not activate the session or refresh media progress.
 Unknown AV controls and malformed envelopes remain terminal. Retained KCP payload
 is capped at 256 KiB per conversation (512 KiB combined), plus the existing bounded
-V1 parser. No threads, workers, decoder or background process are created.
+V1 parser and the 256 KiB pre-ACCEPT queue. No threads, workers, decoder or background
+process are created.
 
 ## Repeatable offline result
 
@@ -55,7 +56,7 @@ independent codec decode**, complete-capture audit, live handshake or latency te
 The existing historical codec decoding milestone remains separate.
 
 Focused tests cover the paired sequence-zero spaces, fragment reordering, wrong
-channel/action/call, START without ACCEPT, media without START, quiet control while
+channel/action/call, missing ACCEPT, media without START, quiet control while
 media progresses, shared failure cleanup and non-authorizing command receipts.
 The full Python suite's previous exit-139 failure is unresolved; avoid claiming
 full regression approval on the basis of focused tests.
@@ -68,11 +69,10 @@ full suite was not repeated, and no memory cap was increased.
 ## Next
 
 The socket-free, one-control reliable outbound primitive is now implemented and
-tested: [native-av-control-send.md](native-av-control-send.md). Composition into a
-live INIT/ACCEPT/START owner is still pending; transport ACK is not AV acceptance.
+tested: [native-av-control-send.md](native-av-control-send.md). Socket-free composition
+is covered by [native-av-handshake.md](native-av-handshake.md); transport ACK is not
+AV acceptance and live socket integration remains pending.
 
-Implement reliable outbound INIT/START ownership and correlate ACKs to actual sent
-sequences, preserving intercom's validated behavior. Decide bounded handling of
-cross-channel reorder before live deployment. Then perform a short camera-3-only
+Preserve intercom's validated behavior while implementing a short camera-3-only
 receive experiment. No production caller, dashboard capability, stream replacement
 or container rebuild was introduced by this milestone.

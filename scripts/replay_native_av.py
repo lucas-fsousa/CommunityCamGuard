@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 from pathlib import Path
 
 from backend.app.drivers.yoosee.p2p.av_receive import AvReceiver
@@ -13,13 +14,16 @@ from .captured_media import CapturedSessions
 from .pcap_input import packets, udp
 
 
-def audit(path: Path, control_flow: str = "flow4") -> dict:
+def audit(path: Path, control_flow: str = "flow4", *, delay_accept: bool = False) -> dict:
     sessions = CapturedSessions()
     flows: dict[tuple, str] = {}
     receiver = None
     route = binding = None
     start = 0.0
     clock = [0.0]
+    delayed: bytes | None = None
+    injected = False
+    peak_buffered = 0
     counts = dict(datagrams=0, headers=0, video_frames=0, audio_frames=0, unhandled_commands=0)
     try:
         for now, raw in packets(path):
@@ -59,17 +63,31 @@ def audit(path: Path, control_flow: str = "flow4") -> dict:
                 continue
             if sessions.lookup(peer, destination, route[2]) != binding:
                 raise ValueError("capture binding changed")
-            result = receiver.receive(wire, peer)
-            counts["datagrams"] += 1
-            counts["unhandled_commands"] += result.unhandled_commands
-            for record in result.records:
-                counts["headers"] += record.encoding is not None
-                counts["video_frames"] += bool(record.video)
-                counts["audio_frames"] += len(record.audio)
-        if receiver is None or receiver.phase != "active" or not counts["video_frames"]:
+            if delay_accept and not injected:
+                if not any(s.conv == route[2] | 0x80000000 and s.command == KCP_PUSH
+                           and s.fragment == 0 and len(s.body) == 76 and s.body[:4] == b"\x03\x00\x4c\x00"
+                           and struct.unpack_from("<I", s.body, 8)[0] == 2 for s in segments):
+                    raise ValueError("scenario requires first complete ACCEPT datagram")
+                delayed, injected = wire, True
+                continue
+            deliveries = [wire]
+            if delayed is not None and clock[0] >= 0.1:
+                deliveries.insert(0, delayed)
+                delayed = None
+            for delivery in deliveries:
+                result = receiver.receive(delivery, peer)
+                peak_buffered = max(peak_buffered, receiver.buffered_bytes)
+                counts["datagrams"] += 1
+                counts["unhandled_commands"] += result.unhandled_commands
+                for record in result.records:
+                    counts["headers"] += record.encoding is not None
+                    counts["video_frames"] += bool(record.video)
+                    counts["audio_frames"] += len(record.audio)
+        if delayed is not None or receiver is None or receiver.phase != "active" or not counts["video_frames"]:
             raise ValueError("capture did not reach active video")
         return dict(control_flow=control_flow, phase=receiver.phase, **counts,
-                    buffered_bytes=receiver.buffered_bytes, prefix_limit_seconds=10)
+                    buffered_bytes=receiver.buffered_bytes, prefix_limit_seconds=10,
+                    delayed_accept=injected, peak_buffered_bytes=peak_buffered)
     finally:
         if receiver is not None:
             receiver.close()
@@ -79,9 +97,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("capture", type=Path)
     parser.add_argument("--control-flow", default="flow4")
+    parser.add_argument("--delay-accept", action="store_true", help="delay first ACCEPT by at least 100 ms offline")
     args = parser.parse_args()
     try:
-        print(json.dumps(audit(args.capture, args.control_flow), indent=2))
+        print(json.dumps(audit(args.capture, args.control_flow, delay_accept=args.delay_accept), indent=2))
     except (OSError, ValueError):
         raise SystemExit("AV replay rejected") from None
 

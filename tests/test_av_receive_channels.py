@@ -39,13 +39,12 @@ def test_independent_sequence_zero_and_media_reordering():
     assert session.buffered_bytes == 0
 
 
-@pytest.mark.parametrize("case", ["start_before_accept", "media_before_start", "accept_on_media",
+@pytest.mark.parametrize("case", ["media_before_start", "accept_on_media",
                                    "start_on_control", "media_on_control", "wrong_call"])
 def test_channels_cannot_substitute_for_each_other(case):
     session = receiver()
     with pytest.raises(ReceiveError):
-        if case != "start_before_accept":
-            session.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
+        session.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
         body, conv, seq = start(), 42, 0
         if case == "media_before_start":
             body = media(header())
