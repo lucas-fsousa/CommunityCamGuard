@@ -95,3 +95,7 @@ state from initialization, clears all state when changing sessions, handles time
 and provides pacing/audio synchronization. Only then can a camera-3-only source
 handoff be homologated, keeping one selected producer and preserving recordings.
 Do not apply this gate to current RTSP or migrate the validated intercom implicitly.
+
+The next socket-free ownership primitive and its handoff/deadline tests are now
+implemented: [native-receive-lifecycle.md](native-receive-lifecycle.md). Connecting
+it to a correlated AV initializer and the continuous parser remains pending.
