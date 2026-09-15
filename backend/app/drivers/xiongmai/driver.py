@@ -2,7 +2,7 @@
 username/password is known). Discovery only for now."""
 from __future__ import annotations
 
-from .base import CameraDriver, DetectContext
+from ..base import CameraDriver, DetectContext
 
 
 class XiongmaiDriver(CameraDriver):

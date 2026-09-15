@@ -16,10 +16,10 @@ See `README.md` for the full architecture and `docs/DECISIONS.md` for the design
 
 ## Adding support for a new camera — write a driver
 
-All camera-family knowledge lives in **one place**: the `backend/app/drivers/` package. A simple
-RTSP discovery driver is one file plus explicit registration. A family with proprietary controls
-or provisioning gets its own package (`drivers/mybrand/`) containing its driver, model profiles,
-controls and protocol adapters. Generic API code accepts only semantic operations and dispatches
+All camera-family knowledge lives in **one place**: the `backend/app/drivers/` package. Each brand
+gets its own package (`drivers/mybrand/`), even when it currently supplies only discovery metadata.
+Start with `driver.py` and an `__init__.py` export; add model profiles, controls and protocol adapters
+only when implemented. Generic API code accepts only semantic operations and dispatches
 them through `CameraDriver`; never add vendor imports or raw command payloads to an API router.
 
 ### Non-negotiable capability rule
@@ -41,11 +41,10 @@ adding brand conditionals to the monitoring core.
 
 ### 1. Discovery-only driver (just RTSP paths)
 
-Create `backend/app/drivers/mybrand.py` (or `drivers/mybrand/driver.py` when the family needs more
-than discovery metadata):
+Create `backend/app/drivers/mybrand/driver.py`:
 
 ```python
-from .base import CameraDriver, DetectContext
+from ..base import CameraDriver, DetectContext
 
 class MyBrandDriver(CameraDriver):
     key = "mybrand"                          # short id
@@ -56,6 +55,11 @@ class MyBrandDriver(CameraDriver):
     def matches(self, ctx: DetectContext) -> bool:      # recognise the family
         return "mybrand" in ctx.vendor.lower()
 ```
+
+Re-export `MyBrandDriver` from `drivers/mybrand/__init__.py`, then register the class in
+`drivers/__init__.py`. Keep discovery-only support explicit; see
+[the partial-driver inventory](docs/internal/driver-package-audit.md). The generic fallback and
+shared contracts stay outside vendor packages.
 
 For ambiguous families, override `match_confidence()` (`0..100`) instead. Strong manufacturer,
 model, serial or protocol evidence should outrank a shared open-port fingerprint. Add a collision

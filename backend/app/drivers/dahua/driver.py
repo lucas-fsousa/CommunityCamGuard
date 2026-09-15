@@ -1,9 +1,10 @@
-"""Dahua-style cameras. Discovery only for now — a contributor with the hardware can add
-ONVIF PTZ/reboot (standard ONVIF on port 80) by overriding ``_probe_controls`` + ``ptz`` /
-``reboot`` (the :mod:`..control` ONVIF toolbox already has the SOAP ops)."""
+"""Dahua-style discovery and RTSP candidates; device controls are not implemented.
+
+Do not infer a camera's ONVIF endpoint or control support from the vendor label.
+"""
 from __future__ import annotations
 
-from .base import CameraDriver, DetectContext
+from ..base import CameraDriver, DetectContext
 
 
 class DahuaDriver(CameraDriver):

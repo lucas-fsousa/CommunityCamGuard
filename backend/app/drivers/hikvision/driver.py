@@ -1,7 +1,7 @@
 """Hikvision-style cameras. Discovery only for now (add ONVIF controls when tested)."""
 from __future__ import annotations
 
-from .base import CameraDriver, DetectContext
+from ..base import CameraDriver, DetectContext
 
 
 class HikvisionDriver(CameraDriver):
