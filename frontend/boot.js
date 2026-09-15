@@ -21,6 +21,7 @@
   importMap.type = "importmap";
   importMap.textContent = JSON.stringify({ imports: {
     "ccg/core": moduleUrl("/modules/core.js"),
+    "ccg/notifications": moduleUrl("/modules/notifications.js"),
     "ccg/i18n": moduleUrl("/i18n.js"),
     "ccg/live": moduleUrl("/modules/live-cameras.js"),
     "ccg/camera-controls": moduleUrl("/modules/camera-controls.js"),

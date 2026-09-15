@@ -1,5 +1,6 @@
 import { t } from "ccg/i18n";
 import { api, el } from "ccg/core";
+import { notify } from "ccg/notifications";
 
 // Camera controls are grouped behind one compact menu. Nothing is read automatically when a
 // tile renders: opening the dashboard must not create extra P2P sessions on resource-limited
@@ -17,6 +18,11 @@ function applying(status) {
 
 function finishApplying(status) {
   status.classList.remove("applying");
+}
+
+function completed(status, message, error = false) {
+  status.textContent = "";
+  notify(message, { anchor: status, error });
 }
 
 async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
@@ -82,11 +88,11 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
           throw new Error(t("control.unconfirmed"));
         }
         status.classList.remove("error");
-        status.textContent = t("control.applied");
+        completed(status, t("control.applied"));
         overlay.remove();
       } catch (error) {
         modalStatus.classList.add("error");
-        modalStatus.textContent = t("control.failed", { msg: error.message });
+        completed(modalStatus, t("control.failed", { msg: error.message }), true);
       } finally {
         finishApplying(modalStatus);
         apply.disabled = false;
@@ -97,7 +103,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
     status.textContent = "";
   } catch (error) {
     status.classList.add("error");
-    status.textContent = t("control.failed", { msg: error.message });
+    completed(status, t("control.failed", { msg: error.message }), true);
   } finally {
     trigger.disabled = false;
   }
@@ -165,11 +171,11 @@ async function openProtectionSchedule(cam, status, trigger) {
           throw new Error(t("control.unconfirmed"));
         }
         status.classList.remove("error");
-        status.textContent = t("control.applied");
+        completed(status, t("control.applied"));
         overlay.remove();
       } catch (error) {
         modalStatus.classList.add("error");
-        modalStatus.textContent = t("control.failed", { msg: error.message });
+        completed(modalStatus, t("control.failed", { msg: error.message }), true);
       } finally {
         finishApplying(modalStatus);
         save.disabled = false;
@@ -180,7 +186,7 @@ async function openProtectionSchedule(cam, status, trigger) {
     status.textContent = "";
   } catch (error) {
     status.classList.add("error");
-    status.textContent = t("control.failed", { msg: error.message });
+    completed(status, t("control.failed", { msg: error.message }), true);
   } finally {
     trigger.disabled = false;
   }
@@ -225,11 +231,11 @@ export function controlWidgets(cam, status) {
         }
         // Actions are momentary; settings retain only the server-confirmed value.
         confirmed = available[controlKey]?.kind === "action" ? "" : selected;
-        status.textContent = success || t("control.applied");
+        completed(status, success || t("control.applied"));
       } catch (error) {
         confirmed = "";
         status.classList.add("error");
-        status.textContent = t("control.failed", { msg: error.message });
+        completed(status, t("control.failed", { msg: error.message }), true);
       } finally {
         finishApplying(status);
         select.value = confirmed;

@@ -14,6 +14,7 @@
 
 const STRINGS = {
   en: {
+    "notification.dismiss": "Dismiss notification",
     "login.prompt": "Enter the dashboard key",
     "login.keyPlaceholder": "secret key",
     "login.unlock": "Unlock",
@@ -329,6 +330,7 @@ const STRINGS = {
     "rec.playbackFailed": "The browser-compatible version could not be prepared.",
   },
   "pt-BR": {
+    "notification.dismiss": "Fechar notificação",
     "login.prompt": "Digite a chave do painel",
     "login.keyPlaceholder": "chave secreta",
     "login.unlock": "Entrar",

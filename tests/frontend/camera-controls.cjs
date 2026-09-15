@@ -59,12 +59,37 @@ const requests = [];
 let pending = null;
 const api = async (...args) => { requests.push(args); return pending ? await pending : {}; };
 const t = (key) => key;
+const notifications = [];
 function load(file, bindings, exported) {
+  bindings = { notify: (message, options) => notifications.push({ message, options }), ...bindings };
   const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export function /g, "function ");
   return new Function(...Object.keys(bindings), source + `\nreturn ${exported};`)(...Object.values(bindings));
 }
 const controlWidgets = load("camera-control-actions.js", { el, api, t }, "controlWidgets");
+{
+  const timers = new Map();
+  let nextTimer = 0;
+  const notify = load("notifications.js", {
+    el, t,
+    setTimeout: (fn, delay) => { assert.equal(delay, 5000); timers.set(++nextTimer, fn); return nextTimer; },
+    clearTimeout: (id) => timers.delete(id),
+  }, "notify");
+  const host = el("section"); document.body.append(host);
+  const anchor = { closest: () => host };
+  notify("<b>plain text</b>", { anchor });
+  const region = host.children[0];
+  assert.equal(region.children[0].children[0].textContent, "<b>plain text</b>");
+  assert.equal(region.children[0].children[1].attributes["aria-label"], "notification.dismiss");
+  region.children[0].children[1].click();
+  assert.equal(timers.size, 0); assert.equal(host.children.length, 0);
+  for (let i = 0; i < 4; i++) notify(`message ${i}`, { anchor });
+  assert.equal(host.children[0].children.length, 3); assert.equal(timers.size, 3);
+  for (const callback of [...timers.values()]) callback();
+  assert.equal(timers.size, 0); assert.equal(host.children.length, 0);
+  host.remove();
+  console.log("Toast contracts passed");
+}
 let audioButtons = 0;
 const audioButton = () => { audioButtons++; return el("button"); };
 const cameraControls = load("camera-controls.js", {
@@ -162,7 +187,8 @@ const cameraControls = load("camera-controls.js", {
   pending = Promise.resolve({ verified: true, value: "daytime" });
   await night.dispatch("change");
   assert.equal(night.value, "daytime");
-  assert.equal(status.textContent, "control.applied");
+  assert.equal(status.textContent, "");
+  assert.equal(notifications.at(-1).message, "control.applied");
   for (const result of [{ verified: false, value: "automatic" }, { verified: true, value: "daytime" }, {}]) {
     night.value = "automatic";
     pending = Promise.resolve(result);

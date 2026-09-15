@@ -419,6 +419,22 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
 }
 
 /* Frontend build badge — tiny, fixed, unobtrusive; shows which asset version the browser loaded. */
+.toast-region {
+  position: fixed; right: 16px; top: 76px; z-index: 10010;
+  width: min(340px, calc(100vw - 32px)); display: grid; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex; align-items: start; gap: 12px; padding: 12px;
+  background: #202936; color: #f1f5f9; border: 1px solid #526174;
+  border-radius: 8px; box-shadow: 0 4px 16px #0003; pointer-events: auto;
+  font-size: 13px; overflow-wrap: anywhere;
+}
+.toast > span { flex: 1; min-width: 0; }
+.toast-error { border-color: #d27b7b; }
+.toast-close { flex: none; min-width: 32px; min-height: 32px; cursor: pointer; }
+.toast-close:focus-visible { outline: 2px solid #92caff; outline-offset: 2px; }
+
 .app-version {
   position: fixed; bottom: 4px; right: 6px; z-index: 9999; pointer-events: none;
   font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .4;
