@@ -178,6 +178,17 @@ def test_driver_uses_only_reviewed_directions_and_rejects_old_hold_client(monkey
     assert calls == ["native", "standard"]
 
 
+def test_same_step_interaction_without_p2p_enrollment(monkeypatch):
+    monkeypatch.setattr(native_ptz_policy, "selected", lambda _: None)
+    from backend.app.control import ptz
+    calls = []
+    monkeypatch.setattr(ptz, "move", lambda *args: calls.append("onvif_step") or True)
+    driver = YooseeDriver()
+    assert driver.ptz_interaction(CAMERA) == "step"
+    assert driver.ptz(CAMERA, "left", "step")
+    assert calls == ["onvif_step"]
+
+
 def test_policy_persists_exact_unit_and_direction_only():
     assert native_ptz_policy.selected(CAMERA.camera_id) is None
     native_ptz_policy.activate(CAMERA.camera_id, IDENTITY, frozenset({"right"}))

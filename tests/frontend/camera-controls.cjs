@@ -63,10 +63,23 @@ const notifications = [];
 function load(file, bindings, exported) {
   bindings = { notify: (message, options) => notifications.push({ message, options }), ...bindings };
   const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
-    .replace(/^import .*;\n/gm, "").replace(/export function /g, "function ");
+    .replace(/^import .*;\n/gm, "").replace(/export (async )?function /g, "$1function ")
+    .replace(/export const /g, "const ");
   return new Function(...Object.keys(bindings), source + `\nreturn ${exported};`)(...Object.values(bindings));
 }
 const controlWidgets = load("camera-control-actions.js", { el, api, t }, "controlWidgets");
+{
+  const selected = [];
+  const ptzControls = load("live-cameras.js", {
+    document: { addEventListener() {} },
+    finitePtzControls: (camera) => { selected.push(camera.id); return "shared-pad"; },
+  }, "ptzControls");
+  for (const camera of [{ id: "native", ptz_interaction: "step" },
+    { id: "onvif", ptz_interaction: "hold" }, { id: "legacy" }]) {
+    assert.equal(ptzControls(camera), "shared-pad");
+  }
+  assert.deepEqual(selected, ["native", "onvif", "legacy"]);
+}
 {
   const timers = new Map();
   let nextTimer = 0;

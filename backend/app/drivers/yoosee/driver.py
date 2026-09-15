@@ -68,9 +68,8 @@ class YooseeDriver(CameraDriver):
         caps.stream_paths = media.stream_paths(ip)
 
     def ptz_interaction(self, camera: Camera) -> str:
-        from .native_ptz_policy import selected
-
-        return "step" if selected(camera.camera_id) is not None else "hold"
+        # Both native PTZ and the ONVIF fallback implement server-stopped steps.
+        return "step"
 
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:
         from . import native_ptz

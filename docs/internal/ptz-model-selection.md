@@ -1,5 +1,28 @@
 # Driver-owned PTZ model selection — 2026-09-15
 
+## Follow-up: shared D-pad
+
+The initial model-selection change did not fix the visual split: the frontend still
+rendered the old arrows for `ptz_interaction=hold`. Runtime inspection showed only
+camera 3 had a durable P2P enrollment; Garagem and Quintal had none, rather than
+merely a missing link to an existing enrollment. Their documented MAC/device
+associations are retained in ignored RE notes, not guessed from IP/name/order.
+
+`live-cameras.js` now always uses the shared finite click/drag D-pad when the camera
+has PTZ capability. Yoosee reports the step interaction regardless of P2P enrollment;
+the existing ONVIF `move` implementation already sends a bounded pulse followed by
+STOP. Driver transport selection and safe native fallback remain unchanged. No
+fake enrollment, camera command or account rebind was performed.
+
+Tests cover shared component selection for step/hold/legacy camera descriptors,
+the ONVIF step route without enrollment, and existing click/drag/STOP contracts.
+Native P2P for Garagem/Quintal still requires recovery of genuine enrollment
+credentials: the current account inventory helper itself requires an enrollment,
+and the onboarding bind path requires temporary provisioning material. Merely
+knowing a device ID is not sufficient to synthesize its subscription token.
+
+The following sections describe the previous backend model-selection milestone.
+
 User clarification: camera 3 was the authorized physical test unit, not the only
 unit allowed to benefit from the implementation. Support decisions belong to the
 driver. Homologation of a compatible model/profile must not require repeating a

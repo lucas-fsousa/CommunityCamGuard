@@ -62,46 +62,9 @@ export function capBadges(cam) {
 // at that rate — sending faster doesn't pan faster, it just backlogs commands that overshoot
 // after release. Matched to the step, at most one step is in flight on release (~0.4s overshoot,
 // the floor since Stop can't cancel a step). Shown only for PTZ cameras.
-const PTZ_REPEAT_MS = 450;   // ~= the camera's step duration; its effective max pan rate
-
 function ptzControls(cam) {
-  if (cam.ptz_interaction === "step") return finitePtzControls(cam);
-  let held = null, timer = null, safety = null;
-  const send = (action, direction) =>
-    api(`/cameras/${encodeURIComponent(cam.id)}/ptz`, {
-      method: "POST", body: JSON.stringify({ action, direction }),
-    })
-      .catch((e) => console.warn(`ptz ${action} ${direction || ""}: ${e.message}`));
-  const stop = () => {
-    if (!held) return;
-    const dir = held; held = null;
-    clearInterval(timer); clearTimeout(safety);
-    send("stop", dir);
-  };
-  const start = (dir) => {
-    if (held) return;
-    held = dir;
-    send("start", dir);                                       // first step now
-    timer = setInterval(() => send("start", dir), PTZ_REPEAT_MS);  // keep stepping while held
-    safety = setTimeout(stop, 8000);   // never pan forever if a release event is missed
-  };
-  const b = (dir, glyph) => {
-    const btn = el("button", { className: "icon-btn ptz-mini", textContent: glyph, title: t("ptz.holdDir", { dir: t("dir." + dir) }) });
-    btn.addEventListener("pointerdown", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      btn.setPointerCapture?.(e.pointerId);   // keep getting events if the finger slides off
-      start(dir);
-    });
-    btn.addEventListener("pointerup", (e) => { e.stopPropagation(); stop(); });
-    btn.addEventListener("pointercancel", stop);
-    btn.addEventListener("lostpointercapture", stop);
-    btn.addEventListener("contextmenu", (e) => e.preventDefault());  // no long-press menu on touch
-    return btn;
-  };
-  // Compact inline arrows (← ↑ ↓ →). A cross D-pad reads nicely but is 3 rows tall, which forces a
-  // tall footer; the footer stays one line this way. (A hover-overlay D-pad is the way to get both.)
-  return el("span", { className: "ptz-inline", title: t("ptz.hold") },
-    b("left", "←"), b("up", "↑"), b("down", "↓"), b("right", "→"));
+  // One visual/gesture contract; the backend driver selects native or ONVIF.
+  return finitePtzControls(cam);
 }
 
 
