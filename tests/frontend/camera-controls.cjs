@@ -306,6 +306,7 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(arrowButtons[3].attributes["aria-busy"], "true");
   await arrowButtons[0].dispatch("click");
   assert.equal(requests.length, beforeStep + 1);
+  assert.equal(requests.at(-1)[0], `/cameras/${encodeURIComponent(cam.id)}/ptz`);
   assert.equal(requests.at(-1)[1].body, '{"action":"step","direction":"right"}');
   finishStep({ ok: true });
   await moving;
@@ -332,6 +333,7 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(requests.length, beforeDrag + 1); // direction change is not queued
   await arrows.dispatch("pointerup", { pointerId: 1 });
   assert.equal(requests.length, beforeDrag + 2);
+  assert.equal(requests.at(-1)[0], `/cameras/${encodeURIComponent(cam.id)}/ptz`);
   assert.equal(requests.at(-1)[1].body, '{"action":"stop"}');
   finishStep({ ok: true });
   for (let i = 0; i < 5; i++) await Promise.resolve();

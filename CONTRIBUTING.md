@@ -130,12 +130,13 @@ Note the exact model(s)/firmware you verified in the module docstring, and add a
 
 ## Code standards
 
-CI (`.github/workflows/ci.yml`) runs three gates on every push/PR — run them locally first:
+CI (`.github/workflows/ci.yml`) runs four gates on every push/PR — run them locally first:
 
 ```bash
 ruff check backend tests   # lint (config in pyproject.toml)
 mypy backend/app           # type-check
 pytest                     # tests (throwaway DB, no cameras/network)
+node --max-old-space-size=64 tests/frontend/camera-controls.cjs  # DOM/control contracts
 ```
 
 - **Types:** annotate public functions; `mypy` must pass. New modules should be typed.
@@ -150,9 +151,18 @@ pytest                     # tests (throwaway DB, no cameras/network)
 ## PR flow
 
 1. Branch off `main`; keep the change focused.
-2. Make the three gates above green; add/adjust tests.
+2. Make the four gates above green; add/adjust tests.
 3. Note the exact camera model(s)/firmware you verified (for driver PRs) in the module docstring.
 4. Open the PR with a short *why*. Match the surrounding style; keep modules cohesive.
+
+After pushing, check the workflow for the **exact pushed SHA** and wait for its terminal
+result before declaring the milestone verified. Local focused tests do not establish CI
+success. With GitHub CLI, locate the run using `gh run list --commit <sha>`, inspect it
+with `gh run view <run-id>`, and read failures with `gh run view <run-id> --log-failed`.
+Fix failures before continuing unrelated milestones; never silently disable a failing gate.
+Use Python 3.12, matching CI, for full-suite reproduction. On memory-constrained WSL hosts,
+run serially in a capped disposable container without mounting `.env`, data or recordings;
+keep focused local checks separate from full-suite/remote CI evidence.
 
 ## Guidelines
 
