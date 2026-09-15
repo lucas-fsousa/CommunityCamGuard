@@ -67,6 +67,10 @@ full suite was not repeated, and no memory cap was increased.
 
 ## Next
 
+The socket-free, one-control reliable outbound primitive is now implemented and
+tested: [native-av-control-send.md](native-av-control-send.md). Composition into a
+live INIT/ACCEPT/START owner is still pending; transport ACK is not AV acceptance.
+
 Implement reliable outbound INIT/START ownership and correlate ACKs to actual sent
 sequences, preserving intercom's validated behavior. Decide bounded handling of
 cross-channel reorder before live deployment. Then perform a short camera-3-only
