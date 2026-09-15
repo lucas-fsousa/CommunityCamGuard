@@ -57,3 +57,8 @@ intercom golden frames and isolate this from production source selection. Then
 test bounded camera-3-only reception, keyframe recovery, pacing/A-V synchronization
 and single-producer handoff. No dashboard capability should be enabled on the
 basis of these synthetic tests.
+
+The inbound ACCEPT/TLV/V1 composition is now implemented and synthetically tested
+in [native-av-receive.md](native-av-receive.md). Historical flow5 begins with START,
+not ACCEPT, and was deliberately rejected; bidirectional role correlation and the
+outbound INIT/ACK owner remain pending before any live negotiation claim.
