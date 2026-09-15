@@ -1,5 +1,9 @@
 # Experimental inbound AV negotiation — 2026-09-14
 
+Update 2026-09-15: explicit paired-channel mode and a successful bounded historical
+replay are documented in [native-av-paired.md](native-av-paired.md). The initial
+single-channel rejection below is retained as evidence of why coordination matters.
+
 `drivers/yoosee/p2p/av_receive.py` connects the existing bounded receive lifecycle
 to complete-TLV correlation/decryption and one continuous V1 parser. It has **no
 socket, INIT sender, production caller or dashboard capability grant**. The route
