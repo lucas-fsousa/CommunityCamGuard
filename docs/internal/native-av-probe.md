@@ -10,21 +10,22 @@ function's deadline and must receive a separate bound in the eventual caller.
 
 ## Resource and failure contract
 
-- Maximum ten seconds, with socket operations limited to 50 ms and cancellation
+- Maximum ten seconds of reception plus two seconds for CLOSE receipt, with socket operations limited to 50 ms and cancellation
   checks before sends, after reception and between iterations.
 - At most 10,000 received datagrams, 8 MiB received and 2 MiB transmitted. Noise
   and foreign traffic count toward receive budgets; no unbounded drain loop.
 - Receive buffer is 2,048 bytes to detect/truncate oversize MTP traffic above the
   protocol's 2,047-byte limit. Oversize packets are discarded, never parsed as a
   valid prefix. Byte accounting measures returned bytes, not truncated wire bytes.
-- Only INIT, START and transport ACKs are sent. No audio payload, microphone,
+- Only INIT, START, CLOSE and transport ACKs are sent. No audio payload, microphone,
   PTZ, siren, lighting, decoder, file writer, worker or media-output queue exists.
 - Record counts are consumed per batch. Only aggregate counters are returned;
   existing bounded handshake/KCP/V1 retention remains in force.
 - Socket and handshake state are closed on success, invalid arguments, cancellation,
   protocol/budget failures and network errors. No reconnect or ambiguous-send retry.
   Network exceptions are sanitized rather than exposing endpoints.
-- Success requires negotiation/header readiness and at least one video record;
+- Success requires negotiation/header readiness, at least one video record and
+  CLOSE transport receipt (not semantic teardown proof);
   it does not establish playable decoding, keyframe readiness or A/V synchronization.
 
 ## Validation and actual scope
@@ -42,10 +43,9 @@ paths are untouched. There is no live CLI/API entry point yet.
 
 ## Before the camera-3 experiment
 
-1. Add bounded AV CLOSE ownership/receipt correlation using the correct next
-   outgoing sequence. The current reliable primitive handles sequence-zero INIT
-   and START only; do not reuse it blindly for CLOSE or copy the legacy scalar
-   receive-sequence handoff. Local socket cleanup is not remote teardown proof.
+1. AV CLOSE ownership/receipt correlation is now implemented and simulated; see
+   [native-av-close.md](native-av-close.md). The surrounding route owner still
+   needs distinct brokered B9 hangup cleanup; CLOSE is not route teardown proof.
 2. Review whether the short probe needs meter/keepalive replies. The current adapter
    ignores non-KCP traffic rather than guessing response fields.
 3. Wire fresh authenticated route preparation under the camera-3 identity/reservation

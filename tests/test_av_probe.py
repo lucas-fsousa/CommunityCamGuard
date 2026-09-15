@@ -70,13 +70,14 @@ def run(sock, **kwargs):
 def test_negotiation_and_reordered_media_are_counted_without_retaining_payload():
     sock = FakeSocket()
     result = run(sock, duration=0.5)
-    assert result.ready and result.headers == result.video_frames == 1
+    assert result.ready and result.close_acknowledged and result.headers == result.video_frames == 1
     assert result.sent_bytes > 0 and result.peak_buffered_bytes > 0
     assert sock.closed
     controls = [s for wire in sock.sent for s in parse_kcp_segments(wire)
                 if s.command == KCP_PUSH]
-    assert [struct.unpack_from("<I", s.body, 8)[0] for s in controls] == [1, 6]
-    assert [s.body[:4] for s in controls] == [b"\x03\x02\x4c\x00", b"\x03\x00\x4c\x00"]
+    assert [struct.unpack_from("<I", s.body, 8)[0] for s in controls] == [1, 6, 7]
+    assert [s.sequence for s in controls] == [0, 0, 1]
+    assert [s.body[:4] for s in controls] == [b"\x03\x02\x4c\x00"] + [b"\x03\x00\x4c\x00"] * 2
 
 
 @pytest.mark.parametrize("mode", ["send_error", "receive_error", "partial", "silence"])

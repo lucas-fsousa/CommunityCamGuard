@@ -26,6 +26,7 @@ MAX_SENT_BYTES = 2 * 1024 * 1024
 @dataclass(frozen=True, slots=True)
 class AvProbeResult:
     ready: bool
+    close_acknowledged: bool
     datagrams: int
     received_bytes: int
     sent_bytes: int
@@ -45,7 +46,7 @@ def probe_av_socket(
     cancelled: Callable[[], bool] = lambda: False,
     clock: Callable[[], float] = time.monotonic,
 ) -> AvProbeResult:
-    """Consume/count records for <=10 seconds; always close socket and AV state.
+    """Receive for <=10 seconds, plus <=2 seconds for CLOSE transport receipt.
 
     Result readiness is negotiation/header readiness, not decoder validation.
     Unsupported routing/meter traffic is ignored, not acknowledged speculatively.
@@ -62,6 +63,7 @@ def probe_av_socket(
         handshake = AvHandshake(peer, attempt.link_id, attempt.call_id, attempt.cookie, clock=clock)
         deadline = clock() + duration
         datagrams = received = sent = headers = video = audio = ignored = peak = 0
+        finishing = False
 
         def check_cancelled() -> None:
             if cancelled():
@@ -78,8 +80,16 @@ def probe_av_socket(
             if sock.sendto(wire, peer) != len(wire):
                 raise ReceiveError("AV probe incomplete datagram send")
 
-        while clock() < deadline:
+        while True:
             check_cancelled()
+            if clock() >= deadline:
+                if finishing:
+                    raise ReceiveError("AV probe CLOSE receipt deadline exceeded")
+                if not handshake.ready or not video:
+                    raise ReceiveError("AV probe ended without negotiated video")
+                handshake.begin_finish()
+                finishing = True
+                deadline = clock() + 2.0
             sock.settimeout(min(0.05, max(0.001, deadline - clock())))
             for wire in handshake.due():
                 send(wire)
@@ -89,7 +99,7 @@ def probe_av_socket(
                 continue  # due()/poll() still enforces all protocol deadlines.
             check_cancelled()
             if clock() >= deadline:
-                break
+                continue
             datagrams += 1
             received += len(wire)
             if datagrams > MAX_DATAGRAMS or received > MAX_RECEIVED_BYTES:
@@ -105,11 +115,11 @@ def probe_av_socket(
                 headers += record.encoding is not None
                 video += bool(record.video)
                 audio += len(record.audio)
+            if handshake.close_acknowledged:
+                break
         check_cancelled()
         handshake.poll()
-        if not handshake.ready or not video:
-            raise ReceiveError("AV probe ended without negotiated video")
-        return AvProbeResult(handshake.ready, datagrams, received, sent,
+        return AvProbeResult(True, handshake.close_acknowledged, datagrams, received, sent,
                              headers, video, audio, ignored, peak)
     except OSError:
         raise ReceiveError("AV probe socket failure") from None

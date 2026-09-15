@@ -1,12 +1,15 @@
 # Bounded AV control transmission — 2026-09-15
 
-`p2p/av_control_send.py` implements a socket-free sender for **one** AV INIT or
-START control on a freshly negotiated conversation. It is not PTZ, microphone
+`p2p/av_control_send.py` implements a socket-free sender for **one** AV INIT,
+START or CLOSE control. INIT/START require a freshly negotiated conversation;
+CLOSE requires the exclusive owner to have completed START. It is not PTZ, microphone
 START, an arbitrary camera-command retry service or a complete KCP implementation.
 Production AV initialization/intercom do not call it.
 
 INIT uses the link's high-bit conversation; AV START uses the base conversation.
-Both begin at sequence zero in their independent outbound spaces. The codec builds
+Both begin at sequence zero in their independent outbound spaces. CLOSE uses the
+base conversation at sequence one, as detailed in [native-av-close.md](native-av-close.md).
+The codec builds
 the existing control bytes; at most four attempts are emitted 250 ms apart within
 a two-second absolute deadline. Retransmissions are byte-identical, including
 sequence and timestamp: they are not new application-level INIT requests. Silence
@@ -40,8 +43,10 @@ actions, timestamp wrap and coalesced ACK segments. No packet was sent to a came
 ## Remaining integration
 
 Update: the socket-free composition is now implemented and synthetically tested in
-[native-av-handshake.md](native-av-handshake.md). Live socket integration remains
-pending; this does not change production intercom.
+[native-av-handshake.md](native-av-handshake.md). The bounded socket probe and CLOSE
+are simulated in [native-av-probe.md](native-av-probe.md) and
+[native-av-close.md](native-av-close.md); live route integration remains pending.
+This does not change production intercom.
 
 The future owner must coordinate this sender with `AvReceiver`, gate outbound
 START on correlated ACCEPT (not merely INIT's transport ACK), preserve independent

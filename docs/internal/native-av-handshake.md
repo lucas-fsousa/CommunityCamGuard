@@ -46,8 +46,9 @@ START arriving before ACCEPT across the independent channels now uses the bounde
 ciphertext queue described in [native-av-reorder.md](native-av-reorder.md). The historical paired replay
 and earlier codec validations remain separate evidence, not proof of this owner's
 live handshake or physical camera interoperability. The bounded socket adapter is
-now simulated in [native-av-probe.md](native-av-probe.md); remote teardown and the
-camera-3 live experiment remain pending before any source switch.
+now simulated in [native-av-probe.md](native-av-probe.md), including bounded CLOSE
+receipt in [native-av-close.md](native-av-close.md). Route release integration and
+the camera-3 live experiment remain pending before any source switch.
 
 Regression verification: 126 selected handshake/send/receive/V1/existing media-session
 tests passed under a 512 MiB address-space cap. Ruff, Mypy (178 source files) and the
