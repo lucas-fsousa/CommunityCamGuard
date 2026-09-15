@@ -264,3 +264,8 @@ receive lifecycle and single-source handoff. Production RTSP/intercom are unchan
 The full Python suite, 49 focused offline tests, Ruff, mypy for the four touched
 analysis modules, and standalone Node panel/PTZ contracts passed. No container
 rebuild or live camera test was performed for this increment.
+
+The next offline milestone is now complete: [native-video-recovery.md](native-video-recovery.md)
+documents configured-IDR gating, three independently decoded restart scenarios,
+and a negative control demonstrating failure when restarting on dependent pictures.
+Live transport reconnect/source handoff remains separate, unimplemented work.
