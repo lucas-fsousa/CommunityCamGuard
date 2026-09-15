@@ -39,8 +39,10 @@ driver capability policy. The operator must select camera 3 for the first run.
 **The function must execute inside the server process.** A host CLI or `docker exec`
 Python process would have independent locks and is not a safe substitute. It does
 not exclude other processes, background capability reads, reboot/registry operations
-or the existing RTSP producer. There is currently no HTTP/CLI trigger or automatic
-background job, and no live camera invocation was performed.
+or the existing RTSP producer. No automatic background job or live invocation was
+performed. The opt-in same-process HTTP trigger is now implemented separately in
+[native-av-operator-trigger.md](native-av-operator-trigger.md); it remains disabled
+by default and was not activated in running containers.
 
 ## Validation and remaining work
 
@@ -52,8 +54,8 @@ six architecture tests passed after placing the diagnostic outside generic servi
 Ruff and Mypy (185 backend source files) passed. Python checks were serial with a
 512 MiB address-space cap; no browser, emulator, decoder or container rebuild ran.
 
-Next: provide a narrowly gated, authenticated same-process operator invocation,
-confirm the reviewed camera-3 association and observe one three-second run alongside
+Next: activate the tested operator trigger temporarily after confirming the reviewed
+camera-3 association and observe one three-second run alongside
 RTSP health. Report actual negotiation/media/CLOSE/B9 outcomes separately. Do not
 claim native live streaming is homologated or launch a standalone probe that bypasses
 the application's operation locks. Broader keepalive timing, reconnect and source

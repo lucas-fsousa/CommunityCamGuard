@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Auto-start go2rtc + recorder + storage monitor with the API (disable for API-only /
     # hardware-less runs and tests).
     autostart_services: bool = True
+    # Internal one-shot native-video diagnostic. Disabled unless an operator supplies
+    # the reviewed test camera pair; not a dashboard feature or capability override.
+    native_av_diagnostic_enabled: bool = False
+    native_av_diagnostic_camera_id: str = ""
+    native_av_diagnostic_device_id: str = ""
     # Whether this process spawns/owns the go2rtc binary. True on host; set False when
     # go2rtc runs as its own container — then we only generate its config and connect.
     manage_go2rtc: bool = True

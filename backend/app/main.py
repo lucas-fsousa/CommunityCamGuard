@@ -37,6 +37,7 @@ from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
 from .db import p2p, registry
+from .diagnostics.yoosee_av_api import router as native_av_diagnostic_router
 from .frontend_build import build_version
 from .media.go2rtc import Go2rtc
 from .recording.playback import Warmer
@@ -134,6 +135,7 @@ app = FastAPI(
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
     ],
 )
+app.include_router(native_av_diagnostic_router)
 app.include_router(auth_router)
 app.include_router(provisioning_router)
 app.include_router(provisioning_account_router)
