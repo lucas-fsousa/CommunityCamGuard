@@ -1,5 +1,11 @@
 # Driver-owned PTZ model selection — 2026-09-15
 
+Latest update: Garagem/Quintal access-only P2P enrollment has now been recovered
+without rebinding cameras; firmware 40.1.22 is explicitly covered by the driver.
+See [existing-camera-p2p-recovery.md](existing-camera-p2p-recovery.md). The missing
+enrollment/subscription concerns below describe the earlier investigation; a
+subscription token is not required for brokered PTZ preparation.
+
 ## Follow-up: shared D-pad
 
 The initial model-selection change did not fix the visual split: the frontend still

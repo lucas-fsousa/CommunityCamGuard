@@ -55,11 +55,12 @@ def test_only_three_correlated_reads_transfer_socket_ownership(prepared):
 
 
 @pytest.mark.parametrize("device_id", ["123456", "654321"])
-def test_driver_model_profile_applies_without_per_unit_opt_in(prepared, device_id):
+@pytest.mark.parametrize("firmware", ["40.1.14", "40.1.22"])
+def test_driver_model_profile_applies_without_per_unit_opt_in(prepared, device_id, firmware):
     prepared.target = int(device_id)
     prepared.values[:2] = [
         dict(productID="6442451494", productModel="GW-IPC-AK-AV100.25", revision=1),
-        dict(swVer="40.1.14", sdkVer="16.20.16355", hwVer=""),
+        dict(swVer=firmware, sdkVer="16.20.16355", hwVer=""),
     ]
     module.prepare_ptz_route(replace(ENTRY, device_id=device_id), None,
                              camera_id="cam_test", direction="left",
@@ -72,6 +73,16 @@ def test_unknown_model_never_constructs_native_movement(prepared):
     with pytest.raises(P2PProbeError, match="model profile"):
         module.prepare_ptz_route(ENTRY, None, camera_id="cam_test", direction="left")
     assert not prepared.constructed and prepared.closed == 1
+
+
+@pytest.mark.parametrize("field,value", [("firmware", "40.1.99"), ("sdk", "different"),
+                                         ("product_id", "123"), ("hardware", "other")])
+def test_model_compatibility_does_not_grant_unknown_variants(field, value):
+    from backend.app.drivers.yoosee.ptz_models import directions_for
+    known = CapabilityIdentity("123456", "6442451494", "GW-IPC-AK-AV100.25", 1,
+                               "40.1.22", "16.20.16355", "")
+    assert directions_for(known) == frozenset({"left", "right", "up", "down"})
+    assert not directions_for(replace(known, **{field: value}))
 
 
 @pytest.mark.parametrize("axis,expected", [(7, {"left", "right", "up", "down"}),
