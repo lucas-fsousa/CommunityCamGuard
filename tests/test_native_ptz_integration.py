@@ -55,6 +55,14 @@ def test_success_does_not_fallback(prepared):
     assert (prepared.runs, prepared.fallback) == (1, 0)
 
 
+def test_enrolled_camera_selects_driver_preflight_without_rollout_row(prepared):
+    profile = native_ptz_policy.selected(CAMERA.camera_id)
+    assert profile.identity is None
+    assert profile.directions == frozenset({"left", "right", "up", "down"})
+    assert native_ptz.step(CAMERA, "right", profile, prepared.fallback_fn)
+    assert prepared.runs == 1 and prepared.fallback == 0
+
+
 @pytest.mark.parametrize("case", ["success", "second_rejection", "cancelled", "wrong_camera"])
 def test_preflight_renewal_rekeys_cache_and_never_replays_movement(prepared, monkeypatch, case):
     old = native_ptz.p2p.get_enrollment_for_camera(CAMERA.camera_id)

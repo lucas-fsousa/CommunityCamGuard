@@ -1,6 +1,9 @@
 # Native transport preference with standard fallback
 
-Status: staged implementation. Video remains RTSP; native PTZ has an exact-unit finite-step opt-in.
+Status: staged implementation. Video remains RTSP. Update 2026-09-15: enrolled
+cameras now use driver-owned PTZ model/profile selection instead of mandatory
+per-unit opt-in; see [ptz-model-selection.md](ptz-model-selection.md). Earlier
+camera-3 rollout sections retain historical test scope, not a production restriction.
 The user requests proven native transports as preferred paths, with standards retained as fallback.
 
 ## User validation and next increment — 2026-09-14

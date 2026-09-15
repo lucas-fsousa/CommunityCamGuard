@@ -1,11 +1,11 @@
-"""Internal exact-unit PTZ opt-in. No brand defaults or public activation API."""
+"""Driver PTZ candidate selection, retaining legacy per-unit experimental profiles."""
 from __future__ import annotations
 
 import json
 import re
 from dataclasses import asdict, dataclass
 
-from ...db import connect
+from ...db import connect, p2p
 from .capability_identity import CapabilityIdentity
 from .p2p.ptz_protocol import DIRECTIONS
 
@@ -15,7 +15,7 @@ _SCHEMA = """CREATE TABLE IF NOT EXISTS yoosee_native_ptz_rollout
 
 @dataclass(frozen=True)
 class PtzProfile:
-    identity: CapabilityIdentity
+    identity: CapabilityIdentity | None
     directions: frozenset[str]
 
 
@@ -30,6 +30,10 @@ def activate(camera_id: str, identity: CapabilityIdentity, directions: frozenset
 
 
 def selected(camera_id: str) -> PtzProfile | None:
+    # Enrollment makes native preflight possible, not proof of model/axis support.
+    # The driver resolves those through correlated reads before constructing START.
+    if p2p.get_enrollment_for_camera(camera_id) is not None:
+        return PtzProfile(None, frozenset(DIRECTIONS))
     with connect() as conn:
         conn.execute(_SCHEMA)
         row = conn.execute("SELECT identity, directions FROM yoosee_native_ptz_rollout WHERE camera_id=?",

@@ -41,12 +41,13 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
         _active[camera.camera_id] = motion
     try:
         entry = p2p.get_enrollment_for_camera(camera.camera_id)
-        if entry is None or entry.device_id != profile.identity.device_id:
+        if entry is None or (profile.identity is not None and entry.device_id != profile.identity.device_id):
             raise ControlNotReady("native PTZ enrollment requires review")
         try:
             def acquire(current: P2PEnrollment) -> CachedPtzRoute:
                 # Renewal wraps preparation only: never put motion.run inside it.
-                if current.camera_id != camera.camera_id or current.device_id != profile.identity.device_id:
+                if (current.camera_id != camera.camera_id or current.device_id != entry.device_id
+                        or (profile.identity is not None and current.device_id != profile.identity.device_id)):
                     raise ControlNotReady("native PTZ renewed enrollment requires review")
                 if motion.cancelled:
                     raise P2PProbeError("native PTZ preparation was cancelled")

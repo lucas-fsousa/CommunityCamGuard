@@ -8,7 +8,10 @@ Status: `todo` · `wip` · `done` · `blocked`.
 
 PTZ update (2026-09-14): **user physically validated all four directions and fluidity
 on camera 3**. Dashboard API validation also passed all four; warm alternating
-actions took 391–411 ms end-to-end. Rollout to other exact units remains separate. Cold setup still
+actions took 391–411 ms end-to-end. Update 2026-09-15: driver-owned model/profile
+selection now replaces per-unit opt-in for P2P-enrolled cameras; see
+`docs/internal/ptz-model-selection.md`. Camera-3-only scope was for physical tests,
+not a permanent support restriction. Cold setup still
 adds latency. See `docs/internal/native-transport-preference.md` for current scope;
 earlier right-only milestones below describe the previous stage.
 

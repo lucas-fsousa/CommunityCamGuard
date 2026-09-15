@@ -54,6 +54,26 @@ def test_only_three_correlated_reads_transfer_socket_ownership(prepared):
     assert prepared.closed == 1
 
 
+@pytest.mark.parametrize("device_id", ["123456", "654321"])
+def test_driver_model_profile_applies_without_per_unit_opt_in(prepared, device_id):
+    prepared.target = int(device_id)
+    prepared.values[:2] = [
+        dict(productID="6442451494", productModel="GW-IPC-AK-AV100.25", revision=1),
+        dict(swVer="40.1.14", sdkVer="16.20.16355", hwVer=""),
+    ]
+    module.prepare_ptz_route(replace(ENTRY, device_id=device_id), None,
+                             camera_id="cam_test", direction="left",
+                             reviewed_directions=frozenset({"left", "right", "up", "down"}))
+    assert prepared.constructed[0]["allowed_directions"] == frozenset({"left", "right", "up", "down"})
+    assert prepared.constructed[0]["device_id"] == int(device_id)
+
+
+def test_unknown_model_never_constructs_native_movement(prepared):
+    with pytest.raises(P2PProbeError, match="model profile"):
+        module.prepare_ptz_route(ENTRY, None, camera_id="cam_test", direction="left")
+    assert not prepared.constructed and prepared.closed == 1
+
+
 @pytest.mark.parametrize("axis,expected", [(7, {"left", "right", "up", "down"}),
                                            (3, {"left", "right"})])
 def test_reuse_axes_intersect_current_evidence_and_reviewed_profile(prepared, axis, expected):
