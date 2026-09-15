@@ -56,8 +56,9 @@ live native stream or a full-suite certification.
 
 ## Next
 
-Review meter/keepalive requirements and add the internal camera-3-only invocation
-under the actual application's camera-operation reservation. Then run one bounded
+The correlated meter responder and reserved internal invocation are now implemented
+and tested: [native-av-meter-diagnostic.md](native-av-meter-diagnostic.md). A safe
+same-process operator trigger and live validation remain pending. Then run one bounded
 three-second sample, checking media counts, AV CLOSE and B9 receipts and whether
 the existing RTSP producer remains healthy. Do not start several retries or enable
 native video in the dashboard on the basis of these tests.

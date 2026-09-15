@@ -49,11 +49,11 @@ paths are untouched. There is no live CLI/API entry point yet.
 1. AV CLOSE ownership/receipt correlation is now implemented and simulated; see
    [native-av-close.md](native-av-close.md). B9 cleanup is now composed and tested
    in [native-av-route.md](native-av-route.md); neither receipt is physical proof.
-2. Review whether the short probe needs meter/keepalive replies. The current adapter
-   ignores non-KCP traffic rather than guessing response fields.
-3. Bind the implemented fresh route owner to an internal camera-3-only invocation
-   under the application's camera-operation reservation. Never borrow the production
-   stream/intercom socket or run an old AV initializer first.
+2. Correlated channel-4 meter replies are now implemented; unsolicited keepalive
+   timing remains unvalidated. See [native-av-meter-diagnostic.md](native-av-meter-diagnostic.md).
+3. The reserved internal diagnostic is implemented, but a safe same-process operator
+   trigger remains pending. Never borrow the production stream/intercom socket,
+   run an old AV initializer first, or assume a separate process shares operation locks.
 4. Perform one short, bounded camera-3 run and record actual readiness, record counts,
    teardown evidence and effects on existing RTSP. Do not infer firmware support
    or enable native streaming from simulated success.

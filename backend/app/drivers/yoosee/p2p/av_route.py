@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from ....db.p2p import P2PEnrollment
+from .av_meter import AvMeter
 from .av_probe import AvProbeResult, probe_av_socket
 from .av_route_io import BudgetSocket
 from .camera_session import open_camera_session
@@ -64,10 +65,14 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
         if not calling.direct_handshake:
             raise P2PProbeError("native AV direct route was not established")
         channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5)
+        if calling.peer_endpoint is None:
+            raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()
         bounded.phase(duration + 2)
         result = probe_av_socket(sock, calling, channel, duration=duration,
-                                 cancelled=cancelled, close_socket=False)
+                                 cancelled=cancelled, close_socket=False,
+                                 meter=AvMeter(calling.peer_endpoint, attempt.link_id,
+                                               attempt.call_id, enrollment.access_id, target.device_id))
     except (OSError, ValueError):
         raise P2PProbeError("native AV route probe failed") from None
     finally:

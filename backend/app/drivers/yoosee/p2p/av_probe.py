@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .av_handshake import AvHandshake
+from .av_meter import AvMeter
 from .contracts import CallingResult
 from .kcp_receive import ReceiveError
 from .media_session import MediaChannelResult
@@ -36,6 +37,7 @@ class AvProbeResult:
     audio_frames: int
     ignored_datagrams: int
     peak_buffered_bytes: int
+    meter_acknowledgements: int = 0
 
 
 def probe_av_socket(
@@ -47,11 +49,12 @@ def probe_av_socket(
     cancelled: Callable[[], bool] = lambda: False,
     clock: Callable[[], float] = time.monotonic,
     close_socket: bool = True,
+    meter: AvMeter | None = None,
 ) -> AvProbeResult:
     """Receive for <=10 seconds, plus <=2 seconds for CLOSE transport receipt.
 
     Result readiness is negotiation/header readiness, not decoder validation.
-    Unsupported routing/meter traffic is ignored, not acknowledged speculatively.
+    Only a caller-supplied correlated meter responder handles maintenance requests.
     Closing the socket is local cleanup, not proof of a peer-side AV teardown.
     With close_socket=False, the enclosing owner must close it on every exit.
     """
@@ -107,6 +110,11 @@ def probe_av_socket(
             received += len(wire)
             if datagrams > MAX_DATAGRAMS or received > MAX_RECEIVED_BYTES:
                 raise ReceiveError("AV probe receive budget exceeded")
+            if meter is not None:
+                response = meter.receive(wire, source)
+                if response is not None:
+                    send(response)
+                    continue
             if source != peer or len(wire) > 2047 or wire[:2] != b"\xc0\x10":
                 ignored += 1
                 continue
@@ -123,7 +131,8 @@ def probe_av_socket(
         check_cancelled()
         handshake.poll()
         return AvProbeResult(True, handshake.close_acknowledged, datagrams, received, sent,
-                             headers, video, audio, ignored, peak)
+                             headers, video, audio, ignored, peak,
+                             meter.acknowledgements if meter is not None else 0)
     except OSError:
         raise ReceiveError("AV probe socket failure") from None
     finally:
