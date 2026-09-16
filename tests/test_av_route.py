@@ -124,3 +124,16 @@ def test_success_log_distinguishes_av_and_release(env, caplog):
     run()
     assert "stage=route_release outcome=av_completed" in caplog.text
     assert "release_acknowledged=True" in caplog.text
+
+
+@pytest.mark.parametrize("direct,meter", [(False, True), (True, False), (False, False)])
+def test_incomplete_bootstrap_is_attributed_before_av_initialization(env, monkeypatch, caplog, direct, meter):
+    monkeypatch.setattr(av_route, "open_media_channel", lambda *args: replace(
+        CHANNEL, direct_acknowledged=direct, meter_acknowledged=meter, datagrams=3))
+    with pytest.raises(av_route.AvBootstrapError) as error:
+        run()
+    assert error.value.observations == dict(phase="media_meter", direct_acknowledged=direct,
+                                            meter_acknowledged=meter, datagrams=3)
+    assert "probe" not in env
+    assert "stage=media_meter" in caplog.text
+    assert env[-2][0] == "release" and env[-1] == "socket_close"

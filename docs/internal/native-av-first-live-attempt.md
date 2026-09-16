@@ -56,3 +56,6 @@ Next: confirm the correction's CI, then deploy the observability update and expl
 rearm for one reviewed attempt. Inspect the resulting phase/cleanup evidence before
 changing timeouts, credentials or protocol framing. Do not mark native streaming
 homologated based on this failed first run.
+
+Follow-up execution and bootstrap attribution are recorded in
+[native-av-bootstrap-investigation.md](native-av-bootstrap-investigation.md).

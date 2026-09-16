@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..api.local_only import require_local_request
 from ..auth import require_auth
 from ..config import get_settings
+from ..drivers.yoosee.p2p.av_route import AvBootstrapError
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
 from ..services.camera_controls import CameraNotFound, ControlBusy
 from .yoosee_av import run_reviewed_native_av
@@ -56,6 +57,9 @@ def native_av(request: Request) -> dict:
                                         reviewed_device_id=device_id)
     except (ControlBusy, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
+    except AvBootstrapError as exc:
+        raise HTTPException(502, dict(message="native AV bootstrap failed; attempt consumed",
+                                     **exc.observations)) from None
     except P2PProbeError:
         raise HTTPException(502, "native AV diagnostic failed; attempt consumed") from None
     return asdict(result)

@@ -33,6 +33,15 @@ class AvRouteResult:
     route_release_acknowledged: bool
 
 
+class AvBootstrapError(P2PProbeError):
+    """Safe bootstrap observations, not decrypted payload or network identity."""
+
+    def __init__(self, *, direct_acknowledged: bool, meter_acknowledged: bool, datagrams: int):
+        super().__init__("native AV media bootstrap incomplete")
+        self.observations = dict(phase="media_meter", direct_acknowledged=direct_acknowledged,
+                                 meter_acknowledged=meter_acknowledged, datagrams=datagrams)
+
+
 def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                    duration: float = 3.0,
                    cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
@@ -78,6 +87,10 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
             raise P2PProbeError("native AV direct route was not established")
         stage = "media_meter"
         channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5)
+        if not channel.direct_acknowledged or not channel.meter_acknowledged:
+            raise AvBootstrapError(direct_acknowledged=channel.direct_acknowledged,
+                                    meter_acknowledged=channel.meter_acknowledged,
+                                    datagrams=channel.datagrams)
         if calling.peer_endpoint is None:
             raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()

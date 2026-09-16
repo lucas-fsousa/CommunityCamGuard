@@ -106,3 +106,17 @@ def test_busy_camera_consumes_attempt_without_retry(setup, monkeypatch):
     monkeypatch.setattr(api, "run_reviewed_native_av", busy)
     assert client.post(PATH).status_code == 409
     assert client.post(PATH).status_code == 409 and len(calls) == 1
+
+
+def test_bootstrap_failure_returns_only_safe_observations(setup, monkeypatch):
+    client, _, calls = setup
+    def fail(**kwargs):
+        calls.append(kwargs)
+        raise api.AvBootstrapError(direct_acknowledged=False, meter_acknowledged=True, datagrams=3)
+    monkeypatch.setattr(api, "run_reviewed_native_av", fail)
+    response = client.post(PATH)
+    assert response.status_code == 502
+    assert response.json()["detail"] == dict(message="native AV bootstrap failed; attempt consumed",
+                                             phase="media_meter", direct_acknowledged=False,
+                                             meter_acknowledged=True, datagrams=3)
+    assert client.post(PATH).status_code == 409 and len(calls) == 1
