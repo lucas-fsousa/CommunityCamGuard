@@ -3,7 +3,8 @@
 **Follow-up:** [SDK bootstrap analysis](native-av-sdk-bootstrap.md) supersedes the
 earlier assumption below that a direct LAN A4 receipt must gate AV. The historical
 results remain valid; the experimental gate now requires a correlated meter
-roundtrip instead. This correction has not yet been tested against a live camera.
+roundtrip instead. The linked follow-up records the camera-3 attempt: roundtrip
+was not confirmed, AV INIT was not sent, and the diagnostic was disarmed.
 
 ## Observed runs
 

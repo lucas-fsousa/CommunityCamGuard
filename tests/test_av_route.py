@@ -138,7 +138,7 @@ def test_incomplete_bootstrap_is_attributed_before_av_initialization(env, monkey
         run()
     assert error.value.observations == dict(phase="media_meter", direct_acknowledged=direct,
                                             meter_acknowledged=meter, datagrams=3,
-                                            meter_roundtrip_confirmed=False)
+                                            meter_roundtrip_confirmed=False, meter_observations=())
     assert "probe" not in env
     assert "stage=media_meter" in caplog.text
     assert env[-2][0] == "release" and env[-1] == "socket_close"

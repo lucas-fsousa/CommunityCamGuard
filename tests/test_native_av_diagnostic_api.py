@@ -119,5 +119,5 @@ def test_bootstrap_failure_returns_only_safe_observations(setup, monkeypatch):
     assert response.json()["detail"] == dict(message="native AV bootstrap failed; attempt consumed",
                                              phase="media_meter", direct_acknowledged=False,
                                              meter_acknowledged=True, datagrams=3,
-                                             meter_roundtrip_confirmed=False)
+                                             meter_roundtrip_confirmed=False, meter_observations=[])
     assert client.post(PATH).status_code == 409 and len(calls) == 1

@@ -37,11 +37,13 @@ class AvBootstrapError(P2PProbeError):
     """Safe bootstrap observations, not decrypted payload or network identity."""
 
     def __init__(self, *, direct_acknowledged: bool, meter_acknowledged: bool, datagrams: int,
-                 meter_roundtrip_confirmed: bool = False):
+                 meter_roundtrip_confirmed: bool = False,
+                 meter_observations: tuple[str, ...] = ()):
         super().__init__("native AV media bootstrap incomplete")
         self.observations = dict(phase="media_meter", direct_acknowledged=direct_acknowledged,
                                  meter_acknowledged=meter_acknowledged, datagrams=datagrams,
-                                 meter_roundtrip_confirmed=meter_roundtrip_confirmed)
+                                 meter_roundtrip_confirmed=meter_roundtrip_confirmed,
+                                 meter_observations=meter_observations)
 
 
 def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
@@ -94,7 +96,8 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
             raise AvBootstrapError(direct_acknowledged=channel.direct_acknowledged,
                                     meter_acknowledged=channel.meter_acknowledged,
                                     datagrams=channel.datagrams,
-                                    meter_roundtrip_confirmed=channel.meter_roundtrip_confirmed)
+                                    meter_roundtrip_confirmed=channel.meter_roundtrip_confirmed,
+                                    meter_observations=channel.meter_observations)
         if calling.peer_endpoint is None:
             raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()

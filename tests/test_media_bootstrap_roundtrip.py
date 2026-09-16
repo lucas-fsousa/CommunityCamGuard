@@ -52,6 +52,15 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
                                                require_roundtrip=True)
     assert result.meter_roundtrip_confirmed is (fault is None)
     assert not result.direct_acknowledged
+    expected = {None: ("reply",), "peer": (), "node": (), "link": (), "source": (),
+                "destination": (), "checksum": (), "kind": ("unknown_kind",),
+                "channel": ("reply", "wrong_channel"),
+                "length": ("reply", "wrong_record_length"), "role": ("reply", "wrong_role"),
+                "call": ("reply", "wrong_call"),
+                "sequence": ("reply", "unmatched_timestamp", "unsent_sequence"),
+                "timestamp": ("reply", "unmatched_timestamp"),
+                "timestamp_high": ("reply", "unmatched_timestamp")}
+    assert result.meter_observations == expected[fault]
     assert len(sent) == (2 if fault is None else 4)
 
 
@@ -76,4 +85,5 @@ def test_request_only_is_not_roundtrip_proof(monkeypatch):
     result = media_session.open_media_channel(Socket(), node, 123, device, calling, 0.1,
                                                require_roundtrip=True)
     assert result.meter_acknowledged and not result.meter_roundtrip_confirmed
+    assert result.meter_observations == ("request",)
     assert len(sent) == 6  # Two bounded attempts, including replies to peer requests.

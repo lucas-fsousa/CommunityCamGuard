@@ -58,3 +58,45 @@ If roundtrip confirmation fails, inspect that phase rather than relaxing it to
 the old meter flag. If it passes, record AV negotiation/record counts and cleanup;
 do not enable a production capability from a bootstrap success alone. Keep normal
 RTSP, disabled-by-default diagnostics, and no automatic retries.
+
+## Camera-3 checkpoint after commit `6bcd0a5`
+
+Remote CI `35140199981` succeeded for the exact commit. Image `934b2924d5de`
+was built with the cached builder capped at 512 MiB / one CPU. Registry MAC and
+durable enrollment matched the private camera-3 inventory before activation.
+One authenticated loopback POST returned **HTTP 502 after 4.18 seconds**:
+
+```json
+{"phase":"media_meter","direct_acknowledged":false,"meter_acknowledged":true,"datagrams":2,"meter_roundtrip_confirmed":false}
+```
+
+The log reported `AvBootstrapError`, `release_attempted=True`,
+`release_acknowledged=True`, `elapsed_ms=4171`. AV INIT was not sent. This is still
+a bootstrap failure, not a failed codec/decoder. It does not establish whether the
+two packets were requests only or unmatched replies. No immediate retry followed.
+
+The ignored override was reset to disabled/empty before the POST. The app was
+recreated after collecting the safe response/log in the same command sequence;
+runtime configuration confirmed disabled/empty and `/health` returned 200. Two
+post-restart samples showed exactly one producer and advancing received bytes for
+each of the three base streams. This proves ingress progress, not browser playback.
+Only the app was recreated (brief recorder interruption); go2rtc and unrelated WSL
+containers retained their uptime. No audio, movement, light or siren was requested.
+
+### Next diagnostic evidence (not deployed in this checkpoint)
+
+The experimental bootstrap now collects a bounded set of fixed labels for
+route-matched meters: request/reply/unknown kind, wrong channel/record length/role/
+call, unsent sequence or unmatched timestamp. The HTTP failure includes these as
+`meter_observations`; no payloads, IDs, endpoints or numeric sequence/timestamp
+values are exposed. Only the experimental path collects them. Gate, timeouts and
+legacy behavior remain unchanged. Synthetic tests assert every label and reject
+foreign peers, broker traffic, wrong routes and invalid checksums.
+
+Validation of this classification change: capped Python 3.12 container completed
+1,763 tests with one Node-dependent skip; host Node contracts passed separately.
+Ruff and Mypy (187 files) passed. No further live invocation was made.
+
+Next live attempt should use these labels to distinguish one-way meter requests
+from rejected roundtrip replies. Do not infer the cause from the broad old flag,
+disable the gate, add blind retries or mark native video homologated.

@@ -7,6 +7,7 @@ import struct
 import time
 from dataclasses import dataclass
 
+from .bootstrap_evidence import classify_meter
 from .contracts import CallingResult, CertifiedNode, OnlineDevice
 from .crypto import gute_mode1_decrypt
 from .media_protocol import (
@@ -34,6 +35,7 @@ class MediaChannelResult:
     datagrams: int
     device_platform_version: int | None = None
     meter_roundtrip_confirmed: bool = False
+    meter_observations: tuple[str, ...] = ()
 
 
 def open_media_channel(
@@ -76,6 +78,7 @@ def open_media_channel(
     meter_acknowledged = False
     meter_roundtrip_confirmed = False
     sent_meters: set[tuple[int, int]] = set()
+    meter_observations: set[str] = set()
     datagrams = 0
     device_platform_version = calling.device_platform_version
     bounded_timeout = max(0.1, min(float(timeout), 5.0))
@@ -133,6 +136,8 @@ def open_media_channel(
             ):
                 continue
             meter_acknowledged = True
+            if require_roundtrip:
+                meter_observations.update(classify_meter(parsed, wire, attempt.call_id, sent_meters))
             valid_record = (
                 parsed.channel_type == 4
                 and parsed.record_length == len(wire) - 6
@@ -155,4 +160,5 @@ def open_media_channel(
         datagrams,
         device_platform_version,
         meter_roundtrip_confirmed,
+        tuple(sorted(meter_observations)),
     )
