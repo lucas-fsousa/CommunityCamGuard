@@ -63,3 +63,31 @@ Next: after green CI, deploy this change for one reviewed camera-3 invocation an
 inspect direct-ACK versus meter-ACK evidence. Do not remove either validation or
 increase the timeout merely to get past the guard. Continue to capture the safe
 result/log and disarm in the same command sequence, before handing control back.
+
+## Structured follow-up result (same day)
+
+Commit `e1bbea7` passed remote CI (run `35098838102`) and was then deployed for
+one separately armed camera-3 sample. The endpoint returned 502 after **3.83s**:
+
+```json
+{"phase":"media_meter","direct_acknowledged":false,"meter_acknowledged":true,"datagrams":2}
+```
+
+The retained log reported `stage=media_meter`, `error_type=AvBootstrapError`,
+`release_attempted=True`, `release_acknowledged=True`, and `elapsed_ms=3821`.
+This confirms incomplete bootstrap: a route-matching meter was observed, but the
+existing parser did not recognize a direct A4 receipt. AV INIT was not invoked.
+It does not yet distinguish absent/lost A4 replies from replies ignored by prefix,
+source, decryption, length, sequence or action checks. The two datagrams were not
+saved as payloads, so their individual classifications are not available.
+
+No protocol requirement was weakened and no immediate retry followed. The standard
+app configuration was restored in the same command sequence after collecting the
+safe HTTP result and log. Runtime checks confirmed opt-in false, targets empty,
+health OK and one producer on each base RTSP stream. This updated error reporting
+is now deployed; native video remains disabled/unhomologated.
+
+Next actual investigation: compare direct-A4 acknowledgement handling with the SDK
+and known working intercom bootstrap, then classify bootstrap traffic safely if
+another capture is needed. Do not diagnose an AV decoder/timing failure or bypass
+the missing receipt from a meter response alone.
