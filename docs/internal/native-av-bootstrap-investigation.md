@@ -1,5 +1,10 @@
 # Native AV bootstrap investigation — 2026-09-16
 
+**Follow-up:** [SDK bootstrap analysis](native-av-sdk-bootstrap.md) supersedes the
+earlier assumption below that a direct LAN A4 receipt must gate AV. The historical
+results remain valid; the experimental gate now requires a correlated meter
+roundtrip instead. This correction has not yet been tested against a live camera.
+
 ## Observed runs
 
 The image containing `90ca08a` phase telemetry was built with a 512 MiB / one-CPU

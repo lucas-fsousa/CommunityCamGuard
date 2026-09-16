@@ -33,6 +33,7 @@ class MediaChannelResult:
     meter_acknowledged: bool
     datagrams: int
     device_platform_version: int | None = None
+    meter_roundtrip_confirmed: bool = False
 
 
 def open_media_channel(
@@ -45,8 +46,14 @@ def open_media_channel(
     *,
     request_user_data: bytes | None = None,
     connection_type: int | None = None,
+    require_roundtrip: bool = False,
 ) -> MediaChannelResult:
-    """Open only MTP routing/meter state; do not send AV or microphone frames."""
+    """Open MTP only; experimental AV can require a correlated meter roundtrip.
+
+    The legacy observation flag includes inbound requests, not just ACKs. Keep its
+    semantics for homologated intercom; never use it alone as AV readiness proof.
+    See docs/internal/native-av-sdk-bootstrap.md for the separate LAN A4 callback.
+    """
 
     peer = calling.peer_endpoint
     attempt = calling.attempt
@@ -67,6 +74,8 @@ def open_media_channel(
     )
     direct_acknowledged = False
     meter_acknowledged = False
+    meter_roundtrip_confirmed = False
+    sent_meters: set[tuple[int, int]] = set()
     datagrams = 0
     device_platform_version = calling.device_platform_version
     bounded_timeout = max(0.1, min(float(timeout), 5.0))
@@ -80,6 +89,9 @@ def open_media_channel(
             sequence=meter_sequence,
         )
         sock.sendto(meter, peer)
+        request = parse_media_meter(meter)
+        assert request is not None
+        sent_meters.add((request.sequence, request.timestamp))
         sock.sendto(direct_a4, peer)
         for wire, source in receive_datagrams(sock, time.monotonic() + bounded_timeout):
             if source == node.address:
@@ -121,13 +133,26 @@ def open_media_channel(
             ):
                 continue
             meter_acknowledged = True
+            valid_record = (
+                parsed.channel_type == 4
+                and parsed.record_length == len(wire) - 6
+                and parsed.role in (1, 2, 3)
+                and parsed.call_id in (None, attempt.call_id)
+            )
+            if (valid_record and parsed.kind == 2
+                    and struct.unpack_from("<Q", wire, 38)[0] == parsed.timestamp
+                    and (parsed.sequence, parsed.timestamp) in sent_meters):
+                meter_roundtrip_confirmed = True
             if parsed.kind == 1:
-                sock.sendto(build_media_meter_ack(wire), peer)
-        if direct_acknowledged and meter_acknowledged:
+                if not require_roundtrip or valid_record:
+                    sock.sendto(build_media_meter_ack(wire), peer)
+        if (meter_roundtrip_confirmed if require_roundtrip
+                else direct_acknowledged and meter_acknowledged):
             break
     return MediaChannelResult(
         direct_acknowledged,
         meter_acknowledged,
         datagrams,
         device_platform_version,
+        meter_roundtrip_confirmed,
     )

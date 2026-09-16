@@ -1,4 +1,5 @@
 import struct
+from dataclasses import replace
 
 import pytest
 
@@ -17,7 +18,7 @@ from tests.test_v1_receive import av
 
 CALLING = CallingResult(True, True, 1, True, None, PEER,
                         attempt=CallingAttempt(42, 123, COOKIE))
-CHANNEL = MediaChannelResult(True, True, 1)
+CHANNEL = MediaChannelResult(True, True, 1, meter_roundtrip_confirmed=True)
 
 
 class FakeSocket:
@@ -96,11 +97,20 @@ def test_invalid_duration_closes_without_sending(duration):
     assert sock.closed and not sock.sent
 
 
-def test_unmetered_route_is_rejected_before_sending():
+@pytest.mark.parametrize("meter", [False, True])
+def test_unmetered_route_is_rejected_before_sending(meter):
     sock = FakeSocket()
     with pytest.raises(ValueError):
-        probe_av_socket(sock, CALLING, MediaChannelResult(True, False, 0))
+        probe_av_socket(sock, CALLING, MediaChannelResult(True, meter, 0))
     assert sock.closed and not sock.sent
+
+
+def test_roundtrip_allows_negotiation_without_direct_calling_receipt():
+    sock = FakeSocket()
+    result = probe_av_socket(sock, CALLING, replace(CHANNEL, direct_acknowledged=False),
+                             clock=lambda: sock.now, duration=0.5)
+    assert result.ready and result.video_frames == 1 and result.close_acknowledged
+    assert sock.closed
 
 
 def test_cancellation_before_and_during_reception():

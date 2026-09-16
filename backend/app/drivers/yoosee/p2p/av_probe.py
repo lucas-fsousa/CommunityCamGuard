@@ -64,7 +64,7 @@ def probe_av_socket(
             raise ValueError("invalid AV probe duration")
         attempt, peer = calling.attempt, calling.peer_endpoint
         if (attempt is None or peer is None or not calling.direct_handshake
-                or not channel.direct_acknowledged or not channel.meter_acknowledged):
+                or not channel.meter_roundtrip_confirmed):
             raise ValueError("AV probe requires a fresh metered direct route")
         handshake = AvHandshake(peer, attempt.link_id, attempt.call_id, attempt.cookie, clock=clock)
         deadline = clock() + duration

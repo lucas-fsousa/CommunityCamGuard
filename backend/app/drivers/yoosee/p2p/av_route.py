@@ -36,10 +36,12 @@ class AvRouteResult:
 class AvBootstrapError(P2PProbeError):
     """Safe bootstrap observations, not decrypted payload or network identity."""
 
-    def __init__(self, *, direct_acknowledged: bool, meter_acknowledged: bool, datagrams: int):
+    def __init__(self, *, direct_acknowledged: bool, meter_acknowledged: bool, datagrams: int,
+                 meter_roundtrip_confirmed: bool = False):
         super().__init__("native AV media bootstrap incomplete")
         self.observations = dict(phase="media_meter", direct_acknowledged=direct_acknowledged,
-                                 meter_acknowledged=meter_acknowledged, datagrams=datagrams)
+                                 meter_acknowledged=meter_acknowledged, datagrams=datagrams,
+                                 meter_roundtrip_confirmed=meter_roundtrip_confirmed)
 
 
 def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
@@ -86,11 +88,13 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
         if not calling.direct_handshake:
             raise P2PProbeError("native AV direct route was not established")
         stage = "media_meter"
-        channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5)
-        if not channel.direct_acknowledged or not channel.meter_acknowledged:
+        channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5,
+                                     require_roundtrip=True)
+        if not channel.meter_roundtrip_confirmed:
             raise AvBootstrapError(direct_acknowledged=channel.direct_acknowledged,
                                     meter_acknowledged=channel.meter_acknowledged,
-                                    datagrams=channel.datagrams)
+                                    datagrams=channel.datagrams,
+                                    meter_roundtrip_confirmed=channel.meter_roundtrip_confirmed)
         if calling.peer_endpoint is None:
             raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()
