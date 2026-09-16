@@ -101,3 +101,26 @@ def test_probe_does_not_use_old_av_initializer_or_audio_or_retry():
     assert not hasattr(av_route, "initialize_av_session")
     assert not hasattr(av_route, "run_with_fresh_access")
     assert not hasattr(av_route, "send_pcm_intercom")
+
+
+@pytest.mark.parametrize("where,stage", [("open_camera_session", "access_session"),
+                                         ("call_device", "rendezvous"),
+                                         ("open_media_channel", "media_meter"),
+                                         ("probe_av_socket", "av_receive_close")])
+def test_failure_stage_and_cleanup_are_logged_without_exception_text(env, monkeypatch, caplog, where, stage):
+    def fail(*args, **kwargs):
+        raise P2PProbeError("secret token 123456 and private endpoint")
+    monkeypatch.setattr(av_route, where, fail)
+    with pytest.raises(P2PProbeError):
+        run()
+    assert f"stage={stage}" in caplog.text and "outcome=failed" in caplog.text
+    assert "error_type=P2PProbeError" in caplog.text
+    assert "secret" not in caplog.text and "123456" not in caplog.text and "private" not in caplog.text
+    assert f"release_attempted={where != 'open_camera_session'}" in caplog.text
+    assert env[-1] == "socket_close"
+
+
+def test_success_log_distinguishes_av_and_release(env, caplog):
+    run()
+    assert "stage=route_release outcome=av_completed" in caplog.text
+    assert "release_acknowledged=True" in caplog.text

@@ -49,7 +49,9 @@ use, sanitized failures and busy-camera consumption. All 274 selected tests pass
 including six architecture tests. Ruff and Mypy (186 backend files) passed. Python
 checks ran serially under a 512 MiB address-space cap.
 
-No camera was contacted and no container was rebuilt/restarted in this milestone.
-Runtime activation and the first live sample remain pending. See
+The trigger implementation was initially tested offline. A subsequent temporary
+activation and one failed live attempt are recorded in
+[native-av-first-live-attempt.md](native-av-first-live-attempt.md); the feature was
+disabled again afterward. No native-video success is claimed. See
 [native-av-meter-diagnostic.md](native-av-meter-diagnostic.md) and
 [native-av-route.md](native-av-route.md) for the underlying protocol ownership.

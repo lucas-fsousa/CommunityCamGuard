@@ -6,9 +6,11 @@ Reviewed identifiers come from the operator's test target, never browser input.
 
 from __future__ import annotations
 
+import logging
 import math
 import secrets
 import socket
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
@@ -21,6 +23,8 @@ from .camera_session import open_camera_session
 from .contracts import CallingAttempt, P2PProbeError
 from .media_session import open_media_channel
 from .rendezvous_session import call_device, close_device_route
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,9 +54,16 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
     attempt = None
     release_sequence = 0
     released = False
+    release_attempted = False
+    stage = "bind"
+    outcome = "incomplete"
+    failure_type = "none"
+    started = time.monotonic()
     try:
         sock.bind(("", 0))
+        stage = "access_session"
         node, target, _ = open_camera_session(sock, enrollment, 1.0, bounded.deadline)
+        stage = "target_validation"
         if str(target.device_id) != device_id or not target.status:
             raise P2PProbeError("native AV target is not the reviewed online camera")
         attempt = CallingAttempt(secrets.randbelow(0xFFFFFF) + 1,
@@ -60,25 +71,35 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
         # One A4 uses node.next_sequence; direct A4 uses next_sequence + 1.
         # Reserve a distinct B9 sequence even when either send fails ambiguously.
         release_sequence = (node.next_sequence + 2) & 0xFFFFFFFF
+        stage = "rendezvous"
         calling = call_device(sock, node, enrollment.access_id, target, 1.0,
                               retries=1, deadline=bounded.deadline, attempt=attempt)
         if not calling.direct_handshake:
             raise P2PProbeError("native AV direct route was not established")
+        stage = "media_meter"
         channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5)
         if calling.peer_endpoint is None:
             raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()
         bounded.phase(duration + 2)
+        stage = "av_receive_close"
         result = probe_av_socket(sock, calling, channel, duration=duration,
                                  cancelled=cancelled, close_socket=False,
                                  meter=AvMeter(calling.peer_endpoint, attempt.link_id,
                                                attempt.call_id, enrollment.access_id, target.device_id))
-    except (OSError, ValueError):
+        stage = "route_release"
+        outcome = "av_completed"
+    except P2PProbeError as exc:
+        outcome, failure_type = "failed", type(exc).__name__
+        raise
+    except (OSError, ValueError) as exc:
+        outcome, failure_type = "failed", type(exc).__name__
         raise P2PProbeError("native AV route probe failed") from None
     finally:
         try:
             if node is not None and target is not None and attempt is not None:
                 bounded.phase(1.0, cleanup=True)
+                release_attempted = True
                 try:
                     released = close_device_route(sock, node, enrollment.access_id, target,
                                                    attempt.link_id, release_sequence, 0.8,
@@ -86,7 +107,15 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                 except (OSError, ValueError, P2PProbeError):
                     released = False
         finally:
-            sock.close()
+            try:
+                sock.close()
+            finally:
+                # No exception text, endpoint, camera/device ID, wire or credentials.
+                # Log after cleanup, retaining the original failed stage.
+                log.warning("native_av_probe stage=%s outcome=%s error_type=%s "
+                            "release_attempted=%s release_acknowledged=%s elapsed_ms=%d",
+                            stage, outcome, failure_type, release_attempted, released,
+                            int((time.monotonic() - started) * 1000))
     if not released:
         raise P2PProbeError("native AV route release receipt not confirmed")
     return AvRouteResult(result, released)
