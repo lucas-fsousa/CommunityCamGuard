@@ -100,3 +100,31 @@ Ruff and Mypy (187 files) passed. No further live invocation was made.
 Next live attempt should use these labels to distinguish one-way meter requests
 from rejected roundtrip replies. Do not infer the cause from the broad old flag,
 disable the gate, add blind retries or mark native video homologated.
+
+## Classified camera-3 checkpoint — 2026-09-21
+
+Commit `e09a9d3` had terminal CI success (`35141064090`) before deployment.
+Image `e1b283b122c8` was built with the same 512 MiB / one-CPU ceiling; only
+the app was recreated. One separately armed loopback attempt returned HTTP 502
+after **4.85s**:
+
+```json
+{"phase":"media_meter","direct_acknowledged":false,"meter_acknowledged":true,"datagrams":2,"meter_roundtrip_confirmed":false,"meter_observations":["reply","wrong_call","wrong_role"]}
+```
+
+The safe log recorded `AvBootstrapError`, B9 release attempted/acknowledged,
+and 4,743 ms elapsed. The observed route-matched replies did not produce a channel,
+record-length, sequence or timestamp rejection. The remaining mismatch is in our
+interpretation/validation of the role and optional call-ID fields. This does not
+establish their actual values or prove whether the camera or our parser is wrong;
+no payload or raw field values were collected. AV INIT was not sent.
+
+No second attempt followed. The ignored override and running configuration were
+restored to disabled/empty; health returned 200. Normal RTSP retained one producer
+per base camera. App recreation briefly interrupted recording ownership; go2rtc
+and unrelated projects were not restarted. No sound, light or PTZ request was made.
+
+Next: compare the SDK's meter **reply** extension layout with its request layout
+and historical PCAP. Do not assume the request extension has identical semantics
+in a kind-2 reply, or remove these checks without documenting that evidence.
+Native live video remains unhomologated; classification is now deployed, disabled.
