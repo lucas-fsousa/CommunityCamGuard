@@ -11,7 +11,9 @@ from tests.test_vendor_media_session import _route
 
 @pytest.mark.parametrize("fault", [None, "peer", "node", "link", "source", "destination",
                                   "kind", "channel", "length", "role", "sequence", "timestamp",
-                                  "timestamp_high", "call", "checksum"])
+                                  "timestamp_high", "call", "checksum", "sdk68", "sdk72",
+                                  "captured68", "bad_zero_call", "bad_zero_role", "bad_tail",
+                                  "zero_request"])
 def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
     node, device, attempt, calling = _route()
     sent = []
@@ -36,6 +38,20 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
         if fault == "call":
             inner.extend(struct.pack("<I", attempt.call_id ^ 1))
             struct.pack_into("<I", inner, 52, len(inner))
+        if fault in ("sdk68", "sdk72", "captured68", "bad_zero_call", "bad_zero_role",
+                     "bad_tail", "zero_request"):
+            inner[64:] = bytes(4 if fault in ("sdk68", "captured68") else 8)
+            struct.pack_into("<I", inner, 52, len(inner))
+            if fault == "captured68":
+                inner[64] = 2
+            if fault == "bad_zero_call":
+                struct.pack_into("<I", inner, 68, attempt.call_id ^ 1)
+            if fault == "bad_zero_role":
+                inner[65] = 99
+            if fault == "bad_tail":
+                inner[66] = 1
+            if fault == "zero_request":
+                inner[1] = 1
         wire = build_mtp_frame(0x90, inner)
         if fault == "checksum":
             wire = wire[:4] + bytes((wire[4] ^ 1,)) + wire[5:]
@@ -50,7 +66,8 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
     monkeypatch.setattr(media_session, "receive_datagrams", receive)
     result = media_session.open_media_channel(Socket(), node, 123, device, calling, 0.1,
                                                require_roundtrip=True)
-    assert result.meter_roundtrip_confirmed is (fault is None)
+    accepted = fault in (None, "sdk68", "sdk72", "captured68")
+    assert result.meter_roundtrip_confirmed is accepted
     assert not result.direct_acknowledged
     expected = {None: ("reply",), "peer": (), "node": (), "link": (), "source": (),
                 "destination": (), "checksum": (), "kind": ("unknown_kind",),
@@ -59,9 +76,14 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
                 "call": ("reply", "wrong_call"),
                 "sequence": ("reply", "unmatched_timestamp", "unsent_sequence"),
                 "timestamp": ("reply", "unmatched_timestamp"),
-                "timestamp_high": ("reply", "unmatched_timestamp")}
+                "timestamp_high": ("reply", "unmatched_timestamp"),
+                "sdk68": ("reply",), "sdk72": ("reply",), "captured68": ("reply",),
+                "bad_zero_call": ("reply", "wrong_call", "wrong_role"),
+                "bad_zero_role": ("reply", "wrong_call", "wrong_role"),
+                "bad_tail": ("reply", "wrong_call", "wrong_role"),
+                "zero_request": ("request", "wrong_call", "wrong_role")}
     assert result.meter_observations == expected[fault]
-    assert len(sent) == (2 if fault is None else 4)
+    assert len(sent) == (2 if accepted else 4)
 
 
 def test_request_only_is_not_roundtrip_proof(monkeypatch):

@@ -7,7 +7,7 @@ import struct
 import time
 from dataclasses import dataclass
 
-from .bootstrap_evidence import classify_meter
+from .bootstrap_evidence import classify_meter, has_reply_only_extension
 from .contracts import CallingResult, CertifiedNode, OnlineDevice
 from .crypto import gute_mode1_decrypt
 from .media_protocol import (
@@ -141,8 +141,9 @@ def open_media_channel(
             valid_record = (
                 parsed.channel_type == 4
                 and parsed.record_length == len(wire) - 6
-                and parsed.role in (1, 2, 3)
-                and parsed.call_id in (None, attempt.call_id)
+                and (has_reply_only_extension(parsed, wire)
+                     or (parsed.role in (1, 2, 3)
+                         and parsed.call_id in (None, attempt.call_id)))
             )
             if (valid_record and parsed.kind == 2
                     and struct.unpack_from("<Q", wire, 38)[0] == parsed.timestamp

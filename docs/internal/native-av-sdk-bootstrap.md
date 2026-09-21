@@ -128,3 +128,48 @@ Next: compare the SDK's meter **reply** extension layout with its request layout
 and historical PCAP. Do not assume the request extension has identical semantics
 in a kind-2 reply, or remove these checks without documenting that evidence.
 Native live video remains unhomologated; classification is now deployed, disabled.
+
+## Reply-extension correction — offline evidence, 2026-09-21
+
+Inspection of the same ARM64 SDK identifies the mistake in the experimental
+extension check. `iv_rcv_meter_req` zeroes the reply buffer at `0x20d970`. At
+`0x20dc2c`–`0x20dca4` it sets kind 2, copies link, swaps source/destination, echoes
+sequence and the full timestamp, and copies record length/channel. It raises the
+record length to at least 68 bytes (`0x20dcb4`–`0x20dcc4`), but does **not** copy
+the request extension into bytes 64 onward. The direct UDP path transmits this
+zero-initialized tail. Thus a 72-byte reply can have role=0 and call=0 without
+being a foreign call. The SDK's ACK consumer likewise uses channel/sequence/RTT,
+not the request extension, as documented above.
+
+A bounded, streaming read of the existing private classic PCAP corroborates the
+distinction (no endpoints, IDs or payloads retained):
+
+| Kind-2 body shape | Count | Extension at body+64 |
+| --- | ---: | --- |
+| 72 bytes, channel 3 | 105 | Eight zero bytes |
+| 72 bytes, channel 4 | 94 | Eight zero bytes |
+| 68 bytes, channel 3 | 52 | `02 00 00 00` |
+| 68 bytes, channel 4 | 107 | `02 00 00 00` |
+
+The 68-byte revision marker is capture-backed; its deeper semantics are not
+inferred. Zero-filled 68-byte tails are SDK-backed. No current live payload was
+saved, so equality of its raw tail with these profiles remains to be verified by
+the bounded corrected parser, not presumed from the earlier rejection labels.
+
+`bootstrap_evidence.has_reply_only_extension` now recognizes **only** kind-2
+tails of exactly four zeros, eight zeros, or the captured four-byte marker.
+It does not reinterpret the shared parser's legacy fields or change the intercom
+completion rule. Other extension shapes retain explicit role/call validation;
+kind-1 requests cannot use the reply exception. Exact peer, checksum, route IDs,
+channel, record length and sent sequence/full timestamp remain mandatory. Both
+the classifier and readiness guard share the profile predicate.
+
+Synthetic cases cover all three accepted tails, changed call/role/reserved byte,
+and a zero-tail request. Existing peer/route/sequence/timestamp rejection tests
+remain. No camera connection, production restart or new live success occurred in
+this offline correction. After green CI, the next checkpoint is one separately
+armed camera-3 attempt; do not enable native streaming from unit-test success.
+
+Validation: 1,770 Python 3.12 tests passed with one Node-dependent skip in the
+512 MiB / one-CPU disposable container. Node contracts passed on the host; Ruff
+and Mypy (187 files) passed. No production image was rebuilt for this correction.

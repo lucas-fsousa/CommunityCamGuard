@@ -71,6 +71,13 @@ or wait on hardware/a human eye.
 ² Depends on hardware / a human eye on the real streams.
 ³ Applied; needs the user to confirm a real freeze now auto-recovers instead of needing a manual reload.
 
+Native-video follow-up (offline, 2026-09-21): SDK reply construction zeroes rather
+than copies the request extension; historical PCAP has 199 zero-tail 72-byte
+replies and 159 tagged-tail 68-byte replies. Experimental bootstrap now recognizes
+these exact reply layouts without relaxing route/sequence/timestamp checks.
+Live validation of this correction remains pending; see
+`docs/internal/native-av-sdk-bootstrap.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication
