@@ -75,8 +75,13 @@ Native-video follow-up (offline, 2026-09-21): SDK reply construction zeroes rath
 than copies the request extension; historical PCAP has 199 zero-tail 72-byte
 replies and 159 tagged-tail 68-byte replies. Experimental bootstrap now recognizes
 these exact reply layouts without relaxing route/sequence/timestamp checks.
-Live validation of this correction remains pending; see
-`docs/internal/native-av-sdk-bootstrap.md`.
+**Live checkpoint passed 2026-09-21:** one camera-3 diagnostic on `afa5f04`
+returned HTTP 200 in 6.23s, negotiation ready, 29 video records / 45 audio frames,
+AV CLOSE and B9 receipts. Diagnostic disarmed; RTSP retained. This supersedes the
+bootstrap-failure next steps above, but is not decoded/dashboard playback or
+LAN-only authentication. Next: bounded real-media decoding/keyframe/timestamp
+validation, then generic native-media adapter/fallback design. See
+`docs/internal/native-av-first-success.md` and `native-av-sdk-bootstrap.md`.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

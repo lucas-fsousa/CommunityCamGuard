@@ -1,5 +1,10 @@
 # Native AV bootstrap: SDK evidence — 2026-09-16
 
+**Latest checkpoint:** the corrected reply parser passed one camera-3 live sample
+on 2026-09-21: HTTP 200, 29 video records / 45 audio frames, AV CLOSE and B9 receipts.
+See [first successful reception](native-av-first-success.md). The historical
+failures below are retained; live decoding/dashboard playback is still pending.
+
 ## Scope and reproducibility
 
 Offline symbol-scoped ARM64 inspection of `re/extracted/libiotvideomulti.so`,
