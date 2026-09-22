@@ -1,5 +1,11 @@
 # Reserved native-video decode diagnostic — 2026-09-22
 
+**Latest checkpoint:** deployed disabled after one successful camera-3 invocation:
+44/44 live HEVC frames decoded at 640×360, with route cleanup before decoding.
+See [first live decode](native-av-first-live-decode.md). The implementation-time
+deployment boundary below is historical; maximum-resolution/browser validation
+remains pending.
+
 Server-only `NATIVE_AV_DIAGNOSTIC_DECODE_VIDEO=false` is an additional opt-in on
 the existing one-shot, authenticated, direct-loopback native AV diagnostic. It
 does not enable the endpoint by itself. No query/body override or public driver

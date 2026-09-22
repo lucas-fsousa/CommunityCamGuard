@@ -97,6 +97,13 @@ New runtime decoder passed historical-PCAP 120-frame validation. Next: green CI,
 capped build and one reviewed camera-3 live decode; no deployment/live decode yet.
 See `docs/internal/native-av-decode-trigger.md`.
 
+**Real camera-3 decode passed (2026-09-22, `bd52dfc`):** one HTTP 200/6.72s sample,
+44/44 HEVC frames independently decoded at 640×360 after AV CLOSE/B9/socket cleanup.
+Sample cleared, both opt-ins disabled, normal RTSP retained. Next: map/prove native
+maximum-resolution selection (640×360 is not the desired default), then generic
+single-source/fan-out + RTSP fallback and sustained/browser validation. No native
+dashboard capability enabled. See `docs/internal/native-av-first-live-decode.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication
