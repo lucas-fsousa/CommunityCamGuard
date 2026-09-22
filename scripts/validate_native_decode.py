@@ -11,6 +11,7 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
+from typing import Protocol
 
 from backend.app.drivers.yoosee.p2p.stream_protocol import V1EncodingHeader
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
@@ -18,6 +19,16 @@ from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 from .replay_native_media import replay
 
 MAX_BYTES = 8 * 1024 * 1024
+
+
+class DecodeSample(Protocol):
+    """In-memory input only; live callers must finish route cleanup before decoding."""
+
+    flow: str
+    kind: str
+    data: bytearray
+    frames: int
+    encoding: V1EncodingHeader | None
 
 
 class Sample:
@@ -47,7 +58,7 @@ class Sample:
             self.frames += 1
 
 
-def validate(sample: Sample) -> dict:
+def validate(sample: DecodeSample) -> dict:
     if not sample.data or sample.encoding is None:
         raise ValueError("sample is empty or has no encoding header")
     expected = 5 if sample.kind == "video" else 4

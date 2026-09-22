@@ -83,6 +83,13 @@ LAN-only authentication. Next: bounded real-media decoding/keyframe/timestamp
 validation, then generic native-media adapter/fallback design. See
 `docs/internal/native-av-first-success.md` and `native-av-sdk-bootstrap.md`.
 
+Native-video decoding foundation (2026-09-22): explicit video-only in-memory sample
+hook, 2 MiB/120 frames, configured-IDR start and failure cleanup implemented without
+enabling retention in the live endpoint. Historical-PCAP replay through the new
+collector independently decoded 120/120 HEVC 640×360 frames. Next: separately gated
+route-owner retention/cleanup and decoder isolation, then one camera-3 live decode.
+See `docs/internal/native-av-video-sample.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication

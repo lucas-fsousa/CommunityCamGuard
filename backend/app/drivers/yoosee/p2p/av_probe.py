@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from .av_handshake import AvHandshake
 from .av_meter import AvMeter
+from .av_sample import AvVideoSample
 from .contracts import CallingResult
 from .kcp_receive import ReceiveError
 from .media_session import MediaChannelResult
@@ -50,6 +51,7 @@ def probe_av_socket(
     clock: Callable[[], float] = time.monotonic,
     close_socket: bool = True,
     meter: AvMeter | None = None,
+    sample: AvVideoSample | None = None,
 ) -> AvProbeResult:
     """Receive for <=10 seconds, plus <=2 seconds for CLOSE transport receipt.
 
@@ -57,9 +59,15 @@ def probe_av_socket(
     Only a caller-supplied correlated meter responder handles maintenance requests.
     Closing the socket is local cleanup, not proof of a peer-side AV teardown.
     With close_socket=False, the enclosing owner must close it on every exit.
+    Optional sample retention is video-only and byte/frame bounded. The caller
+    must clear a successful sample after route teardown/validation; failures clear
+    it here. No decoder or file operation runs in this receive loop.
     """
     handshake: AvHandshake | None = None
+    completed = False
     try:
+        if sample is not None and (sample.closed or sample.encoding is not None or sample.data):
+            raise ValueError("AV probe requires an unused sample")
         if not math.isfinite(duration) or not 0 < duration <= 10:
             raise ValueError("invalid AV probe duration")
         attempt, peer = calling.attempt, calling.peer_endpoint
@@ -123,6 +131,8 @@ def probe_av_socket(
                 send(acknowledgement)
             peak = max(peak, handshake.buffered_bytes)
             for record in batch.records:
+                if sample is not None:
+                    sample.consume(record)
                 headers += record.encoding is not None
                 video += bool(record.video)
                 audio += len(record.audio)
@@ -130,12 +140,15 @@ def probe_av_socket(
                 break
         check_cancelled()
         handshake.poll()
+        completed = True
         return AvProbeResult(True, handshake.close_acknowledged, datagrams, received, sent,
                              headers, video, audio, ignored, peak,
                              meter.acknowledgements if meter is not None else 0)
     except OSError:
         raise ReceiveError("AV probe socket failure") from None
     finally:
+        if sample is not None and not completed:
+            sample.close()
         try:
             if handshake is not None:
                 handshake.close()
