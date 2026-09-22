@@ -18,6 +18,7 @@ CAMERA = "cam_" + "a" * 24
 @pytest.fixture
 def setup(monkeypatch):
     settings = SimpleNamespace(native_av_diagnostic_enabled=True,
+                               native_av_diagnostic_decode_video=False,
                                native_av_diagnostic_camera_id=CAMERA,
                                native_av_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
@@ -39,7 +40,8 @@ def test_single_use_fixed_target_and_safe_counts(setup):
     assert result.status_code == 200
     assert result.json()["route_release_acknowledged"] is True
     assert "123" not in result.text and "token" not in result.text
-    assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA, reviewed_device_id="123")]
+    assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA, reviewed_device_id="123",
+                         decode_video=False)]
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
@@ -121,3 +123,10 @@ def test_bootstrap_failure_returns_only_safe_observations(setup, monkeypatch):
                                              meter_acknowledged=True, datagrams=3,
                                              meter_roundtrip_confirmed=False, meter_observations=[])
     assert client.post(PATH).status_code == 409 and len(calls) == 1
+
+
+def test_decode_mode_is_server_selected(setup):
+    client, settings, calls = setup
+    settings.native_av_diagnostic_decode_video = True
+    assert client.post(PATH).status_code == 200
+    assert calls[0]["decode_video"] is True

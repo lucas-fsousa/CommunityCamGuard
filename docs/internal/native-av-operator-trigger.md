@@ -7,6 +7,10 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 ## Gates and limits
 
 - Disabled by default: `NATIVE_AV_DIAGNOSTIC_ENABLED=false`.
+- Optional post-teardown video decoding is separately disabled by default:
+  `NATIVE_AV_DIAGNOSTIC_DECODE_VIDEO=false`. Its ownership/resource bounds and
+  extended operator-client timeout are documented in
+  [native-av-decode-trigger.md](native-av-decode-trigger.md).
 - Existing authenticated dashboard session cookie required.
 - Direct loopback peer and existing local Host/Origin checks required. LAN clients,
   forwarding headers and cross-origin requests are rejected. Do not expose this

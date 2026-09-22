@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # Internal one-shot native-video diagnostic. Disabled unless an operator supplies
     # the reviewed test camera pair; not a dashboard feature or capability override.
     native_av_diagnostic_enabled: bool = False
+    native_av_diagnostic_decode_video: bool = False
     native_av_diagnostic_camera_id: str = ""
     native_av_diagnostic_device_id: str = ""
     # Whether this process spawns/owns the go2rtc binary. True on host; set False when

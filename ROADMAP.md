@@ -90,6 +90,13 @@ collector independently decoded 120/120 HEVC 640×360 frames. Next: separately g
 route-owner retention/cleanup and decoder isolation, then one camera-3 live decode.
 See `docs/internal/native-av-video-sample.md`.
 
+Native decode opt-in (2026-09-22): server-only, disabled-by-default decode mode is
+wired through exclusive route ownership. All route cleanup completes before
+sequential memory/time-limited decoders; samples clear on every failure/success.
+New runtime decoder passed historical-PCAP 120-frame validation. Next: green CI,
+capped build and one reviewed camera-3 live decode; no deployment/live decode yet.
+See `docs/internal/native-av-decode-trigger.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication

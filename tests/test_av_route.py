@@ -149,3 +149,26 @@ def test_correlated_meter_roundtrip_does_not_require_lan_calling_receipt(env, mo
         CHANNEL, direct_acknowledged=False))
     assert run().media == RESULT
     assert "probe" in env
+
+
+@pytest.mark.parametrize("fault", [None, "release", "identity"])
+def test_sample_ownership_extends_through_route_cleanup(env, monkeypatch, fault):
+    from backend.app.drivers.yoosee.p2p.av_sample import AvVideoSample
+
+    sample = AvVideoSample()
+    def probe(*args, **kwargs):
+        assert kwargs["sample"] is sample
+        sample.data.extend(b"private")
+        return RESULT
+    monkeypatch.setattr(av_route, "probe_av_socket", probe)
+    if fault == "release":
+        monkeypatch.setattr(av_route, "close_device_route", lambda *a, **k: False)
+    if fault:
+        with pytest.raises((ValueError, P2PProbeError)):
+            av_route.probe_av_route(ENROLLMENT, camera_id="wrong" if fault == "identity" else "cam_test",
+                                    device_id="123", sample=sample)
+        assert sample.closed and not sample.data
+    else:
+        assert run(sample=sample).media == RESULT
+        assert env[-1] == "socket_close" and sample.data == b"private" and not sample.closed
+        sample.close()

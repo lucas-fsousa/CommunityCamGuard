@@ -19,6 +19,7 @@ from ....db.p2p import P2PEnrollment
 from .av_meter import AvMeter
 from .av_probe import AvProbeResult, probe_av_socket
 from .av_route_io import BudgetSocket
+from .av_sample import AvVideoSample
 from .camera_session import open_camera_session
 from .contracts import CallingAttempt, P2PProbeError
 from .media_session import open_media_channel
@@ -48,6 +49,21 @@ class AvBootstrapError(P2PProbeError):
 
 def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                    duration: float = 3.0,
+                   sample: AvVideoSample | None = None,
+                   cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
+    """Return a retained sample only after successful AV/B9/socket cleanup."""
+    try:
+        return _probe_av_route(enrollment, camera_id=camera_id, device_id=device_id,
+                               duration=duration, sample=sample, cancelled=cancelled)
+    except BaseException:
+        if sample is not None:
+            sample.close()
+        raise
+
+
+def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
+                   duration: float,
+                   sample: AvVideoSample | None,
                    cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
     """One fresh route: <=20s preparation, <=12s AV and <=1s B9 cleanup.
 
@@ -104,7 +120,7 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
         bounded.phase(duration + 2)
         stage = "av_receive_close"
         result = probe_av_socket(sock, calling, channel, duration=duration,
-                                 cancelled=cancelled, close_socket=False,
+                                 cancelled=cancelled, close_socket=False, sample=sample,
                                  meter=AvMeter(calling.peer_endpoint, attempt.link_id,
                                                attempt.call_id, enrollment.access_id, target.device_id))
         stage = "route_release"
