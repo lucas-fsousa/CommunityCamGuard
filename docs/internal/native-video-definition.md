@@ -97,11 +97,44 @@ this follow-up. Individual disassembler processes were limited to 256 MiB addres
 space and 20 CPU seconds. Host swap was already heavily occupied, so no build or
 full test container was started.
 
+## Startup preparation and wire locations
+
+`with_startup_definitions` now prepares an immutable copy of a supplied, reviewed
+32-byte userdata template. It reuses the strict platform/enum encoder and changes
+only byte 0 (platform 1) or bytes 23–24 (platform 2), preserving all other bytes.
+It rejects missing/wrong-size/mutable templates and does not generate defaults,
+infer a platform, open a socket or change any production caller. In particular,
+it does not overwrite the other platform's field "just in case". Sparse maps
+still zero unspecified packed slots; they are not read-modify-write updates.
+
+Additional bounded disassembly of the same SDK:
+
+| Location | Evidence |
+| --- | --- |
+| `iv_init_frm_CALLING`, `0x202664`–`0x2026d0` | Optional 48-byte extension is copied to A4 offset `0x80`; its last 32 bytes come from channel offset `0x150`, so userdata lands at A4 `0x90:0xb0`. The branch requires channel flags bit 20 (`0x202640`–`0x202648`). |
+| `0x202748`–`0x2027b8` | A separate definition byte comes from channel `0x136`, with bit 7 conditional on `0x137` and bit 6 conditional on connection type 2. It follows the optional extension; do not treat it as an unconditional alias of userdata byte 0. |
+| `iv_init_frm_AvStreamCtl`, `0x2015b8`–`0x201634` | INIT action 1 copies 32 bytes from channel `0x21c` to control-body `0x18:0x38`. Connection type comes from channel `0x10c` into body `0x10`. |
+| `0x201700`–`0x201738` | ACCEPT action 2 uses a different source at channel `0x23c`; do not confuse response userdata with the request template. |
+
+The native channel source offsets differ between A4 and INIT. Their assignment
+chain still needs verification before claiming one supplied template reaches both
+unchanged. Our current custom-userdata codec path permits **SD playback only**;
+do not relax that guard or add the playback-only `0x40` definition bit to live
+requests as a shortcut. The live default remains its captured byte sequence.
+
+38 focused cases passed (existing encoder cases plus startup field preservation,
+immutability, idempotence, invalid templates and sparse packing); Ruff passed.
+Full-suite/type-check validation runs in commit CI, avoiding a local build or
+full-suite container while host swap is nearly exhausted. No camera test or
+production deployment was performed.
+
 ## Next
 
-Trace how this startup userdata propagates through rendezvous and INIT, and trace
-BuiltIn response framing/correlation. The startup offsets and reply callback are
-now mapped; a pre-INIT HD request remains untested. Use the exact camera-3 platform and only
+Trace the assignments to channel `0x150`, `0x21c` and `0x136` before enabling a
+consistent live rendezvous/INIT override, and trace BuiltIn response
+framing/correlation before implementing mid-stream changes. Startup field editing
+and wire destinations are mapped; a pre-INIT HD request remains untested.
+Use the exact camera-3 platform and only
 one reviewed bounded live attempt after tests/CI. Verify actual encoding dimensions
 and independent decoding, not transport ACK alone. Keep changes in the Yoosee
 driver and retain generic maximum-resolution-first / single-source fan-out policy.

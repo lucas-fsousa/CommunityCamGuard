@@ -34,3 +34,21 @@ def encode_definitions(platform_version: int, definitions: Mapping[int, int]) ->
         return DefinitionRequest(5, bytes((values.pop() - 1,)))
     packed = sum(value << (3 * channel) for channel, value in definitions.items())
     return DefinitionRequest(0x33, struct.pack("<H", packed))
+
+
+def with_startup_definitions(user_data: bytes, platform_version: int,
+                             definitions: Mapping[int, int]) -> bytes:
+    """Copy reviewed 32-byte userdata, replacing only its platform's quality field.
+
+    SDK LivePlayer stores legacy quality at userdata[0] and packed quality at
+    userdata[23:25]. Preserve every other field, including the other platform's
+    quality. No default template, connection-type inference or transmission.
+    Sparse slot maps have the same zero-slot caveat as encode_definitions.
+    """
+    if not isinstance(user_data, bytes) or len(user_data) != 32:
+        raise ValueError("startup video definition requires 32-byte userdata")
+    request = encode_definitions(platform_version, definitions)
+    result = bytearray(user_data)
+    offset = 0 if request.command == 5 else 23
+    result[offset:offset + len(request.payload)] = request.payload
+    return bytes(result)

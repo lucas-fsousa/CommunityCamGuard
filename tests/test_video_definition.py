@@ -1,6 +1,10 @@
 import pytest
 
-from backend.app.drivers.yoosee.p2p.video_definition import DefinitionRequest, encode_definitions
+from backend.app.drivers.yoosee.p2p.video_definition import (
+    DefinitionRequest,
+    encode_definitions,
+    with_startup_definitions,
+)
 
 
 @pytest.mark.parametrize("value,wire", [(1, b"\x49\x12"), (2, b"\x92\x24"),
@@ -28,3 +32,33 @@ def test_legacy_subtracts_one_and_uses_single_byte(value, wire):
 def test_unknown_platform_or_ambiguous_or_unsupported_values_fail_closed(platform, definitions):
     with pytest.raises(ValueError):
         encode_definitions(platform, definitions)
+    with pytest.raises(ValueError):
+        with_startup_definitions(bytes(32), platform, definitions)
+
+
+@pytest.mark.parametrize("platform,offset,length", [(1, 0, 1), (2, 23, 2)])
+@pytest.mark.parametrize("definition", [1, 2, 3, 7])
+def test_startup_changes_only_sdk_quality_field(platform, offset, length, definition):
+    original = bytes(range(32))
+    definitions = dict.fromkeys(range(5), definition)
+    result = with_startup_definitions(original, platform, definitions)
+    assert isinstance(result, bytes)
+    assert len(result) == 32
+    assert result[:offset] == original[:offset]
+    assert result[offset:offset + length] == encode_definitions(platform, definitions).payload
+    assert result[offset + length:] == original[offset + length:]
+    assert original == bytes(range(32))
+    assert with_startup_definitions(result, platform, definitions) == result
+
+
+@pytest.mark.parametrize("template", [None, "x" * 32, bytearray(32), bytes(31), bytes(33)])
+def test_startup_rejects_missing_mutable_or_wrong_size_template(template):
+    with pytest.raises(ValueError):
+        with_startup_definitions(template, 2, {0: 3})
+
+
+def test_startup_sparse_hd_does_not_invent_other_slot_values():
+    original = bytes(range(32))
+    result = with_startup_definitions(original, 2, {0: 3})
+    assert result[23:25] == b"\x03\x00"
+    assert result[0] == original[0]

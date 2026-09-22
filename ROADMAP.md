@@ -118,6 +118,12 @@ Next: prove rendezvous/INIT propagation and message correlation before a bounded
 HD trial; no live/default behavior changed. Evidence and exact addresses are in
 `docs/internal/native-video-definition.md`.
 
+Startup quality preparation: immutable, platform-specific userdata editing added
+with preservation/negative tests (38 focused cases total). Native A4 and INIT wire
+destinations mapped; channel source assignment chain remains pending. No live
+override, production default change or HD capability enabled. Keep the existing
+SD-playback-only custom-metadata guard until live propagation is verified.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication
