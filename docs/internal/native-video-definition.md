@@ -57,11 +57,51 @@ packing, ordering, unknown platform, invalid indices/values and legacy ambiguity
 Ruff and Mypy (190 files) passed. Full-suite verification remains the commit CI;
 no repeated full local Docker suite was needed for this pure codec step.
 
+## Startup and reply callback evidence (follow-up)
+
+Bounded symbol disassembly of the same binary establishes these additional facts:
+
+* `LivePlayer::set_opt_conn_params`, `0x108fcc`–`0x108fd4`, passes
+  `this + 0x50`, length **32**, to `Connection::set_req_userdata`.
+  That function (`0xf80c4`) copies the bytes into connection-owned storage.
+  Consequently the legacy definition at player offset `0x50` occupies userdata
+  byte 0; the packed definition at `0x67` occupies userdata bytes 23–24.
+* The shared-pointer constructor at `0x103b6c` places the player at allocation
+  offset `0x18`. It initializes the legacy field to 1 (`0x103c1c`), and copies
+  the low 16 bits of route offset `0x1c` to the packed field (`0x103c30`).
+  This is route-dependent initial state, not proof of a universal HD default.
+  `update_connect_route` (`0x104a94`) instead loads **one byte** from that route
+  offset and writes it as a halfword into `this + 0x67`; do not assume this path
+  preserves all five packed slots.
+* Our current `media_protocol.build_av_init` default writes legacy 1 and packed
+  `0x0012`. Under the mapped enum encoding these are legacy SD and packed SD in
+  slots 0 and 1, with zero in slots 2–4. This is consistent with the observed
+  640×360 sample, but does **not** prove which field the camera consumed or what
+  dimensions each profile yields. The production/default bytes remain unchanged.
+* The unsigned-short setter's reply lambda at `0x107314` compares vector begin
+  and end (`0x107338`–`0x107344`). Empty payload takes its success path. Otherwise
+  only first byte `0xff` takes the `not support` failure path
+  (`0x107348`–`0x107350`, `0x1073ec`). Other first-byte values also take success.
+  Success caches the **requested** value (`0x1073a0`–`0x1073c0`) and invokes the
+  callback without an error; it does not read negotiated dimensions from a reply.
+
+These are application-callback semantics **after** SDK message dispatch, not a
+rule allowing arbitrary UDP packets, empty datagrams or transport ACKs to confirm
+quality. Message framing, response identity and pending-request correlation still
+need tracing before a sender/response parser can be safely implemented. A future
+implementation must separate transport receipt, application acceptance and actual
+decoded resolution. Never mark HD supported merely because this callback succeeds.
+
+No camera traffic, deployment, decoder process or SDK-wide scan was needed for
+this follow-up. Individual disassembler processes were limited to 256 MiB address
+space and 20 CPU seconds. Host swap was already heavily occupied, so no build or
+full test container was started.
+
 ## Next
 
-Trace the initiating live-view userdata/default quality and the BuiltIn response
-callback, framing and correlation; determine whether selecting HD before INIT can
-avoid a mid-stream profile transition. Use the exact camera-3 platform and only
+Trace how this startup userdata propagates through rendezvous and INIT, and trace
+BuiltIn response framing/correlation. The startup offsets and reply callback are
+now mapped; a pre-INIT HD request remains untested. Use the exact camera-3 platform and only
 one reviewed bounded live attempt after tests/CI. Verify actual encoding dimensions
 and independent decoding, not transport ACK alone. Keep changes in the Yoosee
 driver and retain generic maximum-resolution-first / single-source fan-out policy.

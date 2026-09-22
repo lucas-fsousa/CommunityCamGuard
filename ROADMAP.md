@@ -110,6 +110,14 @@ Socket-free payload encoder and negative tests implemented; no live sender or HD
 support claim. Next: INIT/default-quality and response correlation before one
 camera-3 maximum-resolution validation. See `docs/internal/native-video-definition.md`.
 
+Startup/reply follow-up (offline): SDK copies 32-byte player userdata; legacy
+quality is byte 0 and packed quality bytes 23–24. Current INIT defaults encode SD,
+not an explicit HD request. SDK callback accepts empty/non-0xff reply bodies and
+caches the requested value, so callback success cannot homologate resolution.
+Next: prove rendezvous/INIT propagation and message correlation before a bounded
+HD trial; no live/default behavior changed. Evidence and exact addresses are in
+`docs/internal/native-video-definition.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication
