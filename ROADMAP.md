@@ -104,6 +104,12 @@ maximum-resolution selection (640×360 is not the desired default), then generic
 single-source/fan-out + RTSP fallback and sustained/browser validation. No native
 dashboard capability enabled. See `docs/internal/native-av-first-live-decode.md`.
 
+Native quality mapping (2026-09-22): APK/SDK prove LD/SD/HD/AUTO values and distinct
+legacy command 5 (one byte) versus platform-2 command 0x33 (five packed 3-bit slots).
+Socket-free payload encoder and negative tests implemented; no live sender or HD
+support claim. Next: INIT/default-quality and response correlation before one
+camera-3 maximum-resolution validation. See `docs/internal/native-video-definition.md`.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication
