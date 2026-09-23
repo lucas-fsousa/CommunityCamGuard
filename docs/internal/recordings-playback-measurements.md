@@ -66,3 +66,50 @@ Consider native HEVC playback only with explicit client capability detection and
 tested fallback; do not blindly serve HEVC to all browsers or return a partial
 conversion that breaks seeking. Full conversion waiting remains an open design
 tradeoff, not a resolved startup-delay bug.
+
+## Deployment and real HTTP check
+
+Runtime commit `9a092c5` was built as image `299f3352c407`, dashboard build
+`b-c424c1dc6a43`. Legacy Docker build was capped at 512 MiB/no swap and one CPU;
+the context was 3.963 MB. Only `ccg-app` was recreated. go2rtc and unrelated
+services retained their start times; both native diagnostic flags remained false.
+Health returned 200 after startup (the immediate early readiness check initially
+got connection refused while the application was starting).
+
+One authenticated loopback check through the actual application selected a closed,
+bounded camera-3 archive. It used the normal prepare/status/file APIs and allowed
+one shared conversion, not a separate unmanaged encoder. This was a different
+closed archive from the isolated benchmark; do not compare the timings as an
+encoder performance improvement.
+
+| Observation | Result |
+| --- | --- |
+| Initially cached | No |
+| Initial status response | 122.07 ms |
+| Preparation POST response | 7.07 ms |
+| Ready observed (1-second polling) | 18,143 ms; 18 polls |
+| Prefix 4 KiB | HTTP 206; headers in 5.76 ms |
+| Mid-file 4 KiB | HTTP 206; headers in 3.24 ms |
+| Suffix 4 KiB | HTTP 206; headers in 3.83 ms |
+| Cached preparation POST | 3.54 ms; ready/cached, no transcode |
+| Request without session cookie | HTTP 401 |
+
+All three requested ranges contained exactly 4096 bytes and consistent Content-Range
+headers for the 4,282,896-byte derived file. No media payload, cookie or key was
+printed. The production derived cache gained that reproducible file; originals were
+untouched. Post-check application memory was about 106 MiB; no OOM/restarts were
+reported. Two observations found one producer for each of three base streams with
+increasing byte counters. App recreation briefly interrupts recorder ownership;
+this is not a claim of zero recording downtime.
+
+The HTTP metrics above were measured externally. Searching container logs found
+no `playback_prepare` INFO record: the current logging configuration does not
+surface that logger's INFO events by default. Follow-up: wire scoped content-free
+metrics logging (and verify failure visibility) without enabling verbose SDK or
+credential-bearing logs globally.
+
+No browser was launched in this deployment check. First-click autoplay, seek UX
+and mobile rendering remain to be validated in a real browser; HTTP success is
+not a substitute. Backend latency on this sample is concentrated in cold
+conversion, not serving the ready file. Do not revert to fragmented partial
+playback merely to hide that preparation delay.

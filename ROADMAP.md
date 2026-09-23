@@ -189,6 +189,13 @@ lookup: 264ms cold vs 0.058ms cached). Original media untouched. Deployment and 
 browser timing/first-click validation remain pending; see
 `docs/internal/recordings-playback-measurements.md`.
 
+Recordings deployed checkpoint: runtime `9a092c5`, build `b-c424c1dc6a43`, app-only
+recreation with go2rtc unchanged. Actual authenticated HTTP check: cold archive
+ready in 18.1s, cached prepare 3.54ms, three valid 4KiB ranges in 3–6ms, unauthenticated
+access 401. Three base streams retained one producer each and advancing counters.
+Browser first-click/seek validation is still pending. INFO preparation metrics were
+not visible in default container logging; scoped logging remains a follow-up.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
