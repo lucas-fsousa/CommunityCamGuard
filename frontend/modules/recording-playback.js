@@ -1,5 +1,5 @@
 // One archive selection owns its requests, timer and video. No live-camera state.
-export function createRecordingPlayback(player, status, retry, api, t) {
+export function createRecordingPlayback(player, status, api, t) {
   let current = null;
   let disposed = false;
   const active = (item) => !disposed && current === item;
@@ -12,7 +12,7 @@ export function createRecordingPlayback(player, status, retry, api, t) {
       clearTimeout(current.requestTimer);
     }
     current = null;
-    retry.hidden = true;
+    message("");
     player.pause();
     player.removeAttribute("src");
     player.load();
@@ -27,7 +27,6 @@ export function createRecordingPlayback(player, status, retry, api, t) {
     try { promise = player.play(); } catch (error) { promise = Promise.reject(error); }
     Promise.resolve(promise).catch((error) => {
       if (!active(item)) return;
-      retry.hidden = false;
       message(error?.name === "NotAllowedError" ? "rec.readyPressPlay" : "rec.playbackFailed");
     }).finally(() => { item.playPending = false; });
   }
@@ -69,7 +68,6 @@ export function createRecordingPlayback(player, status, retry, api, t) {
 
   function onPlaying() {
     if (!current?.ready || disposed) return;
-    retry.hidden = true;
     message("");
   }
   function onError() {
@@ -77,10 +75,8 @@ export function createRecordingPlayback(player, status, retry, api, t) {
     message("rec.playbackFailed");
     current.failed = true;
   }
-  const retryPlay = () => { if (current) play(current); };
   player.addEventListener("playing", onPlaying);
   player.addEventListener("error", onError);
-  retry.addEventListener("click", retryPlay);
 
   return {
     select(path) {
@@ -100,7 +96,6 @@ export function createRecordingPlayback(player, status, retry, api, t) {
       stop();
       player.removeEventListener("playing", onPlaying);
       player.removeEventListener("error", onError);
-      retry.removeEventListener("click", retryPlay);
     },
   };
 }

@@ -21,7 +21,8 @@ separate legitimate outcome, especially after asynchronous conversion.
 `recording-playback.js` owns one selection, request cancellation and timers. Only
 the current selection may attach a ready source. Play is requested immediately
 after source attachment instead of waiting on a metadata callback; its promise
-reports failures. A localized explicit play button handles autoplay rejection.
+reports failures. Autoplay rejection shows a small localized status message;
+play remains available through the video's native controls.
 Repeated clicks during preparation do nothing; clicks on an already-ready item
 request play without a new POST, reload or loss of seek position. The file URL is
 stable instead of timestamp-cache-busted on every selection.
@@ -43,6 +44,18 @@ without metadata events, duplicate clicks, seek preservation, stale completions,
 autoplay rejection/retry, polling, disposal and request timeout. This harness is
 now a dedicated CI step. Existing camera-control Node contracts and 42 focused
 Python frontend/playback/API tests passed. These are not browser homologation.
+
+### Autoplay UI regression correction
+
+The user reported an oversized ready/play button even without ready media. The
+global `button { display: inline-flex }` rule overrode the HTML `hidden` attribute
+on the extra retry button. That duplicate button has been removed entirely.
+Only actual autoplay rejection displays the small status message; native video
+controls handle manual playback. Stopping playback also clears stale status.
+The fake-media harness did not exercise CSS/layout and missed this regression.
+Updated lifecycle tests cover native-play recovery; a static view regression
+checks that no duplicate autoplay button is created. Real-browser verification
+remains pending; this fix does not remove uncached transcoding startup time.
 
 ## Conversion budget follow-up
 

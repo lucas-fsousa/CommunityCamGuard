@@ -34,8 +34,7 @@ export function renderRecordings(stage) {
 
   const player = el("video", { className: "rec-player", controls: true, preload: "auto", playsInline: true });
   const playbackState = el("small", { className: "muted rec-playback-state" });
-  const retry = el("button", { textContent: t("rec.readyPressPlay"), hidden: true });
-  const playback = createRecordingPlayback(player, playbackState, retry, api, t);
+  const playback = createRecordingPlayback(player, playbackState, api, t);
   let disposed = false;
   let listRequest = null;
   cleanup = () => { disposed = true; listRequest?.abort(); playback.dispose(); };
@@ -109,7 +108,7 @@ export function renderRecordings(stage) {
     el("div", { className: "rec-filter" }, field(t("rec.camera"), camSel), field(t("rec.from"), fromI), field(t("rec.to"), toI), search, retention),
     el("div", { className: "rec-body" },
       el("div", { className: "rec-side" }, list, el("div", { className: "rec-pager" }, prev, info, next)),
-      el("div", { className: "rec-main" }, player, playbackState, retry),
+      el("div", { className: "rec-main" }, player, playbackState),
     ),
   ));
   load();

@@ -300,6 +300,16 @@ def test_recording_first_view_polls_until_seekable_cache_is_ready():
     assert 'if (state.view !== "recordings") stopRecordings();' in app
 
 
+def test_recordings_use_native_play_controls_without_extra_autoplay_button():
+    root = Path(__file__).parents[1] / "frontend" / "modules"
+    view = (root / "recordings.js").read_text()
+    controller = (root / "recording-playback.js").read_text()
+    assert 'controls: true' in view
+    assert 't("rec.readyPressPlay")' not in view
+    assert 'player, playbackState)' in view
+    assert 'retry.hidden' not in controller
+
+
 def test_build_endpoint_is_public_no_store_and_returns_content_id():
     response = main.frontend_build_info()
     body = json.loads(response.body)

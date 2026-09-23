@@ -21,11 +21,11 @@ function harness() {
     removeAttribute(key) { if (key === "src") this.src = ""; },
     play() { this.plays++; return this.reject ? Promise.reject({ name: this.reject }) : Promise.resolve(); },
   });
-  const status = {}; const retry = Object.assign(events(), { hidden: true });
+  const status = {};
   const requests = [];
   const api = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
-  const controller = create(player, status, retry, api, (key) => key);
-  return { controller, player, status, retry, requests, timers };
+  const controller = create(player, status, api, (key) => key);
+  return { controller, player, status, requests, timers };
 }
 (async () => {
   {
@@ -53,9 +53,9 @@ function harness() {
   {
     const h = harness(); h.controller.select("a"); h.player.reject = "NotAllowedError";
     h.requests[0].resolve({ ready: true }); await flush();
-    assert.equal(h.retry.hidden, false); assert.equal(h.status.textContent, "rec.readyPressPlay");
-    h.player.reject = null; h.retry.emit("click"); await flush(); h.player.emit("playing");
-    assert.equal(h.player.plays, 2); assert.equal(h.retry.hidden, true);
+    assert.equal(h.status.textContent, "rec.readyPressPlay");
+    h.player.reject = null; h.player.play(); await flush(); h.player.emit("playing");
+    assert.equal(h.player.plays, 2); assert.equal(h.status.textContent, "");
     assert.equal(h.requests.length, 1); h.controller.dispose();
   }
   {

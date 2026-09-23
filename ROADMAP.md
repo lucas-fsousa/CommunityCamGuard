@@ -167,7 +167,9 @@ brand-agnostic; camera-specific capabilities remain owned by drivers.
 Recordings follow-up (2026-09-23): frontend selection/player lifecycle repaired in
 an isolated module: cancel stale requests/polling on navigation/logout, preserve
 seek on repeated selected-row clicks, request play without a loadedmetadata-only
-trigger, and expose explicit localized play after autoplay rejection. Fake-media
+trigger, and show a discreet localized status after autoplay rejection while
+retaining native video controls (the extra button was removed after a CSS/hidden
+regression reported by the user). Fake-media
 Node regressions added to CI; 42 focused Python contracts passed. The reported
 browser symptom is not yet physically homologated, and uncached full-file HEVC
 conversion still causes startup delay. Next: bounded conversion/timing audit and
