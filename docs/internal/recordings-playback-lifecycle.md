@@ -78,3 +78,6 @@ validate first-selection/navigation on desktop/mobile. Serial conversion can mak
 queued requests wait longer; the purpose here is preventing resource contention,
 not claiming faster individual encoding. No continuous pretranscoding was enabled,
 and no container deployment or browser validation was performed.
+
+Real-file conversion and HTTP Range follow-up:
+[measurements and remaining startup tradeoff](recordings-playback-measurements.md).

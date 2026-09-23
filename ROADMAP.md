@@ -181,6 +181,14 @@ Content-free queue/encode timings added; cache and full seekable MP4 retained.
 passed. Actual-camera first-open latency/browser validation and deployment remain
 pending; do not equate resource hardening with a measured startup-speed fix.
 
+Recordings measured follow-up: one closed camera-3 1080p HEVC archive (300s) took
+22.1s to convert completely under 512 MiB/one CPU; this directly contributes to
+first-open delay. Ten ASGI Range/auth/If-Range tests validate seekable delivery.
+Added a bounded stat-identity codec cache to avoid repeated ffprobe (one measured
+lookup: 264ms cold vs 0.058ms cached). Original media untouched. Deployment and real
+browser timing/first-click validation remain pending; see
+`docs/internal/recordings-playback-measurements.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

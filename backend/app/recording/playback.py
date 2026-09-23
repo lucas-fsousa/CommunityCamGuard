@@ -25,6 +25,7 @@ import uuid
 from pathlib import Path
 
 from ..config import get_settings
+from . import codec_cache
 from .playback_budget import (
     ENCODE_TIMEOUT_SECONDS,
     MAX_JOBS,
@@ -98,12 +99,20 @@ def _evict(keep: Path | None = None) -> None:
 
 
 def video_codec(segment: Path) -> str:
+    """Reuse codec metadata only while file identity/size/timestamps are unchanged."""
+    return codec_cache.lookup(segment, _probe_video_codec)
+
+
+def _probe_video_codec(segment: Path) -> str:
     """The segment's video codec (e.g. ``hevc`` / ``h264``); ``""`` if it can't be read."""
     try:
-        out = subprocess.run(
+        result = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=codec_name", "-of", "default=nk=1:nw=1", str(segment)],
-            capture_output=True, text=True, timeout=10).stdout.strip()
+            capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            return ""
+        out = result.stdout.strip()
         return out.splitlines()[0].lower() if out else ""
     except (OSError, subprocess.SubprocessError):
         return ""

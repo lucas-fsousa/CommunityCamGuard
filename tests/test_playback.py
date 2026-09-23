@@ -12,6 +12,7 @@ from backend.app.recording import playback
 def test_video_codec_parses_ffprobe(monkeypatch):
     class _R:
         stdout = "hevc\n"
+        returncode = 0
     monkeypatch.setattr(playback.subprocess, "run", lambda *a, **k: _R())
     assert playback.video_codec(Path("/x.mp4")) == "hevc"
 
