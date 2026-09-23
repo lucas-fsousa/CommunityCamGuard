@@ -138,6 +138,17 @@ are byte-identical. 139 focused tests passed. No operator/API wiring, camera tes
 or deployment yet. Next: authoritative-platform profile policy under the existing
 reviewed-camera gate, then one bounded HD decode trial.
 
+**HD live trial blocked — evidence review 2026-09-23:** camera 3 still lacks an
+authoritative platform enum. Historical exact-unit rendezvous/MTP collection
+returned no E4, and the reviewed native decode results do not establish that enum.
+The inventory `new_platform` flag, firmware string and 640×360 output must not be
+substituted for it. Startup plumbing is implemented, but a camera-3 HD attempt is
+not currently ready. Unblocking RE: recover the SDK exchange that delivers E4 (or
+prove an equivalent platform source), correlate it to the exact device and retain
+its provenance before enabling operator profile selection. Do not repeat the
+same media probe or select both platform fields speculatively. Recordings playback
+reliability remains the highest-priority independent implementation task.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication

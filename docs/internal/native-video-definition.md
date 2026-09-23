@@ -177,6 +177,22 @@ container restart or build was performed. Commit CI verifies the full suite.
 
 ## Next
 
+**Live HD attempt is blocked as of 2026-09-23.** Review of the existing platform
+parser, rendezvous/media collectors and private SD-investigation evidence confirms
+that camera 3's prior bounded collection returned no authoritative E4. The stored
+live-decode milestones establish decoded media, not the platform enum. A targeted
+filename-only search of Frida logs for `iv_get_device_platform_version`,
+`device_platform_version`, `get_device_platform` and `platformVersion` found no
+matching logs; this is not an exhaustive claim that all captures lack E4.
+
+The SDK's default registry value of 1 in the absence of E4 is not positive evidence
+that this camera uses platform 1. Inventory flags, model/firmware strings and media
+dimensions do not resolve the question. Do not add a configuration integer that
+silently turns an operator guess into authoritative metadata. Next offline RE is
+the E4-producing exchange or an independently proven equivalent; no identical
+live collection retry or profile command was issued during this review. No user
+action is required for that offline investigation.
+
 Connect the operator-only profile selection to authoritative platform metadata,
 camera-3 identity and decoder bounds before any HD trial. The immutable transport
 path is now implemented and tested offline; the live override remains unused.
