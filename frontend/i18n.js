@@ -327,6 +327,7 @@ const STRINGS = {
     "rec.preparingSeekable": "Preparing the complete recording so seeking is available…",
     "rec.seekableReady": "Complete seekable recording ready. Starting…",
     "rec.readyPressPlay": "Recording ready. Press play to start.",
+    "rec.playbackBusy": "Playback preparation is busy. Wait a moment, then select the recording again.",
     "rec.playbackFailed": "The browser-compatible version could not be prepared.",
   },
   "pt-BR": {
@@ -643,6 +644,7 @@ const STRINGS = {
     "rec.preparingSeekable": "Preparando a gravação completa para permitir o avanço…",
     "rec.seekableReady": "Gravação completa e navegável pronta. Iniciando…",
     "rec.readyPressPlay": "Gravação pronta. Pressione reproduzir para iniciar.",
+    "rec.playbackBusy": "Preparação de vídeos ocupada. Aguarde um pouco e selecione a gravação novamente.",
     "rec.playbackFailed": "Não foi possível preparar a versão compatível com o navegador.",
   },
 };

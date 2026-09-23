@@ -173,6 +173,14 @@ browser symptom is not yet physically homologated, and uncached full-file HEVC
 conversion still causes startup delay. Next: bounded conversion/timing audit and
 real-browser validation; see `docs/internal/recordings-playback-lifecycle.md`.
 
+Recordings resource follow-up: shared process-local conversion budget now covers
+foreground and warmer: one encoder, four admitted jobs maximum, bounded queue wait,
+single-thread decoder/encoder/filter settings and explicit HTTP 429/UI busy handling.
+Content-free queue/encode timings added; cache and full seekable MP4 retained.
+54 focused Python tests and Node contracts passed; bounded synthetic conversion
+passed. Actual-camera first-open latency/browser validation and deployment remain
+pending; do not equate resource hardening with a measured startup-speed fix.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

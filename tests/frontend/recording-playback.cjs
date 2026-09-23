@@ -85,5 +85,13 @@ function harness() {
     assert.equal(h.status.textContent, "rec.playbackFailed");
     h.controller.dispose(); assert.equal(h.timers.size, 0);
   }
+  {
+    const h = harness(); h.controller.select("a");
+    h.requests[0].reject({ status: 429 }); await flush();
+    assert.equal(h.status.textContent, "rec.playbackBusy");
+    assert.equal(h.requests.length, 1); // No automatic overload retry storm.
+    h.controller.select("a"); assert.equal(h.requests.length, 2);
+    h.controller.dispose(); h.requests[1].resolve({ ready: true }); await flush();
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

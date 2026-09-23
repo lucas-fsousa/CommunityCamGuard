@@ -20,10 +20,18 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 from pathlib import Path
 
 from ..config import get_settings
+from .playback_budget import (
+    ENCODE_TIMEOUT_SECONDS,
+    MAX_JOBS,
+    QUEUE_WAIT_SECONDS,
+    PlaybackBusy,
+    encoder_slot,
+)
 
 # Codecs a browser plays natively in a <video> tag → serve the original, don't transcode.
 _BROWSER_VIDEO = {"h264", "avc1", "vp8", "vp9", "av1"}
@@ -113,8 +121,10 @@ def _ffmpeg_prefix() -> list[str]:
 
 
 def _ffmpeg_cmd(src: Path, dst: Path) -> list[str]:
-    return [*_ffmpeg_prefix(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+    return [*_ffmpeg_prefix(), "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+            "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1", "-i", str(src),
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-c:a", "copy",
+            "-threads", "1",
             # faststart: moov (with the real duration) up front → the browser can seek immediately
             "-movflags", "+faststart", "-f", "mp4", str(dst)]
 
@@ -137,26 +147,17 @@ def transcoded_path(segment: Path) -> Path | None:
     Returns the cache path (seekable H.264 MP4), or ``None`` when the segment is already
     browser-playable (caller should serve the original) or the transcode fails.
     """
-    if not needs_transcode(segment):
-        return None
-    cache = cache_path(segment)
     hit = cached_path(segment)
     if hit is not None:
         return hit
-    part = cache.with_name(f"{cache.stem}.{uuid.uuid4().hex}.part")
     try:
-        proc = subprocess.run(_ffmpeg_cmd(segment, part),
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
-        if proc.returncode == 0 and part.exists() and not cache.is_file():
-            os.replace(part, cache)          # atomic promote to the shared cache
-    except (OSError, subprocess.SubprocessError):
-        pass
-    finally:
-        part.unlink(missing_ok=True)
-    if cache.is_file():
-        _evict(keep=cache)                   # keep the cache under its size cap
-        return cache
-    return None
+        job = _prepare_job(segment, background=True)
+    except PlaybackBusy:
+        return None
+    if job is None:
+        return cached_path(segment)
+    job.done.wait(ENCODE_TIMEOUT_SECONDS + QUEUE_WAIT_SECONDS + 5)
+    return cached_path(segment)
 
 
 class _TranscodeJob:
@@ -179,43 +180,74 @@ class _TranscodeJob:
         self._thread.start()
 
     def _run(self) -> None:
+        started = time.monotonic()
+        acquired = None
         try:
-            encoded = subprocess.run(
-                _ffmpeg_cmd(self.segment, self.part),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=600,
-            )
-            if encoded.returncode != 0 or not self.part.is_file():
-                self.failed = True
-                log.warning("seekable playback preparation failed for %s", self.segment)
-                return
-            if not self.cache.is_file():
-                os.replace(self.part, self.cache)
-            _evict(keep=self.cache)
-        except (OSError, subprocess.SubprocessError) as exc:
+            with encoder_slot():
+                acquired = time.monotonic()
+                if self.cache.is_file():
+                    return
+                encoded = subprocess.run(
+                    _ffmpeg_cmd(self.segment, self.part),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=ENCODE_TIMEOUT_SECONDS,
+                )
+                if encoded.returncode != 0 or not self.part.is_file():
+                    self.failed = True
+                    return
+                if not self.cache.is_file():
+                    os.replace(self.part, self.cache)
+                _evict(keep=self.cache)
+        except (OSError, subprocess.SubprocessError, PlaybackBusy):
             self.failed = True
-            log.warning("playback preparation failed for %s: %s", self.segment, exc)
         finally:
-            self.part.unlink(missing_ok=True)
-            self.done.set()
-            with _JOBS_LOCK:
-                if _JOBS.get(self.segment) is self:
-                    _JOBS.pop(self.segment, None)
+            try:
+                self.part.unlink(missing_ok=True)
+            except OSError:
+                self.failed = True
+            finally:
+                finished = time.monotonic()
+                log.info("playback_prepare outcome=%s queue_ms=%d encode_ms=%d",
+                         "failed" if self.failed else "ready",
+                         int(((acquired if acquired is not None else finished) - started) * 1000),
+                         int((finished - acquired) * 1000) if acquired is not None else 0)
+                with _JOBS_LOCK:
+                    if _JOBS.get(self.segment) is self:
+                        _JOBS.pop(self.segment, None)
+                    self.done.set()
 
 
 def prepare_transcode(segment: Path) -> bool:
     """Ensure a shared background job is preparing ``segment``; return whether it is running."""
-    if cached_path(segment) is not None or not needs_transcode(segment):
-        return False
+    return _prepare_job(segment) is not None
+
+
+def _prepare_job(segment: Path, *, background: bool = False) -> _TranscodeJob | None:
     key = segment.resolve()
     with _JOBS_LOCK:
+        existing = _JOBS.get(key)
+        if existing is not None:
+            return existing
+        if len(_JOBS) >= MAX_JOBS or (background and _JOBS):
+            raise PlaybackBusy("playback preparation is busy")
+    if cached_path(segment) is not None or not needs_transcode(segment):
+        return None
+    with _JOBS_LOCK:
         job = _JOBS.get(key)
-        if job is None or job.done.is_set():
+        if job is None:
+            if cached_path(segment) is not None:
+                return None
+            if len(_JOBS) >= MAX_JOBS or (background and _JOBS):
+                raise PlaybackBusy("playback preparation is busy")
             job = _TranscodeJob(key)
             _JOBS[key] = job
-            job.start()
-    return True
+            try:
+                job.start()
+            except RuntimeError:
+                _JOBS.pop(key, None)
+                raise PlaybackBusy("playback worker unavailable") from None
+    return job
 
 
 def transcode_in_progress(segment: Path) -> bool:
@@ -260,6 +292,9 @@ class Warmer:
         """Transcode at most one pending segment. Returns True if it did work."""
         if not self.enabled:
             return False
+        with _JOBS_LOCK:
+            if _JOBS:
+                return False  # Do not scan/probe archives while a viewer's job owns the budget.
         cap = get_settings().playback_cache_mb * 1024 * 1024
         if cap > 0 and _cache_size() >= cap * self.HEADROOM:
             return False                     # near the cap — stop, don't churn against eviction

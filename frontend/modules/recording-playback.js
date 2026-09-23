@@ -61,7 +61,7 @@ export function createRecordingPlayback(player, status, retry, api, t) {
     } catch (error) {
       if (!active(item)) return;
       item.failed = true;
-      message("rec.playbackFailed");
+      message(error?.status === 429 ? "rec.playbackBusy" : "rec.playbackFailed");
     } finally {
       clearTimeout(requestTimer);
     }
@@ -90,7 +90,7 @@ export function createRecordingPlayback(player, status, retry, api, t) {
         return;
       }
       stop();
-      current = { path, abort: new AbortController(), deadline: Date.now() + 610000 };
+      current = { path, abort: new AbortController(), deadline: Date.now() + 650000 };
       message("rec.startingPlayback");
       void check(current, true);
     },

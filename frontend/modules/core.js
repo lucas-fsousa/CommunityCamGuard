@@ -38,7 +38,9 @@ export async function api(path, opts = {}) {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || response.statusText);
+    const error = new Error(body.detail || response.statusText);
+    error.status = response.status;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
 }

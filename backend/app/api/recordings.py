@@ -13,6 +13,7 @@ from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import registry
 from ..recording import playback, recorder
+from ..recording.playback_budget import PlaybackBusy
 
 router = APIRouter(prefix="/api", tags=["recordings"])
 
@@ -74,7 +75,10 @@ def recording_file(path: str):
         return FileResponse(playable, media_type="video/mp4")
     if not playback.needs_transcode(target):
         return FileResponse(target, media_type="video/mp4")
-    playback.prepare_transcode(target)
+    try:
+        playback.prepare_transcode(target)
+    except PlaybackBusy:
+        raise HTTPException(429, "playback preparation is busy", headers={"Retry-After": "5"}) from None
     raise HTTPException(
         status_code=409,
         detail="seekable playback is still being prepared",
@@ -96,7 +100,10 @@ def prepare_recording_playback(path: str) -> dict:
     _root, target = _recording_target(path)
     state = _recording_playback_state(target)
     if not state["ready"] and not state["transcoding"]:
-        playback.prepare_transcode(target)
+        try:
+            playback.prepare_transcode(target)
+        except PlaybackBusy:
+            raise HTTPException(429, "playback preparation is busy", headers={"Retry-After": "5"}) from None
         state = _recording_playback_state(target)
     return state
 
