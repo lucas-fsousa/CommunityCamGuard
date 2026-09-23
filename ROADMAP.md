@@ -131,6 +131,13 @@ passed. Next: thread the same immutable metadata through the bounded diagnostic
 route and reliable INIT, with authoritative platform and camera-3 gating before
 one HD trial. No runtime override or new dashboard capability yet.
 
+Bounded quality transport (2026-09-23): optional immutable live userdata now passes
+through rendezvous, direct setup, receive coordinator and reliable INIT. Invalid
+metadata fails before socket creation; START/CLOSE stay unchanged and INIT retries
+are byte-identical. 139 focused tests passed. No operator/API wiring, camera test
+or deployment yet. Next: authoritative-platform profile policy under the existing
+reviewed-camera gate, then one bounded HD decode trial.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication

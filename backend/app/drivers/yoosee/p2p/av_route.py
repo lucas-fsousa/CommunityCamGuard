@@ -22,6 +22,7 @@ from .av_route_io import BudgetSocket
 from .av_sample import AvVideoSample
 from .camera_session import open_camera_session
 from .contracts import CallingAttempt, P2PProbeError
+from .media_protocol import build_av_init
 from .media_session import open_media_channel
 from .rendezvous_session import call_device, close_device_route
 
@@ -50,11 +51,18 @@ class AvBootstrapError(P2PProbeError):
 def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                    duration: float = 3.0,
                    sample: AvVideoSample | None = None,
+                   request_user_data: bytes | None = None,
                    cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
-    """Return a retained sample only after successful AV/B9/socket cleanup."""
+    """Return a retained sample only after successful AV/B9/socket cleanup.
+
+    Optional immutable startup metadata is internal, operator-reviewed input,
+    never an HTTP argument. This primitive does not infer platform or grant HD
+    support; the diagnostic policy must validate those before selecting a profile.
+    """
     try:
         return _probe_av_route(enrollment, camera_id=camera_id, device_id=device_id,
-                               duration=duration, sample=sample, cancelled=cancelled)
+                               duration=duration, sample=sample, cancelled=cancelled,
+                               request_user_data=request_user_data)
     except BaseException:
         if sample is not None:
             sample.close()
@@ -64,6 +72,7 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
 def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                    duration: float,
                    sample: AvVideoSample | None,
+                   request_user_data: bytes | None = None,
                    cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
     """One fresh route: <=20s preparation, <=12s AV and <=1s B9 cleanup.
 
@@ -75,6 +84,9 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
         raise ValueError("native AV probe requires the reviewed enrolled camera")
     if type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 10:
         raise ValueError("invalid native AV probe duration")
+    # Validate immutable live metadata before acquiring a socket or opening a route.
+    connection_type = 1 if request_user_data is not None else None
+    build_av_init(0, request_user_data=request_user_data, connection_type=connection_type)
     if cancelled():
         raise P2PProbeError("native AV probe cancelled")
     bounded = BudgetSocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM), cancelled)
@@ -102,12 +114,14 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
         release_sequence = (node.next_sequence + 2) & 0xFFFFFFFF
         stage = "rendezvous"
         calling = call_device(sock, node, enrollment.access_id, target, 1.0,
-                              retries=1, deadline=bounded.deadline, attempt=attempt)
+                              retries=1, deadline=bounded.deadline, attempt=attempt,
+                              request_user_data=request_user_data, connection_type=connection_type)
         if not calling.direct_handshake:
             raise P2PProbeError("native AV direct route was not established")
         stage = "media_meter"
         channel = open_media_channel(sock, node, enrollment.access_id, target, calling, 0.5,
-                                     require_roundtrip=True)
+                                     require_roundtrip=True, request_user_data=request_user_data,
+                                     connection_type=connection_type)
         if not channel.meter_roundtrip_confirmed:
             raise AvBootstrapError(direct_acknowledged=channel.direct_acknowledged,
                                     meter_acknowledged=channel.meter_acknowledged,
@@ -121,6 +135,7 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
         stage = "av_receive_close"
         result = probe_av_socket(sock, calling, channel, duration=duration,
                                  cancelled=cancelled, close_socket=False, sample=sample,
+                                 request_user_data=request_user_data,
                                  meter=AvMeter(calling.peer_endpoint, attempt.link_id,
                                                attempt.call_id, enrollment.access_id, target.device_id))
         stage = "route_release"

@@ -52,6 +52,7 @@ def probe_av_socket(
     close_socket: bool = True,
     meter: AvMeter | None = None,
     sample: AvVideoSample | None = None,
+    request_user_data: bytes | None = None,
 ) -> AvProbeResult:
     """Receive for <=10 seconds, plus <=2 seconds for CLOSE transport receipt.
 
@@ -74,7 +75,8 @@ def probe_av_socket(
         if (attempt is None or peer is None or not calling.direct_handshake
                 or not channel.meter_roundtrip_confirmed):
             raise ValueError("AV probe requires a fresh metered direct route")
-        handshake = AvHandshake(peer, attempt.link_id, attempt.call_id, attempt.cookie, clock=clock)
+        handshake = AvHandshake(peer, attempt.link_id, attempt.call_id, attempt.cookie, clock=clock,
+                                 request_user_data=request_user_data)
         deadline = clock() + duration
         datagrams = received = sent = headers = video = audio = ignored = peak = 0
         finishing = False

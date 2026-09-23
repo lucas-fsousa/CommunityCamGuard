@@ -30,7 +30,8 @@ def env(monkeypatch):
         return replace(CALLING, attempt=kwargs["attempt"], route_link_id=kwargs["attempt"].link_id)
     monkeypatch.setattr(av_route, "call_device", calling)
     def bootstrap(*args, **kwargs):
-        assert kwargs == {"require_roundtrip": True}
+        assert kwargs == {"require_roundtrip": True, "request_user_data": None,
+                          "connection_type": None}
         return CHANNEL
     monkeypatch.setattr(av_route, "open_media_channel", bootstrap)
     def probe(sock, calling, channel, **kwargs):

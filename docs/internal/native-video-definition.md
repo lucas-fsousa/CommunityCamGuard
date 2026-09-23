@@ -153,11 +153,33 @@ connection types. **91 focused tests passed**, including existing media/session
 and SD-playback-carrier regressions; Ruff passed. Commit CI covers the full suite.
 No deployment or camera traffic occurred.
 
+## Bounded route propagation (2026-09-23)
+
+The internal `probe_av_route` accepts optional immutable `request_user_data` and
+validates it as live metadata before creating a socket. The same bytes object is
+passed to broker rendezvous, direct media setup and `probe_av_socket`; the latter
+passes it through `AvHandshake` to `ReliableAvControl` for INIT only. The sender
+builds the packet once, so retries preserve payload, sequence and timestamp.
+START/CLOSE reject supplied startup metadata and retain their original bodies.
+Omitting metadata keeps all captured defaults unchanged.
+
+This is transport plumbing, **not an enabled HD diagnostic**. No configuration,
+HTTP parameter, dashboard capability or operator handler invokes the override.
+The existing server-side reviewed-camera gate remains unchanged. Platform
+selection/provenance must be enforced by that policy before it supplies metadata;
+the low-level transport cannot establish a platform from arbitrary userdata.
+
+139 focused tests passed across route/probe/handshake/reliable controls and quality
+codecs. New tests cover object-preserving stage propagation, real receive-loop
+INIT/START/CLOSE behavior using fake sockets, byte-identical INIT retries, early
+invalid-input rejection with sample cleanup, and route teardown. No camera action,
+container restart or build was performed. Commit CI verifies the full suite.
+
 ## Next
 
-Thread one immutable reviewed metadata value through the bounded route, direct
-handshake and reliable INIT owner, retaining identical bytes on retries. Gate any
-HD trial on authoritative platform metadata, camera-3 identity and decoder bounds.
+Connect the operator-only profile selection to authoritative platform metadata,
+camera-3 identity and decoder bounds before any HD trial. The immutable transport
+path is now implemented and tested offline; the live override remains unused.
 Do not expose generic arbitrary-userdata input in the dashboard. Trace BuiltIn
 response framing/correlation separately before implementing mid-stream changes.
 A pre-INIT HD request remains untested.

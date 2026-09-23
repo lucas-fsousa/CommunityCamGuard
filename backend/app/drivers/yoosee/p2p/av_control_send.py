@@ -30,6 +30,7 @@ An ACK proves transport receipt only, not acceptance, media readiness or executi
 
     def __init__(self, peer: tuple[str, int], link_id: int, call_id: int, *,
                  action: int, sequence: int = 0,
+                 request_user_data: bytes | None = None,
                  clock: Callable[[], float] = time.monotonic) -> None:
         if type(link_id) is not int or not 0 < link_id <= 0xFFFFFF:
             raise ValueError("invalid AV link")
@@ -39,12 +40,16 @@ An ACK proves transport receipt only, not acceptance, media readiness or executi
             raise ValueError("only AV INIT/START/CLOSE controls are supported")
         if type(sequence) is not int or sequence != (1 if action == 7 else 0):
             raise ValueError("invalid AV control sequence")
+        if request_user_data is not None and action != 1:
+            raise ValueError("AV startup metadata is only valid for INIT")
         self._sequence = sequence
         self._peer, self._clock = peer, clock
         self._conv = link_id | 0x80000000 if action == 1 else link_id
         self._created = clock()
         self._timestamp = int(self._created * 1000) & 0xFFFFFFFF
-        body = build_av_init(call_id) if action == 1 else build_av_control(call_id, action)
+        body = (build_av_init(call_id, request_user_data=request_user_data,
+                              connection_type=1 if request_user_data is not None else None)
+                if action == 1 else build_av_control(call_id, action))
         self._wire = build_kcp_push(self._conv, sequence, body, timestamp=self._timestamp)
         self._last_sent: float | None = None
         self.attempts = 0
