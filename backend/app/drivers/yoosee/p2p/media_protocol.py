@@ -186,8 +186,8 @@ def build_av_init(
     """Build the native 76-byte AVSTREAMCTL INIT request.
 
     Omitted connection metadata preserves the captured live-view request exactly. The only
-    non-live route currently proven is SD playback, whose A4 and AV INIT must carry the same
-    32-byte metadata.
+    non-live route currently proven is SD playback. Explicit live or playback A4
+    and AV INIT must carry the same reviewed 32-byte metadata.
     """
 
     if request_user_data is None and connection_type is None:
@@ -200,7 +200,7 @@ def build_av_init(
             raise ValueError("AV INIT connection type and request user data must be provided together")
         if not isinstance(request_user_data, bytes) or len(request_user_data) != 32:
             raise ValueError("AV INIT request user data must be exactly 32 bytes")
-        if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
+        if type(connection_type) is not int or connection_type not in (1, SD_PLAYBACK_CONNECTION_TYPE):
             raise ValueError("AV INIT connection type is unsupported")
         effective_connection_type = connection_type
         effective_user_data = bytearray(request_user_data)

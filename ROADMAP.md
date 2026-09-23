@@ -124,6 +124,13 @@ destinations mapped; channel source assignment chain remains pending. No live
 override, production default change or HD capability enabled. Keep the existing
 SD-playback-only custom-metadata guard until live propagation is verified.
 
+Live propagation verified offline: SDK argument → channel → A4/INIT copy chain
+closed. Codecs now accept explicit live metadata without the playback flag; old
+default packets stay unchanged. 91 focused codec/media/playback regression tests
+passed. Next: thread the same immutable metadata through the bounded diagnostic
+route and reliable INIT, with authoritative platform and camera-3 gating before
+one HD trial. No runtime override or new dashboard capability yet.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 These are pending work, not implemented guarantees. Keep core settings/authentication

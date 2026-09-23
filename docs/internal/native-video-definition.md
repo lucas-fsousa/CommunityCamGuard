@@ -128,12 +128,39 @@ Full-suite/type-check validation runs in commit CI, avoiding a local build or
 full-suite container while host swap is nearly exhausted. No camera test or
 production deployment was performed.
 
+## Assignment chain closed; explicit live codecs
+
+The pending source-offset question above is now resolved for this SDK binary:
+
+| Step | Exact evidence |
+| --- | --- |
+| C++ userdata → C API argument | `Connection::Impl::connect` lambda `0xfbfac`–`0xfbfdc` copies the structure at Impl `0x94` to the argument passed to `iv_start_av_link`. Userdata at Impl `0xa8` consequently begins at argument offset `0x14`. |
+| Argument → A4 metadata source | `iv_start_av_link`, `0x193bb0` and `0x193c1c`–`0x193c30`, copies `0x4c` bytes of that argument into channel `0x13c`; its userdata is therefore channel `0x150`, already traced into A4 `0x90:0xb0`. |
+| Argument → separate definition byte | `0x193b5c`–`0x193b64` copies argument byte `0x14` to channel `0x136`. This establishes the previously unproven relationship to userdata byte 0 before the CALLING builder adds mode bits. |
+| Argument → intermediate userdata | `0x193d34`–`0x193d54` copies 32 bytes from argument `0x14` to channel `0x114`. |
+| Intermediate → INIT source | `iv_start_process_calling`, `0x201e7c` sets copy length 32; `0x201eec`–`0x201f14` copies channel `0x114` to channel `0x21c`, the source used by `iv_init_frm_AvStreamCtl`. |
+
+The frame codecs now accept explicit connection type **1 (live)** as well as
+**2 (SD playback)**. Both require exact integer types (no bool/float coercion) and
+32-byte metadata. Live's separate A4 definition byte is userdata[0]; only playback
+adds `0x40`. Existing no-argument packets remain unchanged. This supersedes the
+earlier SD-only guard note; it does not enable a runtime override or default HD.
+
+New offline tests decrypt broker/direct A4 frames and compare their complete
+userdata with INIT for both platforms and all four qualities. They also verify
+no playback flag on live, unchanged captured direct/INIT defaults, and invalid
+connection types. **91 focused tests passed**, including existing media/session
+and SD-playback-carrier regressions; Ruff passed. Commit CI covers the full suite.
+No deployment or camera traffic occurred.
+
 ## Next
 
-Trace the assignments to channel `0x150`, `0x21c` and `0x136` before enabling a
-consistent live rendezvous/INIT override, and trace BuiltIn response
-framing/correlation before implementing mid-stream changes. Startup field editing
-and wire destinations are mapped; a pre-INIT HD request remains untested.
+Thread one immutable reviewed metadata value through the bounded route, direct
+handshake and reliable INIT owner, retaining identical bytes on retries. Gate any
+HD trial on authoritative platform metadata, camera-3 identity and decoder bounds.
+Do not expose generic arbitrary-userdata input in the dashboard. Trace BuiltIn
+response framing/correlation separately before implementing mid-stream changes.
+A pre-INIT HD request remains untested.
 Use the exact camera-3 platform and only
 one reviewed bounded live attempt after tests/CI. Verify actual encoding dimensions
 and independent decoding, not transport ACK alone. Keep changes in the Yoosee

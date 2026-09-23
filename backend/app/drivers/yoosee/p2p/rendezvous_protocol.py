@@ -107,13 +107,13 @@ def _write_connection_metadata(
         raise ValueError("calling connection type and request user data must be provided together")
     if not isinstance(request_user_data, bytes) or len(request_user_data) != 32:
         raise ValueError("calling request user data must be exactly 32 bytes")
-    if connection_type != SD_PLAYBACK_CONNECTION_TYPE:
+    if type(connection_type) is not int or connection_type not in (1, SD_PLAYBACK_CONNECTION_TYPE):
         raise ValueError("calling connection type is unsupported")
     options = struct.unpack_from("<H", frame, 0x18)[0]
     struct.pack_into("<H", frame, 0x18, options | 0x4000)
     frame[0x90:0xB0] = request_user_data
     # Native iv_init_frm_CALLING starts with userdata byte zero and adds bit 6 for route type 2.
-    frame[0xB0] = request_user_data[0] | 0x40
+    frame[0xB0] = request_user_data[0] | (0x40 if connection_type == SD_PLAYBACK_CONNECTION_TYPE else 0)
 
 
 def build_nat_online(access_id: int, device_id: int, link_id: int) -> bytes:
