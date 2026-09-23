@@ -32,6 +32,7 @@
     "ccg/push-to-talk": moduleUrl("/modules/push-to-talk.js"),
     "ccg/provisioning-ble": moduleUrl("/modules/camera-provisioning-ble.js"),
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
+    "ccg/recording-playback": moduleUrl("/modules/recording-playback.js"),
   } });
   document.head.append(importMap);
 

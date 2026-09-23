@@ -1,5 +1,12 @@
 import { t } from "ccg/i18n";
 import { api, el, state, svgIcon } from "ccg/core";
+import { createRecordingPlayback } from "ccg/recording-playback";
+
+let cleanup = null;
+export function stopRecordings() {
+  cleanup?.();
+  cleanup = null;
+}
 
 // --- recordings browser (view) -----------------------------------------------------
 function field(label, input) {
@@ -7,6 +14,7 @@ function field(label, input) {
 }
 
 export function renderRecordings(stage) {
+  stopRecordings();
   stage.innerHTML = "";   // rebuilt each time the view is entered (no live camera frames here)
   const r = state.rec;
   const today = new Date().toISOString().slice(0, 10);
@@ -24,99 +32,37 @@ export function renderRecordings(stage) {
   const search = el("button", { className: "btn-primary", innerHTML: svgIcon("i-scan") + `<span>${t("rec.search")}</span>` });
   const retention = el("span", { className: "muted retention", title: t("rec.retentionHint") });
 
-  const player = el("video", { className: "rec-player", controls: true, preload: "auto" });
+  const player = el("video", { className: "rec-player", controls: true, preload: "auto", playsInline: true });
   const playbackState = el("small", { className: "muted rec-playback-state" });
+  const retry = el("button", { textContent: t("rec.readyPressPlay"), hidden: true });
+  const playback = createRecordingPlayback(player, playbackState, retry, api, t);
+  let disposed = false;
+  let listRequest = null;
+  cleanup = () => { disposed = true; listRequest?.abort(); playback.dispose(); };
   const info = el("span", { className: "muted" });
   const prev = el("button", { textContent: t("rec.prev") });
   const next = el("button", { textContent: t("rec.next") });
   const list = el("div", { className: "rec-list" });
-  let playbackSelection = 0;
-
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  function playSeekable(fileUrl, selection, announceReady = false) {
-    if (selection !== playbackSelection) return;
-    if (announceReady) playbackState.textContent = t("rec.seekableReady");
-    player.addEventListener("playing", () => {
-      if (selection === playbackSelection) playbackState.textContent = "";
-    }, { once: true });
-    player.addEventListener("loadedmetadata", () => {
-      if (selection !== playbackSelection) return;
-      player.play().catch(() => {
-        if (selection === playbackSelection) playbackState.textContent = t("rec.readyPressPlay");
-      });
-    }, { once: true });
-    player.src = fileUrl + "&ready=" + Date.now();
-    player.load();
-  }
-
-  async function waitForSeekable(path, fileUrl, selection) {
-    let idleChecks = 0;
-    while (selection === playbackSelection) {
-      await wait(1000);
-      if (selection !== playbackSelection) return;
-      let status;
-      try {
-        status = await api("/recordings/playback-status?path=" + encodeURIComponent(path));
-      } catch (_) {
-        return;
-      }
-      if (selection !== playbackSelection) return;
-      if (status.ready) {
-        playSeekable(fileUrl, selection, status.cached);
-        return;
-      }
-      if (status.transcoding) {
-        idleChecks = 0;
-        playbackState.textContent = t("rec.preparingSeekable");
-        continue;
-      }
-      // The video request and its FFmpeg job start independently from this status poll. Allow a
-      // short race window, but don't poll forever after a failed encoder.
-      idleChecks += 1;
-      if (idleChecks >= 5) {
-        playbackState.textContent = t("rec.playbackFailed");
-        return;
-      }
-    }
-  }
-
-  async function preparePlayback(path, fileUrl, selection) {
-    player.pause();
-    player.removeAttribute("src");
-    player.load();
-    playbackState.textContent = t("rec.startingPlayback");
-    let status;
-    try {
-      status = await api(
-        "/recordings/prepare?path=" + encodeURIComponent(path),
-        { method: "POST" },
-      );
-    } catch (_) {
-      if (selection === playbackSelection) playbackState.textContent = t("rec.playbackFailed");
-      return;
-    }
-    if (selection !== playbackSelection) return;
-    if (status.ready) {
-      playSeekable(fileUrl, selection, status.cached);
-      return;
-    }
-    if (!status.transcoding) {
-      playbackState.textContent = t("rec.playbackFailed");
-      return;
-    }
-    playbackState.textContent = t("rec.preparingSeekable");
-    waitForSeekable(path, fileUrl, selection);
-  }
 
   async function load() {
+    listRequest?.abort();
+    const request = listRequest = new AbortController();
     r.cameraId = camSel.value; r.from = fromI.value; r.to = toI.value;
     list.innerHTML = `<p class='muted'>${t("rec.loading")}</p>`;
     const qs = new URLSearchParams({
       camera_id: r.cameraId, day_from: r.from, day_to: r.to,
       limit: r.pageSize, offset: r.page * r.pageSize,
     });
-    const res = await api("/recordings?" + qs.toString());
+    let res;
+    try {
+      res = await api("/recordings?" + qs.toString(), { signal: request.signal });
+    } catch (_) {
+      if (!disposed && listRequest === request && !request.signal.aborted) {
+        list.replaceChildren(el("p", { className: "muted", textContent: t("rec.playbackFailed") }));
+      }
+      return;
+    }
+    if (disposed || listRequest !== request) return;
     retention.textContent = res.retention_days
       ? t("rec.retention", { days: res.retention_days })
       : t("rec.retentionOff");
@@ -149,9 +95,7 @@ export function renderRecordings(stage) {
       row.addEventListener("click", () => {
         list.querySelectorAll(".rec-row.active").forEach((n) => n.classList.remove("active"));
         row.classList.add("active");
-        const selection = ++playbackSelection;
-        const fileUrl = "/api/recordings/file?path=" + encodeURIComponent(s.path);
-        preparePlayback(s.path, fileUrl, selection);
+        playback.select(s.path);
       });
       list.append(row);
     });
@@ -165,7 +109,7 @@ export function renderRecordings(stage) {
     el("div", { className: "rec-filter" }, field(t("rec.camera"), camSel), field(t("rec.from"), fromI), field(t("rec.to"), toI), search, retention),
     el("div", { className: "rec-body" },
       el("div", { className: "rec-side" }, list, el("div", { className: "rec-pager" }, prev, info, next)),
-      el("div", { className: "rec-main" }, player, playbackState),
+      el("div", { className: "rec-main" }, player, playbackState, retry),
     ),
   ));
   load();

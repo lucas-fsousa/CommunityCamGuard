@@ -286,16 +286,18 @@ def test_camera_status_indicator_uses_online_stream_liveness():
 
 
 def test_recording_first_view_polls_until_seekable_cache_is_ready():
-    recordings = (Path(__file__).parents[1] / "frontend" / "modules" / "recordings.js").read_text()
+    recordings = (Path(__file__).parents[1] / "frontend" / "modules" / "recording-playback.js").read_text()
     assert "/recordings/prepare?path=" in recordings
     assert '{ method: "POST" }' in recordings
     assert "/recordings/playback-status?path=" in recordings
-    assert "status.transcoding" in recordings
-    assert "status.cached" in recordings
+    assert "result.transcoding" in recordings
+    assert "result.cached" in recordings
     assert 'player.removeAttribute("src")' in recordings
-    assert "function playSeekable" in recordings
-    assert 'player.src = fileUrl + "&ready=" + Date.now()' in recordings
-    assert "player.src = fileUrl;" not in recordings
+    assert "function ready" in recordings
+    assert "play(item);" in recordings
+    assert "&ready=" not in recordings
+    app = (Path(__file__).parents[1] / "frontend" / "app.js").read_text()
+    assert 'if (state.view !== "recordings") stopRecordings();' in app
 
 
 def test_build_endpoint_is_public_no_store_and_returns_content_id():

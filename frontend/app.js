@@ -16,7 +16,7 @@ import {
   loadProvisioningStatus,
   renderCameras,
 } from "ccg/cameras";
-import { renderRecordings } from "ccg/recordings";
+import { renderRecordings, stopRecordings } from "ccg/recordings";
 
 const APP_VERSION = window.__CCG_BUILD__ || "dev";
 console.log("[CCG] frontend build " + APP_VERSION);
@@ -29,6 +29,7 @@ let watchdogTimer = 0;
 let cameraStatusTimer = 0;
 
 function stopDashboardSession() {
+  stopRecordings();
   if (storageTimer) {
     clearInterval(storageTimer);
     storageTimer = 0;
@@ -69,6 +70,7 @@ async function loadStorage() {
 }
 
 function applyView() {
+  if (state.view !== "recordings") stopRecordings();
   applyLiveLayout();
   if (state.view === "cameras") renderCameras($("#cameras"));
   if (state.view === "recordings") renderRecordings($("#recordings"));

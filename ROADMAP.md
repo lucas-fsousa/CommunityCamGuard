@@ -164,6 +164,15 @@ brand-agnostic; camera-specific capabilities remain owned by drivers.
 | P1 | **No authentication bypass / secret exposure**: audit dashboard, APIs, snapshots, recordings/downloads, streaming/signaling/WebSockets and internal diagnostics. Test direct URLs, alternate methods, expired/revoked sessions and path traversal. Verify `.env`, VCS metadata, database/backups, RE/temp files and credentials cannot be served through static mounts, errors, logs or proxy routes; inspect image/build-context exposure without printing secrets. Frontend hiding is never authorization | todo |
 | P1 | **Security regression suite and deployment guidance**: automated negative authorization/expiry/revocation/abuse tests across both login modes; document HTTPS, trusted-proxy boundaries and non-exposure of internal media ports when internet-facing. Separate remediation findings from unverified risks; do not claim an internet exposure is safe merely because dashboard login exists | todo |
 
+Recordings follow-up (2026-09-23): frontend selection/player lifecycle repaired in
+an isolated module: cancel stale requests/polling on navigation/logout, preserve
+seek on repeated selected-row clicks, request play without a loadedmetadata-only
+trigger, and expose explicit localized play after autoplay rejection. Fake-media
+Node regressions added to CI; 42 focused Python contracts passed. The reported
+browser symptom is not yet physically homologated, and uncached full-file HEVC
+conversion still causes startup delay. Next: bounded conversion/timing audit and
+real-browser validation; see `docs/internal/recordings-playback-lifecycle.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
