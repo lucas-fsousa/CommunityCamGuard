@@ -34,7 +34,19 @@ export function renderRecordings(stage) {
 
   const player = el("video", { className: "rec-player", controls: true, preload: "auto", playsInline: true });
   const playbackState = el("small", { className: "muted rec-playback-state" });
-  const playback = createRecordingPlayback(player, playbackState, api, t);
+  const loadingText = el("span");
+  const spinner = el("span", { className: "spinner" });
+  spinner.setAttribute("aria-hidden", "true");
+  const overlay = el("div", { className: "rec-loading-overlay", hidden: true }, spinner, loadingText);
+  overlay.setAttribute("role", "status");
+  overlay.setAttribute("aria-live", "polite");
+  const main = el("div", { className: "rec-main" }, player, playbackState, overlay);
+  const playback = createRecordingPlayback(player, playbackState, api, t, ({ loading, text }) => {
+    overlay.hidden = !loading;
+    loadingText.textContent = loading ? text : "";
+    playbackState.hidden = loading;
+    main.setAttribute("aria-busy", String(loading));
+  });
   let disposed = false;
   let listRequest = null;
   cleanup = () => { disposed = true; listRequest?.abort(); playback.dispose(); };
@@ -108,7 +120,7 @@ export function renderRecordings(stage) {
     el("div", { className: "rec-filter" }, field(t("rec.camera"), camSel), field(t("rec.from"), fromI), field(t("rec.to"), toI), search, retention),
     el("div", { className: "rec-body" },
       el("div", { className: "rec-side" }, list, el("div", { className: "rec-pager" }, prev, info, next)),
-      el("div", { className: "rec-main" }, player, playbackState),
+      main,
     ),
   ));
   load();

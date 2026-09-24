@@ -26,10 +26,30 @@ function harness(support = "") {
   const status = {};
   const requests = [];
   const api = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
-  const controller = create(player, status, api, (key) => key);
-  return { controller, player, status, requests, timers, advanceTime(ms) { now += ms; } };
+  const states = [];
+  const controller = create(player, status, api, (key) => key, value => states.push(value));
+  return { controller, player, status, requests, timers, states, advanceTime(ms) { now += ms; } };
 }
 (async () => {
+  {
+    const h = harness(); h.controller.select("a");
+    assert.equal(h.states.at(-1).loading, true);
+    h.requests[0].resolve({ ready: false, transcoding: true }); await flush();
+    assert.deepEqual(h.states.at(-1), { loading: true, text: "rec.preparingSeekable" });
+    h.controller.select("b"); h.requests[1].resolve({ ready: true }); await flush();
+    assert.equal(h.states.at(-1).loading, true);
+    h.player.paused = false; h.player.emit("playing");
+    assert.equal(h.states.at(-1).loading, false);
+    h.player.emit("waiting");
+    assert.deepEqual(h.states.at(-1), { loading: true, text: "rec.buffering" });
+    h.player.emit("playing"); assert.equal(h.states.at(-1).loading, false);
+    h.player.emit("waiting"); h.player.paused = true; h.player.emit("pause");
+    assert.equal(h.states.at(-1).loading, false);
+    h.player.emit("waiting"); assert.equal(h.states.at(-1).loading, false);
+    h.player.emit("canplay"); assert.equal(h.states.at(-1).loading, false);
+    h.controller.dispose(); assert.equal(h.states.at(-1).loading, false);
+    assert.equal(h.player.listeners.size, 0);
+  }
   {
     const h = harness(); h.controller.select("a"); h.controller.select("a");
     assert.equal(h.requests.length, 1); // No duplicate preparation on repeated click.
@@ -56,6 +76,7 @@ function harness(support = "") {
     const h = harness(); h.controller.select("a"); h.player.reject = "NotAllowedError";
     h.requests[0].resolve({ ready: true }); await flush();
     assert.equal(h.status.textContent, "rec.readyPressPlay");
+    assert.equal(h.states.at(-1).loading, false); // Native controls remain usable after autoplay denial.
     h.player.reject = null; h.player.play(); await flush(); h.player.emit("playing");
     assert.equal(h.player.plays, 2); assert.equal(h.status.textContent, "");
     assert.equal(h.requests.length, 1); h.controller.dispose();
@@ -75,6 +96,7 @@ function harness(support = "") {
     const h = harness(); h.controller.select("a");
     h.requests[0].reject(new Error("offline")); await flush();
     assert.equal(h.status.textContent, "rec.playbackFailed");
+    assert.equal(h.states.at(-1).loading, false);
     assert.equal(h.timers.size, 0);
     h.controller.select("a"); assert.equal(h.requests.length, 2);
     h.controller.dispose(); h.requests[1].resolve({ ready: true }); await flush();

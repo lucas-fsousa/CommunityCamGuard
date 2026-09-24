@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isolated recordings loading overlay</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/recording-playback":"/recording-playback.js"}}</script>
+<main id="stage" class="recordings"><div id="recordings"></div></main>
+<script type="module">
+import { renderRecordings } from '/recordings.js';
+import { setLang } from '/i18n.js';
+setLang('pt-BR');
+window.fetch = async url => {
+  if (url.startsWith('/api/recordings/prepare')) return new Promise(() => {});
+  return new Response(JSON.stringify({total: 1, retention_days: 7, items: [{
+    path: 'synthetic.mp4', camera_name: 'Câmera de exemplo', day: '2026-09-24',
+    started_at: '2026-09-24T12:00:00Z', size_bytes: 1000000
+  }]}), {headers: {'Content-Type': 'application/json'}});
+};
+renderRecordings(document.querySelector('#recordings'));
+try {
+  for (let attempt = 0; !document.querySelector('.rec-row'); attempt++) {
+    if (attempt > 100) throw new Error('Recording list did not render');
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  const overlay = document.querySelector('.rec-loading-overlay');
+  if (getComputedStyle(overlay).display !== 'none') throw new Error('Overlay shown before selection');
+  document.querySelector('.rec-row').click();
+  await new Promise(requestAnimationFrame);
+  const box = overlay.getBoundingClientRect(), main = overlay.parentElement.getBoundingClientRect();
+  if (box.width <= 0 || box.height <= 0 || Math.abs(box.width - main.width) > 1 || Math.abs(box.height - main.height) > 1)
+    throw new Error('Overlay does not fit rec-main');
+  if (getComputedStyle(overlay).pointerEvents !== 'none') throw new Error('Overlay blocks controls');
+  if (overlay.hidden || !overlay.textContent.trim()) throw new Error('Missing loading message');
+  const side = document.querySelector('.rec-side').getBoundingClientRect();
+  if (box.left < side.right && box.right > side.left && box.top < side.bottom && box.bottom > side.top)
+    throw new Error('Overlay covers recording list');
+  window.smokeResult = {ok: true, viewport: innerWidth, overlay: true, confinedToPlayer: true};
+} catch (error) { window.smokeResult = {ok: false, error: error.message}; }
+</script>
+</html>

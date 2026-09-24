@@ -306,8 +306,22 @@ def test_recordings_use_native_play_controls_without_extra_autoplay_button():
     controller = (root / "recording-playback.js").read_text()
     assert 'controls: true' in view
     assert 't("rec.readyPressPlay")' not in view
-    assert 'player, playbackState)' in view
+    assert 'player, playbackState, overlay)' in view
     assert 'retry.hidden' not in controller
+
+
+def test_recording_loading_overlay_is_scoped_accessible_and_nonblocking():
+    frontend = Path(__file__).parents[1] / "frontend"
+    view = (frontend / "modules/recordings.js").read_text()
+    css = (frontend / "style.css").read_text()
+    assert 'className: "rec-loading-overlay", hidden: true' in view
+    assert 'overlay.setAttribute("role", "status")' in view
+    assert 'main.setAttribute("aria-busy", String(loading))' in view
+    assert 'overlay.hidden = !loading' in view
+    rule = css.split('.rec-loading-overlay {', 1)[1].split('}', 1)[0]
+    assert 'position: absolute' in rule and 'pointer-events: none' in rule
+    assert '.rec-loading-overlay[hidden]' in css
+    assert '.rec-loading-overlay .spinner { animation: none; }' in css
 
 
 def test_build_endpoint_is_public_no_store_and_returns_content_id():

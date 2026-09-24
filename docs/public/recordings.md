@@ -33,6 +33,13 @@ conversion with a duration that grows a few seconds at a time. HTTP Range reques
 serve requested portions without requiring the browser to download the entire file.
 The live-camera player is a different pipeline from archive playback.
 
+While preparing/starting a recording or waiting for playback data, a localized
+spinner overlay covers only the player area (`rec-main`), never the recording list.
+It does not intercept clicks. Playing, deliberate pause, failure, autoplay rejection
+or leaving the view clears it; errors/autoplay guidance remain discreet text below
+the player. Reduced-motion preferences disable spinner animation. This feedback
+does not speed up conversion or create any additional media process.
+
 ## Resource limits and settings
 
 - One compatibility encoder per application process; up to three additional jobs

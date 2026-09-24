@@ -1,8 +1,8 @@
 """Opt-in browser smoke test. Run inside a memory/CPU/time-limited cgroup.
 
-Serves a short H.264 fixture or --settings test assets on loopback.
+Serves a short H.264 fixture or --settings/--recordings test assets on loopback.
 No dashboard login, real camera connection or production API is involved.
-Optional --width and --screenshot allow isolated settings layout review.
+Optional --width and --screenshot allow isolated component layout review.
 """
 
 import argparse
@@ -25,20 +25,26 @@ def main():
     parser.add_argument("--browser", required=True, type=Path)
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
+    parser.add_argument("--recordings", action="store_true", help="Check isolated recordings loading overlay")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--screenshot", type=Path)
     args = parser.parse_args()
     fixture = args.fixture.resolve() if args.fixture else None
-    if not args.settings and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
+    component = args.settings or args.recordings
+    if args.settings and args.recordings:
+        parser.error("choose one component")
+    if not component and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
         parser.error("fixture must be an existing H.264 MP4 below 10 MiB, at least 4 seconds")
     root = Path(__file__).resolve().parents[1]
     assets = {
         "/": (root / "tests/frontend/recording-browser.html", "text/html"),
         "/recording-playback.js": (root / "frontend/modules/recording-playback.js", "text/javascript"),
     }
-    if args.settings:
-        assets = {"/": (root / "tests/frontend/settings-browser.html", "text/html")}
+    if component:
+        page_name = "settings-browser.html" if args.settings else "recordings-overlay-browser.html"
+        assets = {"/": (root / "tests/frontend" / page_name, "text/html")}
         for name, path in {"style.css": "style.css", "core.js": "modules/core.js",
+                           "recordings.js": "modules/recordings.js", "recording-playback.js": "modules/recording-playback.js",
                            "settings.js": "modules/settings.js", "i18n.js": "i18n.js"}.items():
             assets["/" + name] = (root / "frontend" / path, "text/css" if name.endswith("css") else "text/javascript")
 
@@ -48,7 +54,7 @@ def main():
 
         def do_GET(self):
             url = urlparse(self.path)
-            if url.path == "/api/recordings/file" and not args.settings:
+            if url.path == "/api/recordings/file" and not component:
                 if parse_qs(url.query).get("original") == ["true"]:
                     data, mime = b"deliberately invalid native fixture", "video/mp4"
                 else:
@@ -110,7 +116,7 @@ def main():
                     pages = json.load(response)
                 page = next(page for page in pages if page["type"] == "page")
                 with connect(page["webSocketDebuggerUrl"], open_timeout=5) as socket:
-                    if args.settings:
+                    if component:
                         socket.send(json.dumps({"id": 3, "method": "Emulation.setDeviceMetricsOverride",
                             "params": {"width": args.width, "height": 900, "deviceScaleFactor": 1, "mobile": False}}))
                         socket.recv(timeout=5)

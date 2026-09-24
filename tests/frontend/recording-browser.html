@@ -29,10 +29,13 @@ try {
       return { ready: true, cached: !url.includes("native_hevc=true"),
                original: url.includes("native_hevc=true") };
     };
-    const playback = createRecordingPlayback(video, status, api, key => key);
+    const states = [];
+    const playback = createRecordingPlayback(video, status, api, key => key, value => states.push(value));
     try {
       playback.select("fixture");
+      assert(states.at(-1).loading, "selection did not show loading");
       await waitFor(() => plays > 0 && video.videoWidth > 0 && video.currentTime > 0);
+      assert(!states.at(-1).loading, "playing retained loading overlay");
       assert(requests.length === (native ? 2 : 1), "unexpected preparation count");
       assert(!video.src.includes("original=true"), "fallback not attached");
       video.pause();
@@ -47,6 +50,7 @@ try {
                      requests: requests.length });
     } finally {
       playback.dispose();
+      assert(!states.at(-1).loading, "dispose retained loading overlay");
       assert(!video.hasAttribute("src"), "dispose retained source");
       video.remove(); status.remove();
     }

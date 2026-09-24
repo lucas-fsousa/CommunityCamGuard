@@ -294,6 +294,14 @@ keys created and temporary login/UI remain disabled (`login_enabled: false`).
 Next: permission policy and session/channel invalidation before activation.
 Details and uncertain-create retry guidance: `docs/internal/temporary-access-keys.md`.
 
+Recording loading-feedback checkpoint (2026-09-24): localized spinner overlay in
+`rec-main`, nonblocking and scoped outside the recording list. Preparation/startup/
+buffering state clears on playback, pause, error/autoplay denial and disposal.
+Node lifecycle regressions and capped Chromium desktop/mobile component checks
+passed; actual short H.264 playback/seek and native-error fallback clear loading.
+No extra encoder/request/timer or container restart. Long-recording/native-HEVC/
+physical-mobile validation remains separate; see playback lifecycle notes.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

@@ -1,9 +1,12 @@
 // One archive selection owns its requests, timer and video. No live-camera state.
-export function createRecordingPlayback(player, status, api, t) {
+export function createRecordingPlayback(player, status, api, t, onState = () => {}) {
   let current = null;
   let disposed = false;
   const active = (item) => !disposed && current === item;
-  const message = (key) => { status.textContent = key ? t(key) : ""; };
+  const message = (key, loading = false) => {
+    status.textContent = key ? t(key) : "";
+    onState({ loading, text: status.textContent });
+  };
   // A codec-specific hint, not a guarantee for every HEVC profile/file.
   const nativeHevc = ["hvc1", "hev1"].some((codec) => {
     try { return player.canPlayType?.(`video/mp4; codecs="${codec}, mp4a.40.2"`) === "probably"; }
@@ -63,7 +66,7 @@ export function createRecordingPlayback(player, status, api, t) {
     player.pause();
     player.removeAttribute("src");
     player.load();
-    message("rec.preparingSeekable");
+    message("rec.preparingSeekable", true);
     void check(item, true);
   }
 
@@ -72,7 +75,7 @@ export function createRecordingPlayback(player, status, api, t) {
     item.ready = true;
     item.original = original;
     item.attempt++;
-    message(cached ? "rec.seekableReady" : "rec.startingPlayback");
+    message(cached ? "rec.seekableReady" : "rec.startingPlayback", true);
     player.src = "/api/recordings/file?path=" + encodeURIComponent(item.path)
       + (original ? "&original=true" : "");
     player.load();
@@ -95,7 +98,7 @@ export function createRecordingPlayback(player, status, api, t) {
         message("rec.playbackFailed");
         return;
       }
-      message("rec.preparingSeekable");
+      message("rec.preparingSeekable", true);
       item.timer = setTimeout(() => check(item), 1000);
     } catch (error) {
       if (!active(item)) return;
@@ -124,6 +127,15 @@ export function createRecordingPlayback(player, status, api, t) {
   }
   function onPause() {
     if (current) clearTimeout(current.nativeTimer);
+    if (current?.ready && !disposed && player.paused) message("");
+  }
+  function onWaiting() {
+    if (current?.ready && !current.failed && !disposed && !player.paused) {
+      message("rec.buffering", true);
+    }
+  }
+  function onCanPlay() {
+    if (current?.ready && !disposed && player.paused) message("");
   }
   function onError() {
     if (!current?.ready || disposed) return;
@@ -137,6 +149,9 @@ export function createRecordingPlayback(player, status, api, t) {
   player.addEventListener("loadedmetadata", onMetadata);
   player.addEventListener("play", onPlay);
   player.addEventListener("pause", onPause);
+  player.addEventListener("waiting", onWaiting);
+  player.addEventListener("canplay", onCanPlay);
+  player.addEventListener("ended", onPause);
 
   return {
     select(path) {
@@ -147,7 +162,7 @@ export function createRecordingPlayback(player, status, api, t) {
       }
       stop();
       current = { path, abort: new AbortController(), deadline: Date.now() + 650000, attempt: 0 };
-      message("rec.startingPlayback");
+      message("rec.startingPlayback", true);
       void check(current, true);
     },
     dispose() {
@@ -159,6 +174,9 @@ export function createRecordingPlayback(player, status, api, t) {
       player.removeEventListener("loadedmetadata", onMetadata);
       player.removeEventListener("play", onPlay);
       player.removeEventListener("pause", onPause);
+      player.removeEventListener("waiting", onWaiting);
+      player.removeEventListener("canplay", onCanPlay);
+      player.removeEventListener("ended", onPause);
     },
   };
 }

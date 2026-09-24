@@ -94,3 +94,26 @@ and no container deployment or browser validation was performed.
 
 Real-file conversion and HTTP Range follow-up:
 [measurements and remaining startup tradeoff](recordings-playback-measurements.md).
+
+## Scoped loading overlay — 2026-09-24
+
+The controller exposes an optional state callback; the recordings view owns a
+localized spinner overlay confined to `rec-main`. It displays during preparation,
+startup and media `waiting`, and clears on playing, intentional pause, failure,
+autoplay denial and disposal. No new request, conversion or timer is introduced.
+The overlay uses explicit `[hidden]` CSS, `role=status`, reduced-motion support and
+`pointer-events:none`; the recording list and native controls remain usable.
+
+Node contracts cover transitions/cancellation and existing playback behavior.
+Real Chromium component checks with production view/CSS passed at 1280×900 and
+390×900, confirming initial hiding and containment outside the list; screenshots
+were inspected. An isolated five-second H.264 sample also passed actual playback,
+seek/reselection and forced native-error fallback, asserting loading clears after
+playing/disposal. These are not long-recording/mobile-device homologation.
+
+Browser runs were sequential in 512 MiB/no-swap, 75% CPU cgroups: peaks 456 MiB
+desktop, 176.1 MiB mobile, 236 MiB media lifecycle; all exited. Optional reproduction:
+`scripts/check_recording_browser.py --recordings --browser PATH --width 390
+--screenshot temp/recordings-overlay-mobile.png` inside the same resource limits.
+The existing `--fixture` mode checks actual playback. No camera/production recording
+was requested. Frontend bind mounts serve this after reload, without app recreation.
