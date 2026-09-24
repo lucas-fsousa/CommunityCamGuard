@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "classification": "dashboard_next_operation_candidate",
+      "fields": ["grid_hd_max_cameras", "playback_cache_mb"]
+    },
+    {
+      "classification": "dashboard_service_restart_candidate",
+      "fields": [
+        "segment_seconds", "recording_retention_days", "live_fps", "live_quality",
+        "playback_pretranscode", "storage_alert_percent", "storage_full_percent",
+        "storage_resume_percent", "storage_check_seconds"
+      ]
+    },
+    {
+      "classification": "server_only",
+      "fields": [
+        "dashboard_secret_key", "session_signing_key", "host", "port",
+        "autostart_services", "manage_go2rtc", "db_path", "recordings_dir",
+        "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
+        "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
+        "native_av_diagnostic_camera_id", "native_av_diagnostic_device_id",
+        "provisioning_ble_material_file", "provisioning_ble_material_max_age_seconds",
+        "provisioning_remote_ble_enabled", "aws_access_key_id", "aws_secret_access_key",
+        "go2rtc_api", "go2rtc_host", "go2rtc_rtsp_port", "go2rtc_webrtc_port",
+        "go2rtc_bin", "go2rtc_config"
+      ]
+    },
+    {
+      "classification": "unimplemented",
+      "fields": ["discovery_timeout", "storage_backend", "s3_bucket", "s3_prefix", "aws_region"]
+    }
+  ]
+}

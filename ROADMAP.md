@@ -221,6 +221,14 @@ camera connection. Native HEVC success, default autoplay policy, mobile and full
 dashboard UX remain unverified. Intentional-pause `AbortError` now clears status
 instead of reporting a false failure; covered by a separate fake-media regression.
 
+Settings inventory checkpoint (2026-09-24): all 42 declared fields classified in
+`docs/internal/settings-inventory.json`, with CI coverage for completeness and
+server-only credential/operator boundaries. Application lifetimes, inert S3/timeout
+fields, destructive retention risks and desired/effective-state design documented
+in `docs/internal/settings-dashboard-plan.md`. This is not an editable settings
+screen or a hot-reload implementation. Next: trusted session principal and
+primary-key-only management authorization, before any settings/key write endpoint.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

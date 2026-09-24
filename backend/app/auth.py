@@ -1,8 +1,9 @@
 """Dashboard authentication: a single secret key from ``.env`` gates access.
 
 On login we compare the submitted key to ``dashboard_secret_key`` (constant-time) and, on
-success, hand back a **signed, timed cookie** (itsdangerous). The cookie carries no secret —
-it is safe even if exposed — so the key never travels again after login. Any key value /
+success, hand back a **signed, timed cookie** (itsdangerous). The cookie does not contain
+the login key, but is itself a bearer credential: anyone holding it can reuse the session.
+Never expose/log it. The login key need not travel again after login. Any key value /
 length is accepted, per the product decision.
 """
 from __future__ import annotations
