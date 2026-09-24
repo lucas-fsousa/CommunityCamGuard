@@ -97,6 +97,8 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
 - **Auth** — a secret key from `.env` gates protected operations via a signed, seven-day session
   cookie. Treat that cookie as a credential. Temporary keys, immediate revocation and a dashboard
   settings editor are planned, not available yet.
+  The [primary-session foundation](docs/internal/session-principal.md) is implemented in source
+  (deployment pending); legacy cookies keep existing access but do not gain management permission.
 
 ## Platforms & networking
 

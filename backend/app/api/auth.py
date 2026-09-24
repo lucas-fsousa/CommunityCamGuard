@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from ..auth import COOKIE_NAME, MAX_AGE, check_key, is_authenticated, issue_token
+from ..auth import COOKIE_NAME, MAX_AGE, check_key, issue_token, request_principal
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -36,4 +36,9 @@ def logout(response: Response) -> dict:
 
 @router.get("/me")
 def me(request: Request) -> dict:
-    return {"authenticated": is_authenticated(request)}
+    principal = request_principal(request)
+    return {
+        "authenticated": principal is not None,
+        "authentication": principal.authentication if principal else None,
+        "can_manage": principal.can_manage if principal else False,
+    }

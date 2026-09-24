@@ -57,6 +57,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Playback measurements](recordings-playback-measurements.md) | Cold/cached conversion, codec cache, Range/auth checks, deployment and scoped preparation logs |
 | [Settings plan](settings-dashboard-plan.md) | Current env-only behavior, service snapshots, future authorization/persistence requirements |
 | [Settings inventory](settings-inventory.json) | 42 classified fields; names only, CI checks completeness; not a runtime/API allowlist |
+| [Session principal](session-principal.md) | Primary-only management dependency, exact legacy-cookie migration and pending security/deployment boundaries |
 | [Driver package audit](driver-package-audit.md) | Discovery-only vs implemented driver support and vendor-package boundaries |
 
 For user-facing instructions see the [public documentation index](../README.md). Keep planned

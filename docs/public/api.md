@@ -26,7 +26,8 @@ curl -b jar.txt http://127.0.0.1:3200/api/cameras
 A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRET_KEY` in `.env`.
 Sessions currently expire after seven days. Cookies are bearer credentials: protect cookie jars
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
-revocation of a stolen copy. Temporary keys, key-management roles, immediate revocation and writable
+revocation of a stolen copy. Primary-session identification and its management dependency are
+implemented; temporary keys, immediate revocation and writable
 dashboard settings endpoints are **not implemented**. See the
 [settings/authentication plan](../internal/settings-dashboard-plan.md).
 
@@ -40,7 +41,13 @@ dashboard settings endpoints are **not implemented**. See the
 |---|---|---|---|
 | POST | `/api/login` | `{"key": "..."}` | Sets `ccg_session` cookie. `401` if the key is wrong. |
 | POST | `/api/logout` | — | Clears the cookie. |
-| GET | `/api/me` | — | `{"authenticated": true}` when the session is valid. |
+| GET | `/api/me` | — | `{authenticated, authentication, can_manage}`. `authentication` is `primary`, `legacy`, or null. No session ID/token is returned. |
+
+New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
+existing access until their original expiry but cannot pass the new primary-only management
+dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
+No settings/key-management endpoints are exposed yet. This backend update requires deployment;
+see [session migration and rollout](../internal/session-principal.md).
 
 ### Cameras
 

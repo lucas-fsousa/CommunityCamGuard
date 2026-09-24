@@ -20,6 +20,8 @@ Docs are split by audience:
   Range delivery, observed latency and scoped logging.
 - **[Settings inventory and plan](internal/settings-dashboard-plan.md)** — classification of 42
   options and required authentication/application boundaries; not an implemented settings UI.
+- **[Session principal](internal/session-principal.md)** — implemented primary/legacy session
+  parsing and management gate, migration policy and rollout status; temporary keys remain pending.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

@@ -186,7 +186,8 @@ When adding/removing a `Settings` field, update
 [application/security plan](docs/internal/settings-dashboard-plan.md). CI checks every field is
 classified exactly once. The inventory is documentation, not a runtime allowlist. Never serialize
 the full Settings object to the browser or make credentials/paths/operator overrides writable
-through a generic form. Primary-key-only management authorization is a pending prerequisite.
+through a generic form. Future management routes must use `require_primary_session` server-side;
+UI flags alone are not authorization. See the [session migration contract](docs/internal/session-principal.md).
 
 Keep the root README, [documentation index](docs/README.md), relevant public API/guide and roadmap
 consistent with shipped behavior. Preserve historical ADR decisions with dated amendments and

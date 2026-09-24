@@ -56,6 +56,11 @@ claim that the existing environment parser enforces it.
 
 ## Authentication gate before management endpoints
 
+**Update:** the [session-principal foundation](session-principal.md) is implemented
+and tested, pending deployment. The paragraphs below describe the inventory-time
+baseline and requirements; primary/legacy parsing and the management dependency
+are now covered by that follow-up. Temporary keys and management endpoints remain absent.
+
 Current cookies are signed, seven-day **bearer credentials**, not safe to disclose.
 The cookie payload has no session identity, key identity or role; verification
 currently validates signature/age, with no revocation store. `/me` returns only
@@ -78,9 +83,8 @@ BLE access or publish a public configuration endpoint as part of this work.
 
 ## Next bounded implementation
 
-Implement the session-principal/primary-key authorization boundary first, preserving
-the current login experience and documenting cookie migration. Only then expose
-settings/key management APIs. Begin settings persistence with the two low-impact
+The session-principal/primary-key authorization boundary is now implemented (see
+the linked rollout/migration notes). Next, begin settings persistence with the two low-impact
 next-operation candidates; leave destructive retention and service restarts for
 separate reviewed steps. No live setting, camera command or service restart was
 performed during this inventory.

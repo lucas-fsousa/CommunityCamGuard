@@ -21,17 +21,23 @@ def test_protected_endpoint_requires_auth():
 def test_login_flow_sets_session_and_unlocks_api():
     with TestClient(app) as client:
         # not logged in yet
-        assert client.get("/api/me").json() == {"authenticated": False}
+        assert client.get("/api/me").json() == {
+            "authenticated": False, "authentication": None, "can_manage": False,
+        }
         # wrong key is rejected
         assert client.post("/api/login", json={"key": "nope"}).status_code == 401
         # right key (conftest sets DASHBOARD_SECRET_KEY=test-secret-key) sets the cookie
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
-        assert client.get("/api/me").json() == {"authenticated": True}
+        assert client.get("/api/me").json() == {
+            "authenticated": True, "authentication": "primary", "can_manage": True,
+        }
         # and the session now unlocks a protected route
         assert client.get("/api/cameras").status_code == 200
         # logout clears it
         assert client.post("/api/logout").status_code == 200
-        assert client.get("/api/me").json() == {"authenticated": False}
+        assert client.get("/api/me").json() == {
+            "authenticated": False, "authentication": None, "can_manage": False,
+        }
 
 
 def test_openapi_schema_is_served():

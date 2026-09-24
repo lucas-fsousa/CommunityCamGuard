@@ -236,6 +236,16 @@ evidence. Added `docs/public/recordings.md`. Removed current-feature claims for
 unimplemented S3, clarified seven-day default retention, and distinguished planned
 settings/temporary keys from deployed behavior. No runtime configuration changed.
 
+Session-principal checkpoint (2026-09-24): versioned primary-key sessions now carry
+random identities, strict signed-payload validation and a primary-only management
+dependency. Exact legacy cookies retain existing access without management elevation
+or lifetime extension. `/me` adds safe origin/permission hints; no key/session ID is
+returned. 43 focused tests passed, including negative management cases and legacy
+expiry. Backend deployment remains pending; no settings/key-management endpoint,
+temporary key, revocation store or active-channel invalidation was added. See
+`docs/internal/session-principal.md`. Next: allowlisted settings persistence/application
+behind this gate, with remaining security prerequisites before temporary-key activation.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
