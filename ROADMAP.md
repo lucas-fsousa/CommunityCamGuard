@@ -200,8 +200,9 @@ not visible in default container logging; scoped logging remains a follow-up.
 
 Scoped preparation logging is now implemented and tested under default Uvicorn
 configuration: one stderr event/job, fixed failure reasons, no paths/credentials,
-no global verbosity increase. 35 focused tests passed; backend deployment remains
-pending to avoid restarting active recording solely for a logging change. Next:
+no global verbosity increase. 35 focused tests passed; deployed 2026-09-24 as
+build `b-37d304904a08`, with bounded build/isolated synthetic image logging check,
+health 200 and go2rtc unchanged. Next:
 browser first-click/seek validation and client/server timing correlation; the
 18–22s uncached full-conversion wait is still an open performance tradeoff.
 

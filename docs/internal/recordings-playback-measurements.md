@@ -136,3 +136,22 @@ no enabling of unrelated SDK INFO. Ruff and Mypy (193 files) passed. No camera
 commands, conversion load or running-container restart was needed. Deployment of
 this backend-only logging follow-up remains pending; it takes effect on the next
 application image update/startup, not through the live-mounted frontend.
+
+### Deployment checkpoint — 2026-09-24
+
+The pending logging deployment above is now complete: runtime commit `0d968df`
+(CI `35936866905` successful), image `2be30b003186`, build `b-37d304904a08`.
+Build was limited to 512 MiB/no swap and one CPU, with a 3.969 MB context.
+Before deployment, an isolated image instance (no network/mounts, 128 MiB/no swap,
+half CPU, 32 PIDs) ran two synthetic jobs with a mocked encoder. Actual stderr
+contained one ready and one encoder-failed event with reason/timings. No ffmpeg
+process or real archive was used; this validates image logging, not media playback.
+
+Only `ccg-app` was recreated, starting at `2026-09-24T04:18:49Z`. go2rtc retained
+its `2026-09-23T00:24:47Z` start time. Health returned 200; neither container reported
+OOM or automatic restarts. A sample showed app 112.7 MiB and go2rtc 28.46 MiB.
+The three consumed streams each retained one producer and advancing receive bytes.
+Native diagnostic flags remained disabled through the existing local compose
+override. App recreation briefly interrupts recorder ownership; no camera command
+was sent. Real browser first-play/seek validation and cold-start optimization
+remain open; instrumentation is not itself a playback performance fix.
