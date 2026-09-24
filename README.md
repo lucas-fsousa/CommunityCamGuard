@@ -23,6 +23,7 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 | **[Setup](#setup)** | Run it — Docker on Linux/macOS/Windows, or Python directly. |
 | **[Bluetooth onboarding](docs/public/bluetooth-onboarding.md)** | Put a factory-new camera on Wi-Fi without the vendor UI. |
 | **[Recordings and playback](docs/public/recordings.md)** | Original MP4, native HEVC, compatibility conversion, download and troubleshooting. |
+| **[Dashboard settings](docs/public/settings.md)** | Primary-only Auto/cache preferences, defaults and conflicts. |
 | **[Documentation index](docs/README.md)** | User guides, current implementation notes and validation evidence. |
 | **[API reference](docs/public/api.md)** | Every REST endpoint — build your own UI/scripts. Interactive at `/api/docs`. |
 | **[Contributing](CONTRIBUTING.md)** | Dev setup, standards (ruff/mypy/pytest), how to add a camera brand. |
@@ -95,8 +96,8 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
   **never deletes**. A separate **retention** job (`RECORDING_RETENTION_DAYS`, default **7 days**)
   deletes older footage; set **0** to keep it indefinitely, subject to available storage.
 - **Auth** — a secret key from `.env` gates protected operations via a signed, seven-day session
-  cookie. Treat that cookie as a credential. Temporary keys, immediate revocation and a dashboard
-  settings editor are planned, not available yet.
+  cookie. Treat that cookie as a credential. Temporary keys and immediate revocation remain planned.
+  A primary-only two-field settings view is implemented; see its rollout checkpoint.
   The [primary-session foundation](docs/internal/session-principal.md) is implemented in source
   (deployment pending); legacy cookies keep existing access but do not gain management permission.
 
@@ -165,7 +166,7 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 
 Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
 runtime overrides is implemented in source ([rollout/semantics](docs/internal/runtime-settings.md),
-deployment pending); there is no settings editor or temporary-key management API yet.
+deployment pending), with a localized settings view. There is no temporary-key management API yet.
 After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing

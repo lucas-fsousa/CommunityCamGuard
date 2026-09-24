@@ -33,6 +33,7 @@
     "ccg/provisioning-ble": moduleUrl("/modules/camera-provisioning-ble.js"),
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
     "ccg/recording-playback": moduleUrl("/modules/recording-playback.js"),
+    "ccg/settings": moduleUrl("/modules/settings.js"),
   } });
   document.head.append(importMap);
 

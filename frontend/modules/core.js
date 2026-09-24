@@ -14,6 +14,7 @@ export const state = {
   gridHdMax: 0,
   cameras: [],
   view: "grid",
+  canManage: false,
   selected: null,
   rec: { cameraId: "", from: "", to: "", page: 0, pageSize: 50 },
   candidates: [],

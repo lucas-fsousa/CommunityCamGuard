@@ -28,7 +28,7 @@ Sessions currently expire after seven days. Cookies are bearer credentials: prot
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
 revocation of a stolen copy. Primary-session identification and its management dependency are
 implemented, along with the two-field settings API described below (deployment pending).
-Temporary keys, immediate revocation and the dashboard settings screen are **not implemented**. See the
+The settings screen now uses this API. Temporary keys and immediate revocation are **not implemented**. See the
 [settings/authentication plan](../internal/settings-dashboard-plan.md).
 
 ---
@@ -422,8 +422,8 @@ these two fields; the main login key and other server settings are not writable.
 
 Changes apply on the next metadata fetch/cache policy check, not by restarting services.
 Open dashboards need a metadata refresh/reload for the Auto-mode grid limit. Cache 0
-means unbounded, and saving does not immediately evict files. There is no settings
-screen yet; see [implementation and rollout](../internal/runtime-settings.md).
+means unbounded, and saving does not immediately evict files. See the
+[settings screen guide](settings.md) and [implementation/rollout](../internal/runtime-settings.md).
 
 ### Storage status
 

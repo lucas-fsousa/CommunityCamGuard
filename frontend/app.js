@@ -17,6 +17,7 @@ import {
   renderCameras,
 } from "ccg/cameras";
 import { renderRecordings, stopRecordings } from "ccg/recordings";
+import { renderSettings, stopSettings } from "ccg/settings";
 
 const APP_VERSION = window.__CCG_BUILD__ || "dev";
 console.log("[CCG] frontend build " + APP_VERSION);
@@ -29,6 +30,7 @@ let watchdogTimer = 0;
 let cameraStatusTimer = 0;
 
 function stopDashboardSession() {
+  stopSettings();
   stopRecordings();
   if (storageTimer) {
     clearInterval(storageTimer);
@@ -70,10 +72,12 @@ async function loadStorage() {
 }
 
 function applyView() {
+  if (state.view !== "settings") stopSettings();
   if (state.view !== "recordings") stopRecordings();
   applyLiveLayout();
   if (state.view === "cameras") renderCameras($("#cameras"));
   if (state.view === "recordings") renderRecordings($("#recordings"));
+  if (state.view === "settings") renderSettings($("#settings"));
 }
 
 function render() {
@@ -126,6 +130,7 @@ function setupLanguageSelector() {
 
 async function boot() {
   const me = await api("/me");
+  state.canManage = me.can_manage === true;
   if (!me.authenticated) {
     showLogin();
     return;

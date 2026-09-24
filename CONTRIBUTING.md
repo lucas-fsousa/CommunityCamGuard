@@ -130,7 +130,7 @@ Note the exact model(s)/firmware you verified in the module docstring, and add a
 
 ## Code standards
 
-CI (`.github/workflows/ci.yml`) runs five gates on every push/PR — run them locally first:
+CI (`.github/workflows/ci.yml`) runs six gates on every push/PR — run them locally first:
 
 ```bash
 ruff check backend tests   # lint (config in pyproject.toml)
@@ -138,6 +138,7 @@ mypy backend/app           # type-check
 pytest                     # tests (throwaway DB, no cameras/network)
 node --max-old-space-size=64 tests/frontend/camera-controls.cjs  # DOM/control contracts
 node --max-old-space-size=64 tests/frontend/recording-playback.cjs  # archive player lifecycle
+node --max-old-space-size=64 tests/frontend/settings.cjs  # primary-only settings UI
 ```
 
 - **Types:** annotate public functions; `mypy` must pass. New modules should be typed.
@@ -152,7 +153,7 @@ node --max-old-space-size=64 tests/frontend/recording-playback.cjs  # archive pl
 ## PR flow
 
 1. Branch off `main`; keep the change focused.
-2. Make the five gates above green; add/adjust tests.
+2. Make the six gates above green; add/adjust tests.
 3. Note the exact camera model(s)/firmware you verified (for driver PRs) in the module docstring.
 4. Open the PR with a short *why*. Match the surrounding style; keep modules cohesive.
 

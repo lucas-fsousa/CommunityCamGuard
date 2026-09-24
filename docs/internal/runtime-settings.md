@@ -1,6 +1,6 @@
 # Allowlisted runtime settings — 2026-09-24
 
-**Implemented in source, deployment pending. No dashboard settings view yet.**
+**API and dashboard view implemented in source; deployment pending.**
 
 ## Contract and authority
 
@@ -57,6 +57,15 @@ not be added without service-owned application/rollback semantics and impact UI.
 
 ## Tests and rollout
 
+The dedicated `frontend/modules/settings.js` view provides localized bounded
+inputs, per-field baseline reset, explicit save, busy locking, conflict/uncertain
+completion reload and request cleanup on navigation/logout. `app.js` only wires the
+view/permission hint; the API remains authoritative. Save/reload updates this tab's
+Auto budget; other tabs need refresh. Node contracts cover denied UI access,
+duplicate saves, revision/reset payloads, conflict/403/failure reload and stale
+completion disposal. See the [user guide](../public/settings.md). Full mobile visual
+validation is pending; layout uses a centered bounded-width card and scrollable stage.
+
 86 focused tests passed across settings, playback, warmer and recording/config
 contracts. New coverage includes primary/legacy/unauthenticated requests, strict
 validation/no partial writes, baseline restoration, fresh DB reads, stale revision,
@@ -66,6 +75,5 @@ derived file and verified that a separate original fixture was untouched.
 
 No production DB override was written, no camera was contacted, and no container
 was restarted. Backend/auth changes need rebuild/recreation before this API exists
-in the running deployment. Next: localized primary-only settings UI for these two
-fields, revision conflict handling and clear next-operation/reload explanations.
+in the running deployment. Next: deploy and validate the primary-only settings view.
 Keep temporary-key/revocation/security-hardening work separately tracked.

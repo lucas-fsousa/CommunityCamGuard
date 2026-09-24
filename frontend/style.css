@@ -112,6 +112,18 @@ header {
 #stage.single #players .cam { display: none; }
 #stage.single #players .cam.selected { display: flex; height: 100%; }
 #stage.recordings #players { display: none; }
+#stage.settings #players { display: none; }
+#stage:not(.settings) #settings { display: none; }
+#settings { height: 100%; overflow-y: auto; padding: 12px; }
+.settings-card { max-width: 680px; margin: 0 auto; padding: 20px; }
+.settings-form { display: grid; gap: 20px; }
+.settings-field { display: grid; gap: 8px; min-width: 0; }
+.settings-field p { margin: 0; }
+.settings-field input[type="number"] { width: 100%; box-sizing: border-box; }
+.settings-baseline { display: flex; align-items: center; gap: 8px; }
+.settings-baseline input { width: auto; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-status { min-height: 1.4em; }
 
 #recordings { height: 100%; }
 #stage:not(.recordings) #recordings { display: none; }

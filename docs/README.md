@@ -7,6 +7,7 @@ Docs are split by audience:
 - **[Recordings and playback](public/recordings.md)** — original MP4 vs codecs, native playback,
   fallback/cache limits, downloading and current validation boundaries.
 - **[Bluetooth onboarding](public/bluetooth-onboarding.md)** — setup steps and remaining cloud dependency.
+- **[Dashboard settings](public/settings.md)** — primary-only Auto/cache controls, defaults and conflicts.
 - **[API reference](public/api.md)** — every REST endpoint, for building your own UI or scripts.
   The always-current schema is served live at `/api/openapi.json` (Swagger UI at `/api/docs`).
 
@@ -19,11 +20,11 @@ Docs are split by audience:
   **[measurements](internal/recordings-playback-measurements.md)** — selection cleanup, encoder budget,
   Range delivery, observed latency and scoped logging.
 - **[Settings inventory and plan](internal/settings-dashboard-plan.md)** — classification of 42
-  options and required authentication/application boundaries; not an implemented settings UI.
+  options and required authentication/application boundaries beyond the two editable fields.
 - **[Session principal](internal/session-principal.md)** — implemented primary/legacy session
   parsing and management gate, migration policy and rollout status; temporary keys remain pending.
 - **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
-  application semantics, authorization and tests; deployment/UI pending.
+  application semantics, authorization and UI contracts; deployment pending.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

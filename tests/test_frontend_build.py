@@ -175,7 +175,7 @@ def test_frontend_entrypoint_only_orchestrates_semantic_modules():
     frontend = Path(__file__).parents[1] / "frontend"
     app = (frontend / "app.js").read_text()
 
-    for specifier in ("ccg/core", "ccg/i18n", "ccg/live", "ccg/cameras", "ccg/recordings"):
+    for specifier in ("ccg/core", "ccg/i18n", "ccg/live", "ccg/cameras", "ccg/recordings", "ccg/settings"):
         assert f'from "{specifier}"' in app
     assert len(app.splitlines()) < 200
     assert "function openProvisioningModal" not in app

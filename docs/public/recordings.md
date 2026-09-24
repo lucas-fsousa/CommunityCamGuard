@@ -51,7 +51,7 @@ The live-camera player is a different pipeline from archive playback.
 
 The cache cap has a primary-only runtime override API implemented in source
 ([deployment pending](../internal/runtime-settings.md)); the other settings above
-still come from `.env`/environment. There is no dashboard settings editor yet.
+still come from `.env`/environment. The [settings tab](settings.md) exposes the cache override.
 Environment changes require application recreation/reconfiguration;
 browser reload alone does not update service settings. Never share the `.env` file.
 

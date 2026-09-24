@@ -254,6 +254,15 @@ regressions passed. No production override/restart, no secret/retention controls
 no settings UI yet; deployment pending. See `docs/internal/runtime-settings.md`.
 Next: localized settings view with conflict handling and application-scope notices.
 
+Settings UI checkpoint (2026-09-24): dedicated en/pt-BR settings module with two
+bounded inputs, per-field environment-default reset, primary-only editing, explicit
+save, conflict/uncertain-save reload and navigation/logout cleanup. No credentials
+or retention controls. Node contracts added as a sixth CI gate; 45 focused Python
+tests passed under a whole-process 512 MiB/no-swap cgroup (75.8 MiB peak). An earlier
+RLIMIT_AS attempt prevented Node's virtual reservation; standalone Node contracts
+and the corrected cgroup run passed. No WSL OOM observed. Deployment/mobile visual
+validation pending; see `docs/public/settings.md` and `docs/internal/runtime-settings.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

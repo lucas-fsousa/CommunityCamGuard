@@ -19,6 +19,7 @@
     <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
     <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 20h14"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h4m4 0h8M4 17h8m4 0h4"/><circle cx="10" cy="7" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
   </defs></svg>
 
   <!-- Login -->
@@ -47,6 +48,7 @@
         <button data-view="single" data-i18n-title="nav.singleTitle" title="Single camera"><svg class="icon"><use href="#i-single" /></svg><span data-i18n="nav.single">Single</span></button>
         <button data-view="recordings" data-i18n-title="nav.recordingsTitle" title="Browse recordings"><svg class="icon"><use href="#i-clips" /></svg><span data-i18n="nav.recordings">Recordings</span></button>
         <button data-view="cameras" data-i18n-title="nav.camerasTitle" title="Manage cameras"><svg class="icon"><use href="#i-cam" /></svg><span data-i18n="nav.cameras">Cameras</span></button>
+        <button data-view="settings" data-i18n-title="nav.settings" title="Settings"><svg class="icon"><use href="#i-settings" /></svg><span data-i18n="nav.settings">Settings</span></button>
       </div>
       <select id="lang" class="lang" data-i18n-title="lang.title" title="Language"></select>
       <button id="btn-logout" class="icon-btn" data-i18n-title="nav.logout" title="Logout"><svg class="icon"><use href="#i-logout" /></svg></button>
@@ -57,6 +59,7 @@
       <div id="players"></div>
       <div id="recordings"></div>
       <div id="cameras"></div>
+      <div id="settings"></div>
       <p id="empty" class="muted empty hidden" data-i18n="cams.empty">No cameras yet. Click “Scan network” to find them.</p>
     </main>
   </section>
