@@ -67,9 +67,11 @@ def recordings(
 
 
 @router.get("/recordings/file", dependencies=[Depends(require_auth)])
-def recording_file(path: str):
-    """Serve a browser-playable segment after validating its archive path."""
+def recording_file(path: str, original: bool = False):
+    """Serve compatible media or an explicit original after auth/path validation."""
     _root, target = _recording_target(path)
+    if original:
+        return FileResponse(target, media_type="video/mp4")
     playable = playback.cached_path(target)
     if playable is not None:
         return FileResponse(playable, media_type="video/mp4")
@@ -95,9 +97,13 @@ def _recording_playback_state(target: Path) -> dict:
 
 
 @router.post("/recordings/prepare", dependencies=[Depends(require_auth)])
-def prepare_recording_playback(path: str) -> dict:
-    """Start one shared background HEVC-to-H.264 preparation job."""
+def prepare_recording_playback(path: str, native_hevc: bool = False) -> dict:
+    """Negotiate native HEVC or start one shared compatible preparation job."""
     _root, target = _recording_target(path)
+    # Client capability is a playback preference, never an authorization bypass.
+    # Original delivery stays seekable and never starts a conversion job.
+    if native_hevc and playback.video_codec(target) == "hevc":
+        return {"ready": True, "cached": False, "transcoding": False, "original": True}
     state = _recording_playback_state(target)
     if not state["ready"] and not state["transcoding"]:
         try:

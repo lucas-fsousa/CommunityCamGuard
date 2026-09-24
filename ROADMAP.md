@@ -206,6 +206,13 @@ health 200 and go2rtc unchanged. Next:
 browser first-click/seek validation and client/server timing correlation; the
 18–22s uncached full-conversion wait is still an open performance tradeoff.
 
+Native recordings follow-up (2026-09-24): codec-specific browser hints now opt into
+authenticated original HEVC/MP4 delivery without encoding; unsupported/failed
+native playback falls back once to the shared H.264 cache. Range/auth/path and
+fake-media lifecycle regressions cover the new path. No universal HEVC support
+or real-browser success is assumed. See `docs/internal/recordings-native-playback.md`;
+desktop/mobile native playback and fallback homologation remain pending.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

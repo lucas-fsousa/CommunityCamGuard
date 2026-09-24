@@ -4,7 +4,7 @@ const path = require("node:path");
 const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules/recording-playback.js"), "utf8")
   .replace("export function", "function");
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
-function harness() {
+function harness(support = "") {
   const timers = new Map(); let timerId = 0;
   const create = new Function("setTimeout", "clearTimeout", source + "\nreturn createRecordingPlayback;")(
     (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; },
@@ -16,6 +16,7 @@ function harness() {
     emit(key) { this.listeners.get(key)?.(); },
   });
   const player = Object.assign(events(), {
+    canPlayType() { return support; },
     loads: 0, plays: 0, pauses: 0, src: "", currentTime: 0,
     load() { this.loads++; }, pause() { this.pauses++; },
     removeAttribute(key) { if (key === "src") this.src = ""; },
@@ -92,6 +93,67 @@ function harness() {
     assert.equal(h.requests.length, 1); // No automatic overload retry storm.
     h.controller.select("a"); assert.equal(h.requests.length, 2);
     h.controller.dispose(); h.requests[1].resolve({ ready: true }); await flush();
+  }
+  {
+    const h = harness("probably"); h.controller.select("native");
+    assert(h.requests[0].url.endsWith("&native_hevc=true"));
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    assert(h.player.src.endsWith("&original=true"));
+    h.player.emit("playing"); assert.equal(h.timers.size, 0);
+    assert.equal(h.requests.length, 1); h.controller.dispose();
+  }
+  for (const support of ["", "maybe"]) {
+    const h = harness(support); h.controller.select("a");
+    assert(!h.requests[0].url.includes("native_hevc")); h.controller.dispose();
+  }
+  for (const failure of ["decode", "unsupported", "timeout"]) {
+    const h = harness("probably"); h.controller.select("native");
+    if (failure === "unsupported") h.player.reject = "NotSupportedError";
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    if (failure === "decode") {
+      h.player.currentTime = 7; h.player.error = { code: 3 }; h.player.emit("error");
+      h.player.emit("error"); // A second event must not create another job/request.
+    }
+    if (failure === "timeout") {
+      const [id, timer] = [...h.timers][0]; assert.equal(timer.delay, 12000);
+      h.timers.delete(id); timer.fn();
+    }
+    assert.equal(h.requests.length, 2);
+    assert(!h.requests[1].url.includes("native_hevc"));
+    h.player.reject = null;
+    h.requests[1].resolve({ ready: true, cached: true }); await flush();
+    assert(!h.player.src.includes("original=true"));
+    h.player.currentTime = 0; h.player.duration = 60; h.player.emit("loadedmetadata");
+    if (failure === "decode") assert.equal(h.player.currentTime, 7);
+    h.player.error = { code: 3 }; h.player.emit("error");
+    assert.equal(h.requests.length, 2); // No fallback loop.
+    h.controller.dispose(); assert.equal(h.timers.size, 0);
+  }
+  for (const failure of ["NotAllowedError", "network"]) {
+    const h = harness("probably"); h.controller.select("a");
+    if (failure === "NotAllowedError") h.player.reject = failure;
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    if (failure === "network") { h.player.error = { code: 2 }; h.player.emit("error"); }
+    assert.equal(h.requests.length, 1); assert.equal(h.timers.size, 0);
+    h.controller.dispose();
+  }
+  {
+    const h = harness("probably"); h.controller.select("a");
+    h.player.reject = "NotAllowedError";
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    assert.equal(h.timers.size, 0);
+    h.player.emit("play"); assert.equal(h.timers.size, 1); // Native manual play re-arms timeout.
+    h.player.emit("pause"); assert.equal(h.timers.size, 0); // User pause must not convert.
+    h.player.emit("play"); h.controller.select("b");
+    assert.equal([...h.timers.values()].filter(t => t.delay === 12000).length, 0);
+    h.controller.dispose(); assert.equal(h.timers.size, 0);
+  }
+  {
+    const h = harness("probably"); h.controller.select("a");
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    h.player.videoWidth = 0; h.player.emit("playing");
+    assert.equal(h.requests.length, 2); // Audio-only is not successful video playback.
+    h.controller.dispose();
   }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

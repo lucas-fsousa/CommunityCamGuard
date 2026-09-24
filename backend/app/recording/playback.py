@@ -1,9 +1,9 @@
 """Browser-friendly playback of recordings.
 
-Segments are recorded **HEVC** (``-c:v copy`` — zero-CPU 24/7, the whole point), but browsers
-can't decode HEVC in a ``<video>`` tag (black screen, and the failed video track takes the audio
-down with it). So an HEVC segment is transcoded to **H.264 on demand** the first time it is
-opened, and the result is cached, so later views are instant.
+Segments preserve the camera codec (``-c:v copy``, no continuous video encoding).
+HEVC decoding support varies by browser/device. Capable clients can request original
+delivery through the API; other clients use this **H.264 on-demand** compatibility
+cache. Preparing a complete cache entry avoids repeated conversion on later views.
 
 The first viewer starts one background preparation job and waits for a complete **faststart** MP4
 (``moov`` at the front, real duration, seekable) before attaching it to the browser player. A

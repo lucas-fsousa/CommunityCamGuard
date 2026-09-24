@@ -69,3 +69,60 @@ def test_range_request_cannot_bypass_authentication(archive):
     response = client.get("/api/recordings/file", params={"path": str(source)},
                           headers={"Range": "bytes=0-31"})
     assert response.status_code == 401 and response.content != source.read_bytes()[:32]
+
+
+def test_native_hevc_preparation_never_starts_encoder(archive, monkeypatch):
+    client, source, _ = archive
+    monkeypatch.setattr(recordings.playback, "video_codec", lambda _: "hevc")
+    monkeypatch.setattr(recordings.playback, "prepare_transcode",
+                        lambda _: pytest.fail("native playback started encoder"))
+    response = client.post("/api/recordings/prepare",
+                           params={"path": str(source), "native_hevc": True})
+    assert response.status_code == 200
+    assert response.json() == {"ready": True, "cached": False,
+                               "transcoding": False, "original": True}
+
+
+def test_hevc_default_still_prepares_compatible_copy(archive, monkeypatch):
+    client, source, _ = archive
+    started = []
+    monkeypatch.setattr(recordings.playback, "needs_transcode", lambda _: True)
+    monkeypatch.setattr(recordings.playback, "transcode_in_progress", lambda _: bool(started))
+    monkeypatch.setattr(recordings.playback, "prepare_transcode", lambda target: started.append(target))
+    response = client.post("/api/recordings/prepare", params={"path": str(source)})
+    assert response.status_code == 200 and response.json()["transcoding"]
+    assert started == [source] and "original" not in response.json()
+
+
+@pytest.mark.parametrize("codec", ["h264", ""])
+def test_native_hint_does_not_select_unknown_or_other_codecs(archive, monkeypatch, codec):
+    client, source, _ = archive
+    monkeypatch.setattr(recordings.playback, "video_codec", lambda _: codec)
+    response = client.post("/api/recordings/prepare", params={"path": str(source), "native_hevc": True})
+    assert response.status_code == 200 and "original" not in response.json()
+
+
+def test_original_delivery_ignores_cache_and_preserves_range(archive, monkeypatch):
+    client, source, derived = archive
+    monkeypatch.setattr(recordings.playback, "cached_path", lambda _: derived)
+    monkeypatch.setattr(recordings.playback, "needs_transcode",
+                        lambda _: pytest.fail("original request probed/transcoded"))
+    params = {"path": str(source), "original": True}
+    response = client.get("/api/recordings/file", params=params, headers={"Range": "bytes=2-9"})
+    assert response.status_code == 206 and response.content == source.read_bytes()[2:10]
+    client.cookies.clear()
+    assert client.get("/api/recordings/file", params=params).status_code == 401
+    assert client.post("/api/recordings/prepare", params={"path": str(source),
+                       "native_hevc": True}).status_code == 401
+
+
+@pytest.mark.parametrize("endpoint,method,preference", [
+    ("file", "get", "original"), ("prepare", "post", "native_hevc"),
+])
+def test_native_preferences_do_not_bypass_archive_root(archive, tmp_path, endpoint, method, preference):
+    client, _, _ = archive
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(b"private")
+    response = getattr(client, method)(f"/api/recordings/{endpoint}",
+                                       params={"path": str(outside), preference: True})
+    assert response.status_code == 404
