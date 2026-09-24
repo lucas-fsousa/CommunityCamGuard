@@ -35,6 +35,11 @@ logout is needed. The main login key remains in environment configuration only.
 
 ## Boundaries still pending
 
+The [temporary-key lifecycle foundation](temporary-access-keys.md) now implements
+internal generation, verifier storage, absolute expiry and persistent revocation.
+It is not connected to this session parser/login, so the limitations below still
+apply. Activation requires full HTTP and long-lived-channel enforcement together.
+
 Session IDs are identities only: sessions remain stateless and there is no revocation
 store. Logout clears the caller's cookie but a copied cookie remains usable until
 expiry. Temporary kinds are rejected until key records, non-recoverable verifiers,

@@ -58,6 +58,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Settings plan](settings-dashboard-plan.md) | Current env-only behavior, service snapshots, future authorization/persistence requirements |
 | [Settings inventory](settings-inventory.json) | 42 classified fields; names only, CI checks completeness; not a runtime/API allowlist |
 | [Session principal](session-principal.md) | Primary-only management dependency, exact legacy-cookie migration and pending security/deployment boundaries |
+| [Temporary keys](temporary-access-keys.md) | Tested generation/verifier/expiry/revocation foundation; login/API/UI deliberately not enabled |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |
 | [Driver package audit](driver-package-audit.md) | Discovery-only vs implemented driver support and vendor-package boundaries |
 

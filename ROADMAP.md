@@ -278,6 +278,14 @@ Real Chromium isolated-component checks and screenshot inspection passed at
 Full-dashboard/physical-mobile validation remains distinct. Temporary-key issuance,
 expiry and revocation remain pending. Details: `docs/internal/runtime-settings.md`.
 
+Temporary-key foundation checkpoint (2026-09-24): small platform service/repository
+modules implement random credentials, verifier-only SQLite records, UTC expiry,
+bounded metadata listing and idempotent persistent revocation. 58 focused auth/key
+tests passed, including concurrent revocation and storage failure. No temporary
+login/API/UI enabled, production key created or camera contacted. Next: primary-only
+management boundary, temporary permission policy, session linkage and live-channel
+invalidation before activating login; see `docs/internal/temporary-access-keys.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

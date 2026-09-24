@@ -1,0 +1,71 @@
+# Temporary access keys — lifecycle foundation, 2026-09-24
+
+**Internal, tested foundation only. No temporary login, management API or UI is
+enabled.** Do not create/share production keys from a Python shell: they cannot
+log in. The primary environment key and existing sessions are unchanged.
+
+## Implemented boundary
+
+- `backend/app/access_keys.py` owns validation, generation, metadata, credential
+  verification and current-time validity. `backend/app/db/access_keys.py` owns SQL.
+  Both are platform modules, independent of camera models/drivers.
+- Each generated credential has a random 128-bit public ID and a separate random
+  256-bit secret (`secrets`, never user-chosen). The credential is returned only by
+  creation. Its object representation suppresses it; callers must still avoid
+  logging/serializing the one-time secret except for the future creation response.
+- Only a SHA-256 verifier is stored in `dashboard_access_keys`, alongside ID, label,
+  UTC creation/expiry timestamps and optional first revocation timestamp. This
+  fast verifier is appropriate for generated high-entropy tokens, **not passwords**.
+  No plaintext/encrypted recoverable key is stored, and listings exclude verifiers.
+- Creation requires a nonempty label (up to 80 characters) and explicit aware
+  ISO datetime strictly in the future. Numeric epochs and naive dates are rejected.
+  Expiration is absolute, normalized to UTC, never extended by authentication.
+- `authenticate` checks token shape/length, compares verifiers with `compare_digest`
+  (including a dummy comparison for unknown IDs) and performs a fresh active-record
+  check. This is not a guarantee of constant end-to-end response time.
+- `active_key` is a fresh DB check for future *verified-session* references. A public
+  key ID is **not** a credential and must never authenticate an unsigned request.
+- At `now >= expires_at`, the key is invalid. Revocation is atomic/idempotent,
+  retains its first timestamp and cannot be undone by this API. Other keys are
+  independent; no process-local validity cache survives a revoke.
+- Metadata listing is bounded to 100 records per page, default 50. Storage errors
+  propagate, never become successful authentication. Future HTTP boundaries must
+  sanitize errors and deny access when the store is unavailable.
+
+The schema is lazily initialized when the internal repository is used, not by
+application startup. Tests used throwaway SQLite databases only. No production
+schema/key write, main-key rotation, camera access or container restart occurred.
+
+## Activation gates / next implementation order
+
+1. Primary-only key-management API: create (one-time secret), bounded list and
+   idempotent revoke; strict models, no-store responses, same-origin/JSON writes,
+   sanitized failures. Never expose the verifier. Decide and enforce temporary
+   permissions across existing camera/provisioning/administration routes.
+2. Link signed temporary sessions to persisted key IDs. Check fresh validity on
+   every protected operation, preserve primary-key independence and cover outages,
+   multiple devices/tabs and revoke-during-use races. Do not enable login yet.
+3. Terminate open WebSockets/media authorization and return idle dashboards to login
+   promptly on invalidation. Existing WebSockets authenticate only at establishment;
+   denying subsequent HTTP requests alone does not revoke an open media connection.
+   Review recordings/downloads and WebRTC media that outlive a signaling socket.
+4. Bounded login-abuse protection, cookie/proxy/origin policy, then enable temporary
+   login and a compact localized management section. Validate the full flow before
+   claiming usable expiring access. Never rely on browser time for enforcement.
+
+Primary-key logout remains cookie deletion, not server-side session revocation.
+This work does not close the separate internet-exposure/security-audit backlog.
+Server-side expiration and secure random identifiers follow the
+[OWASP session-management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+
+## Evidence
+
+`tests/test_access_keys.py` covers secret non-persistence, metadata-only listings,
+UTC conversion/exact expiry, validation, malformed/incorrect/unknown credentials,
+bounded pagination, independent keys, repeated/concurrent revocation, fresh module
+reads, revocation during verification and DB failures. Negative integration checks
+prove that generated keys still cannot log in and signed temporary claims remain
+unsupported; primary login still works. Together with existing auth/principal
+tests, **58 tests passed**, under a 512 MiB address-space / 90-second CPU cap.
+
+No complete session/channel invalidation or physical-browser test is claimed here.
