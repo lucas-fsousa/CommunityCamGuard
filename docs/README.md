@@ -27,6 +27,8 @@ Docs are split by audience:
   application semantics, authorization, UI contracts and deployment checkpoint.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.
+- **[Open-session channels](internal/session-channels.md)** — tested socket expiry/error
+  checks, current MSE transport and remaining authorization/activation boundaries.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

@@ -20,6 +20,7 @@ from ..config import get_settings
 from ..media import quality
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
+from ..session_channels import run_guarded
 
 router = APIRouter(prefix="/api", tags=["media"])
 log = logging.getLogger(__name__)
@@ -133,6 +134,11 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
     if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
         await websocket.close(code=1008)
         return
+    await run_guarded(websocket, websocket.cookies.get(COOKIE_NAME) or "",
+                      lambda: _proxy_media(websocket), verify_token)
+
+
+async def _proxy_media(websocket: WebSocket) -> None:
     src = websocket.query_params.get("src", "")
     if not src:
         await websocket.close(code=1008)
@@ -165,10 +171,13 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
                 asyncio.create_task(browser_to_go2rtc()),
                 asyncio.create_task(go2rtc_to_browser()),
             ]
-            _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
     except Exception as exc:
         log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
     finally:

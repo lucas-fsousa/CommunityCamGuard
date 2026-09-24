@@ -46,8 +46,9 @@ expiry. Temporary kinds are rejected until key records, non-recoverable verifier
 expiry/revocation checks and authorization policy are implemented together. Do not
 mint a temporary token by merely changing the payload kind.
 
-Open WebSockets still authenticate at connection establishment; this change does
-not add immediate expiry/revocation termination. Login abuse limits, CSRF/origin
+The deployed WebSockets still authenticate at connection establishment. The subsequent
+[open-channel guard](session-channels.md) adds periodic validation in source but is
+not yet deployed; this does not complete temporary-key/session revocation. Login abuse limits, CSRF/origin
 policy and secure-cookie deployment policy remain separate pending work. Do not
 describe this foundation as a completed internet-exposure security audit.
 

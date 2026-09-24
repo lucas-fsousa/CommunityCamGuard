@@ -302,6 +302,14 @@ passed; actual short H.264 playback/seek and native-error fallback clear loading
 No extra encoder/request/timer or container restart. Long-recording/native-HEVC/
 physical-mobile validation remains separate; see playback lifecycle notes.
 
+Open-channel checkpoint (2026-09-24): shared one-second session revalidation for
+media/intercom sockets, five-second verification timeout, fail-closed 1008 and
+owned-task cleanup. 41 focused fake-channel/intercom/principal tests passed; no
+camera commands or container restart. Backend deployment and temporary login remain
+pending. Dashboard transport confirmed MSE (obsolete WebRTC comment corrected);
+independent WebRTC peers/in-flight HTTP delivery and explicit temporary permissions
+still need enforcement. See `docs/internal/session-channels.md` for scope/latency.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

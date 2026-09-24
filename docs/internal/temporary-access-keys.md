@@ -46,8 +46,9 @@ schema/key write, main-key rotation, camera access or container restart occurred
    every protected operation, preserve primary-key independence and cover outages,
    multiple devices/tabs and revoke-during-use races. Do not enable login yet.
 3. Terminate open WebSockets/media authorization and return idle dashboards to login
-   promptly on invalidation. Existing WebSockets authenticate only at establishment;
-   denying subsequent HTTP requests alone does not revoke an open media connection.
+   promptly on invalidation. [Open-socket revalidation](session-channels.md) is now
+   implemented in source, not deployed; temporary-session linkage is still pending.
+   Denying subsequent HTTP requests alone does not revoke an open media connection.
    Review recordings/downloads and WebRTC media that outlive a signaling socket.
 4. Bounded login-abuse protection, cookie/proxy/origin policy, then enable temporary
    login and a compact localized management section. Validate the full flow before

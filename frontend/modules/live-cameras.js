@@ -32,14 +32,10 @@ export function syncCameraStatusDots() {
 }
 
 // --- camera tiles ------------------------------------------------------------------
-// Every stream the player is pointed at is H.264 + AAC/Opus. VideoRTC negotiates WebRTC and MSE
-// together, then its codec weights prefer WebRTC for these tracks; MSE remains the transport fallback.
-// This matters for remote viewers — MSE is WebSocket/TCP, so a 1080p feed over the internet stalls
-// to rebuffer on any jitter/loss ("travando toda hora"); WebRTC's UDP + jitter buffer rides over it.
-// Diagnostics previously showed the HD tile landing on MSE while the substream got WebRTC; keeping
-// H.264+Opus available makes WebRTC win that selection on normal browsers.
-// The <cam-player> element (player.js) sets mode="webrtc,mse"; here we only hand it the signalling
-// WebSocket. We point it at the app's OWN origin (/api/go2rtc/ws), which proxies to go2rtc: this
+// player.js currently selects MSE only to avoid stale WebRTC frames; its media travels
+// over this socket. The vendored VideoRTC and generic backend proxy can still support
+// WebRTC for other consumers, which must be considered separately during authorization.
+// We point the player at the app's OWN origin (/api/go2rtc/ws), which proxies to go2rtc: this
 // keeps the player same-origin (so the freeze watchdog can read the real <video>) without opening
 // go2rtc's unauthenticated API cross-origin. A leading "/" makes VideoRTC build ws://<app-origin>/…
 function wsFor(streamId) {

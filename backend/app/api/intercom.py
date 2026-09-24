@@ -18,6 +18,7 @@ from ..audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES
 from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
+from ..session_channels import run_guarded
 from .local_only import require_local_request, require_local_websocket
 
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
@@ -131,6 +132,8 @@ def _pcm_queue_iterator(
             return
         if not isinstance(item, bytes):
             raise ValueError("invalid audio stream queue item")
+        if stop.is_set():
+            return
         idle_deadline = time.monotonic() + STREAM_IDLE_SECONDS
         yield item
 
@@ -149,6 +152,13 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     ):
         await websocket.close(code=1008)
         return
+    stop = threading.Event()
+    await run_guarded(websocket, websocket.cookies.get(COOKIE_NAME) or "",
+                      lambda: _stream_audio(websocket, camera_id, stop), verify_token,
+                      on_cancel=stop.set)
+
+
+async def _stream_audio(websocket: WebSocket, camera_id: str, stop: threading.Event) -> None:
     try:
         require_local_websocket(websocket)
     except HTTPException:
@@ -156,7 +166,6 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
         return
 
     chunks: queue.Queue[bytes | object] = queue.Queue(maxsize=STREAM_QUEUE_FRAMES)
-    stop = threading.Event()
     ready = threading.Event()
     iterator = _pcm_queue_iterator(chunks, stop, ready)
     await websocket.accept()
@@ -228,6 +237,9 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
             )
             reported_error = True
             break
+    except asyncio.CancelledError:
+        graceful_stop = False  # Invalidated/disconnected sessions must not drain queued audio.
+        raise
     except (
         CameraNotFound,
         Unsupported,

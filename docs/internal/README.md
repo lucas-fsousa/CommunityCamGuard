@@ -59,6 +59,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Settings inventory](settings-inventory.json) | 42 classified fields; names only, CI checks completeness; not a runtime/API allowlist |
 | [Session principal](session-principal.md) | Primary-only management dependency, exact legacy-cookie migration and pending security/deployment boundaries |
 | [Temporary keys](temporary-access-keys.md) | Lifecycle and primary-only management API tested; API deployment pending, temporary login/UI disabled |
+| [Open-session channels](session-channels.md) | Periodic socket revalidation and cancellation cleanup; not deployed, independent WebRTC/download invalidation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |
 | [Driver package audit](driver-package-audit.md) | Discovery-only vs implemented driver support and vendor-package boundaries |
 
