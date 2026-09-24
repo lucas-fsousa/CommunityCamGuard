@@ -113,3 +113,26 @@ and mobile rendering remain to be validated in a real browser; HTTP success is
 not a substitute. Backend latency on this sample is concentrated in cold
 conversion, not serving the ready file. Do not revert to fragmented partial
 playback merely to hide that preparation delay.
+
+## Scoped logging follow-up
+
+Application startup now configures only `backend.app.recording.playback` at INFO
+with one stderr handler and propagation disabled. Repeated startup does not add
+another handler. Root, SDK and camera logger levels remain unchanged. This makes
+one completion event per preparation job visible under the default Uvicorn logging
+configuration, without per-frame/per-poll output or a new log file.
+
+Events contain only outcome, a fixed reason code and queue/encode milliseconds.
+Reasons distinguish queue timeout, encoder timeout, nonzero encoder exit, missing
+output, I/O/process error and cleanup failure; successful cache reuse is distinct
+from encoding. Exception text, command lines, paths, camera identifiers, media and
+credentials are not included. Admission rejections before a job exists still use
+HTTP 429; these metrics do not claim to cover those rejections or browser latency.
+
+Validation: 35 focused tests passed using fake encoders, including eight completion
+outcomes and an isolated subprocess using Uvicorn's actual default logging config.
+The subprocess confirms INFO visibility, a single event after repeated setup and
+no enabling of unrelated SDK INFO. Ruff and Mypy (193 files) passed. No camera
+commands, conversion load or running-container restart was needed. Deployment of
+this backend-only logging follow-up remains pending; it takes effect on the next
+application image update/startup, not through the live-mounted frontend.

@@ -198,6 +198,13 @@ access 401. Three base streams retained one producer each and advancing counters
 Browser first-click/seek validation is still pending. INFO preparation metrics were
 not visible in default container logging; scoped logging remains a follow-up.
 
+Scoped preparation logging is now implemented and tested under default Uvicorn
+configuration: one stderr event/job, fixed failure reasons, no paths/credentials,
+no global verbosity increase. 35 focused tests passed; backend deployment remains
+pending to avoid restarting active recording solely for a logging change. Next:
+browser first-click/seek validation and client/server timing correlation; the
+18–22s uncached full-conversion wait is still an open performance tradeoff.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

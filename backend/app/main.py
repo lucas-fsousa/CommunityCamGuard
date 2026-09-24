@@ -41,6 +41,7 @@ from .diagnostics.yoosee_av_api import router as native_av_diagnostic_router
 from .frontend_build import build_version
 from .media.go2rtc import Go2rtc
 from .recording.playback import Warmer
+from .recording.playback_logging import configure as configure_playback_logging
 from .recording.recorder import Recorder
 from .recording.retention import RetentionCleaner
 from .recording.storage import StorageMonitor
@@ -49,6 +50,7 @@ from .services.address_recovery import AddressRecovery
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_playback_logging()
     settings = get_settings()
     registry.init_db()
     p2p.init_db()

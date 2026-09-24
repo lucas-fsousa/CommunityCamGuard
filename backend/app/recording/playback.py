@@ -191,10 +191,12 @@ class _TranscodeJob:
     def _run(self) -> None:
         started = time.monotonic()
         acquired = None
+        reason = "none"
         try:
             with encoder_slot():
                 acquired = time.monotonic()
                 if self.cache.is_file():
+                    reason = "cache_hit"
                     return
                 encoded = subprocess.run(
                     _ffmpeg_cmd(self.segment, self.part),
@@ -204,21 +206,31 @@ class _TranscodeJob:
                 )
                 if encoded.returncode != 0 or not self.part.is_file():
                     self.failed = True
+                    reason = "encoder_failed" if encoded.returncode != 0 else "output_missing"
                     return
                 if not self.cache.is_file():
                     os.replace(self.part, self.cache)
                 _evict(keep=self.cache)
-        except (OSError, subprocess.SubprocessError, PlaybackBusy):
+        except PlaybackBusy:
             self.failed = True
+            reason = "queue_timeout"
+        except subprocess.TimeoutExpired:
+            self.failed = True
+            reason = "encode_timeout"
+        except (OSError, subprocess.SubprocessError):
+            self.failed = True
+            reason = "io_or_process_error"
         finally:
             try:
                 self.part.unlink(missing_ok=True)
             except OSError:
                 self.failed = True
+                if reason in ("none", "cache_hit"):
+                    reason = "cleanup_failed"
             finally:
                 finished = time.monotonic()
-                log.info("playback_prepare outcome=%s queue_ms=%d encode_ms=%d",
-                         "failed" if self.failed else "ready",
+                log.info("playback_prepare outcome=%s reason=%s queue_ms=%d encode_ms=%d",
+                         "failed" if self.failed else "ready", reason,
                          int(((acquired if acquired is not None else finished) - started) * 1000),
                          int((finished - acquired) * 1000) if acquired is not None else 0)
                 with _JOBS_LOCK:
