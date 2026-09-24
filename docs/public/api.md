@@ -28,7 +28,9 @@ Sessions currently expire after seven days. Cookies are bearer credentials: prot
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
 revocation of a stolen copy. Primary-session identification and its management dependency are
 implemented and deployed, along with the two-field settings API described below.
-The settings screen now uses this API. Temporary keys and immediate revocation are **not implemented**. See the
+The settings screen now uses this API. Temporary-key management is implemented in source
+(not yet deployed); temporary login and immediate session/channel invalidation remain
+**disabled/pending**. See the
 [settings/authentication plan](../internal/settings-dashboard-plan.md).
 
 ---
@@ -46,9 +48,38 @@ The settings screen now uses this API. Temporary keys and immediate revocation a
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
-Settings endpoints require primary sessions; key-management endpoints do not exist yet.
+Settings and the new key-management endpoints require primary sessions.
 These backend updates are included in the settings deployment;
 see [session migration and rollout](../internal/session-principal.md).
+
+### Temporary-key management (staged, not yet deployed)
+
+These routes are restricted to verified primary sessions: anonymous/invalid sessions
+receive 401, legacy sessions 403. **Generated keys cannot log in yet.** Creation and
+listing explicitly return `login_enabled: false`; no management UI is enabled.
+Do not distribute these staged credentials as usable access keys.
+
+| Method | Path | Body / Params | Response |
+| --- | --- | --- | --- |
+| GET | `/api/access-keys` | `limit` 1–100 (default 50), `offset` ≥0 | `{items, limit, offset, login_enabled: false}`; metadata only |
+| POST | `/api/access-keys` | `{label, expires_at}`; label 1–80 characters, future ISO date with timezone | 201 `{metadata, secret, login_enabled: false}`; secret returned only here |
+| POST | `/api/access-keys/{id}/revoke` | Empty JSON object `{}` | Metadata with first revocation timestamp; repeated revocation is idempotent; unknown ID 404 |
+
+Metadata: `id`, `label`, UTC `created_at`, `expires_at`, nullable `revoked_at`, and
+`status` (`active`, `expired`, `revoked`). Active here describes a key record, **not**
+permission to log in before rollout. Expiry is absolute, never extended by reading.
+Verifiers are never returned; there is no secret-recovery endpoint.
+
+All matched-route responses, including handled failures, carry `Cache-Control: no-store`.
+Writes require JSON (415 otherwise); cross-origin/`Sec-Fetch-Site: cross-site` writes
+are rejected with 403. Authenticated scripts may omit Origin. No forwarded headers
+are trusted by this check; configure trusted proxy handling separately. Invalid
+body/path/pagination receives sanitized 422; storage failures receive generic 503.
+Creation is not idempotent: if its response is lost, list/revoke the uncertain key
+before deliberately creating another; do not automatically retry creation.
+
+No production keys or schema were created for validation. The staged API needs a
+backend rebuild to be served; see [activation gates](../internal/temporary-access-keys.md).
 
 ### Cameras
 

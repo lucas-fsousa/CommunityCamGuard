@@ -286,6 +286,14 @@ login/API/UI enabled, production key created or camera contacted. Next: primary-
 management boundary, temporary permission policy, session linkage and live-channel
 invalidation before activating login; see `docs/internal/temporary-access-keys.md`.
 
+Temporary-key management API checkpoint (2026-09-24): primary-only creation,
+paginated metadata listing and idempotent revoke routes registered; strict input,
+no-store including handled errors, same-origin/JSON writes and sanitized failures.
+94 focused API/lifecycle/settings tests passed. API not yet deployed; no production
+keys created and temporary login/UI remain disabled (`login_enabled: false`).
+Next: permission policy and session/channel invalidation before activation.
+Details and uncertain-create retry guidance: `docs/internal/temporary-access-keys.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

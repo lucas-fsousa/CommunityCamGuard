@@ -25,8 +25,8 @@ Docs are split by audience:
   parsing and management gate, migration policy and rollout status; temporary keys remain pending.
 - **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
   application semantics, authorization, UI contracts and deployment checkpoint.
-- **[Temporary keys](internal/temporary-access-keys.md)** — internal persistence and lifecycle
-  foundation; activation gates for session/channel revocation, API and UI remain pending.
+- **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
+  deployment, session/channel invalidation, temporary login and UI remain pending.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import drivers
+from .api.access_keys import router as access_keys_router
 from .api.auth import router as auth_router
 from .api.cameras import router as cameras_router
 from .api.controls import router as controls_router
@@ -140,6 +141,7 @@ app = FastAPI(
 )
 app.include_router(native_av_diagnostic_router)
 app.include_router(auth_router)
+app.include_router(access_keys_router)
 app.include_router(provisioning_router)
 app.include_router(provisioning_account_router)
 app.include_router(provisioning_ble_router)

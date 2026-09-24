@@ -8,7 +8,8 @@ See the [rollout checkpoint](../internal/runtime-settings.md) for deployment sta
 
 Sign in with the server's primary dashboard key. Old sessions can still monitor
 cameras, but cannot administer settings: sign out and sign in again. The backend
-enforces this independently of the UI. Temporary access keys are not implemented.
+enforces this independently of the UI. Temporary-key login and management UI are
+not enabled; the staged management API is documented in the [API reference](api.md).
 
 The centered panel uses compact numeric fields beside each setting's title, with
 explanations below and separate save/reload actions. It adapts to narrow screens.

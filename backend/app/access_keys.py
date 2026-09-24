@@ -2,7 +2,7 @@
 
 Keys have a public random ID plus a 256-bit random secret. SHA-256 is a verifier
 for generated high-entropy credentials, NOT a password-hashing substitute.
-Storage errors propagate: future HTTP/auth boundaries must fail closed, not grant
+Storage errors propagate: HTTP/auth boundaries must fail closed, not grant
 access on DB failure. Session/channel invalidation must land before activation.
 """
 
@@ -52,6 +52,10 @@ class IssuedKey:
     secret: str = field(repr=False)
 
 
+class InvalidExpiration(ValueError):
+    """User input cannot represent a future UTC expiry."""
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -69,14 +73,18 @@ def _metadata(row: dict, now: datetime) -> KeyMetadata:
 
 def create(body: CreateKey) -> IssuedKey:
     now = _now()
-    if body.expires_at <= now:
-        raise ValueError("Expiration must be in the future")
+    try:
+        expiry = body.expires_at.astimezone(UTC)
+    except (OverflowError, ValueError):
+        raise InvalidExpiration("Expiration must be a valid UTC date") from None
+    if expiry <= now:
+        raise InvalidExpiration("Expiration must be in the future")
     key_id = secrets.token_hex(16)
     secret = f"ccg_tmp_{key_id}.{secrets.token_urlsafe(32)}"
     verifier = hashlib.sha256(secret.encode("ascii")).hexdigest()
-    repository.insert(key_id, body.label, verifier, now.timestamp(), body.expires_at.timestamp())
+    repository.insert(key_id, body.label, verifier, now.timestamp(), expiry.timestamp())
     metadata = KeyMetadata(id=key_id, label=body.label, created_at=now,
-                           expires_at=body.expires_at.astimezone(UTC), revoked_at=None, status="active")
+                           expires_at=expiry, revoked_at=None, status="active")
     return IssuedKey(metadata, secret)
 
 

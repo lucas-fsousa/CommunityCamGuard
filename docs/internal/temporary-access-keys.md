@@ -1,8 +1,9 @@
 # Temporary access keys — lifecycle foundation, 2026-09-24
 
-**Internal, tested foundation only. No temporary login, management API or UI is
-enabled.** Do not create/share production keys from a Python shell: they cannot
-log in. The primary environment key and existing sessions are unchanged.
+**Lifecycle and primary-only management API implemented; API not yet deployed. No
+temporary login or management UI is enabled.** Do not create/share production keys
+as usable credentials: they cannot log in. The primary environment key and existing
+sessions are unchanged.
 
 ## Implemented boundary
 
@@ -38,10 +39,9 @@ schema/key write, main-key rotation, camera access or container restart occurred
 
 ## Activation gates / next implementation order
 
-1. Primary-only key-management API: create (one-time secret), bounded list and
-   idempotent revoke; strict models, no-store responses, same-origin/JSON writes,
-   sanitized failures. Never expose the verifier. Decide and enforce temporary
-   permissions across existing camera/provisioning/administration routes.
+1. Primary-only key-management API is now implemented (checkpoint below). Decide
+   and enforce temporary permissions across existing camera/provisioning/
+   administration routes before enabling their sessions.
 2. Link signed temporary sessions to persisted key IDs. Check fresh validity on
    every protected operation, preserve primary-key independence and cover outages,
    multiple devices/tabs and revoke-during-use races. Do not enable login yet.
@@ -69,3 +69,32 @@ unsupported; primary login still works. Together with existing auth/principal
 tests, **58 tests passed**, under a 512 MiB address-space / 90-second CPU cap.
 
 No complete session/channel invalidation or physical-browser test is claimed here.
+
+## Management API checkpoint — 2026-09-24
+
+`backend/app/api/access_keys.py` registers GET/POST `/api/access-keys` and POST
+`/api/access-keys/{id}/revoke` in the main app. The shared management dependency
+requires a verified primary session before storage access. All matched-route
+responses (including authorization, validation and handled storage failures) are
+no-store. Validation responses do not echo submitted inputs. Response models allow
+only public metadata, plus the one-time secret on successful creation. List/create
+explicitly report `login_enabled: false`; current login still rejects generated keys.
+
+`management_http.py` shares the existing settings JSON/same-origin write guard.
+Origin comparison excludes application root paths and does not read forwarded
+headers directly. Writes without Origin remain available to authenticated scripts.
+This does not harden older camera/provisioning routes or configure trusted proxies.
+
+UTC expiration normalization now happens before insertion, including rejection of
+offset dates that overflow the UTC datetime range; no record is created in that case.
+Creation is not idempotent and must not be automatically retried after an uncertain
+response. List/revoke the uncertain record before deliberately creating a new one.
+
+`tests/test_access_keys_api.py` exercises real ASGI requests, primary-only gating,
+legacy/unknown-kind/expired session denial, schema validation, no input echo,
+pagination, UTC metadata, idempotent revocation, cross-origin/content-type rejection,
+root-path handling, forwarded-header spoof attempts and sanitized storage failure.
+Main-app route registration is checked without starting its lifespan/workers.
+**94 focused API/lifecycle/settings tests passed** under a 512 MiB address-space cap.
+No production DB mutation, token issuance, camera command or container restart occurred.
+Backend rebuild/deployment is still pending; no dashboard control was added.
