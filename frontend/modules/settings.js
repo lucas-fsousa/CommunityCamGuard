@@ -55,17 +55,17 @@ export function renderSettings(container) {
       const id = "setting-" + name;
       const input = el("input", { id, type: "number", min: "0", max: String(max), step: "1", required: true });
       const baseline = el("input", { type: "checkbox", checked: !(name in value.overrides) });
-      input.value = baseline.checked ? "" : String(value.values[name]);
-      const help = el("p", { id: id + "-help", className: "muted", textContent: t("settings." + key + "Help") });
+      input.value = String(value.values[name]);
+      const help = el("p", { id: id + "-help", className: "muted settings-help", textContent: t("settings." + key + "Help") });
       input.setAttribute("aria-describedby", help.id);
       form.append(el("div", { className: "settings-field" },
         el("label", { htmlFor: id, textContent: t("settings." + key) }), help, input,
         el("label", { className: "settings-baseline" }, baseline, el("span", { textContent: t("settings.baseline") })),
-        el("p", { className: "muted", textContent: t("settings.effective", { value: value.values[name] }) })));
+        el("p", { className: "muted settings-effective", textContent: t("settings.effective", { value: value.values[name] }) })));
       fields.push({ name, input, baseline });
       input.addEventListener("input", refresh);
       baseline.addEventListener("change", () => {
-        input.value = baseline.checked ? "" : String(snapshot.values[name]);
+        input.value = String(snapshot.values[name]);
         refresh();
       });
     }

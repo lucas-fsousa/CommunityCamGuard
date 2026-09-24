@@ -1,10 +1,12 @@
 """Opt-in browser smoke test. Run inside a memory/CPU/time-limited cgroup.
 
-Only serves an explicit short H.264 fixture and repository test assets on loopback.
+Serves a short H.264 fixture or --settings test assets on loopback.
 No dashboard login, real camera connection or production API is involved.
+Optional --width and --screenshot allow isolated settings layout review.
 """
 
 import argparse
+import base64
 import json
 import subprocess
 import tempfile
@@ -21,16 +23,24 @@ from websockets.sync.client import connect
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--browser", required=True, type=Path)
-    parser.add_argument("--fixture", required=True, type=Path)
+    parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--screenshot", type=Path)
     args = parser.parse_args()
-    fixture = args.fixture.resolve()
-    if not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024:
+    fixture = args.fixture.resolve() if args.fixture else None
+    if not args.settings and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
         parser.error("fixture must be an existing H.264 MP4 below 10 MiB, at least 4 seconds")
     root = Path(__file__).resolve().parents[1]
     assets = {
         "/": (root / "tests/frontend/recording-browser.html", "text/html"),
         "/recording-playback.js": (root / "frontend/modules/recording-playback.js", "text/javascript"),
     }
+    if args.settings:
+        assets = {"/": (root / "tests/frontend/settings-browser.html", "text/html")}
+        for name, path in {"style.css": "style.css", "core.js": "modules/core.js",
+                           "settings.js": "modules/settings.js", "i18n.js": "i18n.js"}.items():
+            assets["/" + name] = (root / "frontend" / path, "text/css" if name.endswith("css") else "text/javascript")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -38,7 +48,7 @@ def main():
 
         def do_GET(self):
             url = urlparse(self.path)
-            if url.path == "/api/recordings/file":
+            if url.path == "/api/recordings/file" and not args.settings:
                 if parse_qs(url.query).get("original") == ["true"]:
                     data, mime = b"deliberately invalid native fixture", "video/mp4"
                 else:
@@ -84,6 +94,7 @@ def main():
                 "--disable-component-update", "--disable-extensions", "--disable-sync",
                 "--no-first-run", "--no-default-browser-check", "--mute-audio",
                 "--renderer-process-limit=1", "--remote-debugging-port=0",
+                f"--window-size={args.width},900",
                 "--autoplay-policy=no-user-gesture-required", f"--user-data-dir={profile}",
                 f"http://127.0.0.1:{server.server_port}/",
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -99,6 +110,13 @@ def main():
                     pages = json.load(response)
                 page = next(page for page in pages if page["type"] == "page")
                 with connect(page["webSocketDebuggerUrl"], open_timeout=5) as socket:
+                    if args.settings:
+                        socket.send(json.dumps({"id": 3, "method": "Emulation.setDeviceMetricsOverride",
+                            "params": {"width": args.width, "height": 900, "deviceScaleFactor": 1, "mobile": False}}))
+                        socket.recv(timeout=5)
+                        socket.send(json.dumps({"id": 4, "method": "Page.reload"}))
+                        socket.recv(timeout=5)
+                        time.sleep(0.3)
                     while time.monotonic() < deadline:
                         socket.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {
                             "expression": "window.smokeResult || null", "returnByValue": True,
@@ -108,6 +126,10 @@ def main():
                             print(json.dumps(result), flush=True)
                             if not result["ok"]:
                                 raise SystemExit(1)
+                            if args.screenshot:
+                                socket.send(json.dumps({"id": 2, "method": "Page.captureScreenshot"}))
+                                capture = json.loads(socket.recv(timeout=5))
+                                args.screenshot.write_bytes(base64.b64decode(capture["result"]["data"]))
                             break
                         time.sleep(0.2)
                     else:

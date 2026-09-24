@@ -10,7 +10,10 @@ Sign in with the server's primary dashboard key. Old sessions can still monitor
 cameras, but cannot administer settings: sign out and sign in again. The backend
 enforces this independently of the UI. Temporary access keys are not implemented.
 
-Each field shows its current resolved value. **Use server environment default**
+The centered panel uses compact numeric fields beside each setting's title, with
+explanations below and separate save/reload actions. It adapts to narrow screens.
+
+Each field shows its current resolved value, including when disabled. **Use server default**
 means no database override, so the number input is disabled. Uncheck it to enter a
 value and click **Save changes**. Check it again and save to restore the environment
 baseline. Nothing is written until Save; unchanged/busy forms cannot be submitted.

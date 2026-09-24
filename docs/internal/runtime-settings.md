@@ -98,3 +98,22 @@ Sign out/in with the primary key before editing: existing legacy cookies retain
 monitoring access but deliberately do not gain administrative authority. UI contracts
 are automated; full visual/mobile validation remains pending. No browser was launched
 in this settings deployment.
+
+## Compact layout and isolated browser check — 2026-09-24
+
+The revised panel uses description/value columns, bounded 112 px numeric inputs
+(88 px below 540 px), section separators and a separate actions footer. Default
+values remain visible while disabled. English/Portuguese descriptions are shorter.
+
+Actual Chromium layout checks and screenshot inspection passed at 1280×900 and
+390×900 with production CSS/modules and mocked settings reads, no live streams.
+Checks reject invisible/oversized inputs, label overlap and horizontal overflow.
+These are isolated viewport checks, not full-dashboard or physical-phone validation.
+The opt-in runner is `scripts/check_recording_browser.py --settings --browser PATH
+--width 390 --screenshot temp/settings-mobile.png`; no MP4 fixture is needed in
+settings mode. Run inside a cgroup with MemoryMax=512M, MemorySwapMax=0,
+CPUQuota=75%, TasksMax=128 and RuntimeMaxSec=65. Measured browser-tree peaks were
+399 MiB mobile / 204.2 MiB desktop, zero swap; browsers exited after capture.
+Node settings contracts also passed. Frontend bind mounts require a page reload,
+not a container restart. Temporary-key management/revocation remains a separate
+pending security milestone; no production setting was changed by these checks.

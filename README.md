@@ -165,7 +165,7 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 ### Configuration and access: current limits
 
 Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
-runtime overrides is available with a localized Settings tab
+runtime overrides is available with a localized, responsive Settings tab with compact numeric fields
 ([rollout/semantics](docs/internal/runtime-settings.md)). Sign out/in with the primary key if your
 existing session cannot edit. There is no temporary-key management API yet.
 After environment changes, recreate the app container; merely

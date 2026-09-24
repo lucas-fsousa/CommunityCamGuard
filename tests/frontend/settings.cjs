@@ -65,7 +65,7 @@ function edit(h, name, value) {
     h.find(e => e.tag === "form").fire("submit"); assert.equal(h.requests.length, 2);
     h.find(e => e.type === "button").fire("click");
     assert.equal(h.requests.length, 3); h.requests[2].resolve(snapshot(2)); await flush();
-    assert.equal(h.find(e => e.type === "number").value, ""); h.stopSettings();
+    assert.equal(h.find(e => e.type === "number").value, "0"); h.stopSettings();
   }
   {
     const h = harness(); h.stopSettings(); assert(h.requests[0].options.signal.aborted);

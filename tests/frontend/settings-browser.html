@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isolated settings layout check</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js"}}</script>
+<main id="stage" class="settings"><div id="settings"></div></main>
+<script type="module">
+import { state } from '/core.js';
+import { renderSettings } from '/settings.js';
+import { setLang } from '/i18n.js';
+setLang('pt-BR');
+window.fetch = async () => new Response(JSON.stringify({revision: 0,
+  values: {grid_hd_max_cameras: 0, playback_cache_mb: 2048}, overrides: {}}),
+  {headers: {'Content-Type': 'application/json'}});
+state.canManage = true;
+renderSettings(document.querySelector('#settings'));
+try {
+  for (let attempt = 0; !document.querySelector('input[type=number]'); attempt++) {
+    if (attempt > 100) throw new Error('Settings did not render');
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  await new Promise(requestAnimationFrame);
+  const widths = [...document.querySelectorAll('input[type=number]')].map(input => {
+    const rect = input.getBoundingClientRect();
+    const label = input.parentElement.firstElementChild.getBoundingClientRect();
+    if (rect.width <= 0 || rect.width > 112 || rect.right > innerWidth || label.right > rect.left)
+      throw new Error('Oversized or overlapping numeric field');
+    return rect.width;
+  });
+  if (document.documentElement.scrollWidth > innerWidth) throw new Error('Horizontal overflow');
+  window.smokeResult = {ok: true, viewport: innerWidth, inputWidths: widths};
+} catch (error) { window.smokeResult = {ok: false, error: error.message}; }
+</script>
+</html>

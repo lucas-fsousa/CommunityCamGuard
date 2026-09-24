@@ -271,6 +271,13 @@ with one producer each/advancing bytes. Sign out/in with the primary key to edit
 Public guide/readmes updated; mobile visual validation and temporary-key security
 remain pending. Details: `docs/internal/runtime-settings.md`.
 
+Settings layout checkpoint (2026-09-24): compact description/value rows, 112 px
+desktop / 88 px mobile inputs, visible disabled defaults and separate actions.
+Real Chromium isolated-component checks and screenshot inspection passed at
+1280×900 and 390×900; bounded browser runs peaked at 399 MiB with zero swap.
+Full-dashboard/physical-mobile validation remains distinct. Temporary-key issuance,
+expiry and revocation remain pending. Details: `docs/internal/runtime-settings.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
