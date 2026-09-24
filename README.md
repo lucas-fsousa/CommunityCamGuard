@@ -99,7 +99,7 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
   cookie. Treat that cookie as a credential. Temporary keys and immediate revocation remain planned.
   A primary-only two-field settings view is implemented; see its rollout checkpoint.
   The [primary-session foundation](docs/internal/session-principal.md) is implemented in source
-  (deployment pending); legacy cookies keep existing access but do not gain management permission.
+  and deployed; legacy cookies keep existing access but do not gain management permission.
 
 ## Platforms & networking
 
@@ -165,8 +165,9 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 ### Configuration and access: current limits
 
 Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
-runtime overrides is implemented in source ([rollout/semantics](docs/internal/runtime-settings.md),
-deployment pending), with a localized settings view. There is no temporary-key management API yet.
+runtime overrides is available with a localized Settings tab
+([rollout/semantics](docs/internal/runtime-settings.md)). Sign out/in with the primary key if your
+existing session cannot edit. There is no temporary-key management API yet.
 After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing
@@ -183,6 +184,7 @@ ruff check backend tests  # lint
 mypy backend/app          # type-check
 node --max-old-space-size=64 tests/frontend/camera-controls.cjs
 node --max-old-space-size=64 tests/frontend/recording-playback.cjs
+node --max-old-space-size=64 tests/frontend/settings.cjs
 ```
 The suite covers the logic — camera drivers, RTSP parsing/auth + credential
 verification, encryption, capability probe, PTZ/reboot control, storage policy, retention + playback
@@ -218,7 +220,7 @@ API are all **working**. Yoosee two-way audio is physically homologated on every
 the recovered LAN RTSP backchannel, including recorded messages and hold-to-speak from the browser.
 Still open: WAN-independent camera bootstrap/control, long-session intercom hardening, broader
 camera-family coverage for proprietary controls, native HEVC playback validation across desktop/mobile,
-settings and temporary access keys, security hardening, and S3 tiering. S3 is not implemented.
+broader settings and temporary access keys, security hardening, and S3 tiering. S3 is not implemented.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

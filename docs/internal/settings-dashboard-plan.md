@@ -3,8 +3,8 @@
 ## Current behavior, not a new settings feature
 
 **Implementation update:** [two-field runtime persistence](runtime-settings.md) and
-its primary-only API are now implemented in source, pending deployment. No settings
-screen exists yet. The inventory-time analysis below remains relevant for every
+its primary-only API/settings screen are now deployed. The inventory-time analysis
+below remains relevant for every
 other field and for service-restart/destructive application requirements.
 
 Reviewed all **42 declared Settings fields**, their consumers and the session
@@ -62,9 +62,10 @@ claim that the existing environment parser enforces it.
 ## Authentication gate before management endpoints
 
 **Update:** the [session-principal foundation](session-principal.md) is implemented
-and tested, pending deployment. The paragraphs below describe the inventory-time
+and tested, now deployed. The paragraphs below describe the inventory-time
 baseline and requirements; primary/legacy parsing and the management dependency
-are now covered by that follow-up. Temporary keys and management endpoints remain absent.
+are now covered by that follow-up. The two-field settings endpoints/view are deployed;
+temporary-key management remains absent.
 
 Current cookies are signed, seven-day **bearer credentials**, not safe to disclose.
 The cookie payload has no session identity, key identity or role; verification
@@ -89,7 +90,8 @@ BLE access or publish a public configuration endpoint as part of this work.
 ## Next bounded implementation
 
 The session-principal boundary and two-field next-operation persistence are implemented
-(see the linked rollout notes). Next, build the localized settings view over that
-revisioned API; leave destructive retention and service restarts for separate reviewed
+(see the linked rollout notes), together with the localized view. Next, validate its
+mobile UX and continue the separately tracked access-security work; leave destructive
+retention and service restarts for separate reviewed
 steps. No live setting, camera command or service restart was
 performed during this inventory.

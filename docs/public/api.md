@@ -27,7 +27,7 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 Sessions currently expire after seven days. Cookies are bearer credentials: protect cookie jars
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
 revocation of a stolen copy. Primary-session identification and its management dependency are
-implemented, along with the two-field settings API described below (deployment pending).
+implemented and deployed, along with the two-field settings API described below.
 The settings screen now uses this API. Temporary keys and immediate revocation are **not implemented**. See the
 [settings/authentication plan](../internal/settings-dashboard-plan.md).
 
@@ -47,7 +47,7 @@ New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cook
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
 Settings endpoints require primary sessions; key-management endpoints do not exist yet.
-These backend updates require deployment;
+These backend updates are included in the settings deployment;
 see [session migration and rollout](../internal/session-principal.md).
 
 ### Cameras
@@ -407,7 +407,7 @@ current clients discard stale live media instead of accelerating it. `GET /api/m
 returns the last 200 events from the current server process, oldest first. Each event includes a UTC
 timestamp and, when available, a snapshot of the matching go2rtc stream packet/consumer counters.
 
-### Runtime settings (primary session only; deployment pending)
+### Runtime settings (primary session only)
 
 | Method | Path | Body / result |
 | --- | --- | --- |

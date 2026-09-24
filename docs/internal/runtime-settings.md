@@ -1,6 +1,6 @@
 # Allowlisted runtime settings — 2026-09-24
 
-**API and dashboard view implemented in source; deployment pending.**
+**API and dashboard view deployed; see the checkpoint below.**
 
 ## Contract and authority
 
@@ -75,5 +75,26 @@ derived file and verified that a separate original fixture was untouched.
 
 No production DB override was written, no camera was contacted, and no container
 was restarted. Backend/auth changes need rebuild/recreation before this API exists
-in the running deployment. Next: deploy and validate the primary-only settings view.
+in the running deployment. This pending-deployment checkpoint is superseded below.
 Keep temporary-key/revocation/security-hardening work separately tracked.
+
+## Deployed checkpoint — 2026-09-24
+
+Runtime `f51b21c` passed all six CI gates (run `36005181271`). Image `b51391ac1d18`
+was built with 512 MiB/no swap/one CPU, context 4.022 MB. Only `ccg-app` was recreated
+at 13:23:31 UTC; go2rtc retained its 2026-09-23 00:24:47 UTC start time. Build
+`b-26db71224da6`, health 200, neither container reported OOM/automatic restarts.
+
+Actual loopback GET checks confirmed anonymous 401, canonical legacy cookie 403,
+primary cookie 200, and only the two allowed values in the response. Tokens stayed
+in memory and were not printed. Revision remained 0 with no overrides: no production
+PATCH was sent. First access initialized the empty settings table. App recreation
+briefly interrupts recording ownership, but no camera command/go2rtc restart occurred.
+
+Three consumed streams retained one producer each and advancing receive counters.
+One post-update sample showed app 109.9 MiB and go2rtc 59.59 MiB.
+
+Sign out/in with the primary key before editing: existing legacy cookies retain
+monitoring access but deliberately do not gain administrative authority. UI contracts
+are automated; full visual/mobile validation remains pending. No browser was launched
+in this settings deployment.

@@ -263,6 +263,14 @@ RLIMIT_AS attempt prevented Node's virtual reservation; standalone Node contract
 and the corrected cgroup run passed. No WSL OOM observed. Deployment/mobile visual
 validation pending; see `docs/public/settings.md` and `docs/internal/runtime-settings.md`.
 
+Settings deployment checkpoint (2026-09-24): `f51b21c`, image `b51391ac1d18`, build
+`b-26db71224da6`; all six CI gates passed. Bounded build and app-only recreation,
+go2rtc unchanged. Actual settings GET: anonymous 401, legacy 403, primary 200;
+revision 0/no overrides, no production PATCH. Health 200 and three consumed streams
+with one producer each/advancing bytes. Sign out/in with the primary key to edit.
+Public guide/readmes updated; mobile visual validation and temporary-key security
+remain pending. Details: `docs/internal/runtime-settings.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

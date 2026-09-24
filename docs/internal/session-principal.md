@@ -1,6 +1,9 @@
 # Primary-key session boundary — 2026-09-24
 
-## Implemented contract (deployment pending)
+## Implemented contract
+
+Deployed with the [settings UI checkpoint](runtime-settings.md#deployed-checkpoint--2026-09-24).
+The rollout discussion below retains the original implementation-stage context.
 
 Successful primary-key login now issues a signed version-1 payload with explicit
 `authentication: primary` and a random 128-bit session ID. The request body cannot
@@ -17,7 +20,7 @@ In particular, it does not yet establish a restricted temporary-user role.
 `GET /api/me` retains `authenticated` and adds `authentication` (`primary`, `legacy`
 or null) and `can_manage`. These are safe UI hints, not client authority. It returns
 no token, session ID, key or credential. The current frontend can continue reading
-only `authenticated`; administrative UI is not implemented yet.
+only `authenticated`; the later settings UI also consumes `can_manage`.
 
 ## Explicit migration
 
@@ -52,11 +55,11 @@ logout-not-revocation limitation. No production key/cookie is printed or stored 
 test artifacts; settings use the existing isolated fixtures.
 
 The subsequent [runtime-settings API](runtime-settings.md) now uses this management
-dependency; it is also pending deployment. The statements above about absent
+dependency and is now deployed. The statements above about absent
 management endpoints describe this session-only checkpoint, not that later step.
 
 No live camera, production login or container restart is required for these tests.
 The backend change needs an image rebuild/recreation to become active; it is not
-deployed by the frontend bind mount. Next: runtime-settings persistence with strict
-allowed fields and application semantics, protected by the primary-session gate;
-temporary-key activation must additionally close the pending security boundaries.
+deployed by the frontend bind mount. Runtime settings persistence and its UI were
+subsequently implemented/deployed; temporary-key activation must additionally close
+the pending security boundaries.

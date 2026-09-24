@@ -49,8 +49,8 @@ The live-camera player is a different pipeline from archive playback.
   **0 keeps originals indefinitely**, but recording can pause when storage fills.
   The disk monitor and retention cleaner are separate policies.
 
-The cache cap has a primary-only runtime override API implemented in source
-([deployment pending](../internal/runtime-settings.md)); the other settings above
+The cache cap has a deployed primary-only runtime override API
+([implementation](../internal/runtime-settings.md)); the other settings above
 still come from `.env`/environment. The [settings tab](settings.md) exposes the cache override.
 Environment changes require application recreation/reconfiguration;
 browser reload alone does not update service settings. Never share the `.env` file.
