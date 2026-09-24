@@ -3,7 +3,8 @@
 **Open-source, self-hosted NVR and dashboard for generic ONVIF / RTSP IP cameras** — a
 privacy-friendly replacement for the limited, cloud-locked vendor apps that ship with cheap
 Chinese Wi-Fi cameras (Yoosee, XiongMai/XMEye, Dahua/Hikvision clones, and more). Discover
-cameras on your LAN, watch them live, record 24/7, and control them — all local, no cloud.
+cameras on your LAN, watch them live and record locally. Some proprietary onboarding/control
+flows still depend on vendor services; fully WAN-independent operation remains on the roadmap.
 
 <sub>open-source NVR · ONVIF · RTSP · Yoosee · self-hosted camera dashboard · WebRTC · go2rtc · home surveillance</sub>
 
@@ -12,8 +13,8 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 > listen-in audio, **PTZ** control (press-and-hold), 24/7 crash-safe recording with browser
 > playback + time-based retention, storage policy, a localized (en/pt-BR) web dashboard with a
 > dedicated **Cameras** setup tab, and a REST API. Recorded voice messages and bounded push-to-talk
-> are implemented through the Yoosee driver's legacy/IoTVideo-specific transports; final physical
-> speech validation of the corrected IoTVideo path remains (see `docs/DECISIONS.md`).
+> are physically validated on the current Yoosee units through the driver's LAN RTSP backchannel.
+> This does not establish support for every model/firmware or every fallback transport.
 
 ## Documentation
 
@@ -21,6 +22,8 @@ cameras on your LAN, watch them live, record 24/7, and control them — all loca
 |---|---|
 | **[Setup](#setup)** | Run it — Docker on Linux/macOS/Windows, or Python directly. |
 | **[Bluetooth onboarding](docs/public/bluetooth-onboarding.md)** | Put a factory-new camera on Wi-Fi without the vendor UI. |
+| **[Recordings and playback](docs/public/recordings.md)** | Original MP4, native HEVC, compatibility conversion, download and troubleshooting. |
+| **[Documentation index](docs/README.md)** | User guides, current implementation notes and validation evidence. |
 | **[API reference](docs/public/api.md)** | Every REST endpoint — build your own UI/scripts. Interactive at `/api/docs`. |
 | **[Contributing](CONTRIBUTING.md)** | Dev setup, standards (ruff/mypy/pytest), how to add a camera brand. |
 | **[Roadmap](ROADMAP.md)** | Backlog, priorities, milestones. |
@@ -68,7 +71,7 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
    └──────────┘          └──────────────┘                    └────────┬─────────┘
                                                                       ▼
                                                     recordings/<cam>/<UTC-date>/<UTC-hour>/*.mp4
-                                                    + SQLite index  → (optional) S3 tiering
+                                                    + SQLite index (local storage)
 ```
 
 - **Discovery** — active port/path scan (the reliable path for these cams; WS-Discovery is kept
@@ -81,13 +84,19 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
 - **Recording** — `ffmpeg` segment muxer in `-c:v copy` (remux, no re-encode → near-zero CPU),
   configurable chunk length (`SEGMENT_SECONDS`, default 300) laid out by UTC date/hour and indexed in
   SQLite. Each segment is a **crash-safe fragmented MP4** (playable up to its last flushed fragment
-  after a hard kill). Streams are HEVC; the recordings player transcodes HEVC→H.264 on demand into a
-  size-capped LRU cache so clips play (and seek) natively in the browser.
-- **Storage** — local-first; optional S3 tiering via `.env`. A disk monitor alerts at 80% and
+  after a hard kill). The source codec is preserved. For HEVC, the player tries the original when
+  the browser reports probable codec support; failed native playback falls back once to a complete,
+  seekable H.264 copy in a size-capped LRU cache. AAC audio is copied, not re-encoded. Compatibility
+  work is limited to one encoder per app process, with at most three queued jobs. Downloads always
+  provide the original. See the [playback guide](docs/public/recordings.md) for limits and validation.
+- **Storage** — local storage; S3 settings are placeholders, not an implemented tiering feature.
+  A disk monitor alerts at 80% and
   **skips saving (keeps streaming) when full**, resuming automatically when space frees, and
-  **never deletes**. A separate opt-in **retention** job (`RECORDING_RETENTION_DAYS`) trims footage
-  older than N days (0 = keep forever).
-- **Auth** — a secret key from `.env` gates the dashboard via a signed session cookie.
+  **never deletes**. A separate **retention** job (`RECORDING_RETENTION_DAYS`, default **7 days**)
+  deletes older footage; set **0** to keep it indefinitely, subject to available storage.
+- **Auth** — a secret key from `.env` gates protected operations via a signed, seven-day session
+  cookie. Treat that cookie as a credential. Temporary keys, immediate revocation and a dashboard
+  settings editor are planned, not available yet.
 
 ## Platforms & networking
 
@@ -121,7 +130,7 @@ docker compose up -d --build
 Or run it directly with Python (spawns/owns the go2rtc binary itself):
 
 ```bash
-pip install -e .              # or: pip install -e '.[s3,dev]'
+pip install -e .              # or: pip install -e '.[dev]'
 python -m backend.app.discovery.active_scan       # optional: gentle subnet scan from the CLI
 python -m backend.app.main                         # API + dashboard + go2rtc + recorder + storage
 ```
@@ -150,6 +159,16 @@ firewall.
 Need the media engine binary? `go2rtc` is expected at `./bin/go2rtc` (Linux amd64 build from
 the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 
+### Configuration and access: current limits
+
+Configuration still comes from `.env`/environment; there is no runtime settings editor or
+temporary-key management API yet. After environment changes, recreate the app container; merely
+refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
+camera credentials or internal media ports. Authentication alone is not a completed internet-facing
+security audit. The [settings inventory and plan](docs/internal/settings-dashboard-plan.md)
+classifies all 42 declared options, including unused fields, restart requirements and server-only
+secrets. Changes to retention can delete originals; review that policy before deployment.
+
 ### Tests
 
 ```bash
@@ -157,16 +176,20 @@ pip install -e '.[dev]'
 pytest                    # the suite in tests/
 ruff check backend tests  # lint
 mypy backend/app          # type-check
+node --max-old-space-size=64 tests/frontend/camera-controls.cjs
+node --max-old-space-size=64 tests/frontend/recording-playback.cjs
 ```
-The suite (300+ tests, ~91% coverage) covers the logic — camera drivers, RTSP parsing/auth + credential
+The suite covers the logic — camera drivers, RTSP parsing/auth + credential
 verification, encryption, capability probe, PTZ/reboot control, storage policy, retention + playback
 cache, recordings pagination, the REST endpoints and go2rtc config — against a throwaway DB, no
 cameras or network needed. Lint and types are enforced in CI (`.github/workflows/ci.yml`).
+The separate [real-browser smoke test](docs/internal/recordings-native-playback.md#isolated-real-browser-validation--2026-09-24)
+is opt-in and resource-capped; it is not part of ordinary pytest/CI or proof of native HEVC support.
 
-## Operating note: power-cycle the cameras first
+## Operating note: keep camera connections gentle
 
-> **Always reboot (power-cycle) your cameras before a fresh discovery/streaming session, to
-> restore a known-good initial state.**
+> Routine playback and discovery do not require rebooting cameras. Investigate connection pressure
+> and server/relay health first; a reboot interrupts monitoring and must be an explicit operator action.
 
 The cheap generic Wi-Fi cameras this project targets run tiny embedded RTSP servers that can
 **hang or drop off the network under connection pressure** (rapid scans, many simultaneous
@@ -176,8 +199,8 @@ camera not even answering `ping` — none of which mean your path, credentials o
 wrong. A power-cycle (unplug ~10s, plug back in, wait ~30–60s to rejoin Wi-Fi) clears it.
 
 Because of this, discovery and probing are deliberately **gentle** (low concurrency, one reused
-connection per camera, prompt teardown). Even so, rebooting the cameras at the start of a
-session is the reliable way to guarantee a valid baseline.
+connection per camera, prompt teardown). Do not use repeated reboots to hide a resource or
+connection-lifecycle problem.
 
 Tip: clients see a stable opaque camera ID. The current ONVIF/RTSP driver re-matches its private
 MAC identity after DHCP changes; future drivers may map a serial or vendor-native ID instead.
@@ -186,11 +209,12 @@ MAC identity after DHCP changes; future drivers may map a serial or vendor-nativ
 
 Discovery, driver-independent camera IDs, go2rtc live view, 24/7 recording + retention, storage policy,
 pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
-API are all **working**. Still open: final physical validation of continuous **two-way audio
 API are all **working**. Yoosee two-way audio is physically homologated on every current unit through
 the recovered LAN RTSP backchannel, including recorded messages and hold-to-speak from the browser.
 Still open: WAN-independent camera bootstrap/control, long-session intercom hardening, broader
-camera-family coverage for proprietary controls, and optional S3 tiering. See `ROADMAP.md` and
+camera-family coverage for proprietary controls, native HEVC playback validation across desktop/mobile,
+settings and temporary access keys, security hardening, and S3 tiering. S3 is not implemented.
+See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
 Full backlog, priorities and milestones: **[ROADMAP.md](ROADMAP.md)**.

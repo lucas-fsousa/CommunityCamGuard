@@ -11,7 +11,8 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
 ## Authentication
 
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server
-sets an HTTP-only cookie `ccg_session` that every other endpoint requires.
+sets an HTTP-only cookie `ccg_session` required by protected endpoints. Health/build and
+authentication-status endpoints remain public as documented below.
 
 ```bash
 # 1. log in — stores the cookie in a jar
@@ -23,6 +24,11 @@ curl -b jar.txt http://127.0.0.1:3200/api/cameras
 ```
 
 A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRET_KEY` in `.env`.
+Sessions currently expire after seven days. Cookies are bearer credentials: protect cookie jars
+like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
+revocation of a stolen copy. Temporary keys, key-management roles, immediate revocation and writable
+dashboard settings endpoints are **not implemented**. See the
+[settings/authentication plan](../internal/settings-dashboard-plan.md).
 
 ---
 
@@ -404,14 +410,27 @@ timestamp and, when available, a snapshot of the matching go2rtc stream packet/c
 | Method | Path | Params | Notes |
 |---|---|---|---|
 | GET | `/api/recordings` | `camera_id`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Each item includes canonical `camera_id` and registry-resolved `camera_name`; the response also includes `total` and `retention_days`. Deprecated `mac` remains an optional compatibility filter. |
-| POST | `/api/recordings/prepare` | `path` (required) | Starts one shared background HEVC→H.264 preparation job. Returns `{ready, cached, transcoding}`. |
-| GET | `/api/recordings/file` | `path` (required) | Plays only a complete, seekable MP4. Cache hits and browser-native codecs are served directly; an unprepared HEVC file returns `409`. |
+| POST | `/api/recordings/prepare` | `path` (required), `native_hevc=false` | Default: prepares/reuses a shared compatible copy. If `native_hevc=true` and the source is HEVC, returns `{ready:true, cached:false, transcoding:false, original:true}` without encoding. Other responses retain `{ready, cached, transcoding}`. |
+| GET | `/api/recordings/file` | `path` (required), `original=false` | Default: serves a complete compatible source/cache or starts shared preparation and returns `409`; saturation returns `429`. `original=true` serves original bytes directly, never starts encoding and ignores the derived cache. Both paths support Range requests. |
 | GET | `/api/recordings/playback-status` | `path` (required) | Reports `{ready, cached, transcoding}` while the dashboard waits for the complete seekable artifact. |
 | GET | `/api/recordings/download` | `path` (required) | Download the original `.mp4` with `attachment` disposition and a server-generated `Camera_UTC-timestamp.mp4` filename. |
 
 ```bash
 curl -b jar.txt "http://127.0.0.1:3200/api/recordings?camera_id=cam_0123456789abcdef01234567&limit=50"
 ```
+
+All recording endpoints require authentication and validate the path inside the configured
+recordings root. Native preferences do not bypass either check. Clients should opt into native
+HEVC only with capability detection and a bounded fallback. On native failure, prepare again
+**without** `native_hevc=true` and poll status until ready, then load `/file` **without**
+`original=true`. The status endpoint reports compatibility preparation, not the client's native
+decoder state. Do not fall back recursively or start an encode for every Range request.
+
+Preparation admits at most four jobs per application process (one encoder, up to three waiting).
+Admission rejection returns `429` with `Retry-After: 5`; queue expiry/conversion failure reports
+not-ready/not-transcoding rather than an endlessly growing preview. Ready files support 206/416
+and If-Range semantics. Downloads always return the original as an attachment, independently of
+which representation the player uses. See the [playback guide](recordings.md).
 
 ### Health
 
@@ -432,6 +451,9 @@ Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 | 403 | Factory provisioning did not originate from the authenticated trusted local network. |
 | 422 | Validation error — including a **wrong camera password** on add (deliberately not 401, so a UI doesn't bounce to login). |
 | 404 | Camera not found. |
+| 409 | Requested compatible recording is still being prepared; poll playback status. Other endpoints may also use it for state conflicts. |
+| 416 | Recording byte range is not satisfiable. |
+| 429 | Playback preparation admission is busy; honor `Retry-After`. This is not a claim of implemented login rate limiting. |
 | 501 | Camera/driver doesn't support the requested action (e.g. PTZ/reboot). |
 
 > This reference is hand-maintained; the authoritative, always-current schema is

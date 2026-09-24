@@ -30,3 +30,21 @@ MP4:
 - Concurrent viewers do not duplicate encoding, and no new camera connection is opened.
 - Original recordings and downloads remain full-resolution HEVC.
 - ADR 0019 is superseded; fragmented progressive playback is not used for archived review.
+
+## Amendment — native source with bounded compatibility fallback (2026-09-24)
+
+The complete-source/seek requirement remains; mandatory HEVC conversion does not. The dashboard
+now checks codec-specific browser hints and requests original HEVC delivery when support is
+probable. The API validates authentication/path, confirms the source codec, and returns an explicit
+original selection without starting an encoder. Decode/format failure or bounded startup timeout
+falls back once to the shared complete H.264 cache. Autoplay denial is not a codec failure.
+
+Compatibility work is capped at one encoder and three waiters per app process, with bounded
+queue/encode time and one-thread decoder/encoder/filter settings. Original media is never changed;
+the source's AAC audio is copied. Metadata caching avoids repeated ffprobe work on unchanged files.
+
+Selection ownership, stale request/play-promise cancellation, native controls and same-row seek
+preservation live in a dedicated frontend module. HTTP Range/auth checks and an isolated Chromium
+compatible/fallback/seek run passed; native HEVC success on actual desktop/mobile clients remains
+pending. See [lifecycle](recordings-playback-lifecycle.md), [measurements](recordings-playback-measurements.md)
+and [native playback](recordings-native-playback.md) for exact evidence and remaining limits.

@@ -9,7 +9,7 @@ The most useful contribution is usually **adding support for a camera you own**.
 python -m venv .venv && . .venv/bin/activate
 pip install -e '.[dev]'
 pytest                       # run the test suite (no cameras/network needed)
-python -m backend.app.main   # run the app on 127.0.0.1:3200
+python -m backend.app.main   # defaults to 0.0.0.0:3200; set HOST=127.0.0.1 for loopback-only dev
 ```
 
 See `README.md` for the full architecture and `docs/DECISIONS.md` for the design rationale.
@@ -130,13 +130,14 @@ Note the exact model(s)/firmware you verified in the module docstring, and add a
 
 ## Code standards
 
-CI (`.github/workflows/ci.yml`) runs four gates on every push/PR — run them locally first:
+CI (`.github/workflows/ci.yml`) runs five gates on every push/PR — run them locally first:
 
 ```bash
 ruff check backend tests   # lint (config in pyproject.toml)
 mypy backend/app           # type-check
 pytest                     # tests (throwaway DB, no cameras/network)
 node --max-old-space-size=64 tests/frontend/camera-controls.cjs  # DOM/control contracts
+node --max-old-space-size=64 tests/frontend/recording-playback.cjs  # archive player lifecycle
 ```
 
 - **Types:** annotate public functions; `mypy` must pass. New modules should be typed.
@@ -151,7 +152,7 @@ node --max-old-space-size=64 tests/frontend/camera-controls.cjs  # DOM/control c
 ## PR flow
 
 1. Branch off `main`; keep the change focused.
-2. Make the four gates above green; add/adjust tests.
+2. Make the five gates above green; add/adjust tests.
 3. Note the exact camera model(s)/firmware you verified (for driver PRs) in the module docstring.
 4. Open the PR with a short *why*. Match the surrounding style; keep modules cohesive.
 
@@ -177,3 +178,24 @@ Do not add or increment manual `?v=` asset versions. The server hashes the execu
 `frontend/boot.js` applies that content ID automatically. A frontend edit is visible after reload in
 the compose bind-mount workflow; rebuild the app image only when backend code changes. CI tests fail
 if date-based asset versions are reintroduced.
+
+### Settings, documentation and browser validation
+
+When adding/removing a `Settings` field, update
+[`settings-inventory.json`](docs/internal/settings-inventory.json) and its
+[application/security plan](docs/internal/settings-dashboard-plan.md). CI checks every field is
+classified exactly once. The inventory is documentation, not a runtime allowlist. Never serialize
+the full Settings object to the browser or make credentials/paths/operator overrides writable
+through a generic form. Primary-key-only management authorization is a pending prerequisite.
+
+Keep the root README, [documentation index](docs/README.md), relevant public API/guide and roadmap
+consistent with shipped behavior. Preserve historical ADR decisions with dated amendments and
+links to current implementation notes. Separate code/unit evidence, isolated browser tests and
+physical-camera validation; never promote an unverified driver or planned screen to a feature.
+
+The optional [`check_recording_browser.py`](scripts/check_recording_browser.py) uses a short trusted
+H.264 fixture and the real playback controller, without opening the dashboard or contacting a
+camera. Follow the [capped execution instructions](docs/internal/recordings-native-playback.md#isolated-real-browser-validation--2026-09-24):
+cap the entire browser process tree, not just its launcher; keep audio muted and ensure teardown.
+Do not run an uncapped browser/emulator on a shared memory-constrained WSL host. This test forces
+capability responses/autoplay and is not native HEVC or mobile-browser homologation.

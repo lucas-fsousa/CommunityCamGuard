@@ -229,6 +229,13 @@ in `docs/internal/settings-dashboard-plan.md`. This is not an editable settings
 screen or a hot-reload implementation. Next: trusted session principal and
 primary-key-only management authorization, before any settings/key write endpoint.
 
+Documentation synchronization (2026-09-24): root/docs/internal READMEs, contributor
+instructions, recording API reference and ADR 0013/0021 amendments now link the
+native-playback, bounded-conversion, browser-validation and settings-inventory
+evidence. Added `docs/public/recordings.md`. Removed current-feature claims for
+unimplemented S3, clarified seven-day default retention, and distinguished planned
+settings/temporary keys from deployed behavior. No runtime configuration changed.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

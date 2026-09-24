@@ -1,4 +1,4 @@
-# Architecture Decision Records (ADRs)
+# Internal documentation and architecture decisions
 
 The *why* behind non-obvious design choices — one decision per file, in **Context / Decision /
 Consequences** form. Reference them from code as `docs/internal/NNNN-...md`.
@@ -44,6 +44,23 @@ The load-bearing decisions are now captured as ADRs. What remains in `DECISIONS.
 status/planning sections (§5–§7), assorted UX tweaks and bugfix notes (e.g. persistent players §12,
 PTZ latency detail, add/delete-under-compose fix §26) — kept as the historical narrative, not
 promoted to ADRs.
+
+## Current implementation and validation notes
+
+These documents complement the ADRs. They distinguish shipped behavior, measurements,
+hardware/browser validation and pending work; dates/build IDs are checkpoints, not manual versions.
+
+| Topic | Evidence / scope |
+| --- | --- |
+| [Native archive playback](recordings-native-playback.md) | HEVC capability hints, one-shot fallback, original delivery, HTTP measurements and capped Chromium smoke test; native HEVC/mobile validation pending |
+| [Recording player lifecycle](recordings-playback-lifecycle.md) | Selection ownership, cancellation, native controls, removed duplicate button and shared encoder budget |
+| [Playback measurements](recordings-playback-measurements.md) | Cold/cached conversion, codec cache, Range/auth checks, deployment and scoped preparation logs |
+| [Settings plan](settings-dashboard-plan.md) | Current env-only behavior, service snapshots, future authorization/persistence requirements |
+| [Settings inventory](settings-inventory.json) | 42 classified fields; names only, CI checks completeness; not a runtime/API allowlist |
+| [Driver package audit](driver-package-audit.md) | Discovery-only vs implemented driver support and vendor-package boundaries |
+
+For user-facing instructions see the [public documentation index](../README.md). Keep planned
+settings, temporary keys and WAN-independent provisioning out of implemented-feature claims.
 
 ## Format
 

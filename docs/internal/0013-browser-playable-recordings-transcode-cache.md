@@ -2,6 +2,11 @@
 
 **Status:** accepted · **Date:** 2026-07-28
 
+**Current scope (2026-09-24):** this cache is the compatibility path, not mandatory for every
+HEVC-capable browser. See the [native playback amendment](0021-seekable-first-recording-playback.md#amendment--native-source-with-bounded-compatibility-fallback-2026-09-24)
+and [current implementation/validation](recordings-native-playback.md). Earlier observations below
+describe the tested browsers at the time, not a universal inability to decode HEVC.
+
 ## Context
 
 Segments are recorded **HEVC** (`-c:v copy`, the zero-CPU point of 24/7 recording — ADR 0004), but
@@ -19,8 +24,8 @@ segments are served as-is; the recorder is unchanged.
 
 The cache is a **size-capped LRU** (`PLAYBACK_CACHE_MB`, default 2048; `0` = unbounded):
 
-- Only **derived transcodes** are ever evicted — never a source recording (each entry is losslessly
-  reproducible on the next view).
+- Only **derived transcodes** are ever evicted — never a source recording (each entry can be
+  regenerated from the original; the H.264 encode itself is not lossless).
 - **LRU by mtime**, refreshed on a cache *hit* via `os.utime` (read atime is unreliable on `noatime`
   volumes).
 - Eviction runs on the **write path** only, right after a new transcode is promoted (`_evict(keep=…)`)
