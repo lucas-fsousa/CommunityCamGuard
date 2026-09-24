@@ -72,3 +72,44 @@ no camera command was sent and no original/cache file was changed by this check.
 This is HTTP readiness, not measured browser playback time or an apples-to-apples
 benchmark against the earlier converted recording. 57 focused Python tests and
 both Node suites passed; browser homologation is still pending.
+
+## Isolated real-browser validation — 2026-09-24
+
+`scripts/check_recording_browser.py` and `tests/frontend/recording-browser.html`
+exercise the production playback controller against a tiny loopback fixture
+server, not the dashboard/API or cameras. Preparation responses and HEVC hints
+are controlled; video decoding, DOM events, play promises and seeking are real.
+The native attempt deliberately receives invalid bytes to exercise fallback.
+
+Chromium 153.0.8010.36 passed both compatible-first and native-error/fallback
+scenarios using the existing five-second H.264/AAC camera-3 derived sample. Each
+decoded 1920px-wide video, sought to 3 seconds, resumed beyond 3.1 seconds and
+preserved the source/position when reselecting the row. Preparation call counts
+were one/two respectively, with no repeated fallback. Disposal removed the source.
+The browser was muted and did not open the production dashboard or send a camera
+command. This is not HEVC-success, mobile, full-page layout or autoplay-policy
+homologation: autoplay was explicitly allowed for this isolated lifecycle check.
+
+Safety: a transient **user systemd service** capped the whole process tree at
+512 MiB RAM, no swap, 75% of one CPU, 128 tasks and 65 seconds. The Chromium
+binary was invoked directly, not through a Snap launcher which could move it
+outside the service's cgroup. Measured runtime 5.450s, CPU time 2.353s, peak memory
+465.1 MiB, zero swap. All processes terminated when the unit completed. Do not
+run this browser harness uncapped on the WSL host; it disables the browser sandbox
+only for trusted local test fixtures and must not be used to browse external sites.
+No browser was left running. Temporary browser profiles are removed automatically.
+
+Example (replace binary/fixture paths with existing trusted local files):
+
+```sh
+systemd-run --user --wait --pipe --collect \
+  -p MemoryMax=512M -p MemorySwapMax=0 -p CPUQuota=75% \
+  -p TasksMax=128 -p RuntimeMaxSec=65 \
+  /absolute/repo/.venv/bin/python /absolute/repo/scripts/check_recording_browser.py \
+  --browser /absolute/path/to/chrome --fixture /absolute/path/to/short-h264.mp4
+```
+
+Review also fixed intentional pause during a pending `play()` promise: its
+`AbortError` no longer displays a false playback failure when the element is
+paused and has no media error. A fake-media regression covers that race; this
+specific edge case was not part of the real-browser run above.

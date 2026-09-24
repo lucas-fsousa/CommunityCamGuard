@@ -213,6 +213,14 @@ fake-media lifecycle regressions cover the new path. No universal HEVC support
 or real-browser success is assumed. See `docs/internal/recordings-native-playback.md`;
 desktop/mobile native playback and fallback homologation remain pending.
 
+Isolated Chromium validation passed compatible playback and native-error fallback,
+seek to 3s, same-row resume without reload, and disposal, using a five-second local
+derived fixture and the real controller. Browser process tree capped at 512 MiB,
+no swap/75% CPU/65s; peak 465.1 MiB, exited after 5.45s. No production dashboard or
+camera connection. Native HEVC success, default autoplay policy, mobile and full
+dashboard UX remain unverified. Intentional-pause `AbortError` now clears status
+instead of reporting a false failure; covered by a separate fake-media regression.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

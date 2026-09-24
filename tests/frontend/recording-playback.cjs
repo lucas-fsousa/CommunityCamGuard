@@ -166,5 +166,15 @@ function harness(support = "") {
     assert.equal([...h.timers.values()][0].delay, 1000); // Fresh budget after late decode failure.
     h.controller.dispose();
   }
+  {
+    const h = harness("probably"); let rejectPlay;
+    h.player.play = () => new Promise((_resolve, reject) => { rejectPlay = reject; });
+    h.controller.select("a");
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    h.player.paused = true; h.player.emit("pause"); rejectPlay({ name: "AbortError" });
+    await flush();
+    assert.equal(h.status.textContent, ""); assert.equal(h.requests.length, 1);
+    assert.equal(h.timers.size, 0); h.controller.dispose();
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

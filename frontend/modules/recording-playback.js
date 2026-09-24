@@ -44,6 +44,8 @@ export function createRecordingPlayback(player, status, api, t) {
       if (!active(item) || item.attempt !== attempt) return;
       if (error?.name === "NotSupportedError" && item.original) return fallback(item);
       clearTimeout(item.nativeTimer); // Autoplay denial is not a codec failure.
+      // A deliberate pause can reject the pending play promise; it is not a media failure.
+      if (error?.name === "AbortError" && player.paused && !player.error) return message("");
       message(error?.name === "NotAllowedError" ? "rec.readyPressPlay" : "rec.playbackFailed");
     }).finally(() => { if (item.attempt === attempt) item.playPending = false; });
   }

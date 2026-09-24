@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Isolated recording lifecycle smoke test</title>
+<script type="module">
+import { createRecordingPlayback } from "/recording-playback.js";
+const waitFor = async (check) => {
+  const end = performance.now() + 15000;
+  while (!check()) {
+    if (performance.now() > end) throw new Error("condition timeout");
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+};
+const assert = (condition, label) => { if (!condition) throw new Error(label); };
+try {
+  const results = [];
+  for (const native of [false, true]) {
+    const video = document.createElement("video");
+    video.controls = true; video.muted = true; video.playsInline = true;
+    // Force negotiation only. Actual decoding/events/seek/play promises stay real.
+    video.canPlayType = () => native ? "probably" : "";
+    const status = document.createElement("span");
+    document.body.append(video, status);
+    const requests = [];
+    let plays = 0, loads = 0;
+    video.addEventListener("playing", () => plays++);
+    video.addEventListener("loadstart", () => loads++);
+    const api = async (url) => {
+      requests.push(url);
+      return { ready: true, cached: !url.includes("native_hevc=true"),
+               original: url.includes("native_hevc=true") };
+    };
+    const playback = createRecordingPlayback(video, status, api, key => key);
+    try {
+      playback.select("fixture");
+      await waitFor(() => plays > 0 && video.videoWidth > 0 && video.currentTime > 0);
+      assert(requests.length === (native ? 2 : 1), "unexpected preparation count");
+      assert(!video.src.includes("original=true"), "fallback not attached");
+      video.pause();
+      video.currentTime = 3;
+      await waitFor(() => !video.seeking && video.currentTime >= 3);
+      const previousLoads = loads;
+      playback.select("fixture");
+      await waitFor(() => video.currentTime > 3.1 && !video.paused);
+      assert(loads === previousLoads, "same-row click reloaded video");
+      results.push({ mode: native ? "native-error-fallback" : "compatible",
+                     width: video.videoWidth, seek: true, repeatedClickReload: false,
+                     requests: requests.length });
+    } finally {
+      playback.dispose();
+      assert(!video.hasAttribute("src"), "dispose retained source");
+      video.remove(); status.remove();
+    }
+  }
+  window.smokeResult = { ok: true, results };
+} catch (error) {
+  window.smokeResult = { ok: false, error: error.message };
+}
+</script>
+<body></body>
