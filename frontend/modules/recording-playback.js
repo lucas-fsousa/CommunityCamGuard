@@ -52,6 +52,7 @@ export function createRecordingPlayback(player, status, api, t) {
     if (!active(item) || !item.original || item.fallback) return;
     item.resume = player.currentTime || 0;
     item.fallback = true;
+    item.deadline = Date.now() + 650000; // A late decode failure gets its own preparation budget.
     item.original = false;
     item.ready = false;
     item.attempt++;

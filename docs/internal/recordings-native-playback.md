@@ -12,7 +12,7 @@ The browser checks `canPlayType` for MP4 with `hvc1`/`hev1` plus AAC (`mp4a.40.2
 At least one result must be `probably`; empty/`maybe` uses the compatibility path.
 This is deliberately only a hint: it does not identify the source's exact HEVC
 profile, level, sample-entry tag or actual hardware performance. The
-[HTML media specification](https://html.spec.whatwg.org/multipage/media.html#dom-navigator-canplaytype)
+[HTML media specification](https://html.spec.whatwg.org/multipage/media.html)
 defines capability results as confidence levels, not proof of successful playback.
 Actual browser/device homologation remains required; conservative hints may miss
 devices which could decode the source.
@@ -54,3 +54,21 @@ synthetic bytes, not a browser decoding benchmark.
 Remaining: test real HEVC first-play/seek on desktop/mobile with and without
 native support; verify fallback visually and measure ready-to-playing time. Do
 not mark recordings performance fully resolved from API or fake-media tests.
+
+## Deployment and HTTP check
+
+Backend `b2a0134` passed CI `35955790803`, built as image `72887ea757d9` with
+512 MiB/no-swap/one-CPU limits. Only the app was recreated (2026-09-24 04:29:14 UTC);
+go2rtc retained its previous start time. The live-mounted frontend additionally
+resets the fallback preparation deadline after a late native decode failure.
+Dashboard build: `b-8bf3b900f4eb`. Health 200, no reported container OOM/restarts.
+
+One closed camera-3 archive was selected read-only, older than 15 minutes and
+below 10 MiB. Actual authenticated native preparation returned ready/original in
+159.06 ms without starting a transcode. Two 4 KiB ranges (start/end) returned 206
+and matched the original file bytes, in 11.68/9.59 ms including reading/comparison.
+An unauthenticated original request returned 401. No media was played or printed,
+no camera command was sent and no original/cache file was changed by this check.
+This is HTTP readiness, not measured browser playback time or an apples-to-apples
+benchmark against the earlier converted recording. 57 focused Python tests and
+both Node suites passed; browser homologation is still pending.

@@ -6,9 +6,10 @@ const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules/reco
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 function harness(support = "") {
   const timers = new Map(); let timerId = 0;
-  const create = new Function("setTimeout", "clearTimeout", source + "\nreturn createRecordingPlayback;")(
+  let now = Date.now();
+  const create = new Function("setTimeout", "clearTimeout", "Date", source + "\nreturn createRecordingPlayback;")(
     (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; },
-    (id) => timers.delete(id));
+    (id) => timers.delete(id), { now: () => now });
   const events = () => ({
     listeners: new Map(),
     addEventListener(key, fn) { this.listeners.set(key, fn); },
@@ -26,7 +27,7 @@ function harness(support = "") {
   const requests = [];
   const api = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
   const controller = create(player, status, api, (key) => key);
-  return { controller, player, status, requests, timers };
+  return { controller, player, status, requests, timers, advanceTime(ms) { now += ms; } };
 }
 (async () => {
   {
@@ -153,6 +154,16 @@ function harness(support = "") {
     h.requests[0].resolve({ ready: true, original: true }); await flush();
     h.player.videoWidth = 0; h.player.emit("playing");
     assert.equal(h.requests.length, 2); // Audio-only is not successful video playback.
+    h.controller.dispose();
+  }
+  {
+    const h = harness("probably"); h.controller.select("a");
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    h.player.emit("playing"); h.advanceTime(700000);
+    h.player.error = { code: 3 }; h.player.emit("error");
+    h.requests[1].resolve({ ready: false, transcoding: true }); await flush();
+    assert.equal(h.status.textContent, "rec.preparingSeekable");
+    assert.equal([...h.timers.values()][0].delay, 1000); // Fresh budget after late decode failure.
     h.controller.dispose();
   }
   console.log("Recording playback lifecycle contracts passed");
