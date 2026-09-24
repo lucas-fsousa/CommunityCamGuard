@@ -18,6 +18,7 @@ from ..auth import COOKIE_NAME, require_auth, verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..media import quality
+from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -43,7 +44,7 @@ def media_streams(request: Request) -> dict:
     return {
         "go2rtc_api": settings.go2rtc_api,
         "healthy": healthy,
-        "grid_hd_max_cameras": settings.grid_hd_max_cameras,
+        "grid_hd_max_cameras": grid_hd_limit(),
         "live_quality": settings.live_quality,
         "quality_levels": list(quality.LEVELS),
         "live_hwaccel": settings.live_hwaccel,

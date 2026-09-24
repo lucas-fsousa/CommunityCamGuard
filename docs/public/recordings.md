@@ -49,8 +49,10 @@ The live-camera player is a different pipeline from archive playback.
   **0 keeps originals indefinitely**, but recording can pause when storage fills.
   The disk monitor and retention cleaner are separate policies.
 
-These settings still come from `.env`/environment. There is no dashboard settings
-editor yet. Environment changes require application recreation/reconfiguration;
+The cache cap has a primary-only runtime override API implemented in source
+([deployment pending](../internal/runtime-settings.md)); the other settings above
+still come from `.env`/environment. There is no dashboard settings editor yet.
+Environment changes require application recreation/reconfiguration;
 browser reload alone does not update service settings. Never share the `.env` file.
 
 ## Troubleshooting and validation limits

@@ -33,6 +33,7 @@ from .api.provisioning_ble import router as provisioning_ble_router
 from .api.provisioning_network import router as provisioning_network_router
 from .api.provisioning_privileged import router as provisioning_privileged_router
 from .api.recordings import router as recordings_router
+from .api.settings import router as settings_router
 from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
@@ -154,6 +155,7 @@ app.include_router(media_router)
 app.include_router(cameras_router)
 app.include_router(discovery_router)
 app.include_router(storage_router)
+app.include_router(settings_router)
 
 
 @app.middleware("http")

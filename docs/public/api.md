@@ -27,8 +27,8 @@ A missing/invalid session returns **401**. The dashboard key is `DASHBOARD_SECRE
 Sessions currently expire after seven days. Cookies are bearer credentials: protect cookie jars
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
 revocation of a stolen copy. Primary-session identification and its management dependency are
-implemented; temporary keys, immediate revocation and writable
-dashboard settings endpoints are **not implemented**. See the
+implemented, along with the two-field settings API described below (deployment pending).
+Temporary keys, immediate revocation and the dashboard settings screen are **not implemented**. See the
 [settings/authentication plan](../internal/settings-dashboard-plan.md).
 
 ---
@@ -46,7 +46,8 @@ dashboard settings endpoints are **not implemented**. See the
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
-No settings/key-management endpoints are exposed yet. This backend update requires deployment;
+Settings endpoints require primary sessions; key-management endpoints do not exist yet.
+These backend updates require deployment;
 see [session migration and rollout](../internal/session-principal.md).
 
 ### Cameras
@@ -406,7 +407,25 @@ current clients discard stale live media instead of accelerating it. `GET /api/m
 returns the last 200 events from the current server process, oldest first. Each event includes a UTC
 timestamp and, when available, a snapshot of the matching go2rtc stream packet/consumer counters.
 
-### Storage
+### Runtime settings (primary session only; deployment pending)
+
+| Method | Path | Body / result |
+| --- | --- | --- |
+| GET | `/api/settings` | `{revision, values, overrides, application}` for only `grid_hd_max_cameras` and `playback_cache_mb`; no-store. |
+| PATCH | `/api/settings` | `{revision, changes: {...}}`; strict JSON integers (grid 0..64, cache 0..65536 MiB), or null to restore the environment baseline. Empty/unknown fields rejected. Returns the updated snapshot. |
+
+Both routes reject missing/invalid sessions with 401 and legacy sessions with 403.
+PATCH rejects cross-origin browser writes and non-JSON content types; stale revisions
+return 409, invalid values 422 and unavailable storage 503. Reload the snapshot on
+conflict before deciding whether to retry. DB overrides take precedence only for
+these two fields; the main login key and other server settings are not writable.
+
+Changes apply on the next metadata fetch/cache policy check, not by restarting services.
+Open dashboards need a metadata refresh/reload for the Auto-mode grid limit. Cache 0
+means unbounded, and saving does not immediately evict files. There is no settings
+screen yet; see [implementation and rollout](../internal/runtime-settings.md).
+
+### Storage status
 
 | Method | Path | Notes |
 |---|---|---|

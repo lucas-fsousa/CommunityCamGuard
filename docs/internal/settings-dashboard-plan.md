@@ -2,6 +2,11 @@
 
 ## Current behavior, not a new settings feature
 
+**Implementation update:** [two-field runtime persistence](runtime-settings.md) and
+its primary-only API are now implemented in source, pending deployment. No settings
+screen exists yet. The inventory-time analysis below remains relevant for every
+other field and for service-restart/destructive application requirements.
+
 Reviewed all **42 declared Settings fields**, their consumers and the session
 boundary, without reading/printing the deployed `.env` values. The companion
 `settings-inventory.json` is a review artifact, **not an API allowlist or runtime
@@ -83,8 +88,8 @@ BLE access or publish a public configuration endpoint as part of this work.
 
 ## Next bounded implementation
 
-The session-principal/primary-key authorization boundary is now implemented (see
-the linked rollout/migration notes). Next, begin settings persistence with the two low-impact
-next-operation candidates; leave destructive retention and service restarts for
-separate reviewed steps. No live setting, camera command or service restart was
+The session-principal boundary and two-field next-operation persistence are implemented
+(see the linked rollout notes). Next, build the localized settings view over that
+revisioned API; leave destructive retention and service restarts for separate reviewed
+steps. No live setting, camera command or service restart was
 performed during this inventory.

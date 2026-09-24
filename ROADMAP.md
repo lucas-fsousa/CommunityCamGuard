@@ -246,6 +246,14 @@ temporary key, revocation store or active-channel invalidation was added. See
 `docs/internal/session-principal.md`. Next: allowlisted settings persistence/application
 behind this gate, with remaining security prerequisites before temporary-key activation.
 
+Runtime-settings checkpoint (2026-09-24): two-field SQLite overrides and GET/PATCH
+`/api/settings` implemented behind the primary-session gate. Strict schemas,
+revision conflicts, JSON/same-origin write checks and baseline restoration tested;
+media metadata/cache policy consume overrides on their next read. 86 focused
+regressions passed. No production override/restart, no secret/retention controls,
+no settings UI yet; deployment pending. See `docs/internal/runtime-settings.md`.
+Next: localized settings view with conflict handling and application-scope notices.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

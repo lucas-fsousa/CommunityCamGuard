@@ -22,6 +22,8 @@ Docs are split by audience:
   options and required authentication/application boundaries; not an implemented settings UI.
 - **[Session principal](internal/session-principal.md)** — implemented primary/legacy session
   parsing and management gate, migration policy and rollout status; temporary keys remain pending.
+- **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
+  application semantics, authorization and tests; deployment/UI pending.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

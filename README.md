@@ -163,8 +163,10 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 
 ### Configuration and access: current limits
 
-Configuration still comes from `.env`/environment; there is no runtime settings editor or
-temporary-key management API yet. After environment changes, recreate the app container; merely
+Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
+runtime overrides is implemented in source ([rollout/semantics](docs/internal/runtime-settings.md),
+deployment pending); there is no settings editor or temporary-key management API yet.
+After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing
 security audit. The [settings inventory and plan](docs/internal/settings-dashboard-plan.md)

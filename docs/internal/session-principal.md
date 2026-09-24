@@ -51,6 +51,10 @@ unique session IDs, both formats expiring, injected request claims and the expli
 logout-not-revocation limitation. No production key/cookie is printed or stored in
 test artifacts; settings use the existing isolated fixtures.
 
+The subsequent [runtime-settings API](runtime-settings.md) now uses this management
+dependency; it is also pending deployment. The statements above about absent
+management endpoints describe this session-only checkpoint, not that later step.
+
 No live camera, production login or container restart is required for these tests.
 The backend change needs an image rebuild/recreation to become active; it is not
 deployed by the frontend bind mount. Next: runtime-settings persistence with strict

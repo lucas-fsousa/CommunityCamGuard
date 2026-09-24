@@ -25,6 +25,7 @@ import uuid
 from pathlib import Path
 
 from ..config import get_settings
+from ..runtime_settings import playback_cache_limit_mb
 from . import codec_cache
 from .playback_budget import (
     ENCODE_TIMEOUT_SECONDS,
@@ -72,7 +73,7 @@ def _evict(keep: Path | None = None) -> None:
     less) disables eviction. Best-effort: races/permission errors just skip a file. The cache
     holds only derived transcodes, always reproducible from the source segment on next view.
     """
-    cap = get_settings().playback_cache_mb * 1024 * 1024
+    cap = playback_cache_limit_mb() * 1024 * 1024
     if cap <= 0:
         return
     files = []
@@ -316,7 +317,7 @@ class Warmer:
         with _JOBS_LOCK:
             if _JOBS:
                 return False  # Do not scan/probe archives while a viewer's job owns the budget.
-        cap = get_settings().playback_cache_mb * 1024 * 1024
+        cap = playback_cache_limit_mb() * 1024 * 1024
         if cap > 0 and _cache_size() >= cap * self.HEADROOM:
             return False                     # near the cap — stop, don't churn against eviction
         seg = self._next_segment()
