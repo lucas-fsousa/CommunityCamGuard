@@ -48,6 +48,9 @@ The settings screen now uses this API. Temporary-key management is implemented i
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
+The staged parser also recognizes an internally issued `temporary` session tied to
+a valid persisted key, with `can_manage:false`; public login does not issue it yet.
+See its [transitional restrictions](../internal/temporary-sessions.md).
 Settings and the new key-management endpoints require primary sessions.
 These backend updates are included in the settings deployment;
 see [session migration and rollout](../internal/session-principal.md).

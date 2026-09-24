@@ -29,6 +29,8 @@ Docs are split by audience:
   deployment, session/channel invalidation, temporary login and UI remain pending.
 - **[Open-session channels](internal/session-channels.md)** — tested socket expiry/error
   checks, current MSE transport and remaining authorization/activation boundaries.
+- **[Staged temporary sessions](internal/temporary-sessions.md)** — signed key linkage,
+  fresh expiry/revocation checks and transitional permissions; no temporary login yet.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

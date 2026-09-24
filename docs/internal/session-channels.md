@@ -32,11 +32,12 @@ WebRTC/MSE negotiation and has been corrected. The vendored player and generic p
 still allow other clients to negotiate WebRTC; a peer may outlive signaling. This
 change does **not** claim to revoke those independent peer connections.
 
-The current verifier accepts primary and legacy cookies only. It can now enforce
+The channel gate currently accepts primary and legacy cookies only. It can enforce
 their seven-day expiry on an already-open socket, but neither type has a revocation
 registry. Logout still clears only the caller's cookie; the channel captures the
-cookie used to open it. Temporary-key revocation will require session-to-key linkage
-in that shared verifier before it can affect these channels.
+cookie used to open it. [Temporary session linkage](temporary-sessions.md) is now
+implemented in the identity parser, but the channel gate denies temporary sockets
+until complete transport/operation coverage is in place.
 
 ## Authorization inventory / next gates
 

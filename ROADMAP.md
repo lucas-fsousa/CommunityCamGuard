@@ -310,6 +310,15 @@ pending. Dashboard transport confirmed MSE (obsolete WebRTC comment corrected);
 independent WebRTC peers/in-flight HTTP delivery and explicit temporary permissions
 still need enforcement. See `docs/internal/session-channels.md` for scope/latency.
 
+Temporary-session linkage checkpoint (2026-09-24): internal credential-verified
+issuer and signed key-ID binding, fresh key checks per verification, all derived
+cookies invalidated by key expiry/revoke. Primary checks remain independent of DB.
+Transitional exact-route/method allowlist denies uncovered operations; channel gates
+reject temporary sockets before work. 141 focused tests passed, including actual app
+HTTP/WS denial. Not deployed; public login/UI disabled. Next: final permissions,
+in-flight delivery, dashboard invalidation and abuse protection before activation.
+Details: `docs/internal/temporary-sessions.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

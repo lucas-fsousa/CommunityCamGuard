@@ -42,12 +42,12 @@ schema/key write, main-key rotation, camera access or container restart occurred
 1. Primary-only key-management API is now implemented (checkpoint below). Decide
    and enforce temporary permissions across existing camera/provisioning/
    administration routes before enabling their sessions.
-2. Link signed temporary sessions to persisted key IDs. Check fresh validity on
-   every protected operation, preserve primary-key independence and cover outages,
-   multiple devices/tabs and revoke-during-use races. Do not enable login yet.
+2. [Signed temporary-session linkage](temporary-sessions.md) now has fresh key checks,
+   primary independence and transitional default-deny permissions. Public login is
+   still disabled; final operation permissions and UI/channel coverage remain pending.
 3. Terminate open WebSockets/media authorization and return idle dashboards to login
    promptly on invalidation. [Open-socket revalidation](session-channels.md) is now
-   implemented in source, not deployed; temporary-session linkage is still pending.
+   implemented in source, not deployed; temporary transports remain explicitly denied.
    Denying subsequent HTTP requests alone does not revoke an open media connection.
    Review recordings/downloads and WebRTC media that outlive a signaling socket.
 4. Bounded login-abuse protection, cookie/proxy/origin policy, then enable temporary

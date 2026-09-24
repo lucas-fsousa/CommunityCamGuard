@@ -172,6 +172,8 @@ not yet deployed; temporary login and management UI remain disabled. See the
 [lifecycle/API checkpoint and activation gates](docs/internal/temporary-access-keys.md).
 Open-socket revalidation is also implemented but not yet deployed; see the
 [channel coverage and remaining gaps](docs/internal/session-channels.md).
+Signed temporary-session linkage and transitional permissions are tested internally;
+[public login remains disabled](docs/internal/temporary-sessions.md).
 After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing

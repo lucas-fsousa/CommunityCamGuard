@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
-from ..auth import COOKIE_NAME, require_auth, verify_token
+from ..auth import COOKIE_NAME, require_auth
+from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..media import quality

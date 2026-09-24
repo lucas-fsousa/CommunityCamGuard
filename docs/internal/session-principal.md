@@ -37,14 +37,13 @@ logout is needed. The main login key remains in environment configuration only.
 
 The [temporary-key lifecycle foundation](temporary-access-keys.md) now implements
 internal generation, verifier storage, absolute expiry and persistent revocation.
-It is not connected to this session parser/login, so the limitations below still
-apply. Activation requires full HTTP and long-lived-channel enforcement together.
+It is now connected to the parser in the [staged session checkpoint](temporary-sessions.md),
+but not to login. Activation requires full HTTP and long-lived-channel enforcement together.
 
-Session IDs are identities only: sessions remain stateless and there is no revocation
-store. Logout clears the caller's cookie but a copied cookie remains usable until
-expiry. Temporary kinds are rejected until key records, non-recoverable verifiers,
-expiry/revocation checks and authorization policy are implemented together. Do not
-mint a temporary token by merely changing the payload kind.
+Primary/legacy sessions remain stateless. Logout clears only the caller's cookie.
+Staged temporary sessions check their persisted key on every verification, with
+transitional default-deny permissions. Public temporary login is still disabled.
+Do not mint a temporary token by merely changing the payload kind.
 
 The deployed WebSockets still authenticate at connection establishment. The subsequent
 [open-channel guard](session-channels.md) adds periodic validation in source but is
