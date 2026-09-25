@@ -33,6 +33,8 @@ Docs are split by audience:
   fresh expiry/revocation checks and transitional permissions; no temporary login yet.
 - **[Dashboard session watch](internal/dashboard-session-watch.md)** — validity polling,
   stale-response rejection and audio/player cleanup; browser validation limits.
+- **[Revocable recordings](internal/recording-session-delivery.md)** — in-flight temporary
+  delivery cancellation with Range/seek support; deployment/end-to-end checks pending.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

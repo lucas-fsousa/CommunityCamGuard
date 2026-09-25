@@ -122,7 +122,6 @@ def test_malformed_or_elevated_signed_claims_fail(clock, change):
 
 @pytest.mark.parametrize("method,path", [
     ("POST", "/api/cameras"), ("DELETE", "/api/cameras/test"),
-    ("GET", "/api/recordings/file"), ("GET", "/api/recordings/download"),
     ("GET", "/api/new-feature"), ("POST", "/api/provisioning/start"),
     ("GET", "/api/settings"), ("GET", "/api/access-keys"),
     ("POST", "/api/access-keys"), ("POST", "/api/access-keys/" + "a" * 32 + "/revoke"),
@@ -171,8 +170,6 @@ def test_real_app_denies_uncovered_routes_and_websockets_before_work(clock):
     for method, path in [
         ("POST", "/api/cameras"), ("POST", "/api/media/restart"),
         ("POST", "/api/discovery/scan"), ("GET", "/api/provisioning/status"),
-        ("GET", "/api/recordings/download?path=never-read.mp4"),
-        ("GET", "/api/recordings/file?path=never-read.mp4"),
         ("POST", "/api/internal/diagnostics/native-av"),
     ]:
         assert client.request(method, path, json={}).status_code == 403

@@ -49,7 +49,8 @@ schema/key write, main-key rotation, camera access or container restart occurred
    promptly on invalidation. [Open-socket revalidation](session-channels.md) is now
    implemented in source, not deployed; temporary transports remain explicitly denied.
    Denying subsequent HTTP requests alone does not revoke an open media connection.
-   Review recordings/downloads and WebRTC media that outlive a signaling socket.
+   [Recording/download guards](recording-session-delivery.md) are now implemented;
+   validate real proxy/browser interruption and cover WebRTC media that outlive signaling.
 4. Bounded login-abuse protection, cookie/proxy/origin policy, then enable temporary
    login and a compact localized management section. Validate the full flow before
    claiming usable expiring access. Never rely on browser time for enforcement.

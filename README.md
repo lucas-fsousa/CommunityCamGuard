@@ -176,6 +176,8 @@ Signed temporary-session linkage and transitional permissions are tested interna
 [public login remains disabled](docs/internal/temporary-sessions.md).
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
+Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)
+in source; backend deployment and temporary login remain pending.
 After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing

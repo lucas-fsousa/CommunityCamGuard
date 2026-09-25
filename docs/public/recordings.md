@@ -33,6 +33,11 @@ conversion with a duration that grows a few seconds at a time. HTTP Range reques
 serve requested portions without requiring the browser to download the entire file.
 The live-camera player is a different pipeline from archive playback.
 
+The staged temporary-access implementation adds revocable file/download delivery
+while retaining Range/seek behavior. It is not deployed and temporary login remains
+disabled. See [interruption semantics and limits](../internal/recording-session-delivery.md);
+already-delivered bytes cannot be recalled.
+
 While preparing/starting a recording or waiting for playback data, a localized
 spinner overlay covers only the player area (`rec-main`), never the recording list.
 It does not intercept clicks. Playing, deliberate pause, failure, autoplay rejection

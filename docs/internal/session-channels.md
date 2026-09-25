@@ -49,7 +49,7 @@ until complete transport/operation coverage is in place.
 | Provisioning/onboarding/vendor controls | Authentication plus local/trusted-LAN gates | Retain locality checks and explicitly decide temporary-user authority |
 | MSE media and live intercom | Open-session revalidation added | Link temporary sessions to fresh persisted key validity; test multiple sockets/devices |
 | Independently negotiated WebRTC | Generic proxy still supports signaling | Restrict that transport for temporary sessions or track/terminate peers server-side |
-| Recordings/download responses | Authentication at request start | Define and enforce handling of in-flight delivery after invalidation |
+| Recordings/download responses | Temporary in-flight delivery guard implemented; see [checkpoint](recording-session-delivery.md) | Validate real browser/proxy interruption and partial downloads |
 | Idle dashboard and audio dialogs | Existing periodic API calls can receive 401 | Explicit invalidation notification/watch and complete UI/media cleanup across tabs |
 
 Login-abuse protection, secure-cookie/proxy policy and old-route CSRF review also

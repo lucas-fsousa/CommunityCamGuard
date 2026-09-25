@@ -1,8 +1,8 @@
 """Revalidate open dashboard sockets without blocking the event loop.
 
-This closes the socket and cancels its owned operation, not independent WebRTC
-peers or already-authorized HTTP downloads. Temporary login must remain disabled
-until those separate paths are covered as well.
+Socket ownership lives here; the recording delivery adapter reuses the validity
+watcher for HTTP transfers. Neither stops independent WebRTC peers. Temporary
+login remains disabled until remaining activation gates are covered.
 """
 
 import asyncio
@@ -14,7 +14,7 @@ CHECK_INTERVAL = 1.0
 CHECK_TIMEOUT = 5.0
 
 
-async def _until_invalid(token: str, verify: Callable[[str], bool]) -> None:
+async def wait_until_invalid(token: str, verify: Callable[[str], bool]) -> None:
     while True:
         await asyncio.sleep(CHECK_INTERVAL)
         try:
@@ -35,7 +35,7 @@ async def run_guarded(
     async def perform() -> None:
         await operation()
     work = asyncio.create_task(perform())
-    guard = asyncio.create_task(_until_invalid(token, verify))
+    guard = asyncio.create_task(wait_until_invalid(token, verify))
     try:
         done, _ = await asyncio.wait((work, guard), return_when=asyncio.FIRST_COMPLETED)
         if guard in done:

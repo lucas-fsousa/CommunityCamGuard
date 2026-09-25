@@ -6,13 +6,13 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
 
 from ..auth import require_auth
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import registry
 from ..recording import playback, recorder
+from ..recording.delivery import SessionFileResponse as FileResponse
 from ..recording.playback_budget import PlaybackBusy
 
 router = APIRouter(prefix="/api", tags=["recordings"])

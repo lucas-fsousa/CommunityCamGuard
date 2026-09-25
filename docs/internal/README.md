@@ -62,6 +62,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Open-session channels](session-channels.md) | Periodic socket revalidation and cancellation cleanup; not deployed, independent WebRTC/download invalidation pending |
 | [Staged temporary sessions](temporary-sessions.md) | Fresh key validity and transitional default-deny permissions; login and transports disabled |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
+| [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |
 | [Driver package audit](driver-package-audit.md) | Discovery-only vs implemented driver support and vendor-package boundaries |
 

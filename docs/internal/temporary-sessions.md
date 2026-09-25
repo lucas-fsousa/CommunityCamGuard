@@ -30,6 +30,10 @@ invalidate copies; a temporary key's revocation invalidates all derived cookies.
 - `/api/recordings`, `/api/recordings/playback-status`
 - `/api/storage`, `/api/media/streams`, `/api/media/activity`
 
+The subsequent [guarded delivery checkpoint](recording-session-delivery.md) also
+allows GET `/api/recordings/file`, GET `/api/recordings/download` and POST
+`/api/recordings/prepare`. File bodies now have temporary-session lifetime guards.
+
 `require_auth` matches the resolved route template and exact method, not URL
 prefixes. Other protected operations, including new routes, deny with 403. Settings
 and keys retain their separate primary-only gate. Invalid/expired/revoked sessions
@@ -39,8 +43,8 @@ receive 401. `/api/me` can describe an internally issued temporary session with
 Both WebSocket entry points use `verify_channel_token`: temporary sessions are
 rejected before acceptance/work. Do not replace this permission gate with the
 identity-only `verify_token`. This keeps uncovered WebRTC/streaming paths closed.
-Downloads, file playback, controls and administration are also not enabled for
-temporary sessions yet. Primary/legacy behavior is unchanged. These are temporary
+Controls and administration are not enabled for temporary sessions yet; archive
+delivery is now covered as noted above. Primary/legacy behavior is unchanged. These are temporary
 development safeguards, not a permanent read-only guest-role decision.
 
 ## Verification and next steps
@@ -53,8 +57,9 @@ All databases/services are isolated; no workers, cameras or containers were star
 
 The [dashboard watcher](dashboard-session-watch.md) now implements validity polling,
 stale-response rejection and player/audio cleanup. Real multi-tab/device invalidation
-remains to be validated. Before activation: final ordinary-operation permissions; in-flight file/stream
-invalidation and constrained or terminated independent peers; prompt dashboard
+remains to be validated. Archive file invalidation is implemented in source, with
+proxy/browser validation pending. Before activation: final ordinary-operation permissions;
+stream invalidation and constrained or terminated independent peers; prompt dashboard
 logout with complete media/dialog cleanup across tabs/devices; login-abuse and
 cookie/proxy/origin protections. Only then wire public login, ship management UI,
 rebuild and validate end-to-end. See [keys](temporary-access-keys.md) and

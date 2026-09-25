@@ -327,6 +327,14 @@ Node suites and 74 focused Python tests passed; new lifecycle suite is CI gate s
 No camera/container operations. Full browser/multi-device validation and server-side
 in-flight delivery remain pending; temporary login disabled. See session-watch notes.
 
+Recording authority checkpoint (2026-09-25): temporary file/download delivery now
+owns a periodic validity watcher and cancels on invalidity even under ASGI send
+backpressure. Starlette Range/206/multipart/If-Range semantics retained; pathsend
+disabled only for temporary transfers. Temporary prepare/file/download routes now
+allowed internally; login and WebSockets still disabled. 84 focused tests passed;
+no production/camera/container operations. Proxy/browser interruption validation and
+remaining activation gates pending. See `docs/internal/recording-session-delivery.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
