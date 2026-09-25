@@ -342,6 +342,14 @@ operations. Public temporary login remains disabled; backend deployment, real
 browser/proxy validation and other activation gates remain pending. Details:
 `docs/internal/temporary-live-media.md`.
 
+Login-abuse checkpoint (2026-09-25): fixed-memory origin pacing before login body
+parsing, atomic burst/refill, no quota reset on success, generic 429/Retry-After and
+localized feedback. Bundled launcher disables forwarded-header identity rewriting;
+proxy clients currently share quotas. No cameras/production login/container changes.
+Body/resource limits, explicit proxy/cookie/CSRF policy and final temporary permissions
+remain open; temporary login is still disabled and backend deployment pending.
+See `docs/internal/login-abuse-protection.md` for collision/multi-worker trade-offs.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

@@ -193,4 +193,5 @@ if __name__ == "__main__":
 
     s = get_settings()
     # Binds to settings.host (0.0.0.0 by default); dashboard authentication remains mandatory.
-    uvicorn.run(app, host=s.host, port=s.port)
+    # Keep request.client tied to the transport peer (not attacker-supplied headers).
+    uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False)

@@ -18,6 +18,12 @@ unchanged. See [transport limits and activation gates](../internal/temporary-liv
 
 ## Authentication
 
+Staged source change (backend deployment pending): POST `/api/login` allows a burst
+of 10 attempts per origin quota, replenishing one every 6 seconds. Excess attempts
+receive 429 with `Retry-After` seconds; successful and malformed requests also count.
+Do not retry in a tight loop. Clients behind a proxy/NAT may share the quota.
+See [identity boundaries and limitations](../internal/login-abuse-protection.md).
+
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server
 sets an HTTP-only cookie `ccg_session` required by protected endpoints. Health/build and
 authentication-status endpoints remain public as documented below.

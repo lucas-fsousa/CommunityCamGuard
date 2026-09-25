@@ -176,6 +176,9 @@ Signed temporary-session linkage and transitional permissions are tested interna
 [public login remains disabled](docs/internal/temporary-sessions.md).
 The [restricted temporary MSE bridge](docs/internal/temporary-live-media.md) is tested
 in source; real-browser/proxy validation and backend deployment remain pending.
+[Login pacing](docs/internal/login-abuse-protection.md) is also implemented in source:
+fixed-memory origin quotas and explicit no-forwarded-header trust in the bundled
+launcher. Backend deployment and trusted-proxy/cookie review remain pending.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

@@ -179,8 +179,8 @@ $("#login-form").addEventListener("submit", async (event) => {
     });
     $("#login-key").value = "";
     await boot();
-  } catch {
-    $("#login-error").textContent = t("login.invalid");
+  } catch (error) {
+    $("#login-error").textContent = t(error.status === 429 ? "login.throttled" : "login.invalid");
   }
 });
 

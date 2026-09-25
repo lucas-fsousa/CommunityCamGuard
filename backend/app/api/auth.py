@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from ..auth import COOKIE_NAME, MAX_AGE, check_key, issue_token, request_principal
+from ..login_throttle import LoginRoute
 
-router = APIRouter(prefix="/api", tags=["auth"])
+router = APIRouter(prefix="/api", tags=["auth"], route_class=LoginRoute)
 
 
 class LoginIn(BaseModel):
@@ -17,7 +18,7 @@ class LoginIn(BaseModel):
 @router.post("/login")
 def login(body: LoginIn, response: Response) -> dict:
     if not check_key(body.key):
-        raise HTTPException(status_code=401, detail="Invalid key")
+        raise HTTPException(status_code=401, detail="Invalid key", headers={"Cache-Control": "no-store"})
     response.set_cookie(
         COOKIE_NAME,
         issue_token(),

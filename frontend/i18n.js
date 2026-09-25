@@ -35,6 +35,7 @@ const STRINGS = {
     "login.keyPlaceholder": "secret key",
     "login.unlock": "Unlock",
     "login.invalid": "Invalid key",
+    "login.throttled": "Too many login attempts. Wait a few seconds and try again.",
 
     "nav.grid": "Grid",
     "nav.gridTitle": "Grid view",
@@ -369,6 +370,7 @@ const STRINGS = {
     "login.keyPlaceholder": "chave secreta",
     "login.unlock": "Entrar",
     "login.invalid": "Chave inválida",
+    "login.throttled": "Muitas tentativas de acesso. Aguarde alguns segundos e tente novamente.",
 
     "nav.grid": "Grade",
     "nav.gridTitle": "Visão em grade",
