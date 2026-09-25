@@ -174,6 +174,8 @@ Open-socket revalidation is also implemented but not yet deployed; see the
 [channel coverage and remaining gaps](docs/internal/session-channels.md).
 Signed temporary-session linkage and transitional permissions are tested internally;
 [public login remains disabled](docs/internal/temporary-sessions.md).
+The [restricted temporary MSE bridge](docs/internal/temporary-live-media.md) is tested
+in source; real-browser/proxy validation and backend deployment remain pending.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

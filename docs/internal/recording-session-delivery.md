@@ -46,7 +46,8 @@ plus POST `/api/recordings/prepare`, alongside existing archive metadata reads.
 Preparation keeps the shared bounded conversion budget; revocation does not cancel
 a conversion already accepted for other viewers/cache reuse. Unknown operations
 still deny by default, key/settings management stays primary-only, all temporary
-WebSockets remain denied and `/api/login` still does not issue temporary sessions.
+intercom sockets remain denied and `/api/login` still does not issue temporary sessions.
+Live media now has a separate [restricted MSE bridge](temporary-live-media.md).
 
 ## Evidence and next steps
 

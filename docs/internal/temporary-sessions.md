@@ -40,9 +40,9 @@ and keys retain their separate primary-only gate. Invalid/expired/revoked sessio
 receive 401. `/api/me` can describe an internally issued temporary session with
 `can_manage:false`, without returning key/session IDs or credentials.
 
-Both WebSocket entry points use `verify_channel_token`: temporary sessions are
-rejected before acceptance/work. Do not replace this permission gate with the
-identity-only `verify_token`. This keeps uncovered WebRTC/streaming paths closed.
+The generic channel gate rejects temporary sessions. Media now has a separate
+[restricted MSE bridge](temporary-live-media.md); intercom and independent WebRTC
+remain denied. Do not replace the generic gate with identity-only `verify_token`.
 Controls and administration are not enabled for temporary sessions yet; archive
 delivery is now covered as noted above. Primary/legacy behavior is unchanged. These are temporary
 development safeguards, not a permanent read-only guest-role decision.

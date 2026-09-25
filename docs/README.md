@@ -25,6 +25,7 @@ Docs are split by audience:
   parsing and management gate, migration policy and rollout status; temporary keys remain pending.
 - **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
   application semantics, authorization, UI contracts and deployment checkpoint.
+- **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.
 - **[Open-session channels](internal/session-channels.md)** — tested socket expiry/error

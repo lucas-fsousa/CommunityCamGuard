@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
-from ..auth import COOKIE_NAME, require_auth
+from ..auth import COOKIE_NAME, require_auth, token_principal
 from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
@@ -22,6 +22,7 @@ from ..media import quality
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
 from ..session_channels import run_guarded
+from .temporary_media import serve_temporary_media
 
 router = APIRouter(prefix="/api", tags=["media"])
 log = logging.getLogger(__name__)
@@ -133,6 +134,11 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
     """Bridge an authenticated same-origin browser socket to loopback-only go2rtc."""
 
     if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
+        token = websocket.cookies.get(COOKIE_NAME) or ""
+        principal = token_principal(token)
+        if principal is not None and principal.authentication == "temporary":
+            await serve_temporary_media(websocket, token)
+            return
         await websocket.close(code=1008)
         return
     await run_guarded(websocket, websocket.cookies.get(COOKIE_NAME) or "",

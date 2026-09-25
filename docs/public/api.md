@@ -8,6 +8,14 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
   raw schema at [`/api/openapi.json`](/api/openapi.json).
 - **Content type:** JSON request/response unless noted.
 
+## Staged live-media authorization
+
+`/api/go2rtc/ws` has a restricted temporary-session MSE path implemented in source,
+not deployed. It accepts only registered HD/web sources and rechecks key validity
+during delivery; arbitrary sources and WebRTC negotiation are denied for temporary
+sessions. Public temporary login remains disabled. Primary/legacy behavior is
+unchanged. See [transport limits and activation gates](../internal/temporary-live-media.md).
+
 ## Authentication
 
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server

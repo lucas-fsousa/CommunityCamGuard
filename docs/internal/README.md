@@ -60,7 +60,8 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Session principal](session-principal.md) | Primary-only management dependency, exact legacy-cookie migration and pending security/deployment boundaries |
 | [Temporary keys](temporary-access-keys.md) | Lifecycle and primary-only management API tested; API deployment pending, temporary login/UI disabled |
 | [Open-session channels](session-channels.md) | Periodic socket revalidation and cancellation cleanup; not deployed, independent WebRTC/download invalidation pending |
-| [Staged temporary sessions](temporary-sessions.md) | Fresh key validity and transitional default-deny permissions; login and transports disabled |
+| [Staged temporary sessions](temporary-sessions.md) | Fresh key validity and transitional default-deny permissions; public login disabled |
+| [Temporary live media](temporary-live-media.md) | Registered-source MSE bridge, revocation and protocol restrictions; not deployed |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
 | [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |

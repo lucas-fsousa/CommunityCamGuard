@@ -47,7 +47,8 @@ schema/key write, main-key rotation, camera access or container restart occurred
    still disabled; final operation permissions and UI/channel coverage remain pending.
 3. Terminate open WebSockets/media authorization and return idle dashboards to login
    promptly on invalidation. [Open-socket revalidation](session-channels.md) is now
-   implemented in source, not deployed; temporary transports remain explicitly denied.
+   implemented in source, not deployed; [restricted temporary MSE](temporary-live-media.md)
+   is covered, while intercom and independent WebRTC remain denied.
    Denying subsequent HTTP requests alone does not revoke an open media connection.
    [Recording/download guards](recording-session-delivery.md) are now implemented;
    validate real proxy/browser interruption and cover WebRTC media that outlive signaling.

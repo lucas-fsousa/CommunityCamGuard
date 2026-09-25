@@ -37,7 +37,8 @@ their seven-day expiry on an already-open socket, but neither type has a revocat
 registry. Logout still clears only the caller's cookie; the channel captures the
 cookie used to open it. [Temporary session linkage](temporary-sessions.md) is now
 implemented in the identity parser, but the channel gate denies temporary sockets
-until complete transport/operation coverage is in place.
+in the generic proxy. A separate [restricted temporary MSE bridge](temporary-live-media.md)
+now covers registered dashboard streams; intercom remains denied.
 
 ## Authorization inventory / next gates
 

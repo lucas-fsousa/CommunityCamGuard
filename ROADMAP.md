@@ -335,6 +335,13 @@ allowed internally; login and WebSockets still disabled. 84 focused tests passed
 no production/camera/container operations. Proxy/browser interruption validation and
 remaining activation gates pending. See `docs/internal/recording-session-delivery.md`.
 
+Temporary live-media checkpoint (2026-09-25): dedicated registered-source MSE bridge
+with bounded handshake, no arbitrary upstream commands/WebRTC, fresh key/registry
+checks and relay cancellation. 71 focused tests passed without camera/container
+operations. Public temporary login remains disabled; backend deployment, real
+browser/proxy validation and other activation gates remain pending. Details:
+`docs/internal/temporary-live-media.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
