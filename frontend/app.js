@@ -1,4 +1,5 @@
-import { $, api, el, onUnauthorized, state } from "ccg/core";
+import { $, api, el, endSession, onUnauthorized, state } from "ccg/core";
+import { createSessionWatch } from "ccg/session-watch";
 import { applyI18n, getLang, I18N_LANGS, setLang, t } from "ccg/i18n";
 import {
   applyLiveLayout,
@@ -28,8 +29,12 @@ if (versionBadge) versionBadge.textContent = "build " + APP_VERSION;
 let storageTimer = 0;
 let watchdogTimer = 0;
 let cameraStatusTimer = 0;
+let sessionGeneration = 0;
+const sessionWatch = createSessionWatch(
+  signal => api("/me", { signal, cache: "no-store" }), showLogin);
 
 function stopDashboardSession() {
+  sessionGeneration++; sessionWatch.stop(); endSession();
   stopSettings();
   stopRecordings();
   if (storageTimer) {
@@ -97,7 +102,9 @@ function setView(view) {
 }
 
 async function loadCameras() {
-  state.cameras = await api("/cameras");
+  const epoch = sessionGeneration, cameras = await api("/cameras");
+  if (epoch !== sessionGeneration) return;
+  state.cameras = cameras;
   render();
 }
 
@@ -129,20 +136,30 @@ function setupLanguageSelector() {
 }
 
 async function boot() {
-  const me = await api("/me");
-  state.canManage = me.can_manage === true;
-  if (!me.authenticated) {
-    showLogin();
-    return;
+  const epoch = sessionGeneration;
+  try {
+    const me = await api("/me", { cache: "no-store" });
+    if (epoch !== sessionGeneration) return;
+    state.canManage = me.can_manage === true;
+    if (!me.authenticated) {
+      showLogin();
+      return;
+    }
+    showDash();
+    sessionWatch.start();
+    const media = await api("/media/streams");
+    if (epoch !== sessionGeneration) return;
+    state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
+    state.gridHdMax = media.grid_hd_max_cameras ?? 0;
+    await Promise.all([loadCameras(), loadStorage(), loadProvisioningStatus()]);
+    if (epoch !== sessionGeneration) return;
+    if (!storageTimer) storageTimer = setInterval(loadStorage, 15000);
+    if (!watchdogTimer) watchdogTimer = setInterval(freezeWatchdog, STALL_POLL_MS);
+    if (!cameraStatusTimer) cameraStatusTimer = setInterval(loadCameraStatuses, 5000);
+  } catch (error) {
+    if (epoch === sessionGeneration) showLogin();
+    throw error;
   }
-  showDash();
-  const media = await api("/media/streams");
-  state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
-  state.gridHdMax = media.grid_hd_max_cameras ?? 0;
-  await Promise.all([loadCameras(), loadStorage(), loadProvisioningStatus()]);
-  if (!storageTimer) storageTimer = setInterval(loadStorage, 15000);
-  if (!watchdogTimer) watchdogTimer = setInterval(freezeWatchdog, STALL_POLL_MS);
-  if (!cameraStatusTimer) cameraStatusTimer = setInterval(loadCameraStatuses, 5000);
 }
 
 onUnauthorized(showLogin);
@@ -174,4 +191,4 @@ $("#btn-logout").addEventListener("click", async () => {
 
 applyI18n();
 setupLanguageSelector();
-boot().catch(showLogin);
+boot().catch(() => {}); // boot owns generation-aware error cleanup.

@@ -45,6 +45,11 @@ The settings screen now uses this API. Temporary-key management is implemented i
 | POST | `/api/logout` | — | Clears the cookie. |
 | GET | `/api/me` | — | `{authenticated, authentication, can_manage}`. `authentication` is `primary`, `legacy`, or null. No session ID/token is returned. |
 
+The dashboard polls `/api/me` without caching and returns to login when the session
+is invalid. The response also declares `Cache-Control:no-store` in source (backend
+deployment pending). Polling complements, rather than replaces, server authorization;
+suspended browser tabs may react later. See [session cleanup](../internal/dashboard-session-watch.md).
+
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.

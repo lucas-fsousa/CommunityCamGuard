@@ -41,6 +41,7 @@ def test_primary_login_mints_distinct_verified_sessions(client):
             "authenticated": True, "authentication": "primary", "can_manage": True,
         }
         assert "sid" not in client.get("/api/me").text
+        assert client.get("/api/me").headers["cache-control"] == "no-store"
         assert "httponly" in response.headers["set-cookie"].lower()
         assert "samesite=lax" in response.headers["set-cookie"].lower()
     assert ids[0] != ids[1]

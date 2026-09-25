@@ -319,6 +319,14 @@ HTTP/WS denial. Not deployed; public login/UI disabled. Next: final permissions,
 in-flight delivery, dashboard invalidation and abuse protection before activation.
 Details: `docs/internal/temporary-sessions.md`.
 
+Dashboard invalidation checkpoint (2026-09-25): dedicated non-overlapping `/me`
+watcher, one-second post-check interval, focus/pageshow checks and five-second abort
+deadline; invalid sessions return to login. Stale response/boot guards prevent player
+reactivation, and controls/voice/PTT cleanup includes late microphone grants. Four
+Node suites and 74 focused Python tests passed; new lifecycle suite is CI gate seven.
+No camera/container operations. Full browser/multi-device validation and server-side
+in-flight delivery remain pending; temporary login disabled. See session-watch notes.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

@@ -27,6 +27,8 @@ jobs:
         run: node --max-old-space-size=64 tests/frontend/recording-playback.cjs
       - name: Settings view contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/settings.cjs
+      - name: Session lifecycle contracts (Node)
+        run: node --max-old-space-size=64 tests/frontend/session-lifecycle.cjs
     # Note: `black --check` is intentionally not enforced yet — adopting the formatter across the
     # existing codebase is a deliberate, separate step (see ROADMAP M2). The config lives in
     # pyproject so it is a one-command switch once that lands.

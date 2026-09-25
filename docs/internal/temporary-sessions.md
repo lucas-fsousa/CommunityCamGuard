@@ -51,7 +51,9 @@ keys/primary sessions, exact expiry/cookie ceiling, storage outages, malformed s
 claims, privilege escalation, revoke-during-issuance and actual app HTTP/WS denial.
 All databases/services are isolated; no workers, cameras or containers were started.
 
-Before activation: final ordinary-operation permissions; in-flight file/stream
+The [dashboard watcher](dashboard-session-watch.md) now implements validity polling,
+stale-response rejection and player/audio cleanup. Real multi-tab/device invalidation
+remains to be validated. Before activation: final ordinary-operation permissions; in-flight file/stream
 invalidation and constrained or terminated independent peers; prompt dashboard
 logout with complete media/dialog cleanup across tabs/devices; login-abuse and
 cookie/proxy/origin protections. Only then wire public login, ship management UI,

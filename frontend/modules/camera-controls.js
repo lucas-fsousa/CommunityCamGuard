@@ -1,5 +1,5 @@
 // Presentation only: the driver catalogue remains the authority for every active control.
-import { el, state } from "ccg/core";
+import { el, onSessionEnd, state } from "ccg/core";
 import { t } from "ccg/i18n";
 import { controlWidgets } from "ccg/control-actions";
 import { audioMessageButton } from "ccg/audio-message";
@@ -99,12 +99,14 @@ export function cameraControls(camera, extras = {}) {
     });
     dialogs.observe(document.body, { childList: true });
     const dismiss = () => {
+      unregister();
       dialogs.disconnect();
       overlay.remove();
       siblings.forEach(([node, inert]) => { node.inert = inert; });
       document.body.style.overflow = previousOverflow;
       if (trigger.isConnected) trigger.focus();
     };
+    const unregister = onSessionEnd(dismiss);
     close.addEventListener("click", dismiss);
     recordings.addEventListener("click", () => {
       state.rec.cameraId = cam.id;

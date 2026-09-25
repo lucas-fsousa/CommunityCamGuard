@@ -174,6 +174,8 @@ Open-socket revalidation is also implemented but not yet deployed; see the
 [channel coverage and remaining gaps](docs/internal/session-channels.md).
 Signed temporary-session linkage and transitional permissions are tested internally;
 [public login remains disabled](docs/internal/temporary-sessions.md).
+The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
+browser background throttling and remaining server-side rollout gates are documented.
 After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing
@@ -191,6 +193,7 @@ mypy backend/app          # type-check
 node --max-old-space-size=64 tests/frontend/camera-controls.cjs
 node --max-old-space-size=64 tests/frontend/recording-playback.cjs
 node --max-old-space-size=64 tests/frontend/settings.cjs
+node --max-old-space-size=64 tests/frontend/session-lifecycle.cjs
 ```
 The suite covers the logic — camera drivers, RTSP parsing/auth + credential
 verification, encryption, capability probe, PTZ/reboot control, storage policy, retention + playback

@@ -1,4 +1,4 @@
-import { api, el } from "ccg/core";
+import { api, el, onSessionEnd } from "ccg/core";
 import { t } from "ccg/i18n";
 
 const TARGET_RATE = 16000;
@@ -50,6 +50,7 @@ class PcmRecorder {
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
+    if (this.cancelled) { await this.cancel(); throw new DOMException("Cancelled", "AbortError"); }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     this.context = new AudioContextClass();
     this.chunks = [];
@@ -72,6 +73,7 @@ class PcmRecorder {
     } finally {
       URL.revokeObjectURL(moduleUrl);
     }
+    if (this.cancelled) { await this.cancel(); throw new DOMException("Cancelled", "AbortError"); }
     this.input = this.context.createMediaStreamSource(this.stream);
     this.processor = new AudioWorkletNode(this.context, "ccg-pcm-capture");
     this.silence = this.context.createGain();
@@ -100,6 +102,7 @@ class PcmRecorder {
   }
 
   async cancel() {
+    this.cancelled = true;
     clearTimeout(this.limitTimer);
     this.stream?.getTracks().forEach((track) => track.stop());
     if (this.context && this.context.state !== "closed") await this.context.close();
@@ -187,13 +190,17 @@ export function audioMessageButton(cam) {
         record.disabled = false;
       }
     };
-    const dismiss = async () => {
-      if (sending) return;
+    let closed = false;
+    const sendAbort = new AbortController();
+    const dismiss = async (force = false) => {
+      if (closed || (sending && !force)) return;
+      closed = true; unregister(); sendAbort.abort();
       clearInterval(elapsedTimer);
-      await recorder?.cancel();
       pcmPreview.stop();
       overlay.remove();
+      await recorder?.cancel();
     };
+    const unregister = onSessionEnd(() => dismiss(true));
 
     record.addEventListener("click", async () => {
       pcmPreview.stop();
@@ -205,6 +212,7 @@ export function audioMessageButton(cam) {
       recorder = new PcmRecorder();
       try {
         await recorder.start(() => void finishRecording());
+        if (closed) return;
         stop.disabled = false;
         setStatus("intercom.recording", { seconds: "0.0" });
         elapsedTimer = setInterval(() => {
@@ -231,6 +239,7 @@ export function audioMessageButton(cam) {
       try {
         await api(`/cameras/${encodeURIComponent(cam.id)}/intercom/messages`, {
           method: "POST", headers: { "Content-Type": "audio/pcm" }, body: pcm,
+          signal: sendAbort.signal,
         });
         setStatus("intercom.sent");
         pcm = null;

@@ -31,6 +31,8 @@ Docs are split by audience:
   checks, current MSE transport and remaining authorization/activation boundaries.
 - **[Staged temporary sessions](internal/temporary-sessions.md)** — signed key linkage,
   fresh expiry/revocation checks and transitional permissions; no temporary login yet.
+- **[Dashboard session watch](internal/dashboard-session-watch.md)** — validity polling,
+  stale-response rejection and audio/player cleanup; browser validation limits.
 - **[Historical decisions](DECISIONS.md)** — earlier reasoning and progress; later amendments and
   focused implementation notes describe the current behavior.
 

@@ -1,4 +1,4 @@
-import { el } from "ccg/core";
+import { el, onSessionEnd } from "ccg/core";
 import { t } from "ccg/i18n";
 
 const TARGET_RATE = 16000;
@@ -65,6 +65,7 @@ class PushToTalkSession {
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
+    if (this.finished) { this.cancel(); throw new DOMException("Cancelled", "AbortError"); }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     this.context = new AudioContextClass();
     this.framer = new PcmFramer(this.context.sampleRate);
@@ -87,11 +88,13 @@ class PushToTalkSession {
     } finally {
       URL.revokeObjectURL(moduleUrl);
     }
+    if (this.finished) { this.cancel(); throw new DOMException("Cancelled", "AbortError"); }
     this.input = this.context.createMediaStreamSource(this.stream);
     this.processor = new AudioWorkletNode(this.context, "ccg-live-pcm-capture");
     this.silence = this.context.createGain();
     this.silence.gain.value = 0;
     await this.openSocket();
+    if (this.finished) { this.cancel(); throw new DOMException("Cancelled", "AbortError"); }
     this.processor.port.onmessage = (event) => {
       if (this.socket?.readyState !== WebSocket.OPEN) return;
       for (const frame of this.framer.feed(new Float32Array(event.data))) {
@@ -143,6 +146,15 @@ class PushToTalkSession {
     });
   }
 
+  cancel() {
+    this.finished = true;
+    clearTimeout(this.limitTimer);
+    this.input?.disconnect(); this.processor?.disconnect(); this.silence?.disconnect();
+    this.stream?.getTracks().forEach(track => track.stop());
+    this.socket?.close();
+    if (this.context && this.context.state !== "closed") void this.context.close().catch(() => {});
+  }
+
   async stop() {
     if (this.finished) return;
     this.finished = true;
@@ -177,6 +189,7 @@ export function pushToTalkButton(cam) {
     let session = null;
     let held = false;
     let starting = false;
+    let stopping = false;
     const status = el("small", { className: "camera-control-status", textContent: t("talk.idle") });
     const talk = el("button", {
       className: "btn-primary push-talk-button", textContent: t("talk.hold"), type: "button",
@@ -191,9 +204,9 @@ export function pushToTalkButton(cam) {
     const stop = async () => {
       held = false;
       talk.classList.remove("active");
-      if (!session) return;
+      if (!session || stopping) return;
+      stopping = true;
       const current = session;
-      session = null;
       try {
         await current.stop();
         setStatus("talk.done");
@@ -201,6 +214,8 @@ export function pushToTalkButton(cam) {
         status.classList.add("error");
         status.textContent = t("talk.failedDetail", { msg: error.message });
       } finally {
+        if (session === current) session = null;
+        stopping = false;
         talk.disabled = false;
       }
     };
@@ -210,12 +225,13 @@ export function pushToTalkButton(cam) {
       talk.disabled = true;
       setStatus("talk.connecting");
       const current = new PushToTalkSession(cam.id, setStatus, () => void stop());
+      session = current; // Cleanup must also own a pending microphone/connection request.
       try {
         await current.start();
-        session = current;
         if (!held) await stop();
       } catch (error) {
         try { await current.stop(); } catch { /* Preserve the original startup error. */ }
+        if (session === current) session = null;
         setStatus("talk.failedDetail", true);
         status.textContent = t("talk.failedDetail", { msg: error.message });
         talk.disabled = false;
@@ -235,7 +251,11 @@ export function pushToTalkButton(cam) {
     }
     close.addEventListener("click", () => {
       if (starting || session) return;
+      unregister();
       overlay.remove();
+    });
+    const unregister = onSessionEnd(() => {
+      held = false; session?.cancel(); session = null; overlay.remove();
     });
     const card = el("div", { className: "card modal-card audio-message-modal" },
       el("div", { className: "modal-head" },

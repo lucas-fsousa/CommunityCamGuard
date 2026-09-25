@@ -35,7 +35,8 @@ def logout(response: Response) -> dict:
 
 
 @router.get("/me")
-def me(request: Request) -> dict:
+def me(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
     principal = request_principal(request)
     return {
         "authenticated": principal is not None,

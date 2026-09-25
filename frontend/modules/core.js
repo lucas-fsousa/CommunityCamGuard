@@ -23,16 +23,32 @@ export const state = {
 };
 
 let unauthorizedHandler = () => {};
+let sessionEpoch = 0;
+const sessionCleanups = new Set();
+export function onSessionEnd(cleanup) {
+  sessionCleanups.add(cleanup);
+  return () => sessionCleanups.delete(cleanup);
+}
+export function endSession() {
+  sessionEpoch++;
+  for (const cleanup of [...sessionCleanups]) {
+    try { Promise.resolve(cleanup()).catch(() => {}); } catch { /* Continue other cleanup. */ }
+  }
+  sessionCleanups.clear();
+  state.canManage = false;
+}
 
 export function onUnauthorized(handler) {
   unauthorizedHandler = handler;
 }
 
 export async function api(path, opts = {}) {
+  const epoch = sessionEpoch;
   const response = await fetch("/api" + path, {
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
+  if (epoch !== sessionEpoch) throw new DOMException("Stale session", "AbortError");
   if (response.status === 401) {
     unauthorizedHandler();
     throw new Error("unauthorized");
@@ -43,5 +59,7 @@ export async function api(path, opts = {}) {
     error.status = response.status;
     throw error;
   }
-  return response.status === 204 ? null : response.json();
+  const body = response.status === 204 ? null : await response.json();
+  if (epoch !== sessionEpoch) throw new DOMException("Stale session", "AbortError");
+  return body;
 }

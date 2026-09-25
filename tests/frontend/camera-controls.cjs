@@ -61,7 +61,7 @@ const api = async (...args) => { requests.push(args); return pending ? await pen
 const t = (key) => key;
 const notifications = [];
 function load(file, bindings, exported) {
-  bindings = { notify: (message, options) => notifications.push({ message, options }), ...bindings };
+  bindings = { onSessionEnd: () => () => {}, notify: (message, options) => notifications.push({ message, options }), ...bindings };
   const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export (async )?function /g, "$1function ")
     .replace(/export const /g, "const ");
@@ -110,6 +110,17 @@ const cameraControls = load("camera-controls.js", {
 }, "cameraControls");
 
 (async () => {
+  for (const [file, name] of [["audio-message.js", "audioMessageButton"], ["push-to-talk.js", "pushToTalkButton"]]) {
+    const cleanups = new Set();
+    const button = load(file, { el, api, t, onSessionEnd: fn => {
+      cleanups.add(fn); return () => cleanups.delete(fn);
+    } }, name)({ id: "isolated", name: "Test" });
+    const count = document.body.children.length;
+    await button.click();
+    assert.equal(cleanups.size, 1); assert.equal(document.body.children.length, count + 1);
+    for (const cleanup of [...cleanups]) await cleanup();
+    assert.equal(document.body.children.length, count);
+  }
   const cam = { id: "cam_test", name: "Test", controls: {}, capabilities: {} };
   const app = el("main"), alreadyInert = el("aside", { inert: true });
   document.body.style.overflow = "auto";
