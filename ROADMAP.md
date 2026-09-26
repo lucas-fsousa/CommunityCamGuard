@@ -433,6 +433,13 @@ removed from decoder logs. 91 focused tests passed (86 MiB peak, zero swap), syn
 inputs only. Wi-Fi-list/link-type payload contracts, other successful driver results,
 SDK logs and deployment remain pending. See `docs/internal/provisioning-public-errors.md`.
 
+BLE-network-metadata checkpoint (2026-09-26): explicit Yoosee `0x81` Wi-Fi list and
+`0x73` link-type projections, bounded entries/fields, no raw text/hex fallback.
+105 focused tests passed; 78.1 MiB peak, no swap, no hardware/container operations.
+Alternate firmware schemas need explicit mapping/acceptance before deploying; broader
+driver/privileged successful payloads and SDK logs remain pending. Details in
+`docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

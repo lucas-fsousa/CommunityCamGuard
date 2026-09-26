@@ -571,6 +571,12 @@ validated signed-32-bit-integer `connectStatus`; unknown camera fields are disca
 Invalid/missing status produces null JSON/status and `wifi_connection.connected=false`.
 Only integer zero counts as connected. The existing `wifi_connection` metadata is
 preserved; raw hex and internal confirmation keys remain hidden.
+Yoosee `0x81` projects `wifiList` entries to UTF-8 SSIDs of 1–32 bytes and optional
+signed-32-bit integer `level` (first 100 entries inspected). `0x73` projects integer
+`linkType`, with derived `linkTypeName="WIFI"` only for type 1. Unknown schemas return
+null metadata; unknown fields are discarded. Public text is regenerated and `hex`
+is empty for all supported replies. Alternate firmware layouts require explicit
+driver mapping before backend rollout; these limits are not a live validation claim.
 
 | Code | Meaning |
 |---|---|

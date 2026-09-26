@@ -99,3 +99,30 @@ status types, valid success/failure and preserved existing handoff behavior. Pea
 memory 86 MiB, zero swap, under 512 MiB / 75% CPU caps. Synthetic inputs only; no
 camera traffic or container rollout. Dashboard consumes the preserved
 `wifi_connection` fields; no frontend changes were required.
+
+## Follow-up: optional network metadata
+
+Yoosee `0x81` now accepts the tested `wifiList` object/list contract and projects at
+most the first 100 entries into SSID (1–32 UTF-8 bytes) and optional signed-32-bit
+integer `level`. Invalid entries are skipped. Unknown/nested fields are discarded.
+SSID itself remains deliberately public network metadata, not a secret detector;
+the projection cannot identify a credential intentionally placed in an SSID.
+
+`0x73` exposes a signed-32-bit integer `linkType`; only type 1 has a derived name,
+`WIFI`, from the recovered outbound contract. Arbitrary device-supplied names are
+not returned. This is not proof of all firmware response formats or new supported
+link types. Malformed/non-object/unknown schemas return null public metadata. All
+supported replies regenerate public text from the projection and return empty hex;
+non-JSON binary diagnostics are no longer exposed. Deep/malformed JSON is rejected
+without raw fallback. Existing challenge, Wi-Fi acknowledgment and handoff behavior
+is preserved.
+
+Dashboard uses decoded Wi-Fi SSIDs and does not wait for a link-type response. No UI
+change was necessary for the tested contract. Previously its recursive extractor
+could accept other response layouts: alternate firmware schemas now need an explicit
+driver mapping and tests before rollout. No live compatibility claim is made.
+
+105 focused tests passed; Ruff and mypy also passed. Serial capped execution peaked
+at 78.1 MiB, zero swap. No scans/camera/container operations. Remaining work: broader
+successful privileged/driver payloads and SDK logs, plus real BLE/browser acceptance
+of these staged contracts before deployment.

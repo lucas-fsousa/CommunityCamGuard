@@ -12,11 +12,11 @@ from .ble import (
     ble_provisioning_attempt,
     decrypt_ble_payload,
 )
+from .ble_public_payload import network_metadata
 from .privileged import PrivilegedEnrollmentError, remember_privileged_handoff
 
 log = logging.getLogger(__name__)
 _RESPONSE_COMMANDS = {0x71, 0x73, 0x81, 0x83, 0x85}
-_SECRET_COMMANDS = {0x71, 0x83, 0x85}
 
 
 def decode_response(
@@ -45,7 +45,7 @@ def decode_response(
     try:
         text = decoded.rstrip(b"\x00").decode("utf-8")
         payload = json.loads(text) if text else None
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, ValueError, RecursionError):
         pass
 
     challenge_valid = None
@@ -59,7 +59,7 @@ def decode_response(
             )
         )
     wifi_connection: dict[str, object] | None = None
-    public_payload = payload
+    public_payload = network_metadata(command, payload)
     connect_status = None
     handoff_advertised = False
     if command == 0x85:
@@ -91,12 +91,11 @@ def decode_response(
     if command in {0x71, 0x83}:
         text = ""
         public_payload = None
-    if command == 0x85:
-        text = (
-            json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
-            if public_payload is not None
-            else ""
-        )
+    text = (
+        json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
+        if public_payload is not None
+        else ""
+    )
     log.warning(
         "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d "
         "connect_status=%s privileged_handoff=%d",
@@ -115,7 +114,7 @@ def decode_response(
         valid=challenge_valid,
         text=text[:4096],
         public_payload=public_payload,
-        hex_preview="" if command in _SECRET_COMMANDS else decoded[:128].hex() if not text else "",
+        hex_preview="",
         configuration_acknowledged=command == 0x83,
         wifi_connection=wifi_connection,
     )
