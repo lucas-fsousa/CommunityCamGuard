@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Response
 
 from ..camera_identity import stable_camera_id
 from ..drivers.onboarding import OnboardingStateError, OnboardingTransportError
+from .enrollment_errors import EnrollmentFailure, enrollment_failure
 from .provisioning_common import (
     BLE_PROVISIONING,
     LOCAL_PROVISIONING,
@@ -48,8 +49,8 @@ def provisioning_privileged_online_status(
             device_id=identity["device_id"],
             attempt_id=body.attempt_id,
         )
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.SESSION) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
@@ -75,10 +76,10 @@ def provisioning_privileged_bind(body: ProvisioningPrivilegedBindIn, response: R
             time_zone=body.time_zone,
             camera_id=(stable_camera_id("mac", identity["mac"]) if identity["mac"] else None),
         )
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingTransportError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.BIND) from None
+    except OnboardingTransportError:
+        raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     log.info("Privileged P2P enrollment accepted device=%s", identity["device_id"])
@@ -99,10 +100,10 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
     try:
         provider = onboarding(body.driver) if body.driver else onboarding()
         inventory = provider.probe_inventory(identity["device_id"])
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingTransportError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.STATE) from None
+    except OnboardingTransportError:
+        raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
@@ -129,10 +130,10 @@ def provisioning_privileged_p2p_route_probe(
     try:
         provider = onboarding(body.driver) if body.driver else onboarding()
         route = provider.probe_route(identity["device_id"])
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingTransportError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.STATE) from None
+    except OnboardingTransportError:
+        raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
@@ -164,10 +165,10 @@ def provisioning_privileged_p2p_property_read(
         raise HTTPException(status_code=422, detail="thing-model path is not read-only allowlisted")
     try:
         result = provider.read_property(identity["device_id"], body.property_path)
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingTransportError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.STATE) from None
+    except OnboardingTransportError:
+        raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {

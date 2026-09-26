@@ -11,6 +11,7 @@ from ..drivers.onboarding import (
     OnboardingStateError,
 )
 from ..services.camera_runtime import resync_services
+from .enrollment_errors import EnrollmentFailure, enrollment_failure
 from .local_only import require_local_request
 from .provisioning_common import (
     ProvisioningLabelIn,
@@ -51,10 +52,10 @@ def complete_onboarding(
             name=body.name,
             firmware_hint=identity["firmware_version"],
         )
-    except OnboardingStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingCompletionError as exc:
-        raise HTTPException(status_code=502, detail=f"{exc.stage}: {exc}") from exc
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.STATE) from None
+    except OnboardingCompletionError:
+        raise enrollment_failure(EnrollmentFailure.COMPLETE) from None
     resync_services(request)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"

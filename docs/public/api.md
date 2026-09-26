@@ -562,7 +562,10 @@ see [provisioning audit](../internal/provisioning-public-errors.md).
 BLE preparation/decoding also uses fixed 422 recovery messages for known session or
 material errors. Missing material retains 503 and account/transport retrieval failures
 retain 502; these handled failures have no-store headers and do not return provider
-exception text. Labels and privileged enrollment errors are separate pending work.
+exception text. Label/driver-resolution failures now also use fixed 422 instructions.
+Handled privileged state failures return fixed 409 recovery guidance; transport and
+completion failures use fixed 502 messages. Completion error stage strings are no
+longer exposed. Successful payloads are unchanged; these are staged backend changes.
 
 | Code | Meaning |
 |---|---|

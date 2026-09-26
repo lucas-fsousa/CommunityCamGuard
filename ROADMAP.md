@@ -418,6 +418,14 @@ responses. 110 focused tests passed (82.2 MiB peak, zero swap), no hardware/cont
 operations. Label resolution and privileged/P2P errors, successful payloads and logs
 remain pending. Source-only; see `docs/internal/provisioning-public-errors.md`.
 
+Identification/enrollment-error checkpoint (2026-09-26): fixed no-store projections
+replace raw label/driver-resolution, handled privileged state/transport and completion
+errors. Untrusted completion stage strings are no longer returned. HTTP 422/409/502
+semantics preserved. 113 focused tests passed, one non-applicable case skipped;
+100 MiB peak, no swap. No hardware/container operations. Successful payloads,
+unexpected exceptions, lower-level logs and backend/browser rollout remain pending.
+See `docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

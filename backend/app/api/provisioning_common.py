@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from pydantic import BaseModel, Field, SecretStr
 
 from .. import drivers
 from ..auth import require_auth
 from ..drivers.onboarding import OnboardingLabelError
+from .enrollment_errors import EnrollmentFailure, enrollment_failure
 from .local_only import require_local_or_remote_ble_request, require_local_request
 
 LOCAL_PROVISIONING = [Depends(require_auth), Depends(require_local_request)]
@@ -19,8 +20,8 @@ def onboarding(driver_key: str | None = None):
 
     try:
         return drivers.onboarding_provider(driver_key)
-    except LookupError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except LookupError:
+        raise enrollment_failure(EnrollmentFailure.DRIVER) from None
 
 
 class ProvisioningLabelIn(BaseModel):
@@ -104,5 +105,5 @@ def inspect_provisioning_label(body: ProvisioningLabelIn) -> dict:
             mac=body.mac,
         )
         return {**identity, "driver": provider.driver_key}
-    except OnboardingLabelError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OnboardingLabelError:
+        raise enrollment_failure(EnrollmentFailure.LABEL) from None
