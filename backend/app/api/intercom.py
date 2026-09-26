@@ -21,6 +21,7 @@ from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..origin_policy import browser_origin_allowed
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
 from ..session_channels import run_guarded
+from .control_errors import control_failure
 from .local_only import require_local_request, require_local_websocket
 
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
@@ -40,13 +41,7 @@ stream_router = APIRouter(prefix="/api/cameras/{camera_id}/intercom", tags=["cam
 
 
 def _failure(exc: Exception) -> HTTPException:
-    if isinstance(exc, CameraNotFound):
-        return HTTPException(status_code=404, detail=str(exc))
-    if isinstance(exc, Unsupported):
-        return HTTPException(status_code=501, detail="this camera doesn't support audio messages")
-    if isinstance(exc, (ControlNotReady, ControlBusy)):
-        return HTTPException(status_code=409, detail=str(exc))
-    return HTTPException(status_code=502, detail=str(exc))
+    return control_failure(exc, unsupported="this camera doesn't support audio messages")
 
 
 async def _bounded_pcm(request: Request) -> bytes:
@@ -98,7 +93,7 @@ async def create_audio_message(
         ControlBusy,
         ControlOperationError,
     ) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
     if not result.completed:
         raise HTTPException(status_code=502, detail="camera did not complete the audio message")
     response.headers["Cache-Control"] = "no-store"
@@ -251,8 +246,11 @@ async def _stream_audio(websocket: WebSocket, camera_id: str, stop: threading.Ev
     ) as exc:
         await _send_ws_json(websocket, {"type": "error", "detail": str(_failure(exc).detail)})
         reported_error = True
-    except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
-        await _send_ws_json(websocket, {"type": "error", "detail": str(exc)})
+    except TimeoutError:
+        await _send_ws_json(websocket, {"type": "error", "detail": "camera audio stream timed out"})
+        reported_error = True
+    except (OSError, RuntimeError, ValueError):
+        await _send_ws_json(websocket, {"type": "error", "detail": "camera audio stream failed"})
         reported_error = True
     finally:
         if graceful_stop:

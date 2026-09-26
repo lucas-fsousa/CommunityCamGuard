@@ -66,4 +66,4 @@ def resync_services(request: Any) -> None:
         if recorder is not None:
             recorder.start()
     except Exception as exc:  # registry changes are durable; startup reconciles later
-        log.warning("service resync after registry change failed: %s", exc)
+        log.warning("service resync after registry change failed error_type=%s", type(exc).__name__)

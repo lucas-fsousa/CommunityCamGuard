@@ -19,6 +19,7 @@ from ..drivers import (
     Unsupported,
 )
 from ..services import CameraNotFound, read_control, write_control
+from .control_errors import control_failure
 from .local_only import require_local_request
 
 router = APIRouter(
@@ -39,27 +40,21 @@ class OrientationIn(BaseModel):
 
 
 def _failure(exc: Exception) -> HTTPException:
-    if isinstance(exc, CameraNotFound):
-        return HTTPException(status_code=404, detail=str(exc))
-    if isinstance(exc, Unsupported):
-        return HTTPException(status_code=501, detail="this camera doesn't support that control")
-    if isinstance(exc, ControlNotReady):
-        return HTTPException(status_code=409, detail=str(exc))
-    return HTTPException(status_code=502, detail=str(exc))
+    return control_failure(exc)
 
 
 def _read(camera_id: str, key: str):
     try:
         return read_control(camera_id, key)
     except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
 
 
 def _write(camera_id: str, key: str, value: bool | str):
     try:
         return write_control(camera_id, key, value)
     except (CameraNotFound, Unsupported, ControlNotReady, ControlOperationError) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
 
 
 @router.get("/{camera_id}/white-light")

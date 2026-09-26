@@ -52,10 +52,12 @@ def provisioning_vendor_account_login(
                 area=body.area,
             )
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except OnboardingAccountError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError:
+        raise HTTPException(status_code=422, detail="invalid vendor account parameters",
+                            headers={"Cache-Control": "no-store"}) from None
+    except OnboardingAccountError:
+        raise HTTPException(status_code=502, detail="vendor account login failed",
+                            headers={"Cache-Control": "no-store"}) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
@@ -72,10 +74,12 @@ def provisioning_vendor_account_refresh(response: Response, driver: str | None =
     provider = onboarding(driver) if driver else onboarding()
     try:
         provider.refresh_account()
-    except LookupError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except OnboardingAccountError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except LookupError:
+        raise HTTPException(status_code=409, detail="vendor account session is unavailable; sign in again",
+                            headers={"Cache-Control": "no-store"}) from None
+    except OnboardingAccountError:
+        raise HTTPException(status_code=502, detail="vendor account refresh failed",
+                            headers={"Cache-Control": "no-store"}) from None
     response.headers["Cache-Control"] = "no-store"
     return {
         "provider": provider.provider,

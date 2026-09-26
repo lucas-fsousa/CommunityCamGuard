@@ -130,6 +130,23 @@ class _AudioBrowser:
         self.application_state = WebSocketState.DISCONNECTED
 
 
+def test_audio_websocket_sanitizes_receive_errors(monkeypatch) -> None:
+    browser = _AudioBrowser(threading.Event())
+    async def fail_receive():
+        raise OSError("rtsp://user:DO_NOT_EXPOSE@192.0.2.1/live?token=DO_NOT_EXPOSE")
+    def dispatch(_camera_id, chunks):
+        list(chunks)  # Synthetic queue only; stopped by the handler's sentinel.
+        return AudioMessageResult(20, 0, 0, 0, True, True, True)
+    monkeypatch.setattr(browser, "receive", fail_receive)
+    monkeypatch.setattr(intercom, "verify_token", lambda _: True)
+    monkeypatch.setattr(intercom, "require_local_websocket", lambda _: None)
+    monkeypatch.setattr(intercom, "send_audio_stream", dispatch)
+    asyncio.run(intercom.stream_audio(browser, CAMERA_ID))
+    assert browser.sent == [{"type": "ready", "max_ms": 10000},
+                            {"type": "error", "detail": "camera audio stream failed"}]
+    assert "DO_NOT_EXPOSE" not in json.dumps(browser.sent)
+
+
 def test_audio_websocket_bridges_bounded_pcm_to_generic_stream_service(monkeypatch) -> None:
     consumed = threading.Event()
     browser = _AudioBrowser(consumed)
@@ -186,7 +203,7 @@ def test_audio_websocket_bounds_a_stuck_camera_setup(monkeypatch) -> None:
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
 
     assert browser.sent == [
-        {"type": "error", "detail": "camera audio stream did not become ready"}
+        {"type": "error", "detail": "camera audio stream timed out"}
     ]
     assert browser.application_state == WebSocketState.DISCONNECTED
 

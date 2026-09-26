@@ -18,6 +18,10 @@ unchanged. See [transport limits and activation gates](../internal/temporary-liv
 
 ## Authentication
 
+Staged error contract: covered control/PTZ/intercom and vendor-account errors retain
+their status codes but use fixed public messages instead of raw provider/transport
+exceptions. Do not parse vendor exception prose. See [scope and remaining audit](../internal/public-control-errors.md).
+
 Public surface: login/logout, session status, build/health, API schema/docs and
 reviewed dashboard assets. Serving the dashboard shell does not authorize API access.
 Staged file hardening (not deployed) rejects unlisted public files and hidden/non-MP4

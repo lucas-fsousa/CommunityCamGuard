@@ -30,6 +30,7 @@ Docs are split by audience:
 - **[Browser origin policy](internal/browser-origin-policy.md)** — origin-based CSRF checks and optional canonical HTTPS origin; staged proxy migration guidance.
 - **[Public files/routes](internal/public-file-audit.md)** — asset allowlist, archive-file restrictions, Docker context rules and exceptional-route inventory.
 - **[Recording GET boundary](internal/recording-get-boundary.md)** — explicit POST preparation and legacy-client compatibility; staged.
+- **[Public control errors](internal/public-control-errors.md)** — driver/account error projections, synthetic secret tests and outstanding query-credential migration.
 - **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.

@@ -15,6 +15,7 @@ from ..drivers.contracts import (
     public_control_value,
 )
 from ..services import CameraNotFound, ControlBusy, control_options, read_control, write_control
+from .control_errors import control_failure
 from .local_only import require_local_request
 
 router = APIRouter(
@@ -55,13 +56,7 @@ class ControlWriteIn(BaseModel):
 
 
 def _failure(exc: Exception) -> HTTPException:
-    if isinstance(exc, CameraNotFound):
-        return HTTPException(status_code=404, detail=str(exc))
-    if isinstance(exc, Unsupported):
-        return HTTPException(status_code=501, detail="this camera doesn't support that control")
-    if isinstance(exc, (ControlNotReady, ControlBusy)):
-        return HTTPException(status_code=409, detail=str(exc))
-    return HTTPException(status_code=502, detail=str(exc))
+    return control_failure(exc)
 
 
 def _public(camera_id: str, result: ControlResult) -> dict[str, object]:
@@ -93,7 +88,7 @@ def read_camera_control_options(
     try:
         options = control_options(camera_id, control_key)
     except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {
@@ -114,7 +109,7 @@ def read_camera_control(
     try:
         result = read_control(camera_id, control_key)
     except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return _public(camera_id, result)
@@ -132,7 +127,7 @@ def write_camera_control(
     try:
         result = write_control(camera_id, control_key, body.contract_value())
     except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
-        raise _failure(exc) from exc
+        raise _failure(exc) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return _public(camera_id, result)

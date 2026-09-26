@@ -382,6 +382,13 @@ playback contracts passed without production camera/file/encoder/container opera
 Backend deployment and broader response-redaction/temporary-access gates remain open.
 See `docs/internal/recording-get-boundary.md`.
 
+Public-error checkpoint (2026-09-26): shared fixed-message control/HTTP/audio error
+projection, safe vendor-account login/refresh failures and selected exception-type-only
+logs. 129 focused tests passed with synthetic secret-bearing exceptions and fake
+hardware dispatch. Backend not deployed. Next priority: remove discovery credentials
+from query URLs; then remaining provisioning errors, sensitive validation responses,
+successful driver payloads and SDK logs. See `docs/internal/public-control-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

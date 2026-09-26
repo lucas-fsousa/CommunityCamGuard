@@ -19,6 +19,7 @@ from ..services.camera_runtime import (
     runtime_statuses,
 )
 from .camera_presenter import camera_out
+from .control_errors import control_failure
 
 router = APIRouter(prefix="/api", tags=["cameras"])
 log = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ def upsert_camera(body: CameraIn, request: Request) -> dict:
         try:
             camera = probe_and_store(camera)
         except Exception as exc:
-            log.warning("capability probe on add failed for %s: %s", camera.mac, exc)
+            log.warning("capability probe on add failed for %s error_type=%s", camera.camera_id, type(exc).__name__)
     resync_services(request)
     return camera_out(camera)
 
@@ -130,14 +131,13 @@ def ptz_move(camera_id: str, body: PtzIn) -> dict:
         else:
             with _exclusive(camera.camera_id):
                 ok = driver.ptz(camera, body.direction, action)
-    except (ControlBusy, drivers.ControlNotReady) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except drivers.ControlOperationError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except (ControlBusy, drivers.ControlNotReady, drivers.ControlOperationError) as exc:
+        raise control_failure(exc) from None
     except drivers.Unsupported as exc:
         raise HTTPException(status_code=501, detail="this camera doesn't support PTZ") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid PTZ direction or action",
+                            headers={"Cache-Control": "no-store"}) from None
     if not ok:
         raise HTTPException(status_code=502, detail="camera did not accept the PTZ command")
     return {

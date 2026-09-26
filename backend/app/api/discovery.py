@@ -33,7 +33,7 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
         try:
             recorder.rekey_segments(old, new)
         except Exception as exc:
-            log.warning("could not migrate recordings %s -> %s: %s", old, new, exc)
+            log.warning("could not migrate recordings %s -> %s error_type=%s", old, new, type(exc).__name__)
 
     configured, candidates = registry.reconcile(hosts, on_rekey=on_rekey)
     if any(before.get(cam.camera_id) != cam.last_ip for cam in configured):
@@ -44,7 +44,7 @@ def discovery_scan(request: Request, username: str = "", password: str = "") -> 
         try:
             configured[index] = probe_and_store(camera)
         except Exception as exc:
-            log.warning("backfill capability probe failed for %s: %s", camera.mac, exc)
+            log.warning("backfill capability probe failed for %s error_type=%s", camera.camera_id, type(exc).__name__)
     return {
         "configured": [camera_out(camera) for camera in configured],
         "candidates": [
