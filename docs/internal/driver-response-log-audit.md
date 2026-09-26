@@ -56,3 +56,19 @@ Before deployment: external-client completion compatibility, alternate BLE firmw
 layouts and controlled browser/proxy acceptance. Public temporary login stays
 disabled. Broader remaining work: per-property public schemas, camera catalogue
 stream-path/capability privacy and external media-process logs.
+
+## Follow-up: camera catalogue
+
+The camera response no longer includes `stream_path`, and `capabilities` is a
+generic display projection rather than the entire persisted driver dictionary.
+It preserves strict boolean flags, bounded public driver/model/firmware/codec labels,
+probe timestamp and bounded valid open ports. Internal `stream_paths`, role maps,
+unknown keys and nested private evidence are omitted. Labels are deliberately public
+metadata, not scanned for secret-looking substrings. External clients depending on
+removed internals need migration before deployment.
+
+Control catalogue, PTZ interaction and audio/SD support are still computed by the
+selected driver against the unchanged full camera object. No driver/model branch
+or feature grant was added to the presenter. 87 focused tests passed (98.2 MiB peak,
+zero swap), including preservation of driver evidence and control output. Ruff and
+mypy passed. No production registry, camera or container was changed.

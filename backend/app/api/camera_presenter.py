@@ -6,6 +6,7 @@ from .. import drivers
 from ..db import registry
 from ..media import go2rtc
 from ..services import control_catalog
+from .public_capabilities import public_capabilities
 
 
 def camera_out(camera: registry.Camera) -> dict:
@@ -22,13 +23,12 @@ def camera_out(camera: registry.Camera) -> dict:
         "name": camera.name,
         "username": camera.username,
         "has_password": bool(camera.password),
-        "stream_path": camera.stream_path,
         "rtsp_port": camera.rtsp_port,
         "last_ip": camera.last_ip,
         "vendor": camera.vendor,
-        "capabilities": camera.capabilities,
+        "capabilities": public_capabilities(camera.capabilities),
         "ptz_interaction": driver.ptz_interaction(camera),
-        "has_audio": bool(camera.capabilities.get("has_audio")),
+        "has_audio": camera.capabilities.get("has_audio") is True,
         "stream_id": go2rtc.stream_id(camera.camera_id),
         "web_stream_id": go2rtc.web_stream_id(camera.camera_id),
         "hd_stream_id": go2rtc.hd_stream_id(camera.camera_id),

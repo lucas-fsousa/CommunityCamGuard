@@ -455,6 +455,12 @@ Ruff/mypy passed. No hardware/deployment. Privileged raw-property diagnostics re
 operator-only, not a public privacy contract. External process logs and catalogue
 privacy remain broader work. See `docs/internal/driver-response-log-audit.md`.
 
+Camera-catalogue checkpoint (2026-09-26): public capability display projection and
+raw stream-path omission; private driver evidence remains available to driver-owned
+control/support decisions only. 87 focused tests passed (98.2 MiB, no swap). No
+hardware/deployment. External-client migration required for removed internal fields;
+see `docs/internal/driver-response-log-audit.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

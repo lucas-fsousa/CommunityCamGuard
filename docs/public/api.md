@@ -425,6 +425,10 @@ types and otherwise return fixed 502 errors. Completion no longer returns
 `camera.stream_path`; unknown transport/codec labels and stage names are omitted or
 empty. Camera ID/name/IP remain available. External clients must review this change
 before deployment; the current dashboard does not consume that completion path field.
+Camera list/add/probe responses likewise omit `stream_path`; `capabilities` contains
+only generic display metadata, not persisted driver evidence or `stream_paths`.
+The `controls`, PTZ interaction and audio/SD support contracts remain driver-owned.
+External clients consuming internal capability keys must migrate before rollout.
 
 `/complete` also never accepts the temporary public HTTPS-tunnel exception. When a phone supplies
 Bluetooth through such a tunnel, finish the BLE/bind stage, close the tunnel and reopen the label
