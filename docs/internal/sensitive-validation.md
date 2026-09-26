@@ -41,3 +41,5 @@ measured peak memory 87.7 MiB, zero swap. Ruff and diff whitespace checks passed
 
 Backend rollout and real browser/proxy acceptance remain separate pending work.
 Next: typed, safe provisioning business errors without losing recovery instructions.
+Follow-up: [Wi-Fi/QR error projection](provisioning-public-errors.md) is now implemented;
+BLE/session, label and privileged business errors remain pending.

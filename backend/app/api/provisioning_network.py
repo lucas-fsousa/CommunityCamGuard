@@ -19,6 +19,7 @@ from .provisioning_common import (
     inspect_provisioning_label,
     onboarding,
 )
+from .provisioning_errors import wifi_qr_failure, wifi_selection_failure
 
 router = APIRouter(prefix="/api/provisioning", tags=["provisioning"])
 
@@ -57,7 +58,7 @@ def provisioning_manual_network(body: ProvisioningManualNetworkIn, response: Res
     try:
         network = manual_network(body.ssid, body.security)
     except WifiSelectionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise wifi_selection_failure(exc) from None
     response.headers["Cache-Control"] = "no-store"
     return {"network": network.public()}
 
@@ -75,7 +76,7 @@ def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
     try:
         network = selected_network(body.wifi_network_id)
     except WifiSelectionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise wifi_selection_failure(exc) from None
     password = body.wifi_password.get_secret_value()
     try:
         provider = onboarding(body.driver) if body.driver else onboarding()
@@ -84,8 +85,8 @@ def provisioning_start(body: ProvisioningStartIn, response: Response) -> dict:
             password=password,
             security=network.security,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError:
+        raise wifi_qr_failure() from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {

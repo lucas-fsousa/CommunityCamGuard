@@ -33,6 +33,7 @@ Docs are split by audience:
 - **[Public control errors](internal/public-control-errors.md)** — driver/account error projections, synthetic secret tests and outstanding query-credential migration.
 - **[Discovery credential migration](internal/discovery-credential-body.md)** — bounded JSON input and query-free access logs; legacy-client/proxy considerations.
 - **[Sensitive validation](internal/sensitive-validation.md)** — generic HTTP schema failures without echoing submitted credentials; staged backend change.
+- **[Provisioning error audit](internal/provisioning-public-errors.md)** — Wi-Fi/QR errors sanitized; BLE/session and privileged errors still pending.
 - **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.

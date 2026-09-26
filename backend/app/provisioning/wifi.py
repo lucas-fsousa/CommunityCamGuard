@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from enum import Enum
 
 from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 
@@ -20,8 +21,17 @@ TOKEN_MAX_AGE = 300
 _TOKEN_SALT = "ccg-wifi-selection-v1"
 
 
+class WifiSelectionReason(Enum):
+    INVALID = "invalid"
+    EXPIRED = "expired"
+    SSID_LENGTH = "ssid_length"
+    SECURITY = "security"
+
+
 class WifiSelectionError(ValueError):
-    pass
+    def __init__(self, message: str, *, reason: WifiSelectionReason = WifiSelectionReason.INVALID):
+        super().__init__(message)
+        self.reason = reason
 
 
 @dataclass(frozen=True)
@@ -51,12 +61,12 @@ def manual_network(ssid: str, security: str) -> WifiNetwork:
     """Validate a localhost-only fallback selection before signing it like a scan result."""
     normalized_ssid = ssid.strip()
     if not normalized_ssid or len(normalized_ssid.encode("utf-8")) > 32:
-        raise WifiSelectionError("SSID must contain 1 to 32 UTF-8 bytes")
+        raise WifiSelectionError("SSID must contain 1 to 32 UTF-8 bytes", reason=WifiSelectionReason.SSID_LENGTH)
     security_labels = {"wpa": "WPA/WPA2", "wep": "WEP", "open": "open"}
     try:
         normalized_security = security_labels[security.strip().lower()]
     except KeyError as exc:
-        raise WifiSelectionError("unsupported Wi-Fi security") from exc
+        raise WifiSelectionError("unsupported Wi-Fi security", reason=WifiSelectionReason.SECURITY) from exc
     return WifiNetwork(ssid=normalized_ssid, security=normalized_security)
 
 
@@ -64,7 +74,7 @@ def selected_network(token: str) -> WifiNetwork:
     try:
         payload = _serializer().loads(token, max_age=TOKEN_MAX_AGE)
     except SignatureExpired as exc:
-        raise WifiSelectionError("Wi-Fi selection expired; scan again") from exc
+        raise WifiSelectionError("Wi-Fi selection expired; scan again", reason=WifiSelectionReason.EXPIRED) from exc
     except BadData as exc:
         raise WifiSelectionError("invalid Wi-Fi selection") from exc
     ssid = payload.get("ssid") if isinstance(payload, dict) else None

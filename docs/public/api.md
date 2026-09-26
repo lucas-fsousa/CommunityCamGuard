@@ -554,6 +554,11 @@ Staged backend change: framework HTTP request-validation failures return 422 wit
 `{"detail":"Invalid request parameters"}` and no-store headers, not the framework's
 input-bearing detail array. Business errors and separately handled login/discovery
 errors retain their own safe messages. See [validation boundary](../internal/sensitive-validation.md).
+Wi-Fi selection failures in manual/QR/BLE preparation also return fixed 422/no-store
+messages chosen by typed reason (including expired selection). QR encoding failures
+return a fixed instruction to check SSID, password and security mode, never provider
+exception text. Other provisioning business-error paths remain under review;
+see [provisioning audit](../internal/provisioning-public-errors.md).
 
 | Code | Meaning |
 |---|---|

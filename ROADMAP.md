@@ -404,6 +404,13 @@ No camera/container operations or backend deployment. Provisioning business erro
 successful payloads, SDK logs and browser/proxy rollout remain pending. See
 `docs/internal/sensitive-validation.md`.
 
+Provisioning-error checkpoint (2026-09-26): Wi-Fi domain now supplies typed failure
+reasons; manual/QR/BLE network-selection errors use fixed recovery messages. QR
+provider errors no longer echo exception text. 84 focused tests passed (87.4 MiB
+peak, no swap), with mocked hardware/scans. Source only. Label resolution, BLE
+material/session, privileged/P2P completion errors and successful payload/log review
+remain pending. Details: `docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

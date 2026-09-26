@@ -24,6 +24,7 @@ from .provisioning_common import (
     inspect_provisioning_label,
     onboarding,
 )
+from .provisioning_errors import wifi_selection_failure
 
 router = APIRouter(prefix="/api/provisioning/ble", tags=["provisioning"])
 
@@ -41,7 +42,7 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
     try:
         network = selected_network(body.wifi_network_id)
     except WifiSelectionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise wifi_selection_failure(exc) from None
 
     settings = get_settings()
     try:
