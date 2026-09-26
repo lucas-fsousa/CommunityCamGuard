@@ -58,7 +58,7 @@ def decode_response(
                 material.random_number.encode("utf-8")[-len(decoded) :],
             )
         )
-    wifi_connection = None
+    wifi_connection: dict[str, object] | None = None
     public_payload = payload
     connect_status = None
     handoff_advertised = False
