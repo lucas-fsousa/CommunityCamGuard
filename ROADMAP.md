@@ -448,6 +448,13 @@ safe 409/502 messages. 104 tests passed, one existing non-applicable case skippe
 success projections and full SDK log audit remain pending. Contract documented in
 `docs/internal/provisioning-public-errors.md`.
 
+Driver-response/log checkpoint (2026-09-26): online/inventory/route scalar validation,
+reviewed completion metadata (raw stream path removed), safe media proxy failure
+logs and fixed AAC encoder errors. 148 focused tests passed (120.1 MiB peak, no swap),
+Ruff/mypy passed. No hardware/deployment. Privileged raw-property diagnostics remain
+operator-only, not a public privacy contract. External process logs and catalogue
+privacy remain broader work. See `docs/internal/driver-response-log-audit.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

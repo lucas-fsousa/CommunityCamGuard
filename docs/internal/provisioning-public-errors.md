@@ -150,3 +150,6 @@ Synthetic provider results only; no hardware, account calls, scans or deployment
 Read-only inspection found existing type-only or bounded diagnostics in capability
 refresh, white-light and PTZ code, but this is not a completed SDK/native log audit.
 Next: remaining inventory/route/property/completion success projections and SDK logs.
+Follow-up: [driver response/log audit](driver-response-log-audit.md) covers online,
+inventory/route scalars, completion metadata and selected logging sinks; privileged
+raw property reads require separate driver-owned public schemas.

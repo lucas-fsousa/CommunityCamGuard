@@ -190,7 +190,8 @@ async def _proxy_media(websocket: WebSocket) -> None:
                         task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
     except Exception as exc:
-        log.debug("go2rtc ws proxy for %s ended: %s", src, exc)
+        # src may be a credential-bearing URL; upstream errors may echo it too.
+        log.debug("go2rtc ws proxy ended error_type=%s", type(exc).__name__)
     finally:
         if websocket.application_state != WebSocketState.DISCONNECTED:
             try:

@@ -211,6 +211,9 @@ BLE network-list/link-type metadata is also projected through explicit field lim
 alternate firmware response layouts require compatibility validation before rollout.
 Privileged enrollment status also has an explicit vendor-neutral field/type contract;
 driver dictionaries cannot silently expose additional fields to the browser.
+The [driver response/log audit](docs/internal/driver-response-log-audit.md) adds strict
+diagnostic scalars, reviewed completion metadata and safe proxy/AAC failure reporting.
+Raw trusted-LAN property diagnostics are not a public or guest-safe data contract.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

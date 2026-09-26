@@ -11,6 +11,7 @@ from ..drivers.onboarding import (
     OnboardingStateError,
 )
 from ..services.camera_runtime import resync_services
+from .completion_presenter import completion_metadata
 from .enrollment_errors import EnrollmentFailure, enrollment_failure
 from .local_only import require_local_request
 from .provisioning_common import (
@@ -66,15 +67,7 @@ def complete_onboarding(
             "id": camera.camera_id,
             "name": camera.name,
             "last_ip": camera.last_ip,
-            "stream_path": camera.stream_path,
         },
-        "media": {
-            "transport": completed.proof.transport,
-            "has_video": completed.proof.has_video,
-            "has_audio": completed.proof.has_audio,
-            "video_codec": completed.proof.video_codec,
-            "audio_codec": completed.proof.audio_codec,
-        },
-        "stages": list(completed.stages),
+        **completion_metadata(completed),
         "already_configured": completed.already_configured,
     }

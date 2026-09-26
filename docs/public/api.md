@@ -416,6 +416,15 @@ the capability roots recovered from the APK and compiled into the backend allowl
 `Action.*` roots are queried with B7 and are never executed with AC. The response contains the
 camera-owned JSON value, transport acknowledgement and device error code. Unlike the temporary
 Web-Bluetooth subset, this route never accepts the remote HTTPS-tunnel exception.
+This is an operator diagnostic: returned property JSON is not credential-redacted.
+The read-only path allowlist is not a privacy schema. Do not share raw results with
+temporary/public users; dedicated public projections require driver-owned schemas.
+
+Staged response hardening: online/inventory/route diagnostics require strict scalar
+types and otherwise return fixed 502 errors. Completion no longer returns
+`camera.stream_path`; unknown transport/codec labels and stage names are omitted or
+empty. Camera ID/name/IP remain available. External clients must review this change
+before deployment; the current dashboard does not consume that completion path field.
 
 `/complete` also never accepts the temporary public HTTPS-tunnel exception. When a phone supplies
 Bluetooth through such a tunnel, finish the BLE/bind stage, close the tunnel and reopen the label

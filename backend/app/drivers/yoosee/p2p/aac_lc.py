@@ -113,7 +113,7 @@ class AacLcAdtsEncoder:
                 command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 bufsize=0,
             )
         except OSError as exc:
@@ -138,9 +138,8 @@ class AacLcAdtsEncoder:
         return frames
 
     def _error(self) -> RuntimeError:
-        stderr = self._process.stderr
-        detail = stderr.read(512).decode("utf-8", "replace").strip() if stderr else ""
-        return RuntimeError(f"FFmpeg AAC encoding failed{': ' + detail if detail else ''}")
+        # Never echo subprocess diagnostics or block reading stderr on failure.
+        return RuntimeError("FFmpeg AAC encoding failed")
 
     def feed(self, pcm16le: bytes, *, final: bool = False) -> tuple[bytes, ...]:
         if self._closed:

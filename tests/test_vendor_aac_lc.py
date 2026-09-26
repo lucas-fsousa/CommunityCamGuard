@@ -4,9 +4,16 @@ import pytest
 
 from backend.app.drivers.yoosee.p2p.aac_lc import (
     OUTPUT_BIT_RATE,
+    AacLcAdtsEncoder,
     extract_adts_frames,
     validate_aac_lc_adts_frame,
 )
+
+
+def test_encoder_failure_does_not_read_or_reflect_stderr() -> None:
+    # No process/encoder is started. Missing _process also proves no stderr read.
+    encoder = object.__new__(AacLcAdtsEncoder)
+    assert str(encoder._error()) == "FFmpeg AAC encoding failed"
 
 
 def _adts(payload: bytes = b"aac") -> bytes:

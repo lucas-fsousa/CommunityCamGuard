@@ -10,6 +10,7 @@ from ..camera_identity import stable_camera_id
 from ..drivers.onboarding import OnboardingStateError, OnboardingTransportError
 from .enrollment_errors import EnrollmentFailure, enrollment_failure
 from .enrollment_presenter import enrollment_status
+from .enrollment_results import diagnostic_result
 from .provisioning_common import (
     BLE_PROVISIONING,
     LOCAL_PROVISIONING,
@@ -60,14 +61,14 @@ def provisioning_privileged_online_status(
         raise enrollment_failure(EnrollmentFailure.SESSION) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return {
+    return diagnostic_result("online", {
         "device_id": identity["device_id"],
         "query_succeeded": result.query_succeeded,
         "online": result.online,
         "terminal_failure": result.terminal_failure,
         "code": result.code,
         "privileged_handoff_ready": result.handoff_ready,
-    }
+    }, device_id=identity["device_id"])
 
 
 @router.post("/bind", dependencies=BLE_PROVISIONING)
@@ -113,7 +114,7 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
         raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return {
+    return diagnostic_result("inventory", {
         "device_id": identity["device_id"],
         "authenticated": inventory.authenticated,
         "device_count": inventory.device_count,
@@ -123,7 +124,7 @@ def provisioning_privileged_p2p_probe(body: ProvisioningLabelIn, response: Respo
         "target_term_resolved": inventory.target_term_resolved,
         "skipped_incomplete_nodes": inventory.skipped_incomplete_nodes,
         "camera_contacted": False,
-    }
+    }, device_id=identity["device_id"])
 
 
 @router.post("/p2p-route-probe", dependencies=BLE_PROVISIONING)
@@ -143,7 +144,7 @@ def provisioning_privileged_p2p_route_probe(
         raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return {
+    return diagnostic_result("route", {
         "device_id": identity["device_id"],
         "authenticated": route.authenticated,
         "target_visible": route.target_visible,
@@ -156,7 +157,7 @@ def provisioning_privileged_p2p_route_probe(
         "broker_error_code": route.broker_error_code,
         "media_opened": False,
         "command_sent": False,
-    }
+    }, device_id=identity["device_id"])
 
 
 @router.post("/p2p-property-read", dependencies=LOCAL_PROVISIONING)

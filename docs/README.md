@@ -34,6 +34,7 @@ Docs are split by audience:
 - **[Discovery credential migration](internal/discovery-credential-body.md)** — bounded JSON input and query-free access logs; legacy-client/proxy considerations.
 - **[Sensitive validation](internal/sensitive-validation.md)** — generic HTTP schema failures without echoing submitted credentials; staged backend change.
 - **[Provisioning error audit](internal/provisioning-public-errors.md)** — fixed errors, bounded BLE replies and strict enrollment status; broader payload/log review pending.
+- **[Driver response/log audit](internal/driver-response-log-audit.md)** — diagnostic/completion contracts, proxy/AAC fixes and explicit privacy boundaries.
 - **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.

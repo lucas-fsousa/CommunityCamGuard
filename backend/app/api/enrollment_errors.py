@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 
 class EnrollmentFailure(Enum):
+    INVALID_DIAGNOSTIC = (502, "camera driver returned invalid enrollment diagnostics")
     INVALID_RESULT = (502, "camera driver returned an invalid enrollment status")
     DRIVER = (422, "selected driver does not support factory onboarding")
     LABEL = (422, "invalid camera label; check the QR code, device ID, capability code and MAC address")
