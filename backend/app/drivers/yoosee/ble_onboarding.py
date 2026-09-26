@@ -35,8 +35,10 @@ def decode_response(
         attempt = ble_provisioning_attempt(attempt_id, expected_device_id=device_id)
         material = attempt.material
         decoded = decrypt_ble_payload(raw, material.tan_key) if encrypted else raw
-    except (BleCodecError, ValueError) as exc:
-        raise OnboardingInputError(str(exc)) from exc
+    except BleCodecError as exc:
+        raise OnboardingInputError("BLE response could not be decoded", reason=exc.reason) from None
+    except ValueError:
+        raise OnboardingInputError("BLE response could not be decoded") from None
 
     text = ""
     payload = None

@@ -559,6 +559,10 @@ messages chosen by typed reason (including expired selection). QR encoding failu
 return a fixed instruction to check SSID, password and security mode, never provider
 exception text. Other provisioning business-error paths remain under review;
 see [provisioning audit](../internal/provisioning-public-errors.md).
+BLE preparation/decoding also uses fixed 422 recovery messages for known session or
+material errors. Missing material retains 503 and account/transport retrieval failures
+retain 502; these handled failures have no-store headers and do not return provider
+exception text. Labels and privileged enrollment errors are separate pending work.
 
 | Code | Meaning |
 |---|---|

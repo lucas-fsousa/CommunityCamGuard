@@ -29,11 +29,30 @@ QR provider failures and authentication denial. Existing provisioning and sensit
 validation suites also passed. Tests stub scanners/providers; no hardware calls.
 Tests ran serially with 512 MiB memory / 75% CPU limits: 87.4 MiB peak, zero swap.
 
+## Completed: BLE session/material failures
+
+The driver-neutral onboarding input error now carries an optional typed reason.
+Yoosee translates codec errors into that reason without forwarding raw codec text.
+Preparation and response decoding project known reasons into fixed HTTP 422 messages:
+restart an expired attempt, restart for the correct camera, renew unavailable/expired
+material, or ask the administrator to restrict file permissions. Unknown reasons
+receive a generic input/retry instruction. No matching against exception text occurs.
+
+Preparation's missing-material errors retain 503; account/transport retrieval errors
+retain 502, with fixed account/retry instructions. These responses use no-store and
+no-cache headers. Success payloads, expiry durations, frame encoding and actual
+camera behavior are unchanged. No new reason field is exposed in the HTTP contract.
+
+110 focused tests passed, including provider/codec translation, expired attempts,
+missing material, all public reasons and synthetic secret-bearing exceptions. Tests
+ran at 82.2 MiB peak memory with no swap under the same 512 MiB / 75% CPU caps.
+This remains source-only, not a physical BLE homologation or container rollout.
+
 ## Still pending
 
 - Label/driver-resolution business errors currently return raw exception text.
-- BLE material/session failures need safe typed recovery reasons (renew material,
-  reconnect, or retry) before replacing their current messages.
+- Unexpected exceptions, successful BLE payloads and lower-level logs need a separate
+  review; the handled HTTP error projections are not a complete credential audit.
 - Privileged enrollment, P2P and completion errors require the same review, including
   completion stage values. This checkpoint does not harden those paths.
 - Successful driver payloads, SDK logs and browser/proxy acceptance remain unaudited

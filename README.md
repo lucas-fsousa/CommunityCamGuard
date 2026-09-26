@@ -202,8 +202,8 @@ HTTP schema failures now use a [generic validation response](docs/internal/sensi
 instead of exposing rejected inputs or validator context. This backend change is also
 staged; business errors and successful driver payloads remain under review.
 The [provisioning error audit](docs/internal/provisioning-public-errors.md) now covers
-Wi-Fi selection and QR failures with fixed, actionable messages; BLE/session and
-privileged business errors remain pending. No backend rollout is implied.
+Wi-Fi selection, QR and handled BLE/session failures with fixed, actionable messages;
+label resolution and privileged business errors remain pending. No backend rollout is implied.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

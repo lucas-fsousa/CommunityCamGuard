@@ -173,8 +173,10 @@ class YooseeOnboarding:
             )
             frames = build_ble_provisioning_frames(material, wifi_payload=wifi_payload, mtu=256)
             attempt = begin_ble_provisioning_attempt(material)
-        except (BleCodecError, ValueError) as exc:
-            raise OnboardingInputError(str(exc)) from exc
+        except BleCodecError as exc:
+            raise OnboardingInputError("BLE preparation failed", reason=exc.reason) from None
+        except ValueError:
+            raise OnboardingInputError("BLE preparation failed") from None
         except VendorProvisioningCloudError as exc:
             raise OnboardingTransportError(str(exc)) from exc
         return BlePreparation(

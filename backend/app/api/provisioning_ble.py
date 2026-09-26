@@ -24,7 +24,7 @@ from .provisioning_common import (
     inspect_provisioning_label,
     onboarding,
 )
-from .provisioning_errors import wifi_selection_failure
+from .provisioning_errors import ble_input_failure, ble_material_failure, wifi_selection_failure
 
 router = APIRouter(prefix="/api/provisioning/ble", tags=["provisioning"])
 
@@ -55,12 +55,12 @@ def provisioning_ble_prepare(body: ProvisioningStartIn, response: Response) -> d
             fallback_file=settings.provisioning_ble_material_file,
             max_age_seconds=settings.provisioning_ble_material_max_age_seconds,
         )
-    except LookupError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except (OnboardingAccountError, OnboardingTransportError) as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except LookupError:
+        raise ble_material_failure(unavailable=True) from None
+    except (OnboardingAccountError, OnboardingTransportError):
+        raise ble_material_failure() from None
     except OnboardingInputError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise ble_input_failure(exc) from None
 
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -103,7 +103,7 @@ def provisioning_ble_decode_response(body: ProvisioningBleResponseIn, response: 
             raw=raw,
         )
     except OnboardingInputError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise ble_input_failure(exc) from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {

@@ -17,6 +17,8 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from ..onboarding import OnboardingInputReason
+
 BLE_SERVICE_UUID = "8922a5c3-1e44-403e-a587-bcf972e398b4"
 BLE_READ_UUID = "0000fed4-0000-1000-8000-00805f9b34fb"
 BLE_WRITE_UUID = "0000fed5-0000-1000-8000-00805f9b34fb"
@@ -43,7 +45,9 @@ _VENDOR_AES_IV = b"iotVideo" + bytes(8)
 
 
 class BleCodecError(ValueError):
-    pass
+    def __init__(self, message: str, *, reason: OnboardingInputReason = OnboardingInputReason.INVALID):
+        super().__init__(message)
+        self.reason = reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,9 +123,9 @@ def ble_provisioning_attempt(
         _purge_expired_attempts(current)
         item = _attempts.get(str(attempt_id))
     if item is None:
-        raise BleCodecError("BLE provisioning attempt has expired; start the Bluetooth step again")
+        raise BleCodecError("BLE provisioning attempt has expired; start the Bluetooth step again", reason=OnboardingInputReason.SESSION_EXPIRED)
     if item.material.device_id != str(expected_device_id):
-        raise BleCodecError("BLE provisioning attempt belongs to a different camera")
+        raise BleCodecError("BLE provisioning attempt belongs to a different camera", reason=OnboardingInputReason.WRONG_CAMERA)
     return item
 
 
@@ -140,9 +144,9 @@ def load_ble_provisioning_material(
     """Load short-lived research material without ever returning it through the API."""
     target = Path(path)
     if target.is_symlink() or not target.is_file():
-        raise BleCodecError("BLE provisioning material is unavailable")
+        raise BleCodecError("BLE provisioning material is unavailable", reason=OnboardingInputReason.RENEW_MATERIAL)
     if stat.S_IMODE(target.stat().st_mode) & 0o077:
-        raise BleCodecError("BLE provisioning material must be readable only by its owner")
+        raise BleCodecError("BLE provisioning material must be readable only by its owner", reason=OnboardingInputReason.MATERIAL_PERMISSIONS)
     try:
         raw = json.loads(target.read_text())
         cloud_auth = raw.get("cloudAuth")
@@ -171,14 +175,14 @@ def load_ble_provisioning_material(
             cloud_headers=cloud_headers,
         )
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise BleCodecError("BLE provisioning material is invalid") from exc
+        raise BleCodecError("BLE provisioning material is invalid", reason=OnboardingInputReason.RENEW_MATERIAL) from exc
     if material.device_id != str(expected_device_id):
-        raise BleCodecError("BLE provisioning material belongs to a different camera")
+        raise BleCodecError("BLE provisioning material belongs to a different camera", reason=OnboardingInputReason.WRONG_CAMERA)
     age = (int(time.time()) if now is None else int(now)) - material.captured_at
     if age < 0 or age > max_age_seconds:
-        raise BleCodecError("BLE provisioning material has expired")
+        raise BleCodecError("BLE provisioning material has expired", reason=OnboardingInputReason.RENEW_MATERIAL)
     if not material.config_token or not material.random_number:
-        raise BleCodecError("BLE provisioning material is incomplete")
+        raise BleCodecError("BLE provisioning material is incomplete", reason=OnboardingInputReason.RENEW_MATERIAL)
     encrypt_ble_payload(b"", material.tan_key)
     return material
 

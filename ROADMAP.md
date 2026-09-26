@@ -411,6 +411,13 @@ peak, no swap), with mocked hardware/scans. Source only. Label resolution, BLE
 material/session, privileged/P2P completion errors and successful payload/log review
 remain pending. Details: `docs/internal/provisioning-public-errors.md`.
 
+BLE-error checkpoint (2026-09-26): driver-neutral typed input reasons now preserve
+expiry/renewal/wrong-camera/file-permission recovery guidance without exposing raw
+codec messages. Handled prepare/decode failures use fixed 422/502/503 no-store
+responses. 110 focused tests passed (82.2 MiB peak, zero swap), no hardware/container
+operations. Label resolution and privileged/P2P errors, successful payloads and logs
+remain pending. Source-only; see `docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

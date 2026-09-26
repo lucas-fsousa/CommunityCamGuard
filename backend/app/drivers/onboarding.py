@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -15,8 +16,20 @@ class OnboardingLabelError(ValueError):
     """A printed/scanned identity is not valid for the selected camera family."""
 
 
+class OnboardingInputReason(Enum):
+    INVALID = "invalid"
+    SESSION_EXPIRED = "session_expired"
+    WRONG_CAMERA = "wrong_camera"
+    RENEW_MATERIAL = "renew_material"
+    MATERIAL_PERMISSIONS = "material_permissions"
+
+
 class OnboardingInputError(ValueError):
     """A driver-specific provisioning input cannot be encoded safely."""
+
+    def __init__(self, message: str, *, reason: OnboardingInputReason = OnboardingInputReason.INVALID):
+        super().__init__(message)
+        self.reason = reason
 
 
 class OnboardingTransportError(RuntimeError):
