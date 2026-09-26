@@ -509,7 +509,7 @@ means unbounded, and saving does not immediately evict files. See the
 |---|---|---|---|
 | GET | `/api/recordings` | `camera_id`, `day_from`, `day_to`, `limit`, `offset` (all optional) | Paginated segment index (newest first). Dates and `started_at` are UTC. Each item includes canonical `camera_id` and registry-resolved `camera_name`; the response also includes `total` and `retention_days`. Deprecated `mac` remains an optional compatibility filter. |
 | POST | `/api/recordings/prepare` | `path` (required), `native_hevc=false` | Default: prepares/reuses a shared compatible copy. If `native_hevc=true` and the source is HEVC, returns `{ready:true, cached:false, transcoding:false, original:true}` without encoding. Other responses retain `{ready, cached, transcoding}`. |
-| GET | `/api/recordings/file` | `path` (required), `original=false` | Default: serves a complete compatible source/cache or starts shared preparation and returns `409`; saturation returns `429`. `original=true` serves original bytes directly, never starts encoding and ignores the derived cache. Both paths support Range requests. |
+| GET | `/api/recordings/file` | `path` (required), `original=false` | Default: serves a complete compatible source/cache or returns `409` without starting conversion. POST preparation first; `429` admission applies to that POST. `original=true` serves original bytes directly and ignores the derived cache. Both delivery paths support Range requests. |
 | GET | `/api/recordings/playback-status` | `path` (required) | Reports `{ready, cached, transcoding}` while the dashboard waits for the complete seekable artifact. |
 | GET | `/api/recordings/download` | `path` (required) | Download the original `.mp4` with `attachment` disposition and a server-generated `Camera_UTC-timestamp.mp4` filename. |
 
@@ -525,6 +525,9 @@ HEVC only with capability detection and a bounded fallback. On native failure, p
 decoder state. Do not fall back recursively or start an encode for every Range request.
 
 Preparation admits at most four jobs per application process (one encoder, up to three waiting).
+The GET-no-conversion behavior is staged in source, not deployed. Legacy API clients
+must explicitly POST preparation: polling after 409 alone will not start a job.
+See [compatibility checkpoint](../internal/recording-get-boundary.md).
 Admission rejection returns `429` with `Retry-After: 5`; queue expiry/conversion failure reports
 not-ready/not-transcoding rather than an endlessly growing preview. Ready files support 206/416
 and If-Range semantics. Downloads always return the original as an attachment, independently of
@@ -549,7 +552,7 @@ Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 | 403 | Factory provisioning did not originate from the authenticated trusted local network. |
 | 422 | Validation error — including a **wrong camera password** on add (deliberately not 401, so a UI doesn't bounce to login). |
 | 404 | Camera not found. |
-| 409 | Requested compatible recording is still being prepared; poll playback status. Other endpoints may also use it for state conflicts. |
+| 409 | Compatible recording is not ready; explicitly POST preparation, then poll playback status. Other endpoints may also use it for state conflicts. |
 | 416 | Recording byte range is not satisfiable. |
 | 429 | Playback preparation admission is busy; honor `Retry-After`. This is not a claim of implemented login rate limiting. |
 | 501 | Camera/driver doesn't support the requested action (e.g. PTZ/reboot). |

@@ -33,6 +33,9 @@ function harness(support = "") {
 (async () => {
   {
     const h = harness(); h.controller.select("a");
+    assert.equal(h.requests[0].options.method, "POST");
+    assert(h.requests[0].url.startsWith("/recordings/prepare?path="));
+    assert.equal(h.player.src, ""); // Never request media before explicit preparation.
     assert.equal(h.states.at(-1).loading, true);
     h.requests[0].resolve({ ready: false, transcoding: true }); await flush();
     assert.deepEqual(h.states.at(-1), { loading: true, text: "rec.preparingSeekable" });

@@ -79,13 +79,10 @@ def recording_file(path: str, original: bool = False):
         return FileResponse(playable, media_type="video/mp4")
     if not playback.needs_transcode(target):
         return FileResponse(target, media_type="video/mp4")
-    try:
-        playback.prepare_transcode(target)
-    except PlaybackBusy:
-        raise HTTPException(429, "playback preparation is busy", headers={"Retry-After": "5"}) from None
     raise HTTPException(
         status_code=409,
-        detail="seekable playback is still being prepared",
+        detail="compatible playback is not ready; POST /api/recordings/prepare before polling playback status",
+        headers={"Cache-Control": "no-store"},
     )
 
 

@@ -35,6 +35,9 @@ not every possible sensitive filename or a Docker daemon's implementation.
 
 ## Route inventory and remaining GET work
 
+Follow-up: [GET conversion initiation was removed in source](recording-get-boundary.md).
+The finding below records the audit-time behavior; deployment remains pending.
+
 `tests/test_route_auth_inventory.py` inspects current router wiring/dependencies
 without invoking endpoints. Ordinary HTTP routes require `require_auth` or
 `require_primary_session`; the native AV diagnostic retains its custom wrapper that

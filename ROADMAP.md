@@ -374,6 +374,14 @@ initiation to POST `/recordings/prepare` with compatibility coverage. Deeper res
 redaction, browser/proxy validation and temporary-login rollout remain pending.
 Details: `docs/internal/public-file-audit.md`.
 
+Recording GET checkpoint (2026-09-26): media GET no longer starts/restarts conversion;
+missing compatible output returns 409/no-store and requires explicit POST preparation.
+Dashboard ordering already conforms; legacy API migration documented. Range, original
+delivery, downloads and shared POST admission preserved. 95 focused tests and Node
+playback contracts passed without production camera/file/encoder/container operations.
+Backend deployment and broader response-redaction/temporary-access gates remain open.
+See `docs/internal/recording-get-boundary.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

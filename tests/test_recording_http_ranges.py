@@ -94,6 +94,55 @@ def test_hevc_default_still_prepares_compatible_copy(archive, monkeypatch):
     assert started == [source] and "original" not in response.json()
 
 
+def test_get_never_starts_or_restarts_conversion_and_post_owns_preparation(archive, monkeypatch):
+    client, source, derived = archive
+    state = {"started": 0, "cached": False, "running": False}
+    monkeypatch.setattr(recordings.playback, "needs_transcode", lambda _: True)
+    monkeypatch.setattr(recordings.playback, "cached_path", lambda _: derived if state["cached"] else None)
+    monkeypatch.setattr(recordings.playback, "transcode_in_progress", lambda _: state["running"])
+    def prepare(_):
+        state["started"] += 1
+        state["running"] = True
+    monkeypatch.setattr(recordings.playback, "prepare_transcode", prepare)
+    params = {"path": str(source)}
+    for _ in range(3):
+        response = client.get("/api/recordings/file", params=params, headers={"Range": "bytes=0-15"})
+        assert response.status_code == 409
+        assert "POST /api/recordings/prepare" in response.json()["detail"]
+        assert response.headers["cache-control"] == "no-store"
+        assert not client.get("/api/recordings/playback-status", params=params).json()["transcoding"]
+    assert state["started"] == 0
+    denied = client.post("/api/recordings/prepare", params=params, headers={"Origin": "https://other.invalid"})
+    assert denied.status_code == 403 and state["started"] == 0
+    assert client.post("/api/recordings/prepare", params=params).json()["transcoding"]
+    assert client.get("/api/recordings/file", params=params).status_code == 409
+    assert client.post("/api/recordings/prepare", params=params).json()["transcoding"]
+    assert state["started"] == 1
+    state["cached"] = True
+    state["running"] = False
+    response = client.get("/api/recordings/file", params=params, headers={"Range": "bytes=0-15"})
+    assert response.status_code == 206 and response.content == derived.read_bytes()[:16]
+    state["cached"] = False  # Eviction cannot silently restart a job via GET.
+    assert client.get("/api/recordings/file", params=params).status_code == 409
+    assert state["started"] == 1
+    assert not client.get("/api/recordings/playback-status", params=params).json()["transcoding"]
+    assert client.post("/api/recordings/prepare", params=params).json()["transcoding"]
+    assert state["started"] == 2
+
+
+def test_busy_encoder_only_affects_explicit_post(archive, monkeypatch):
+    client, source, _ = archive
+    monkeypatch.setattr(recordings.playback, "needs_transcode", lambda _: True)
+    monkeypatch.setattr(recordings.playback, "transcode_in_progress", lambda _: False)
+    def busy(_):
+        raise recordings.PlaybackBusy("synthetic busy")
+    monkeypatch.setattr(recordings.playback, "prepare_transcode", busy)
+    params = {"path": str(source)}
+    assert client.get("/api/recordings/file", params=params).status_code == 409
+    response = client.post("/api/recordings/prepare", params=params)
+    assert response.status_code == 429 and response.headers["retry-after"] == "5"
+
+
 @pytest.mark.parametrize("codec", ["h264", ""])
 def test_native_hint_does_not_select_unknown_or_other_codecs(archive, monkeypatch, codec):
     client, source, _ = archive

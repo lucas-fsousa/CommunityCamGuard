@@ -189,6 +189,9 @@ Local-only camera-operation restrictions are unchanged.
 [Public-file hardening](docs/internal/public-file-audit.md) is also staged: an explicit
 dashboard asset allowlist, MP4-only archive paths and stronger build-context exclusions.
 No deployment or complete secret-exposure audit is implied by these source changes.
+The [recording GET boundary](docs/internal/recording-get-boundary.md) is staged too:
+only explicit POST initiates HTTP playback conversion. The dashboard already follows
+this sequence; older API clients may need adjustment before backend rollout.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

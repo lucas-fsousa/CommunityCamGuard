@@ -66,6 +66,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Login request boundaries](login-request-boundaries.md) | Body/time/concurrency limits, credential redaction, transport cookie flags and remaining origin/proxy review |
 | [Browser origin policy](browser-origin-policy.md) | Shared origin checks, canonical public origin, HTTPS proxy cookies and migration limitations; not deployed |
 | [Public file / route audit](public-file-audit.md) | Public asset allowlist, MP4 archive boundary, build-context exclusions and outstanding GET work; not deployed |
+| [Recording GET boundary](recording-get-boundary.md) | Only explicit POST initiates HTTP preparation; legacy client migration, no deployment |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
 | [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |

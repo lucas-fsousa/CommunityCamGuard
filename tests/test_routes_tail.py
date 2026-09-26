@@ -44,7 +44,7 @@ def test_recording_file_serves_an_existing_segment(monkeypatch):
     assert resp.status_code == 200  # a FileResponse for the segment
 
 
-def test_recording_file_refuses_partial_hevc_and_starts_preparation(monkeypatch):
+def test_recording_file_refuses_partial_hevc_without_starting_preparation(monkeypatch):
     root = Path(get_settings().recordings_dir)
     seg = root / "aabbccddee01" / "2026-08-01" / "12" / "20260801_120000.mp4"
     seg.parent.mkdir(parents=True, exist_ok=True)
@@ -63,7 +63,7 @@ def test_recording_file_refuses_partial_hevc_and_starts_preparation(monkeypatch)
     else:
         raise AssertionError("uncached HEVC was served before it became seekable")
 
-    assert started == [seg.resolve()]
+    assert started == []
 
 
 def test_prepare_recording_starts_shared_job_and_reports_progress(monkeypatch):

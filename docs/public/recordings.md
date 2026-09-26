@@ -1,5 +1,10 @@
 # Recordings: playback, downloads and resource usage
 
+Staged backend change (not deployed): media GET requests no longer start conversion.
+The dashboard already requests preparation via POST. Custom API clients must also
+POST preparation before polling/loading an incompatible uncached recording; a 409
+does not mean conversion started. [Compatibility details](../internal/recording-get-boundary.md).
+
 ## What is stored
 
 CCG records local MP4 segments without re-encoding the source video. MP4 is a
