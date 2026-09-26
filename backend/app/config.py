@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     # Dashboard access
     dashboard_secret_key: str = "change-me"
     session_signing_key: str = ""
+    # Optional canonical browser origin for a proxy deployment; never inferred from headers.
+    dashboard_public_origin: str = ""
+
+    @field_validator("dashboard_public_origin")
+    @classmethod
+    def _public_origin(cls, value: str) -> str:
+        from .origin_policy import normalize_origin
+        return normalize_origin(value) if value else ""
 
     # Dashboard/API — exposed to the LAN and always protected by DASHBOARD_SECRET_KEY. Internal
     # go2rtc API/RTSP ports remain loopback-only behind the authenticated app proxy.

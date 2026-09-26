@@ -20,6 +20,7 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 
 from . import access_keys
 from .config import get_settings
+from .origin_policy import require_browser_write
 from .session_permissions import temporary_http_allowed
 
 COOKIE_NAME = "ccg_session"
@@ -139,6 +140,7 @@ def require_auth(request: Request) -> None:
     principal = request_principal(request)
     if principal is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    require_browser_write(request)
     if principal.authentication == "temporary":
         route = request.scope.get("route")
         if not temporary_http_allowed(request.method, getattr(route, "path", None)):
@@ -152,4 +154,5 @@ def require_primary_session(request: Request) -> SessionPrincipal:
         raise HTTPException(status_code=401, detail="Not authenticated")
     if not principal.can_manage:
         raise HTTPException(status_code=403, detail="Sign in with the primary key to manage settings")
+    require_browser_write(request)
     return principal

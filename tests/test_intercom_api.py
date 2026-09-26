@@ -7,6 +7,7 @@ import time
 
 import pytest
 from fastapi import HTTPException, Response
+from starlette.datastructures import URL, Headers
 from starlette.requests import Request
 from starlette.websockets import WebSocketState
 
@@ -101,6 +102,8 @@ def test_incomplete_camera_delivery_is_an_http_failure(monkeypatch) -> None:
 
 class _AudioBrowser:
     def __init__(self, consumed: threading.Event) -> None:
+        self.headers = Headers({"host": "testserver"})
+        self.url = URL("ws://testserver/api/intercom/stream")
         self.cookies = {intercom.COOKIE_NAME: "test-token"}
         self.application_state = WebSocketState.CONNECTING
         self.sent: list[dict[str, object]] = []

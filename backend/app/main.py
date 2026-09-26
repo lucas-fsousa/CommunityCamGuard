@@ -6,7 +6,8 @@ recorder writes 60s segments, and the storage monitor enforces the disk policy. 
 are stopped cleanly on shutdown. Startup is best-effort — if go2rtc's binary is missing the
 API still serves so cameras can be managed.
 
-Run with: ``uvicorn backend.app.main:app`` (host/port from ``.env``).
+Run with: ``python -m backend.app.main`` (host/port from ``.env``).
+Custom Uvicorn launchers must retain ``--no-proxy-headers``.
 """
 
 from __future__ import annotations

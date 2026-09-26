@@ -33,6 +33,11 @@ header limits remain deployment responsibilities. No claim of DDoS resistance.
 
 ## Cookies and origin/proxy review
 
+Follow-up: [shared origin policy](browser-origin-policy.md) now covers authenticated
+writes/login/logout/socket handshakes and adds optional canonical HTTPS origin cookie
+handling. The observations below record the prior checkpoint; proxy/browser rollout
+and exceptional-route review are still pending.
+
 `api/auth.py` now sets `Secure` when the ASGI request scheme is HTTPS; local HTTP
 remains supported. Cookies remain host-only, HttpOnly, SameSite=Lax, Path=/ and
 seven days; logout deletes with matching security attributes and no-store. Raw

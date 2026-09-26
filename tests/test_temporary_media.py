@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -41,7 +42,17 @@ def env(monkeypatch):
     monkeypatch.setattr(temporary_media.websockets, "connect", connect)
     monkeypatch.setattr(session_channels, "CHECK_INTERVAL", 0.005)
     app = FastAPI(); app.include_router(media.router)
-    with TestClient(app) as client:
+    finished = threading.Event()
+    async def application(scope, receive, send):
+        if scope["type"] == "websocket":
+            finished.clear()
+        try:
+            await app(scope, receive, send)
+        finally:
+            if scope["type"] == "websocket":
+                finished.set()
+    with TestClient(application) as client:
+        client.websocket_finished = finished
         client.cookies.set(auth.COOKIE_NAME, token)
         yield client, cam, key, connections, sent, closed
 
@@ -110,6 +121,8 @@ def test_binary_uploads_and_second_negotiation_never_forwarded(env):
         with pytest.raises(WebSocketDisconnect) as caught:
             ws.receive_bytes()
         assert caught.value.code == 1008
+        # Wait for owned relay tasks to finish before TestClient cancels its scope.
+        assert client.websocket_finished.wait(2)
     assert len(sent) == 1 and closed
 
 

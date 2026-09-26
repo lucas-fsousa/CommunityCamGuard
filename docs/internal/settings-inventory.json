@@ -16,7 +16,7 @@
     {
       "classification": "server_only",
       "fields": [
-        "dashboard_secret_key", "session_signing_key", "host", "port",
+        "dashboard_secret_key", "session_signing_key", "dashboard_public_origin", "host", "port",
         "autostart_services", "manage_go2rtc", "db_path", "recordings_dir",
         "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",

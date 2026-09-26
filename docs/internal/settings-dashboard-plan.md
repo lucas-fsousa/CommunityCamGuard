@@ -7,7 +7,7 @@ its primary-only API/settings screen are now deployed. The inventory-time analys
 below remains relevant for every
 other field and for service-restart/destructive application requirements.
 
-Reviewed all **42 declared Settings fields**, their consumers and the session
+Reviewed all **43 declared Settings fields**, their consumers and the session
 boundary, without reading/printing the deployed `.env` values. The companion
 `settings-inventory.json` is a review artifact, **not an API allowlist or runtime
 configuration source**. CI requires every field to have exactly one classification;
@@ -39,6 +39,9 @@ different value. The proposed storage ordering is a new API requirement, not a
 claim that the existing environment parser enforces it.
 
 ## Required architecture
+
+`dashboard_public_origin` was added as a server-only, restart-required field on
+2026-09-25; it is not a runtime dashboard setting. See [origin policy](browser-origin-policy.md).
 
 1. Keep bootstrap settings/credentials in environment-only Settings. Add a small,
    explicit runtime-settings schema for approved non-secret fields; no generic

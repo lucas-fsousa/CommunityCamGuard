@@ -8,6 +8,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse
 
+from .origin_policy import require_browser_write
+
 MAX_BODY_BYTES = 16 * 1024
 BODY_TIMEOUT = 5.0
 MAX_IN_FLIGHT = 8
@@ -33,6 +35,7 @@ class LoginRequests:
             self._slots.release()
 
     async def _handle(self, request: Request, handler):
+        require_browser_write(request)
         lengths = request.headers.getlist("content-length")
         if lengths:
             if len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit() or len(lengths[0]) > 10:

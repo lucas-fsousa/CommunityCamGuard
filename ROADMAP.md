@@ -357,6 +357,14 @@ tests passed, no production/camera/container operations. Proxy/public-origin pol
 consistent CSRF protection and final temporary permissions remain pending; login
 activation/deployment still deferred. See `docs/internal/login-request-boundaries.md`.
 
+Browser-origin checkpoint (2026-09-25): shared source/target validation for login,
+logout, authenticated writes and media/intercom sockets; optional server-only
+`DASHBOARD_PUBLIC_ORIGIN` pins proxy Host/origin and HTTPS cookie issuance without
+trusting forwarded client identity. Local-only controls remain restricted. 284 focused
+tests passed without physical camera/container operations. Real proxy/browser rollout,
+exceptional-route/GET-mutation and static-secret audit, final temporary permissions
+and login/UI activation remain pending. See `docs/internal/browser-origin-policy.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

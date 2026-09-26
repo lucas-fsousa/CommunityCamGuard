@@ -4,6 +4,7 @@ import asyncio
 import threading
 
 import pytest
+from starlette.datastructures import URL, Headers
 from starlette.websockets import WebSocketState
 
 from backend.app import auth, session_channels
@@ -15,6 +16,8 @@ from backend.app.drivers.contracts import AudioMessageResult
 class Socket:
     def __init__(self):
         self.application_state = WebSocketState.CONNECTING
+        self.headers = Headers({"host": "testserver"})
+        self.url = URL("ws://testserver/api/go2rtc/ws")
         self.cookies = {auth.COOKIE_NAME: auth.issue_token()}
         self.query_params = {"src": "synthetic"}
         self.closed = []

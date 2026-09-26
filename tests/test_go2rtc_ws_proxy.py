@@ -5,6 +5,7 @@ import asyncio
 import threading
 from types import SimpleNamespace
 
+from starlette.datastructures import URL, Headers
 from starlette.websockets import WebSocketState
 
 from backend.app.api import media as media_routes
@@ -38,6 +39,8 @@ class _Upstream:
 class _Browser:
     def __init__(self) -> None:
         self.cookies = {media_routes.COOKIE_NAME: "test-token"}
+        self.headers = Headers({"host": "testserver"})
+        self.url = URL("ws://testserver/api/go2rtc/ws")
         self.query_params = {"src": "cam_test_hd"}
         self.application_state = WebSocketState.CONNECTING
         self._messages = iter((

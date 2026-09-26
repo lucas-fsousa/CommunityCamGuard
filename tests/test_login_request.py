@@ -14,7 +14,8 @@ from backend.app.login_request import MAX_BODY_BYTES, LoginRequests
 
 def request(receive, headers=()):
     return Request({"type": "http", "method": "POST", "path": "/api/login",
-                    "headers": list(headers), "query_string": b"", "scheme": "http"}, receive)
+                    "headers": [(b"host", b"testserver"), (b"origin", b"http://testserver"), *headers],
+                    "query_string": b"", "scheme": "http"}, receive)
 
 
 def run_body(chunks, headers=()):

@@ -180,8 +180,12 @@ in source; real-browser/proxy validation and backend deployment remain pending.
 fixed-memory origin quotas and explicit no-forwarded-header trust in the bundled
 launcher. Backend deployment and trusted-proxy/cookie review remain pending.
 [Login request boundaries](docs/internal/login-request-boundaries.md) add body/time/work
-limits and transport-based Secure cookies in source; proxy/CSRF policy and rollout
+limits and transport-based Secure cookies in source; proxy/browser validation and rollout
 remain pending. These staged changes do not establish safe internet exposure.
+The [shared browser-origin policy](docs/internal/browser-origin-policy.md) now adds
+origin checks and an optional server-only `DASHBOARD_PUBLIC_ORIGIN` for HTTPS proxies.
+It remains undeployed; the proxy must preserve Host and restrict its backend port.
+Local-only camera-operation restrictions are unchanged.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)
@@ -190,7 +194,7 @@ After environment changes, recreate the app container; merely
 refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
 camera credentials or internal media ports. Authentication alone is not a completed internet-facing
 security audit. The [settings inventory and plan](docs/internal/settings-dashboard-plan.md)
-classifies all 42 declared options, including unused fields, restart requirements and server-only
+classifies all 43 declared options, including unused fields, restart requirements and server-only
 secrets. Changes to retention can delete originals; review that policy before deployment.
 
 ### Tests

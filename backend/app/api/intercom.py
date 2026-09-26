@@ -18,6 +18,7 @@ from ..audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES
 from ..auth import COOKIE_NAME, require_auth
 from ..auth import verify_channel_token as verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
+from ..origin_policy import browser_origin_allowed
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
 from ..session_channels import run_guarded
 from .local_only import require_local_request, require_local_websocket
@@ -148,7 +149,7 @@ async def _send_ws_json(websocket: WebSocket, payload: dict[str, object]) -> Non
 async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
     """Feed one bounded PCM push-to-talk session through a driver worker."""
 
-    if not _CAMERA_ID.fullmatch(camera_id) or not verify_token(
+    if not browser_origin_allowed(websocket) or not _CAMERA_ID.fullmatch(camera_id) or not verify_token(
         websocket.cookies.get(COOKIE_NAME) or ""
     ):
         await websocket.close(code=1008)

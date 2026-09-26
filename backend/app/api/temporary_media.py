@@ -15,6 +15,7 @@ from starlette.websockets import WebSocket, WebSocketState
 from .. import auth
 from ..config import get_settings
 from ..db import registry
+from ..origin_policy import browser_origin_allowed
 from ..session_channels import run_guarded
 
 _SOURCE = re.compile(r"(cam_[0-9a-f]{24})_(hd|web)")
@@ -48,11 +49,8 @@ def mse_request(raw: object) -> str:
 async def serve_temporary_media(socket: WebSocket, token: str) -> None:
     src = socket.query_params.get("src", "")
     match = _SOURCE.fullmatch(src)
-    expected_origin = ("https" if socket.url.scheme == "wss" else "http") + "://" + socket.url.netloc
-    origin = socket.headers.get("origin")
     if (not match or list(socket.query_params.multi_items()) != [("src", src)]
-            or (origin is not None and origin.lower() != expected_origin.lower())
-            or socket.headers.get("sec-fetch-site", "").lower() == "cross-site"):
+            or not browser_origin_allowed(socket)):
         await socket.close(code=1008)
         return
 

@@ -19,6 +19,7 @@ from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..media import quality
+from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
 from ..session_channels import run_guarded
@@ -133,6 +134,9 @@ def media_recover(camera_id: str, request: Request) -> dict:
 async def go2rtc_ws(websocket: WebSocket) -> None:
     """Bridge an authenticated same-origin browser socket to loopback-only go2rtc."""
 
+    if not browser_origin_allowed(websocket):
+        await websocket.close(code=1008)
+        return
     if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
         token = websocket.cookies.get(COOKIE_NAME) or ""
         principal = token_principal(token)

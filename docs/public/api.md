@@ -18,6 +18,13 @@ unchanged. See [transport limits and activation gates](../internal/temporary-liv
 
 ## Authentication
 
+Staged origin policy (not deployed): login/logout, authenticated mutations and
+WebSocket handshakes reject mismatched Origin/Referer and cross-site/same-site fetch
+metadata. Scripts without these headers remain supported, but no-Origin HTML form
+media types are denied. `DASHBOARD_PUBLIC_ORIGIN` can pin the external origin behind
+HTTPS termination; preserve Host and restrict backend access. This does not relax
+local-only controls. See [policy and migration](../internal/browser-origin-policy.md).
+
 Staged source change (backend deployment pending): POST `/api/login` allows a burst
 of 10 attempts per origin quota, replenishing one every 6 seconds. Excess attempts
 receive 429 with `Retry-After` seconds; successful and malformed requests also count.
@@ -27,7 +34,8 @@ See [identity boundaries and limitations](../internal/login-abuse-protection.md)
 Additional staged login limits: 16 KiB JSON envelope (413), a total 5-second body
 deadline (408), and 8 concurrent handlers (503 + `Retry-After: 1`). Unsupported body
 encoding/type returns 415; invalid input is redacted. HTTPS ASGI requests receive
-Secure cookies; TLS termination outside the app requires further proxy policy work.
+Secure cookies; TLS termination outside the app uses the optional canonical origin
+described above and still requires real proxy/browser validation.
 See [request/cookie boundaries](../internal/login-request-boundaries.md). Not deployed.
 
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server

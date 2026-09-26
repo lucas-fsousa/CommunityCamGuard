@@ -20,6 +20,8 @@ An Origin header, when supplied, must match the socket's scheme/authority;
 cross-site fetch metadata is rejected. Missing Origin supports authenticated
 non-browser clients. The bridge does not directly trust forwarded headers; trusted
 proxy configuration and cookie policy still require review before activation.
+Follow-up: this now uses the [shared origin policy](browser-origin-policy.md),
+including optional canonical public origin, same-site rejection and Referer fallback.
 
 Fresh key validity and registry membership are checked initially (5-second timeout)
 and through the shared channel watcher (normally every second, verification timeout

@@ -103,7 +103,7 @@ def test_cross_origin_writes_rejected(client, headers):
 
 def test_form_posts_and_extra_envelope_fields_rejected(client):
     assert client.patch("/api/settings", content='{"revision":0,"changes":{"playback_cache_mb":1}}',
-                        headers={"Content-Type": "text/plain"}).status_code == 415
+                        headers={"Content-Type": "text/plain", "Origin": "http://testserver"}).status_code == 415
     assert client.patch("/api/settings", json={"revision": True, "changes": {"playback_cache_mb": 1}}).status_code == 422
     assert client.patch("/api/settings", json={"revision": 0, "changes": {"playback_cache_mb": 1},
                                               "admin": True}).status_code == 422

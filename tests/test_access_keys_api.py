@@ -87,7 +87,8 @@ def test_revoke_enforces_write_boundary(client):
     created = check(client.post("/api/access-keys", json=body()), 201)
     path = "/api/access-keys/" + created["metadata"]["id"] + "/revoke"
     check(client.post(path, json={}, headers={"Origin": "https://attacker.invalid"}), 403)
-    check(client.post(path, content="{}", headers={"Content-Type": "text/plain"}), 415)
+    check(client.post(path, content="{}", headers={"Content-Type": "text/plain"}), 403)
+    check(client.post(path, content="{}", headers={"Content-Type": "text/plain", "Origin": "http://testserver"}), 415)
     assert access_keys.active_key(created["metadata"]["id"]) is not None
 
 

@@ -27,6 +27,9 @@ workers/replicas have independent budgets; the bundled deployment uses one worke
 
 ## Transport identity
 
+Follow-up: optional [canonical browser origin](browser-origin-policy.md) handles
+HTTPS proxy origins/cookies without changing the peer-based limiter identity.
+
 The bundled `python -m backend.app.main` launcher explicitly sets
 `proxy_headers=False`. The limiter never directly reads `Forwarded`,
 `X-Forwarded-For` or `X-Real-IP`. A custom Uvicorn launcher must use

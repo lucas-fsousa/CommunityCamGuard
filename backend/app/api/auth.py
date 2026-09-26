@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ..auth import COOKIE_NAME, MAX_AGE, check_key, issue_token, request_principal
 from ..login_throttle import LoginRoute
+from ..origin_policy import require_browser_write, require_target_origin, secure_cookie
 
 router = APIRouter(prefix="/api", tags=["auth"], route_class=LoginRoute)
 
@@ -23,7 +24,7 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
         COOKIE_NAME,
         issue_token(),
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=secure_cookie(request),
         samesite="lax",
         max_age=MAX_AGE,
     )
@@ -32,13 +33,15 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
 
 @router.post("/logout")
 def logout(request: Request, response: Response) -> dict:
+    require_browser_write(request)
     response.headers["Cache-Control"] = "no-store"
-    response.delete_cookie(COOKIE_NAME, httponly=True, secure=request.url.scheme == "https", samesite="lax")
+    response.delete_cookie(COOKIE_NAME, httponly=True, secure=secure_cookie(request), samesite="lax")
     return {"ok": True}
 
 
 @router.get("/me")
 def me(request: Request, response: Response) -> dict:
+    require_target_origin(request)
     response.headers["Cache-Control"] = "no-store"
     principal = request_principal(request)
     return {

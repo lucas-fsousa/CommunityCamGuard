@@ -54,7 +54,8 @@ schema/key write, main-key rotation, camera access or container restart occurred
    validate real proxy/browser interruption and cover WebRTC media that outlive signaling.
 4. [Fixed-memory login pacing](login-abuse-protection.md) is now implemented in source;
    [login body/work limits](login-request-boundaries.md) are also tested in source.
-   Explicit cookie/proxy/origin policy remains pending. Then enable temporary
+   [Shared origin/canonical-proxy policy](browser-origin-policy.md) is implemented;
+   browser/proxy validation and exceptional-route review remain pending. Then enable temporary
    login and a compact localized management section. Validate the full flow before
    claiming usable expiring access. Never rely on browser time for enforcement.
 
