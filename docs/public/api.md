@@ -18,6 +18,11 @@ unchanged. See [transport limits and activation gates](../internal/temporary-liv
 
 ## Authentication
 
+Public surface: login/logout, session status, build/health, API schema/docs and
+reviewed dashboard assets. Serving the dashboard shell does not authorize API access.
+Staged file hardening (not deployed) rejects unlisted public files and hidden/non-MP4
+archive targets. See [file and route audit](../internal/public-file-audit.md).
+
 Staged origin policy (not deployed): login/logout, authenticated mutations and
 WebSocket handshakes reject mismatched Origin/Referer and cross-site/same-site fetch
 metadata. Scripts without these headers remain supported, but no-Origin HTML form

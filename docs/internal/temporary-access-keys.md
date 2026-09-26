@@ -60,6 +60,9 @@ schema/key write, main-key rotation, camera access or container restart occurred
    claiming usable expiring access. Never rely on browser time for enforcement.
 
 Primary-key logout remains cookie deletion, not server-side session revocation.
+The [public-file/route checkpoint](public-file-audit.md) adds a static asset allowlist,
+MP4 archive restrictions and explicit route inventory; legacy GET conversion work
+and deeper error/secret auditing remain open.
 This work does not close the separate internet-exposure/security-audit backlog.
 Server-side expiration and secure random identifiers follow the
 [OWASP session-management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).

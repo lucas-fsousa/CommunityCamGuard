@@ -19,7 +19,7 @@ COPY backend ./backend
 COPY frontend ./frontend
 RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 
-# Runs with host networking (see docker-compose.yml) and binds 127.0.0.1:3200 from settings
-# — loopback only, nothing exposed to the network. go2rtc runs as its own container, so the
+# Runs with host networking (see docker-compose.yml); the authenticated app defaults
+# to LAN 0.0.0.0:3200. Internal go2rtc ports remain loopback-only, and go2rtc runs separately, so the
 # app is started with MANAGE_GO2RTC=false.
 CMD ["python", "-m", "backend.app.main"]

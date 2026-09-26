@@ -365,6 +365,15 @@ tests passed without physical camera/container operations. Real proxy/browser ro
 exceptional-route/GET-mutation and static-secret audit, final temporary permissions
 and login/UI activation remain pending. See `docs/internal/browser-origin-policy.md`.
 
+Public-file/route checkpoint (2026-09-26): static public asset allowlist, asset symlink
+denial, hidden/non-MP4 archive rejection and expanded Docker context secret/backup
+exclusions. Explicit public/custom-auth route inventory added. 119 focused tests
+passed without production file/camera/container operations. Outstanding finding:
+legacy GET `/recordings/file` can still initiate compatibility conversion; move that
+initiation to POST `/recordings/prepare` with compatibility coverage. Deeper response
+redaction, browser/proxy validation and temporary-login rollout remain pending.
+Details: `docs/internal/public-file-audit.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

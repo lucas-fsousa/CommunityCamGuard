@@ -13,8 +13,22 @@ htmlcov/
 
 # Runtime data & secrets (never into the image/context)
 .env
+.env*
+**/.env*
+**/.git
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.keystore
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.bak
+**/*.old
 data/
 recordings/
+backups/
 bin/
 FEEDBACK.md
 

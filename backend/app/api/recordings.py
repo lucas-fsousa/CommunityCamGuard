@@ -28,6 +28,8 @@ def _recording_target(path: str) -> tuple[Path, Path]:
     target = Path(path).resolve()
     if root not in target.parents or not target.is_file():
         raise HTTPException(status_code=404, detail="not found")
+    if target.suffix.lower() != ".mp4" or any(part.startswith(".") for part in target.relative_to(root).parts):
+        raise HTTPException(status_code=404, detail="not found")
     return root, target
 
 

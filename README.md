@@ -186,6 +186,9 @@ The [shared browser-origin policy](docs/internal/browser-origin-policy.md) now a
 origin checks and an optional server-only `DASHBOARD_PUBLIC_ORIGIN` for HTTPS proxies.
 It remains undeployed; the proxy must preserve Host and restrict its backend port.
 Local-only camera-operation restrictions are unchanged.
+[Public-file hardening](docs/internal/public-file-audit.md) is also staged: an explicit
+dashboard asset allowlist, MP4-only archive paths and stronger build-context exclusions.
+No deployment or complete secret-exposure audit is implied by these source changes.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

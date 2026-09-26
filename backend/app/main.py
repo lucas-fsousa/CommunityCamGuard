@@ -17,7 +17,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from . import drivers
 from .api.access_keys import router as access_keys_router
@@ -42,6 +41,7 @@ from .config import get_settings
 from .db import p2p, registry
 from .diagnostics.yoosee_av_api import router as native_av_diagnostic_router
 from .frontend_build import build_version
+from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
 from .recording.playback import Warmer
 from .recording.playback_logging import configure as configure_playback_logging
@@ -110,9 +110,10 @@ async def lifespan(app: FastAPI):
 API_DESCRIPTION = """
 REST API for **Community Cam Guard** — discover, stream, record and control ONVIF/RTSP cameras.
 
-All endpoints are under `/api` and, except `POST /api/login`, require a session cookie
-(`ccg_session`) obtained by logging in with the dashboard key. Build your own UI against these
-endpoints — see `docs/public/api.md` for the full reference with examples.
+Protected endpoints require a session cookie (`ccg_session`) obtained by logging in
+with the dashboard key. Login/logout, session status, build/health and API documentation
+are public; public dashboard assets contain no authority to access protected APIs.
+See `docs/public/api.md` for the full reference with examples.
 """
 
 app = FastAPI(
@@ -186,7 +187,7 @@ def health() -> dict:
 # Static dashboard (plain HTML/JS, no bundler). Mounted last so /api and /health win.
 _frontend = get_settings().frontend_dir
 if _frontend.is_dir():
-    app.mount("/", StaticFiles(directory=_frontend, html=True), name="frontend")
+    app.mount("/", DashboardFiles(directory=_frontend), name="frontend")
 
 
 if __name__ == "__main__":
