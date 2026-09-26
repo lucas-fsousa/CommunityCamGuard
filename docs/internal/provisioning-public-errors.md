@@ -78,3 +78,24 @@ swap, capped at 512 MiB and 75% CPU. No cameras, scans or containers were operat
   boundary; suppressing HTTP exception chaining does not sanitize lower-level logs.
 - Successful driver payloads, SDK logs and browser/proxy acceptance remain unaudited
   in this step. Backend deployment is separate from source validation.
+
+## Follow-up: Wi-Fi connection response projection
+
+The Yoosee BLE `0x85` success/connection response previously removed only `confirmKey`
+and forwarded other arbitrary camera fields. It now projects only `connectStatus`,
+accepted strictly as a signed 32-bit integer (not bool, float, string or nested data).
+Public text is regenerated from that projection, and hex remains empty. Unknown
+fields and non-object responses are not reflected. Missing/invalid status yields
+null public JSON/status and `connected: false`; only integer zero can retain a
+privileged handoff. `confirmKey` remains internal to the existing handoff mechanism.
+
+The decoder log no longer lists camera-supplied JSON keys or raw status values;
+it uses validated status and boolean handoff metadata. This is not a full SDK log
+audit. Wi-Fi list/link-type responses (`0x81`/`0x73`) still need explicit field-contract
+review, as do other drivers and successful privileged responses.
+
+91 focused tests passed, including unknown/nested secret-bearing fields, invalid
+status types, valid success/failure and preserved existing handoff behavior. Peak
+memory 86 MiB, zero swap, under 512 MiB / 75% CPU caps. Synthetic inputs only; no
+camera traffic or container rollout. Dashboard consumes the preserved
+`wifi_connection` fields; no frontend changes were required.

@@ -205,6 +205,8 @@ The [provisioning error audit](docs/internal/provisioning-public-errors.md) now 
 Wi-Fi selection, QR and handled BLE/session failures with fixed, actionable messages;
 label resolution and handled privileged errors are now covered as well. Successful
 payloads and lower-level logs remain under review. No backend rollout is implied.
+The Yoosee BLE Wi-Fi confirmation now exposes only a validated connection status;
+unknown response fields are no longer forwarded to the browser or listed in decoder logs.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

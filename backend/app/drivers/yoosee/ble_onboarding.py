@@ -60,11 +60,17 @@ def decode_response(
         )
     wifi_connection = None
     public_payload = payload
-    if command == 0x85 and isinstance(payload, dict):
-        confirm_key = payload.get("confirmKey")
-        connect_status = payload.get("connectStatus")
-        public_payload = {key: value for key, value in payload.items() if key != "confirmKey"}
-        text = json.dumps(public_payload, separators=(",", ":"), ensure_ascii=False)
+    connect_status = None
+    handoff_advertised = False
+    if command == 0x85:
+        # Project a known scalar, never a dictionary minus a secret denylist.
+        source = payload if isinstance(payload, dict) else {}
+        confirm_key = source.get("confirmKey")
+        candidate = source.get("connectStatus")
+        if type(candidate) is int and -(2**31) <= candidate < 2**31:
+            connect_status = candidate
+        public_payload = {"connectStatus": connect_status} if connect_status is not None else None
+        handoff_advertised = isinstance(confirm_key, str) and bool(confirm_key)
         handoff_ready = False
         if connect_status == 0 and isinstance(confirm_key, str) and confirm_key:
             try:
@@ -78,11 +84,10 @@ def decode_response(
         wifi_connection = {
             "connected": connect_status == 0,
             "status": connect_status,
-            "privileged_handoff_advertised": isinstance(confirm_key, str) and bool(confirm_key),
+            "privileged_handoff_advertised": handoff_advertised,
             "privileged_handoff_ready": handoff_ready,
         }
-    # Challenge data and the echoed Wi-Fi request are never public. The 0x85 projection excludes
-    # confirmKey by construction and is serialized again only from that sanitized mapping.
+    # Challenge/echo data are never public; 0x85 only exposes its validated status.
     if command in {0x71, 0x83}:
         text = ""
         public_payload = None
@@ -93,16 +98,15 @@ def decode_response(
             else ""
         )
     log.warning(
-        "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d json_keys=%s "
+        "BLE response device=%s command=0x%02x bytes=%d encrypted=%d text=%d "
         "connect_status=%s privileged_handoff=%d",
         device_id,
         command,
         len(decoded),
         int(encrypted),
         int(bool(text)),
-        sorted(str(key) for key in payload) if isinstance(payload, dict) else [],
-        payload.get("connectStatus", "-") if isinstance(payload, dict) else "-",
-        int(bool(payload.get("confirmKey"))) if isinstance(payload, dict) else 0,
+        connect_status,
+        int(handoff_advertised),
     )
     return BleDecodeResult(
         command=command,

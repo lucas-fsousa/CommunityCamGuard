@@ -566,6 +566,11 @@ exception text. Label/driver-resolution failures now also use fixed 422 instruct
 Handled privileged state failures return fixed 409 recovery guidance; transport and
 completion failures use fixed 502 messages. Completion error stage strings are no
 longer exposed. Successful payloads are unchanged; these are staged backend changes.
+Follow-up for Yoosee BLE command `0x85`: public `json`/`text` now contain only a
+validated signed-32-bit-integer `connectStatus`; unknown camera fields are discarded.
+Invalid/missing status produces null JSON/status and `wifi_connection.connected=false`.
+Only integer zero counts as connected. The existing `wifi_connection` metadata is
+preserved; raw hex and internal confirmation keys remain hidden.
 
 | Code | Meaning |
 |---|---|

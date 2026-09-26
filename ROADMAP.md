@@ -426,6 +426,13 @@ semantics preserved. 113 focused tests passed, one non-applicable case skipped;
 unexpected exceptions, lower-level logs and backend/browser rollout remain pending.
 See `docs/internal/provisioning-public-errors.md`.
 
+BLE-payload checkpoint (2026-09-26): Wi-Fi connection reply `0x85` now allowlists a
+strict signed integer status rather than forwarding arbitrary fields minus confirmKey.
+Malformed statuses cannot mark a connection successful; raw field names/statuses
+removed from decoder logs. 91 focused tests passed (86 MiB peak, zero swap), synthetic
+inputs only. Wi-Fi-list/link-type payload contracts, other successful driver results,
+SDK logs and deployment remain pending. See `docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
