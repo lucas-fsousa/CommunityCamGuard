@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Response
 from ..camera_identity import stable_camera_id
 from ..drivers.onboarding import OnboardingStateError, OnboardingTransportError
 from .enrollment_errors import EnrollmentFailure, enrollment_failure
+from .enrollment_presenter import enrollment_status
 from .provisioning_common import (
     BLE_PROVISIONING,
     LOCAL_PROVISIONING,
@@ -32,7 +33,13 @@ def provisioning_privileged_status(body: ProvisioningLabelIn, response: Response
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     provider = onboarding(body.driver) if body.driver else onboarding()
-    return provider.privileged_status(identity["device_id"])
+    try:
+        result = provider.privileged_status(identity["device_id"])
+    except OnboardingStateError:
+        raise enrollment_failure(EnrollmentFailure.STATE) from None
+    except OnboardingTransportError:
+        raise enrollment_failure(EnrollmentFailure.TRANSPORT) from None
+    return enrollment_status(result, device_id=identity["device_id"])
 
 
 @router.post("/online-status", dependencies=BLE_PROVISIONING)

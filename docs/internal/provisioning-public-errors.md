@@ -73,8 +73,8 @@ swap, capped at 512 MiB and 75% CPU. No cameras, scans or containers were operat
 
 - Unexpected exceptions, successful BLE payloads and lower-level logs need a separate
   review; the handled HTTP error projections are not a complete credential audit.
-- Unexpected exceptions and routes without an explicit domain-error handler (such as
-  privileged status) remain outside these fixed projections. Logging is a separate
+- Unexpected exceptions remain outside these fixed projections. Privileged status
+  received a separate projection in the follow-up below. Logging is a separate
   boundary; suppressing HTTP exception chaining does not sanitize lower-level logs.
 - Successful driver payloads, SDK logs and browser/proxy acceptance remain unaudited
   in this step. Backend deployment is separate from source validation.
@@ -126,3 +126,27 @@ driver mapping and tests before rollout. No live compatibility claim is made.
 at 78.1 MiB, zero swap. No scans/camera/container operations. Remaining work: broader
 successful privileged/driver payloads and SDK logs, plus real BLE/browser acceptance
 of these staged contracts before deployment.
+
+## Follow-up: privileged enrollment status
+
+`POST /api/provisioning/privileged/status` no longer returns the driver dictionary
+verbatim. Its vendor-neutral presenter permits exactly `device_id`, `expires_in`,
+`handoff_ready`, `bound`, `subscription_material_ready`, `p2p_access_ready` and
+`rtsp_ready`. Unknown fields are ignored, including nested data or future tokens.
+The five readiness flags must be actual booleans; expiry must be an integer from
+0 through 2^31−1; device identity must match the inspected label. Missing/invalid
+required data returns a fixed 502/no-store response instead of coercion or silent
+false readiness. The driver's capability decisions remain its responsibility.
+
+Status now also translates handled state/transport exceptions into fixed 409/502
+messages. Authentication/local-only policy and successful Yoosee field values are
+unchanged. New drivers must implement this explicit response contract rather than
+extend the browser response implicitly. No driver/model-specific condition was
+added to the generic API.
+
+104 focused tests passed, one existing non-applicable combination skipped, with
+88.1 MiB peak memory and zero swap under the usual caps. Ruff and mypy passed.
+Synthetic provider results only; no hardware, account calls, scans or deployment.
+Read-only inspection found existing type-only or bounded diagnostics in capability
+refresh, white-light and PTZ code, but this is not a completed SDK/native log audit.
+Next: remaining inventory/route/property/completion success projections and SDK logs.

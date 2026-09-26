@@ -577,6 +577,11 @@ signed-32-bit integer `level` (first 100 entries inspected). `0x73` projects int
 null metadata; unknown fields are discarded. Public text is regenerated and `hex`
 is empty for all supported replies. Alternate firmware layouts require explicit
 driver mapping before backend rollout; these limits are not a live validation claim.
+Privileged `/status` permits only `device_id`, `expires_in` and boolean flags
+`handoff_ready`, `bound`, `subscription_material_ready`, `p2p_access_ready`, `rtsp_ready`.
+The identity must match the request's inspected label; expiry must be an integer
+0–2^31−1. Missing/invalid fields produce fixed 502/no-store errors; extra driver fields
+are ignored. Handled status state/transport failures return fixed 409/502 messages.
 
 | Code | Meaning |
 |---|---|

@@ -440,6 +440,14 @@ Alternate firmware schemas need explicit mapping/acceptance before deploying; br
 driver/privileged successful payloads and SDK logs remain pending. Details in
 `docs/internal/provisioning-public-errors.md`.
 
+Enrollment-status checkpoint (2026-09-26): generic API now projects explicit status
+fields with strict booleans/expiry and camera-identity matching; extra driver fields
+are discarded and malformed results fail with fixed 502. Status domain errors use
+safe 409/502 messages. 104 tests passed, one existing non-applicable case skipped;
+88.1 MiB peak, zero swap. No hardware/deployment. Inventory/route/property/completion
+success projections and full SDK log audit remain pending. Contract documented in
+`docs/internal/provisioning-public-errors.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |
