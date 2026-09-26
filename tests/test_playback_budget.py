@@ -94,9 +94,17 @@ def test_saturation_returns_retryable_http_status(monkeypatch, tmp_path, endpoin
     monkeypatch.setattr(playback, "cached_path", lambda _: None)
     monkeypatch.setattr(playback, "transcode_in_progress", lambda _: False)
     monkeypatch.setattr(playback, "needs_transcode", lambda _: True)
-    def busy(_):
+    attempts = []
+    def busy(target):
+        attempts.append(target)
         raise playback_budget.PlaybackBusy()
     monkeypatch.setattr(playback, "prepare_transcode", busy)
     with pytest.raises(HTTPException) as caught:
         endpoint("x")
-    assert caught.value.status_code == 429 and caught.value.headers == {"Retry-After": "5"}
+    if endpoint is recordings.recording_file:
+        assert caught.value.status_code == 409
+        assert caught.value.headers == {"Cache-Control": "no-store"}
+        assert not attempts
+    else:
+        assert caught.value.status_code == 429 and caught.value.headers == {"Retry-After": "5"}
+        assert attempts == [target]

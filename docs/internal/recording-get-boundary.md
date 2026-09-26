@@ -31,3 +31,7 @@ existing routes. New synthetic cases cover repeated GETs with no job, cross-orig
 POST rejection, shared pending preparation, cached ranges, eviction and busy admission
 affecting POST only. Node recording playback contracts and ruff passed. Peak test
 memory: 87.1 MiB, no swap, capped at 512 MiB/75% CPU. Browser/proxy rollout is pending.
+
+The first full CI run exposed an older admission test that still expected GET to
+enter the encoder queue. Its contract now explicitly asserts GET 409/no admission
+versus POST 429/Retry-After on saturation; 25 budget/range tests passed locally.
