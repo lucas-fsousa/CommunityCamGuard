@@ -389,6 +389,14 @@ hardware dispatch. Backend not deployed. Next priority: remove discovery credent
 from query URLs; then remaining provisioning errors, sensitive validation responses,
 successful driver payloads and SDK logs. See `docs/internal/public-control-errors.md`.
 
+Discovery-credential checkpoint (2026-09-26): scan credentials moved to optional
+bounded JSON; query parameters rejected without scan, bodyless dashboard flow retained,
+generic validation errors and SecretStr password handling added. Bundled Uvicorn HTTP
+access logs omit queries, including rejected legacy URLs. 93 focused tests passed with
+fake scanners; no LAN/camera/container operations. External proxy/custom-launcher logs,
+sensitive validation in other routes, provisioning errors and driver payload/log audit
+remain pending. See `docs/internal/discovery-credential-body.md`; backend not deployed.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

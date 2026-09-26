@@ -195,7 +195,7 @@ def test_discovery_scan_returns_configured_and_candidates(monkeypatch):
     monkeypatch.setattr(
         discovery_routes.registry, "reconcile", lambda hosts, on_rekey=None: ([], [])
     )
-    out = discovery_routes.discovery_scan(_req(media=None, rec=None))
+    out = discovery_routes.discovery_scan(_req(media=None, rec=None), discovery_routes.ScanCredentials())
     assert out == {"configured": [], "candidates": []}
 
 

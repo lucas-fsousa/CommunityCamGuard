@@ -40,6 +40,9 @@ audio queue. Peak memory 89.7 MiB, no swap, capped at 512 MiB/75% CPU. Mypy pass
 
 ## Outstanding security work
 
+Follow-up: [discovery query credentials have been removed in source](discovery-credential-body.md),
+with query-free bundled HTTP access logs. Deployment/proxy validation remains pending.
+
 - **Priority:** `/api/discovery/scan` currently accepts username/password in query
   parameters. Even a later response scrub cannot erase a URL already captured by
   an HTTP server/proxy log. Move credentials to a bounded JSON body, stop generating

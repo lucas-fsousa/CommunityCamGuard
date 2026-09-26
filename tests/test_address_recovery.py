@@ -130,9 +130,9 @@ def test_manual_scan_reapplies_changed_address_only(monkeypatch):
     resync = Mock()
     monkeypatch.setattr(discovery, "resync_services", resync)
     request = SimpleNamespace()
-    discovery.discovery_scan(request)
+    discovery.discovery_scan(request, discovery.ScanCredentials())
     resync.assert_called_once_with(request)
-    discovery.discovery_scan(request)
+    discovery.discovery_scan(request, discovery.ScanCredentials())
     resync.assert_called_once()
 
 

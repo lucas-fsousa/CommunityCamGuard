@@ -12,20 +12,23 @@ from ..discovery import active_scan, scan_lock
 from ..recording import recorder
 from ..services.camera_runtime import probe_and_store, resync_services
 from .camera_presenter import camera_out
+from .discovery_input import ScanCredentials, read_scan_credentials
 
 router = APIRouter(prefix="/api", tags=["discovery"])
 log = logging.getLogger(__name__)
 
 
-@router.post("/discovery/scan", dependencies=[Depends(require_auth)])
-def discovery_scan(request: Request, username: str = "", password: str = "") -> dict:
+@router.post("/discovery/scan", dependencies=[Depends(require_auth)], openapi_extra={
+    "requestBody": {"required": False, "content": {"application/json": {"schema": ScanCredentials.model_json_schema()}}},
+})
+def discovery_scan(request: Request, credentials: ScanCredentials = Depends(read_scan_credentials)) -> dict:
     """Scan gently, refresh configured camera addresses and return new candidates."""
 
     before = {cam.camera_id: cam.last_ip for cam in registry.list_cameras()}
     if not scan_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="network discovery already running")
     try:
-        hosts = active_scan.scan(username=username, password=password)
+        hosts = active_scan.scan(username=credentials.username, password=credentials.password.get_secret_value())
     finally:
         scan_lock.release()
 

@@ -194,7 +194,10 @@ only explicit POST initiates HTTP playback conversion. The dashboard already fol
 this sequence; older API clients may need adjustment before backend rollout.
 [Control/account error hardening](docs/internal/public-control-errors.md) now removes
 raw exception text from covered HTTP/audio responses and selected logs. It is staged,
-not a complete credential audit; discovery query credentials remain a priority finding.
+not a complete credential audit. Discovery query credentials were a priority finding.
+That finding is now [addressed in source](docs/internal/discovery-credential-body.md):
+discovery accepts credentials only in bounded JSON, and bundled HTTP access logs omit
+query strings. Legacy clients and external proxies need review before backend rollout.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

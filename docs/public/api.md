@@ -326,7 +326,7 @@ semantics. The Yoosee driver maps the complete value to `guardParm.plan` and req
 
 | Method | Path | Params | Notes |
 |---|---|---|---|
-| POST | `/api/discovery/scan` | `username`, `password` (query, optional) | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Gentle by design — cheap cameras hang under aggressive probing. |
+| POST | `/api/discovery/scan` | Optional JSON `{username, password}`; no query parameters | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Empty body retains credential-free discovery. Credential migration is staged, not deployed. |
 
 ### Factory provisioning (authenticated trusted LAN only)
 

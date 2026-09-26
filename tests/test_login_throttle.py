@@ -115,7 +115,7 @@ def test_success_cannot_reset_budget_and_app_instances_are_isolated(clock):
 
 def test_bundled_launcher_disables_proxy_identity_rewriting():
     source = (Path(__file__).parents[1] / "backend/app/main.py").read_text()
-    assert "uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False)" in source
+    assert "uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False, log_config=access_log_config())" in source
 
 
 def test_login_throttle_feedback_is_localized():
