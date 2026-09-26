@@ -122,3 +122,5 @@ def test_login_throttle_feedback_is_localized():
     root = Path(__file__).parents[1] / "frontend"
     assert 'error.status === 429 ? "login.throttled"' in (root / "app.js").read_text()
     assert (root / "i18n.js").read_text().count('"login.throttled":') == 2
+    assert '[408, 503].includes(error.status) ? "login.retry"' in (root / "app.js").read_text()
+    assert (root / "i18n.js").read_text().count('"login.retry":') == 2

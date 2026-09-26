@@ -63,6 +63,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Staged temporary sessions](temporary-sessions.md) | Fresh key validity and transitional default-deny permissions; public login disabled |
 | [Temporary live media](temporary-live-media.md) | Registered-source MSE bridge, revocation and protocol restrictions; not deployed |
 | [Login pacing](login-abuse-protection.md) | Fixed-memory origin quota and proxy identity boundary; backend deployment pending |
+| [Login request boundaries](login-request-boundaries.md) | Body/time/concurrency limits, credential redaction, transport cookie flags and remaining origin/proxy review |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
 | [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |

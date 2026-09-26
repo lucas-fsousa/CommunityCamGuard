@@ -4,7 +4,7 @@ On login we compare the submitted key to ``dashboard_secret_key`` (constant-time
 success, hand back a **signed, timed cookie** (itsdangerous). The cookie does not contain
 the login key, but is itself a bearer credential: anyone holding it can reuse the session.
 Never expose/log it. The login key need not travel again after login. Any key value /
-length is accepted, per the product decision.
+format is compared without trimming; the HTTP login envelope has a separate bounded size.
 """
 from __future__ import annotations
 

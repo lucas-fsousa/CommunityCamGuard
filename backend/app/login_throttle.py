@@ -15,6 +15,8 @@ from fastapi import Request
 from fastapi.routing import APIRoute
 from starlette.responses import JSONResponse
 
+from .login_request import LoginRequests
+
 _INITIALIZE = threading.Lock()
 
 class LoginThrottle:
@@ -64,13 +66,17 @@ class LoginRoute(APIRoute):
                 if throttle is None:
                     throttle = LoginThrottle()
                     request.app.state.login_throttle = throttle
+                requests = getattr(request.app.state, "login_requests", None)
+                if requests is None:
+                    requests = LoginRequests()
+                    request.app.state.login_requests = requests
             # Never consult X-Forwarded-For/Forwarded directly. The bundled server
             # disables ASGI-server proxy rewriting; custom launchers must do likewise.
             retry = throttle.retry_after(request.client.host if request.client else "unknown")
             if retry:
                 return JSONResponse({"detail": "Too many login attempts"}, status_code=429,
                                     headers={"Retry-After": str(retry), "Cache-Control": "no-store"})
-            response = await handler(request)
+            response = await requests.handle(request, handler)
             response.headers["Cache-Control"] = "no-store"
             return response
 

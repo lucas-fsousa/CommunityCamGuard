@@ -36,6 +36,7 @@ const STRINGS = {
     "login.unlock": "Unlock",
     "login.invalid": "Invalid key",
     "login.throttled": "Too many login attempts. Wait a few seconds and try again.",
+    "login.retry": "Login is temporarily unavailable. Wait a few seconds and try again.",
 
     "nav.grid": "Grid",
     "nav.gridTitle": "Grid view",
@@ -371,6 +372,7 @@ const STRINGS = {
     "login.unlock": "Entrar",
     "login.invalid": "Chave inválida",
     "login.throttled": "Muitas tentativas de acesso. Aguarde alguns segundos e tente novamente.",
+    "login.retry": "Acesso temporariamente indisponível. Aguarde alguns segundos e tente novamente.",
 
     "nav.grid": "Grade",
     "nav.gridTitle": "Visão em grade",

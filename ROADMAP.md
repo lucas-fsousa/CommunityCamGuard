@@ -350,6 +350,13 @@ Body/resource limits, explicit proxy/cookie/CSRF policy and final temporary perm
 remain open; temporary login is still disabled and backend deployment pending.
 See `docs/internal/login-abuse-protection.md` for collision/multi-worker trade-offs.
 
+Login-request checkpoint (2026-09-25): bounded 16 KiB body collection with a total
+5-second deadline, 8 in-flight handlers, generic credential-safe validation errors,
+localized busy/timeout feedback and HTTPS-transport Secure cookies. 202 focused
+tests passed, no production/camera/container operations. Proxy/public-origin policy,
+consistent CSRF protection and final temporary permissions remain pending; login
+activation/deployment still deferred. See `docs/internal/login-request-boundaries.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

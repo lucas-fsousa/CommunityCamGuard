@@ -26,6 +26,7 @@ Docs are split by audience:
 - **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
   application semantics, authorization, UI contracts and deployment checkpoint.
 - **[Login pacing](internal/login-abuse-protection.md)** — bounded login attempts, proxy limitations and pending security gates.
+- **[Login requests/cookies](internal/login-request-boundaries.md)** — byte/deadline/work limits, redacted validation errors and remaining proxy/origin review.
 - **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.

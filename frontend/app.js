@@ -180,7 +180,8 @@ $("#login-form").addEventListener("submit", async (event) => {
     $("#login-key").value = "";
     await boot();
   } catch (error) {
-    $("#login-error").textContent = t(error.status === 429 ? "login.throttled" : "login.invalid");
+    $("#login-error").textContent = t(error.status === 429 ? "login.throttled"
+      : [408, 503].includes(error.status) ? "login.retry" : "login.invalid");
   }
 });
 

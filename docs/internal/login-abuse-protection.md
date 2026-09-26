@@ -50,8 +50,9 @@ and provisioning). Mypy passed for 205 files, ruff and Node session lifecycle
 contracts passed. The serial test cgroup peaked at 85.1 MiB with no swap, capped at
 512 MiB/75% CPU. No production login attempts or camera operations were performed.
 
-Still pending: request size/time/concurrency limits against oversized/slow bodies,
-trusted proxy and secure-cookie policy, CSRF/origin review, final temporary-user
+Request size/time/concurrency limits and transport-based Secure cookies are now
+implemented in source; see [request boundaries and remaining review](login-request-boundaries.md).
+Still pending: explicit trusted-proxy/cookie policy, CSRF/origin review, final temporary-user
 operation permissions, real browser/proxy validation, temporary login/UI activation
 and deployment. Login pacing alone does not make weak primary keys safe. Keep a
 strong server key, restrict network exposure and do not expose internal media ports.

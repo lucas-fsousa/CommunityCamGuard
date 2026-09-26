@@ -16,13 +16,14 @@ class LoginIn(BaseModel):
 
 
 @router.post("/login")
-def login(body: LoginIn, response: Response) -> dict:
+def login(body: LoginIn, request: Request, response: Response) -> dict:
     if not check_key(body.key):
         raise HTTPException(status_code=401, detail="Invalid key", headers={"Cache-Control": "no-store"})
     response.set_cookie(
         COOKIE_NAME,
         issue_token(),
         httponly=True,
+        secure=request.url.scheme == "https",
         samesite="lax",
         max_age=MAX_AGE,
     )
@@ -30,8 +31,9 @@ def login(body: LoginIn, response: Response) -> dict:
 
 
 @router.post("/logout")
-def logout(response: Response) -> dict:
-    response.delete_cookie(COOKIE_NAME)
+def logout(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    response.delete_cookie(COOKIE_NAME, httponly=True, secure=request.url.scheme == "https", samesite="lax")
     return {"ok": True}
 
 

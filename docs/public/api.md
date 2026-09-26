@@ -24,6 +24,12 @@ receive 429 with `Retry-After` seconds; successful and malformed requests also c
 Do not retry in a tight loop. Clients behind a proxy/NAT may share the quota.
 See [identity boundaries and limitations](../internal/login-abuse-protection.md).
 
+Additional staged login limits: 16 KiB JSON envelope (413), a total 5-second body
+deadline (408), and 8 concurrent handlers (503 + `Retry-After: 1`). Unsupported body
+encoding/type returns 415; invalid input is redacted. HTTPS ASGI requests receive
+Secure cookies; TLS termination outside the app requires further proxy policy work.
+See [request/cookie boundaries](../internal/login-request-boundaries.md). Not deployed.
+
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server
 sets an HTTP-only cookie `ccg_session` required by protected endpoints. Health/build and
 authentication-status endpoints remain public as documented below.
