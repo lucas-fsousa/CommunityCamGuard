@@ -550,6 +550,11 @@ which representation the player uses. See the [playback guide](recordings.md).
 
 Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 
+Staged backend change: framework HTTP request-validation failures return 422 with
+`{"detail":"Invalid request parameters"}` and no-store headers, not the framework's
+input-bearing detail array. Business errors and separately handled login/discovery
+errors retain their own safe messages. See [validation boundary](../internal/sensitive-validation.md).
+
 | Code | Meaning |
 |---|---|
 | 401 | Not authenticated (log in first). |

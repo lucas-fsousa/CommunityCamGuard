@@ -397,6 +397,13 @@ fake scanners; no LAN/camera/container operations. External proxy/custom-launche
 sensitive validation in other routes, provisioning errors and driver payload/log audit
 remain pending. See `docs/internal/discovery-credential-body.md`; backend not deployed.
 
+Sensitive-validation checkpoint (2026-09-26): main-app HTTP request schema errors now
+return fixed 422/no-store responses without rejected values or validator context.
+Synthetic body/JSON/path/query coverage added; authentication failures preserved.
+No camera/container operations or backend deployment. Provisioning business errors,
+successful payloads, SDK logs and browser/proxy rollout remain pending. See
+`docs/internal/sensitive-validation.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

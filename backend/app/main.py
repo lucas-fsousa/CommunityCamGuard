@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import drivers
@@ -49,6 +50,7 @@ from .recording.recorder import Recorder
 from .recording.retention import RetentionCleaner
 from .recording.storage import StorageMonitor
 from .services.address_recovery import AddressRecovery
+from .validation_errors import invalid_request
 
 
 @asynccontextmanager
@@ -141,6 +143,7 @@ app = FastAPI(
         {"name": "recordings", "description": "Browse and fetch recorded segments."},
     ],
 )
+app.add_exception_handler(RequestValidationError, invalid_request)
 app.include_router(native_av_diagnostic_router)
 app.include_router(auth_router)
 app.include_router(access_keys_router)

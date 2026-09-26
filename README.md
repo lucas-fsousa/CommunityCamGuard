@@ -198,6 +198,9 @@ not a complete credential audit. Discovery query credentials were a priority fin
 That finding is now [addressed in source](docs/internal/discovery-credential-body.md):
 discovery accepts credentials only in bounded JSON, and bundled HTTP access logs omit
 query strings. Legacy clients and external proxies need review before backend rollout.
+HTTP schema failures now use a [generic validation response](docs/internal/sensitive-validation.md)
+instead of exposing rejected inputs or validator context. This backend change is also
+staged; business errors and successful driver payloads remain under review.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)
