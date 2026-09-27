@@ -1,5 +1,6 @@
 import { api, el, state } from "ccg/core";
 import { t } from "ccg/i18n";
+import { renderAccessKeys } from "ccg/access-keys";
 
 let dispose = null;
 export function stopSettings() { dispose?.(); dispose = null; }
@@ -24,7 +25,8 @@ export function renderSettings(container) {
   const reload = el("button", { type: "button", textContent: t("settings.reload") });
   const actions = el("div", { className: "settings-actions" }, save, reload);
   panel.append(form, status);
-  dispose = () => { alive = false; request?.abort(); };
+  const disposeKeys = renderAccessKeys(container);
+  dispose = () => { alive = false; request?.abort(); disposeKeys(); };
 
   function changes() {
     const result = {};

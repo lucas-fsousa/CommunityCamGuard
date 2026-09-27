@@ -56,7 +56,7 @@ async def serve_temporary_media(socket: WebSocket, token: str) -> None:
 
     camera_id = match[1]
     def valid() -> bool:
-        return auth.verify_token(token) and registry.get_camera_by_id(camera_id) is not None
+        return auth.verify_permission_token(token, "live") and registry.get_camera_by_id(camera_id) is not None
 
     try:
         allowed = await asyncio.wait_for(asyncio.to_thread(valid), 5)

@@ -27,6 +27,8 @@ jobs:
         run: node --max-old-space-size=64 tests/frontend/recording-playback.cjs
       - name: Settings view contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/settings.cjs
+      - name: Delegated access contracts (Node)
+        run: node --max-old-space-size=64 tests/frontend/access-keys.cjs
       - name: Session lifecycle contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/session-lifecycle.cjs
     # Note: `black --check` is intentionally not enforced yet — adopting the formatter across the

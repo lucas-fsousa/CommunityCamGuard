@@ -167,7 +167,10 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
 runtime overrides is available with a localized, responsive Settings tab with compact numeric fields
 ([rollout/semantics](docs/internal/runtime-settings.md)). Sign out/in with the primary key if your
-existing session cannot edit. Temporary-key management endpoints are implemented but
+existing session cannot edit. A primary-only delegated-access modal now lets the owner
+select individual features and an expiration date or no expiration; it also lists and
+revokes keys. This is still preparation-only: public delegated login is gated pending
+permission-aware navigation and transport integration. Temporary-key management endpoints are implemented but
 not yet deployed; temporary login and management UI remain disabled. See the
 [lifecycle/API checkpoint and activation gates](docs/internal/temporary-access-keys.md).
 Open-socket revalidation is also implemented but not yet deployed; see the

@@ -16,6 +16,7 @@ from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
+from .access_policy import LEGACY_PERMISSIONS, Permission
 from .db import access_keys as repository
 
 _KEY_ID = re.compile(r"[0-9a-f]{32}")
@@ -25,11 +26,21 @@ _CREDENTIAL = re.compile(r"ccg_tmp_([0-9a-f]{32})\.([A-Za-z0-9_-]{43})")
 class CreateKey(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     label: str = Field(min_length=1, max_length=80, strict=True)
-    expires_at: AwareDatetime
+    expires_at: AwareDatetime | None
+    permissions: tuple[Permission, ...] = LEGACY_PERMISSIONS
+
+    @field_validator("permissions")
+    @classmethod
+    def unique_permissions(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Duplicate permissions")
+        return value
 
     @field_validator("expires_at", mode="before")
     @classmethod
     def explicit_datetime(cls, value):
+        if value is None:
+            return None
         if not isinstance(value, str | datetime):
             raise ValueError("An explicit timezone-aware date is required")
         return datetime.fromisoformat(value) if isinstance(value, str) else value
@@ -40,7 +51,8 @@ class KeyMetadata(BaseModel):
     id: str
     label: str
     created_at: datetime
-    expires_at: datetime
+    expires_at: datetime | None
+    permissions: tuple[Permission, ...] = LEGACY_PERMISSIONS
     revoked_at: datetime | None
     status: Literal["active", "expired", "revoked"]
 
@@ -65,26 +77,28 @@ def _metadata(row: dict, now: datetime) -> KeyMetadata:
     return KeyMetadata(
         id=row["id"], label=row["label"],
         created_at=datetime.fromtimestamp(row["created_at"], UTC),
-        expires_at=datetime.fromtimestamp(row["expires_at"], UTC),
+        expires_at=datetime.fromtimestamp(row["expires_at"], UTC) if row["expires_at"] is not None else None,
+        permissions=row["permissions"],
         revoked_at=datetime.fromtimestamp(revoked, UTC) if revoked is not None else None,
-        status="revoked" if revoked is not None else "expired" if row["expires_at"] <= now.timestamp() else "active",
+        status="revoked" if revoked is not None else "expired" if row["expires_at"] is not None and row["expires_at"] <= now.timestamp() else "active",
     )
 
 
 def create(body: CreateKey) -> IssuedKey:
     now = _now()
     try:
-        expiry = body.expires_at.astimezone(UTC)
+        expiry = body.expires_at.astimezone(UTC) if body.expires_at is not None else None
     except (OverflowError, ValueError):
         raise InvalidExpiration("Expiration must be a valid UTC date") from None
-    if expiry <= now:
+    if expiry is not None and expiry <= now:
         raise InvalidExpiration("Expiration must be in the future")
     key_id = secrets.token_hex(16)
     secret = f"ccg_tmp_{key_id}.{secrets.token_urlsafe(32)}"
     verifier = hashlib.sha256(secret.encode("ascii")).hexdigest()
-    repository.insert(key_id, body.label, verifier, now.timestamp(), expiry.timestamp())
+    repository.insert(key_id, body.label, verifier, now.timestamp(),
+                      expiry.timestamp() if expiry is not None else None, body.permissions)
     metadata = KeyMetadata(id=key_id, label=body.label, created_at=now,
-                           expires_at=expiry, revoked_at=None, status="active")
+                           expires_at=expiry, revoked_at=None, status="active", permissions=body.permissions)
     return IssuedKey(metadata, secret)
 
 

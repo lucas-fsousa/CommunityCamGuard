@@ -1,11 +1,39 @@
 # Temporary access keys — lifecycle foundation, 2026-09-24
 
-**Lifecycle and primary-only management API implemented; API not yet deployed. No
-temporary login or management UI is enabled.** Do not create/share production keys
+**Lifecycle and primary-only management API implemented; API not yet deployed.
+Management UI is implemented in source; temporary login remains disabled.** Do not create/share production keys
 as usable credentials: they cannot log in. The primary environment key and existing
 sessions are unchanged.
 
 ## Implemented boundary
+
+### User-defined grants and optional expiry — 2026-09-27
+
+The owner now specifies the delegated features, not one fixed guest role. Creation
+accepts `expires_at: null` for a key valid until revocation, or a future aware date.
+The signed session still has its independent seven-day maximum; a non-expiring key
+does not mean an immortal cookie. Permission names are vendor-neutral, explicit
+and bounded. Unknown/new controls and administration are never implicitly granted.
+Older staged keys migrate transactionally to their previous live/recordings-only
+ceiling, preserving IDs, verifiers, dates and revocations. New API callers should
+always supply `permissions`; omission retains that staged compatibility default.
+
+Settings now has primary-only metadata paging/revocation and a responsive native
+dialog: name, per-feature checkboxes (none preselected), expiration or no expiration.
+Dates are entered in browser local time and sent in UTC. The dialog closes only
+with its explicit X; secrets are cleared on close/navigation or after 60 seconds,
+never stored or automatically copied. Uncertain creation cannot be retried in the
+same dialog; reconcile the list first. UI text explicitly states login is not yet
+enabled, rather than presenting preparation keys as usable access.
+
+HTTP permissions use matched route templates and stored per-key grants. Live MSE
+also requires the live grant. Capability support remains the driver's decision;
+permission is an additional restriction, not a way to enable unsupported features.
+Remaining activation work: permission-aware dashboard boot/navigation/controls,
+intercom transport integration and end-to-end login coverage before turning on
+public delegated login. No production key/schema mutation or camera test occurred.
+
+The original checkpoints below describe the earlier expiry-required implementation.
 
 - `backend/app/access_keys.py` owns validation, generation, metadata, credential
   verification and current-time validity. `backend/app/db/access_keys.py` owns SQL.

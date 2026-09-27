@@ -19,9 +19,9 @@ function harness(canManage = true) {
   const state = { canManage, gridHdMax: 0 };
   const el = (tag, props = {}, ...children) => { const e = new Element(tag, props); e.append(...children); return e; };
   const api = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
-  const controller = new Function("api", "el", "state", "t", "setTimeout", "clearTimeout",
+  const controller = new Function("api", "el", "state", "t", "setTimeout", "clearTimeout", "renderAccessKeys",
     source + "; return {renderSettings, stopSettings};")(api, el, state, key => key,
-    fn => { timers.set(++id, fn); return id; }, n => timers.delete(n));
+    fn => { timers.set(++id, fn); return id; }, n => timers.delete(n), () => () => {});
   const container = el("div"); controller.renderSettings(container);
   const find = predicate => walk(container).find(predicate);
   return { ...controller, container, requests, timers, state, find };

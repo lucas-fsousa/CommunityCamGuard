@@ -39,7 +39,7 @@ def test_one_time_random_secret_never_stored_or_listed(clock):
     records = access_keys.list_keys()
     assert len(records) == 2
     for record in records:
-        assert set(record.model_dump()) == {"id", "label", "created_at", "expires_at", "revoked_at", "status"}
+        assert set(record.model_dump()) == {"id", "label", "created_at", "expires_at", "revoked_at", "status", "permissions"}
         assert first.secret not in record.model_dump_json()
     assert "verifier" not in repository.get(first.metadata.id)
     stored = repository.get(first.metadata.id, with_verifier=True)
@@ -47,7 +47,7 @@ def test_one_time_random_secret_never_stored_or_listed(clock):
     assert first.secret.encode() not in get_settings().db_path.read_bytes()
 
 
-@pytest.mark.parametrize("expiration", [None, True, 123, 123.5, "123", "infinity", "2026-09-25", "2026-09-25T12:00:00"])
+@pytest.mark.parametrize("expiration", [True, 123, 123.5, "123", "infinity", "2026-09-25", "2026-09-25T12:00:00"])
 def test_expiration_requires_explicit_timezone(expiration):
     with pytest.raises(ValidationError):
         access_keys.CreateKey(label="Guest", expires_at=expiration)

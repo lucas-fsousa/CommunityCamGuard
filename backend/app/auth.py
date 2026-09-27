@@ -37,6 +37,7 @@ class SessionPrincipal:
     authentication: Literal["primary", "legacy", "temporary"]
     session_id: str | None = None
     key_id: str | None = None
+    permissions: tuple[str, ...] = ()
 
     @property
     def can_manage(self) -> bool:
@@ -108,11 +109,12 @@ def token_principal(token: str) -> SessionPrincipal | None:
         if not isinstance(key_id, str) or not _SESSION_ID.fullmatch(key_id):
             return None
         try:
-            if access_keys.active_key(key_id) is None:
+            key = access_keys.active_key(key_id)
+            if key is None:
                 return None
         except (sqlite3.Error, ValueError, OverflowError):
             return None
-        return SessionPrincipal("temporary", sid, key_id)
+        return SessionPrincipal("temporary", sid, key_id, key.permissions)
     return SessionPrincipal("primary", sid)
 
 
@@ -125,6 +127,12 @@ def verify_channel_token(token: str) -> bool:
     """Temporary transport access stays closed until all transport guards land."""
     principal = token_principal(token)
     return principal is not None and principal.authentication != "temporary"
+
+
+def verify_permission_token(token: str, permission: str) -> bool:
+    principal = token_principal(token)
+    return principal is not None and (
+        principal.authentication != "temporary" or permission in principal.permissions)
 
 
 def request_principal(request: Request) -> SessionPrincipal | None:
@@ -143,7 +151,8 @@ def require_auth(request: Request) -> None:
     require_browser_write(request)
     if principal.authentication == "temporary":
         route = request.scope.get("route")
-        if not temporary_http_allowed(request.method, getattr(route, "path", None)):
+        if not temporary_http_allowed(request.method, getattr(route, "path", None),
+                                      principal.permissions, request.path_params.get("control_key")):
             raise HTTPException(403, "Operation unavailable for temporary sessions")
 
 

@@ -34,6 +34,8 @@
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
     "ccg/recording-playback": moduleUrl("/modules/recording-playback.js"),
     "ccg/settings": moduleUrl("/modules/settings.js"),
+    "ccg/access-keys": moduleUrl("/modules/access-keys.js"),
+    "ccg/access-key-dialog": moduleUrl("/modules/access-key-dialog.js"),
     "ccg/session-watch": moduleUrl("/modules/session-watch.js"),
   } });
   document.head.append(importMap);
