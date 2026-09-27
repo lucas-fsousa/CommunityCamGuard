@@ -461,6 +461,13 @@ control/support decisions only. 87 focused tests passed (98.2 MiB, no swap). No
 hardware/deployment. External-client migration required for removed internal fields;
 see `docs/internal/driver-response-log-audit.md`.
 
+Private-media-config checkpoint (2026-09-27): generated go2rtc credential config is
+written 0600 (including unchanged-content permission repair), without replacing its
+Docker-mounted inode; final symlinks/non-regular targets rejected. 49 focused tests
+passed (83.4 MiB peak, zero swap), Ruff/mypy passed. No live files/processes touched.
+Custom UID ownership, symlink migration and controlled backend rollout need review;
+see `docs/internal/private-media-config.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

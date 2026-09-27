@@ -27,6 +27,7 @@ from ..config import get_settings
 from ..db import registry
 from ..db.registry import Camera
 from . import quality
+from .config_file import write_private_config
 
 
 def stream_id(camera_id: str) -> str:
@@ -214,22 +215,14 @@ class Go2rtc:
 
     # --- config -------------------------------------------------------------------
     def write_config(self, cameras: list[Camera] | None = None) -> Path:
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(json.dumps(build_config(cameras), indent=2))
+        write_private_config(self.config_path, json.dumps(build_config(cameras), indent=2))
         return self.config_path
 
     def write_config_if_changed(self, cameras: list[Camera] | None = None) -> bool:
         """Write the generated config only when its complete content changed."""
 
         rendered = json.dumps(build_config(cameras), indent=2)
-        try:
-            if self.config_path.read_text() == rendered:
-                return False
-        except OSError:
-            pass
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(rendered)
-        return True
+        return write_private_config(self.config_path, rendered, only_if_changed=True)
 
     # --- process ------------------------------------------------------------------
     def is_running(self) -> bool:

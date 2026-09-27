@@ -216,6 +216,9 @@ diagnostic scalars, reviewed completion metadata and safe proxy/AAC failure repo
 Raw trusted-LAN property diagnostics are not a public or guest-safe data contract.
 Camera catalogue responses also omit raw stream paths and private capability fields;
 driver control/support decisions still use the unchanged internal evidence.
+Generated go2rtc configuration is [written owner-only](docs/internal/private-media-config.md)
+while preserving its Docker file mount. Custom deployments with different service
+UIDs must review ownership before rollout; existing live files are not yet migrated.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

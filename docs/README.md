@@ -35,6 +35,7 @@ Docs are split by audience:
 - **[Sensitive validation](internal/sensitive-validation.md)** — generic HTTP schema failures without echoing submitted credentials; staged backend change.
 - **[Provisioning error audit](internal/provisioning-public-errors.md)** — fixed errors, bounded BLE replies and strict enrollment status; broader payload/log review pending.
 - **[Driver response/log audit](internal/driver-response-log-audit.md)** — diagnostic/completion contracts, proxy/AAC fixes and explicit privacy boundaries.
+- **[Private media config](internal/private-media-config.md)** — 0600 generated go2rtc configuration with bind-mount-safe writes and ownership requirements.
 - **[Temporary live media](internal/temporary-live-media.md)** — restricted MSE bridge and revocation; not deployed.
 - **[Temporary keys](internal/temporary-access-keys.md)** — lifecycle and staged management API;
   deployment, session/channel invalidation, temporary login and UI remain pending.

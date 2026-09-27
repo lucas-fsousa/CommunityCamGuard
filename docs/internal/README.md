@@ -72,6 +72,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Sensitive validation](sensitive-validation.md) | Generic HTTP schema errors without rejected credentials or validator context; not deployed |
 | [Provisioning public errors](provisioning-public-errors.md) | Safe errors, bounded BLE replies and strict enrollment status; remaining payload/log and firmware acceptance tracked |
 | [Driver response/log audit](driver-response-log-audit.md) | Diagnostic/completion contracts, proxy/AAC fixes and privileged raw-read boundary |
+| [Private media config](private-media-config.md) | Owner-only generated credential config preserving Docker file-bind identity; deployment/ownership caveats |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
 | [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |
