@@ -45,6 +45,11 @@ WebSocket-route test proves a PTZ-only key cannot open a registered live source.
 Fake-media/Node contracts cover grant intersection, navigation, secret disposal,
 uncertain creation, modal dismissal and session cleanup. Existing channel guards,
 PCM endpoints and recording delivery are exercised with synthetic data only.
+Targeted authentication/channel/frontend tests passed (226 tests before the final
+registered-source denial addition); peak observed local test memory was 121.1 MiB
+with zero swap. The full GitHub CI passed for activation commit `155f6d5`, including
+all Python and Node suites. Later UI polish distinguishes denied permissions from
+unsupported hardware and hides video-only controls for control-only guests.
 
 This is source implementation, **not deployment or browser/device homologation**.
 No production keys, camera commands, browser, containers or WSL-heavy SDK process

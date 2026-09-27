@@ -40,6 +40,21 @@ function fill(h) {
 }
 (async () => {
   {
+    const h = harness(); const dispose = h.open();
+    h.find(e => e.id === "access-key-name").value = "Timed";
+    const expiry = h.find(e => e.id === "access-key-expiry");
+    expiry.value = "2036-01-02T12:30";
+    const form = h.find(e => e.tag === "form");
+    form.fire("submit"); assert.equal(h.requests.length, 0); // No implicit grant.
+    const boxes = walk(h.document.body).filter(e => e.type === "checkbox");
+    boxes[3].checked = true; // PTZ, independently of live/recordings.
+    form.fire("submit");
+    assert.deepEqual(JSON.parse(h.requests[0].opts.body), { label: "Timed",
+      expires_at: new Date("2036-01-02T12:30").toISOString(), permissions: ["ptz"] });
+    h.requests[0].resolve({ secret: "synthetic", login_enabled: true }); await flush();
+    assert(!h.find(e => e.textContent === "keys.stagedCreated")); dispose();
+  }
+  {
     const h = harness(); const dispose = h.open(); fill(h);
     const form = h.find(e => e.tag === "form");
     form.fire("submit"); form.fire("submit");

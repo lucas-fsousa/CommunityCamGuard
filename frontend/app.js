@@ -112,6 +112,7 @@ async function loadCameras() {
 }
 
 async function loadCameraStatuses() {
+  if (state.authentication === "temporary" && !state.permissions.length) return;
   try {
     const statuses = await api("/cameras/status");
     const byId = new Map(statuses.map((item) => [item.id, item]));

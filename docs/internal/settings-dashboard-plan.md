@@ -2,6 +2,11 @@
 
 ## Current behavior, not a new settings feature
 
+**2026-09-27 update:** [delegated access](delegated-access-activation.md) now implements
+the owner's optional-expiry/per-feature policy, modal and login/channel checks in
+source. Deployment/browser acceptance remain pending; the absence notes below
+belong to the original inventory checkpoint.
+
 **Implementation update:** [two-field runtime persistence](runtime-settings.md) and
 its primary-only API/settings screen are now deployed. The inventory-time analysis
 below remains relevant for every

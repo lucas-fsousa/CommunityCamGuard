@@ -56,13 +56,14 @@ export function cameraControls(camera, extras = {}) {
     for (const [group, entries] of GROUPS) {
       body.append(el("section", { className: "control-section" },
         el("h3", { textContent: t(`panel.${group}`) }),
-        ...entries.map(([key, label]) => row(label, widgets.get(key)))));
+        ...entries.map(([key, label]) => row(label, widgets.get(key),
+          allowed(key.startsWith("audio_") ? "intercom" : key) ? "panel.unavailable" : "panel.accessDenied"))));
     }
     const recordings = el("button", { type: "button", textContent: t("panel.openRecordings") });
     recordings.disabled = !allowed("recordings");
     body.append(el("section", { className: "control-section" },
       el("h3", { textContent: t("panel.storage") }),
-      row("panel.serverRecordings", recordings),
+      row("panel.serverRecordings", recordings, "panel.accessDenied"),
       row("panel.sdRecordings", null, "panel.sdPending")));
     body.append(el("section", { className: "control-section maintenance-section" },
       el("h3", { textContent: t("panel.maintenance") }),

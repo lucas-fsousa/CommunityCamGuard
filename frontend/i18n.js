@@ -14,6 +14,7 @@
 
 const STRINGS = {
   en: {
+    "panel.accessDenied": "Not permitted for this access.",
     "keys.title": "Delegated access",
     "keys.refresh": "Load / refresh accesses",
     "keys.previous": "Previous",
@@ -391,6 +392,7 @@ const STRINGS = {
     "rec.playbackFailed": "The browser-compatible version could not be prepared.",
   },
   "pt-BR": {
+    "panel.accessDenied": "Não permitido para este acesso.",
     "keys.title": "Acessos delegados",
     "keys.refresh": "Carregar / atualizar acessos",
     "keys.previous": "Anterior",

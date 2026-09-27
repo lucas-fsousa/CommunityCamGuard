@@ -111,8 +111,11 @@ function camBar(cam) {
   // keeps the footer small (the go2rtc player already adds its own control strip above us).
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz && allowed("ptz")) actions.append(ptzControls(cam));
-  if (cam.has_quality_variants) actions.append(qualityControls(cam));
-  actions.append(zoomControls(cam), reload, cameraControls(cam, {
+  if (allowed("live")) {
+    if (cam.has_quality_variants) actions.append(qualityControls(cam));
+    actions.append(zoomControls(cam), reload);
+  }
+  actions.append(cameraControls(cam, {
     maintenance: state.authentication === "temporary" ? [] : [probe, del],
   }));
   return el("div", { className: "bar" },
