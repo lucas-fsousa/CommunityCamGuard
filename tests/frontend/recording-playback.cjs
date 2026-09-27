@@ -201,5 +201,38 @@ function harness(support = "") {
     assert.equal(h.status.textContent, ""); assert.equal(h.requests.length, 1);
     assert.equal(h.timers.size, 0); h.controller.dispose();
   }
+  {
+    const h = harness(); let rejectPlay;
+    h.player.play = () => new Promise((_resolve, reject) => { rejectPlay = reject; });
+    h.controller.select("stuck");
+    h.requests[0].resolve({ ready: true, cached: true }); await flush();
+    const entry = [...h.timers].find(([, timer]) => timer.delay === 30000);
+    assert(entry, "ready media must have a bounded start deadline");
+    h.timers.delete(entry[0]); entry[1].fn();
+    assert.equal(h.status.textContent, "rec.startTimedOut");
+    assert.equal(h.states.at(-1).loading, false);
+    assert.equal(h.player.src, "");
+    assert.equal(h.requests.length, 1); // No automatic conversion/retry.
+    rejectPlay({ name: "AbortError" }); await flush();
+    assert.equal(h.status.textContent, "rec.startTimedOut");
+    h.controller.select("stuck"); assert.equal(h.requests.length, 2);
+    h.controller.dispose();
+  }
+  for (const transition of ["playing", "pause", "replace", "dispose"]) {
+    const h = harness(); h.controller.select("a");
+    h.requests[0].resolve({ ready: true, cached: true }); await flush();
+    const entry = [...h.timers].find(([, timer]) => timer.delay === 30000);
+    assert(entry);
+    if (transition === "replace") h.controller.select("b");
+    else if (transition === "dispose") h.controller.dispose();
+    else {
+      h.player.paused = transition === "pause";
+      h.player.emit(transition);
+    }
+    assert(!h.timers.has(entry[0]));
+    entry[1].fn(); // Even a callback already queued by the browser is harmless.
+    assert.notEqual(h.status.textContent, "rec.startTimedOut");
+    h.controller.dispose();
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -674,5 +674,10 @@ authoritative firmware implementation. Further equivalent live retries add no ev
 
 ---
 
+2026-09-27: prepared-recording playback now terminates an unresolved browser startup
+after 30 seconds with an explicit retry, without automatic conversion retries.
+Node lifecycle and 41 focused Python tests passed; browser acceptance remains pending.
+See [playback lifecycle](docs/internal/recordings-playback-lifecycle.md).
+
 _Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
 under `docs/internal/`._

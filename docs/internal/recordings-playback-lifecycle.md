@@ -1,5 +1,19 @@
 # Recording playback: lifecycle repair (2026-09-23)
 
+## Prepared-media startup deadline — 2026-09-27
+
+A ready server response is not proof that the browser started playing. A pending
+`play()` promise without `playing` or `error` could leave the loading overlay up
+indefinitely. Prepared H.264 playback now has a 30-second startup deadline; expiry
+detaches the source and offers a localized, explicit row-selection retry. It does
+not automatically enqueue another conversion. Playing, pause, replacement and
+disposal cancel the deadline; attempt ownership rejects late promise results.
+Native HEVC retains its separate 12-second fallback deadline.
+
+The Node lifecycle suite and 41 focused Python tests passed (81.6 MiB peak,
+zero swap). No browser/camera/container was started. This bounds a code-level
+failure, not a claim of real-browser homologation or faster uncached conversion.
+
 ## Findings
 
 Code inspection establishes two separate paths, not a single diagnosed browser

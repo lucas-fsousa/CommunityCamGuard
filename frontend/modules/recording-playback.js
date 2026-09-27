@@ -19,6 +19,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
       clearTimeout(current.timer);
       clearTimeout(current.requestTimer);
       clearTimeout(current.nativeTimer);
+      clearTimeout(current.startTimer);
     }
     current = null;
     message("");
@@ -27,10 +28,25 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     player.load();
   }
 
-  function watchNativeStart(item) {
+  function watchStart(item) {
     if (item.original && !item.started) {
       clearTimeout(item.nativeTimer);
       item.nativeTimer = setTimeout(() => fallback(item), 12000);
+    }
+    if (!item.original && !item.started) {
+      clearTimeout(item.startTimer);
+      const attempt = item.attempt;
+      item.startTimer = setTimeout(() => {
+        if (!active(item) || item.attempt !== attempt || item.started || player.paused) return;
+        item.failed = true;
+        item.ready = false;
+        item.attempt++; // Late play rejection/events no longer own this attempt.
+        item.playPending = false;
+        player.pause();
+        player.removeAttribute("src");
+        player.load();
+        message("rec.startTimedOut");
+      }, 30000);
     }
   }
 
@@ -38,7 +54,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     if (!active(item) || !item.ready || item.playPending) return;
     item.playPending = true;
     const attempt = item.attempt;
-    watchNativeStart(item);
+    watchStart(item);
     // Issue play immediately after attaching the source, not from loadedmetadata.
     // The promise waits for media readiness; native browser autoplay policy still applies.
     let promise;
@@ -47,6 +63,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
       if (!active(item) || item.attempt !== attempt) return;
       if (error?.name === "NotSupportedError" && item.original) return fallback(item);
       clearTimeout(item.nativeTimer); // Autoplay denial is not a codec failure.
+      clearTimeout(item.startTimer);
       // A deliberate pause can reject the pending play promise; it is not a media failure.
       if (error?.name === "AbortError" && player.paused && !player.error) return message("");
       message(error?.name === "NotAllowedError" ? "rec.readyPressPlay" : "rec.playbackFailed");
@@ -63,6 +80,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     item.attempt++;
     item.playPending = false;
     clearTimeout(item.nativeTimer);
+    clearTimeout(item.startTimer);
     player.pause();
     player.removeAttribute("src");
     player.load();
@@ -73,6 +91,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
   function ready(item, cached, original = false) {
     if (!active(item)) return;
     item.ready = true;
+    item.started = false;
     item.original = original;
     item.attempt++;
     message(cached ? "rec.seekableReady" : "rec.startingPlayback", true);
@@ -115,6 +134,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     if (current.original && player.videoWidth === 0) return fallback(current);
     current.started = true;
     clearTimeout(current.nativeTimer);
+    clearTimeout(current.startTimer);
     message("");
   }
   function onMetadata() {
@@ -123,10 +143,11 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     current.resume = 0;
   }
   function onPlay() {
-    if (current?.ready && !disposed) watchNativeStart(current);
+    if (current?.ready && !disposed) watchStart(current);
   }
   function onPause() {
     if (current) clearTimeout(current.nativeTimer);
+    if (current) clearTimeout(current.startTimer);
     if (current?.ready && !disposed && player.paused) message("");
   }
   function onWaiting() {
@@ -141,6 +162,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     if (!current?.ready || disposed) return;
     if (current.original && [3, 4].includes(player.error?.code)) return fallback(current);
     clearTimeout(current.nativeTimer);
+    clearTimeout(current.startTimer);
     message("rec.playbackFailed");
     current.failed = true;
   }
