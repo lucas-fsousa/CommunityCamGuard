@@ -1,9 +1,9 @@
 # Temporary access keys — lifecycle foundation, 2026-09-24
 
-**Lifecycle and primary-only management API implemented; API not yet deployed.
-Management UI is implemented in source; temporary login remains disabled.** Do not create/share production keys
-as usable credentials: they cannot log in. The primary environment key and existing
-sessions are unchanged.
+**Current status (2026-09-27): delegated login and owner-only UI are implemented in
+source, not yet deployed.** See [activation and rollout](delegated-access-activation.md).
+The checkpoints below retain the earlier staged history, including former gates.
+The primary environment key remains unchanged.
 
 ## Implemented boundary
 

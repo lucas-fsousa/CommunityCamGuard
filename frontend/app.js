@@ -19,6 +19,7 @@ import {
 } from "ccg/cameras";
 import { renderRecordings, stopRecordings } from "ccg/recordings";
 import { renderSettings, stopSettings } from "ccg/settings";
+import { allowed, applySessionAccess, viewAllowed } from "ccg/session-access";
 
 const APP_VERSION = window.__CCG_BUILD__ || "dev";
 console.log("[CCG] frontend build " + APP_VERSION);
@@ -64,6 +65,7 @@ function showDash() {
 }
 
 async function loadStorage() {
+  if (!allowed("recordings")) return;
   try {
     const storage = await api("/storage");
     const gigabytes = (bytes) => (bytes / 1e9).toFixed(0);
@@ -92,6 +94,7 @@ function render() {
 }
 
 function setView(view) {
+  if (!viewAllowed(view)) return;
   state.view = view;
   ensureSelected();
   reconcilePlayerSources();
@@ -140,18 +143,21 @@ async function boot() {
   try {
     const me = await api("/me", { cache: "no-store" });
     if (epoch !== sessionGeneration) return;
-    state.canManage = me.can_manage === true;
     if (!me.authenticated) {
       showLogin();
       return;
     }
     showDash();
+    applySessionAccess(me);
     sessionWatch.start();
-    const media = await api("/media/streams");
+    const media = allowed("live") ? await api("/media/streams") : {};
     if (epoch !== sessionGeneration) return;
     state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
     state.gridHdMax = media.grid_hd_max_cameras ?? 0;
-    await Promise.all([loadCameras(), loadStorage(), loadProvisioningStatus()]);
+    await Promise.all([
+      state.authentication !== "temporary" || state.permissions.length ? loadCameras() : Promise.resolve(render()),
+      loadStorage(), state.authentication !== "temporary" ? loadProvisioningStatus() : Promise.resolve(),
+    ]);
     if (epoch !== sessionGeneration) return;
     if (!storageTimer) storageTimer = setInterval(loadStorage, 15000);
     if (!watchdogTimer) watchdogTimer = setInterval(freezeWatchdog, STALL_POLL_MS);

@@ -2,6 +2,7 @@ import { t } from "ccg/i18n";
 import { $, api, el, state, svgIcon } from "ccg/core";
 import { cameraControls } from "ccg/camera-controls";
 import { finitePtzControls } from "ccg/step-ptz";
+import { allowed } from "ccg/session-access";
 
 let reloadCameras = async () => {};
 let refreshView = () => {};
@@ -109,10 +110,10 @@ function camBar(cam) {
   // A single compact row: identity on the left, controls on the right. Keeping it one line is what
   // keeps the footer small (the go2rtc player already adds its own control strip above us).
   const actions = el("span", { className: "bar-actions" });
-  if (caps.ptz) actions.append(ptzControls(cam));
+  if (caps.ptz && allowed("ptz")) actions.append(ptzControls(cam));
   if (cam.has_quality_variants) actions.append(qualityControls(cam));
   actions.append(zoomControls(cam), reload, cameraControls(cam, {
-    maintenance: [probe, del],
+    maintenance: state.authentication === "temporary" ? [] : [probe, del],
   }));
   return el("div", { className: "bar" },
     status,
@@ -160,6 +161,7 @@ function streamFor(cam) {
 }
 
 function camFrame(cam) {
+  if (!allowed("live")) return suspendedFrame();
   const sid = streamFor(cam);
   const frame = el("cam-player", { className: "frame" });
   frame.dataset.src = sid;   // so a view switch can tell if it must reconnect
@@ -170,6 +172,7 @@ function camFrame(cam) {
 }
 
 function reportMediaEvent(cam, frame, detail) {
+  if (state.authentication === "temporary") return;
   if (!cam || !detail.event || document.hidden) return;
   const d = typeof frame.diagnostics === "function" ? frame.diagnostics() : {};
   // The API schema deliberately accepts only scalars. Flatten the player/RTC snapshot and omit
@@ -316,6 +319,8 @@ function qualityControls(cam) {
 // an explicit recovery also allows the server relay to detach and release the unused producer.
 // Other viewers keep their shared producer. Neither path reconnects the base camera/recorder feed.
 async function refreshPlayer(cameraId, btn, restartProducer = false) {
+  if (!allowed("live")) return;
+  if (state.authentication === "temporary") restartProducer = false;
   const cam = state.cameras.find((candidate) => candidate.id === cameraId);
   const t = cam ? tiles.get(cam.mac) : null;
   if (!t || !cam) return;
@@ -448,6 +453,7 @@ document.addEventListener("visibilitychange", () => {
 // resuming rebuilds it to reconnect. Grid<->Single stay live (no-op) so those switches never rebuffer.
 let _playersSuspended = false;
 export function setPlayersLive(live) {
+  live = live && allowed("live");
   if (live === !_playersSuspended) return;   // already in the desired state
   _playersSuspended = !live;
   tiles.forEach((t, mac) => {

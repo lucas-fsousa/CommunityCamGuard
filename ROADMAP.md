@@ -676,9 +676,10 @@ authoritative firmware implementation. Further equivalent live retries add no ev
 
 2026-09-27: delegated access now has optional expiration and explicit per-resource
 grants, with a primary-only responsive creation dialog and metadata/revocation UI.
-Server checks grants independently of the dashboard. Public login stays gated
-until permission-aware navigation and intercom integration are complete; do not
-share preparation keys as usable access. See [access keys](docs/internal/temporary-access-keys.md).
+Server checks grants independently of the dashboard. Follow-up completed delegated
+login, permission-aware navigation and guarded intercom/MSE. Implementation is
+source-tested, not deployed; browser/proxy and modal-layout acceptance remain.
+See [activation/rollout](docs/internal/delegated-access-activation.md).
 
 2026-09-27: prepared-recording playback now terminates an unresolved browser startup
 after 30 seconds with an explicit retry, without automatic conversion retries.

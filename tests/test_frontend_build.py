@@ -147,7 +147,7 @@ def test_camera_operations_address_api_by_opaque_id():
     live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
     panel = (Path(__file__).parents[1] / "frontend" / "modules" / "camera-controls.js").read_text()
     ptz = (Path(__file__).parents[1] / "frontend" / "modules" / "step-ptz.js").read_text()
-    assert "if (caps.ptz) actions.append(ptzControls(cam))" in live
+    assert 'if (caps.ptz && allowed("ptz")) actions.append(ptzControls(cam))' in live
     assert "extras.movement" not in panel
     assert '"panel.movement"' not in panel
 
@@ -177,7 +177,7 @@ def test_frontend_entrypoint_only_orchestrates_semantic_modules():
 
     for specifier in ("ccg/core", "ccg/i18n", "ccg/live", "ccg/cameras", "ccg/recordings", "ccg/settings", "ccg/session-watch"):
         assert f'from "{specifier}"' in app
-    assert len(app.splitlines()) < 200
+    assert len(app.splitlines()) < 225  # Orchestration only; permission/UI logic lives in modules.
     assert "function openProvisioningModal" not in app
     assert "function freezeWatchdog" not in app
 

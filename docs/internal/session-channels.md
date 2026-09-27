@@ -1,6 +1,8 @@
 # Open-channel session checks — 2026-09-24
 
-**Implemented/tested in source, not deployed. Temporary login remains disabled.**
+**Implemented/tested in source, not deployed.** Delegated login and per-key grants
+are now wired in source; see [activation](delegated-access-activation.md). Earlier
+staged restrictions below are historical where superseded by that checkpoint.
 
 `session_channels.run_guarded` owns a socket operation plus one validity watcher.
 After initial route authentication, it re-runs the existing token verifier every

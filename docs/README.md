@@ -13,6 +13,9 @@ Docs are split by audience:
 
 ## `internal/` — for contributors
 
+- **[Delegated access activation](internal/delegated-access-activation.md)** — optional expiry,
+  per-feature grants, modal, login/channel enforcement and pending deployment/browser acceptance.
+
 - **[Internal index](internal/README.md)** — ADRs and current implementation/measurement notes.
 - **[Native recording playback](internal/recordings-native-playback.md)** — negotiation, fallback,
   HTTP checks and capped real-browser validation; unverified cases are explicit.

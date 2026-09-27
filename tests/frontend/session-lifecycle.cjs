@@ -19,6 +19,23 @@ function watchHarness() {
 }
 (async () => {
   {
+    const state = { authentication: "temporary", permissions: ["ptz", "orientation"], cameras: [] };
+    const access = new Function("state", source("session-access.js") + "\nreturn {allowed, viewAllowed, permittedCamera};")(state);
+    assert(access.allowed("ptz")); assert(!access.allowed("live"));
+    assert(!access.allowed("intercom")); assert(!access.allowed("future_control"));
+    assert(!access.viewAllowed("settings")); assert(!access.viewAllowed("cameras"));
+    assert(!access.viewAllowed("recordings")); assert(access.viewAllowed("grid"));
+    const camera = { controls: { orientation: {}, white_light: {} }, audio_messages: true, audio_streams: true };
+    const visible = access.permittedCamera(camera);
+    assert.deepEqual(Object.keys(visible.controls), ["orientation"]);
+    assert.equal(visible.audio_messages, false); assert.equal(visible.audio_streams, false);
+    assert.equal(camera.audio_messages, true); // Never rewrite the driver's capability evidence.
+    state.permissions = ["intercom", "recordings"];
+    assert(access.permittedCamera(camera).audio_streams); assert(access.viewAllowed("recordings"));
+    state.authentication = "primary";
+    assert.strictEqual(access.permittedCamera(camera), camera); assert(access.viewAllowed("settings"));
+  }
+  {
     const h = watchHarness(); h.watch.start(); h.listeners.get("focus")();
     assert.equal(h.requests.length, 1); // Focus cannot overlap the in-flight check.
     h.requests[0].resolve({ authenticated: true }); await flush(); h.tick(1000);

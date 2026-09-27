@@ -5,7 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from ..auth import COOKIE_NAME, MAX_AGE, check_key, issue_token, request_principal
+from ..auth import (
+    COOKIE_NAME,
+    MAX_AGE,
+    check_key,
+    issue_temporary_token,
+    issue_token,
+    request_principal,
+)
 from ..login_throttle import LoginRoute
 from ..origin_policy import require_browser_write, require_target_origin, secure_cookie
 
@@ -18,11 +25,12 @@ class LoginIn(BaseModel):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response) -> dict:
-    if not check_key(body.key):
+    token = issue_token() if check_key(body.key) else issue_temporary_token(body.key)
+    if token is None:
         raise HTTPException(status_code=401, detail="Invalid key", headers={"Cache-Control": "no-store"})
     response.set_cookie(
         COOKIE_NAME,
-        issue_token(),
+        token,
         httponly=True,
         secure=secure_cookie(request),
         samesite="lax",
@@ -44,8 +52,11 @@ def me(request: Request, response: Response) -> dict:
     require_target_origin(request)
     response.headers["Cache-Control"] = "no-store"
     principal = request_principal(request)
-    return {
+    result: dict = {
         "authenticated": principal is not None,
         "authentication": principal.authentication if principal else None,
         "can_manage": principal.can_manage if principal else False,
     }
+    if principal is not None and principal.authentication == "temporary":
+        result["permissions"] = list(principal.permissions)
+    return result

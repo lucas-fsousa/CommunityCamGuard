@@ -8,8 +8,9 @@ See the [rollout checkpoint](../internal/runtime-settings.md) for deployment sta
 
 Sign in with the server's primary dashboard key. Old sessions can still monitor
 cameras, but cannot administer settings: sign out and sign in again. The backend
-enforces this independently of the UI. Temporary-key login and management UI are
-not enabled; the staged management API is documented in the [API reference](api.md).
+enforces this independently of the UI. Delegated-access login and management are
+implemented in source; backend/frontend deployment and browser validation are still
+pending. See [activation and rollout](../internal/delegated-access-activation.md).
 
 The centered panel uses compact numeric fields beside each setting's title, with
 explanations below and separate save/reload actions. It adapts to narrow screens.
@@ -36,6 +37,24 @@ is no automatic retry or forced overwrite. Reload is also required if a save's
 result cannot be confirmed: the server may already have committed it. Leaving the
 view/signing out cancels browser requests, not a completed server transaction.
 
-Retention, credentials, ports, camera controls and temporary-key management are not
-part of this screen. Environment files are never rewritten; DB overrides apply only
-to these two fields. See [API](api.md), [recordings](recordings.md) and [roadmap](../../ROADMAP.md).
+## Delegated access
+
+The separate access card is available only to the primary session. Choose **Create
+access**, enter a name, select allowed features and choose a future expiration in
+your local time or **No expiration**. Rights apply across configured cameras, but
+never add a feature the camera driver does not support. Server administration
+cannot be delegated. Local-only camera controls remain local-only.
+
+Copy the generated key from the dialog: it is displayed only once and cleared on
+close or after 60 seconds. Share it securely; do not place it in URLs. The recipient
+uses the normal login form. Keys without expiration remain valid until revoked;
+each browser login still expires after seven days. **Load / refresh accesses** lists
+metadata and permissions, never secrets. Revoke invalidates that key's sessions;
+the open dashboard returns to login through its periodic session check.
+
+If creation or revocation cannot be confirmed, reload the list before another
+attempt. Do not assume a failed network response means the server made no change.
+
+Retention, server credentials and ports remain outside this screen. Environment
+files are never rewritten; DB runtime overrides apply only to the two preferences.
+See [API](api.md), [recordings](recordings.md) and [roadmap](../../ROADMAP.md).

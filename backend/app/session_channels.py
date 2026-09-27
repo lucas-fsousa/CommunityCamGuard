@@ -1,8 +1,8 @@
 """Revalidate open dashboard sockets without blocking the event loop.
 
 Socket ownership lives here; the recording delivery adapter reuses the validity
-watcher for HTTP transfers. Neither stops independent WebRTC peers. Temporary
-login remains disabled until remaining activation gates are covered.
+watcher for HTTP transfers. Neither stops independent WebRTC peers; delegated
+sessions cannot negotiate those peers and use the guarded MSE path only.
 """
 
 import asyncio

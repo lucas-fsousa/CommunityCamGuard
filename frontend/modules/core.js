@@ -15,6 +15,8 @@ export const state = {
   cameras: [],
   view: "grid",
   canManage: false,
+  authentication: null,
+  permissions: [],
   selected: null,
   rec: { cameraId: "", from: "", to: "", page: 0, pageSize: 50 },
   candidates: [],
@@ -36,6 +38,8 @@ export function endSession() {
   }
   sessionCleanups.clear();
   state.canManage = false;
+  state.authentication = null;
+  state.permissions = [];
 }
 
 export function onUnauthorized(handler) {

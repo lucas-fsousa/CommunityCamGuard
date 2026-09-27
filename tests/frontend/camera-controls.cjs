@@ -107,6 +107,7 @@ let audioButtons = 0;
 const audioButton = () => { audioButtons++; return el("button"); };
 const cameraControls = load("camera-controls.js", {
   el, state, t, controlWidgets, audioMessageButton: audioButton, pushToTalkButton: audioButton,
+  allowed: () => true, permittedCamera: cam => cam,
 }, "cameraControls");
 
 (async () => {

@@ -1,7 +1,8 @@
 # Staged temporary live media — 2026-09-25
 
-Implemented in source, not deployed. Public temporary login remains disabled.
-Primary/legacy media behavior is unchanged; temporary intercom remains denied.
+Implemented in source, not deployed. [Delegated login activation](delegated-access-activation.md)
+now checks the live grant; intercom has its own grant and guarded transport.
+Primary/legacy media behavior is unchanged. Earlier staging notes below are historical.
 
 `api/temporary_media.py` owns a separate restricted bridge. Only a single `src`
 query parameter identifying a registered `cam_<24 hex>_hd` or `_web` is accepted.

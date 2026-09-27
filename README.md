@@ -96,7 +96,7 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
   **never deletes**. A separate **retention** job (`RECORDING_RETENTION_DAYS`, default **7 days**)
   deletes older footage; set **0** to keep it indefinitely, subject to available storage.
 - **Auth** — a secret key from `.env` gates protected operations via a signed, seven-day session
-  cookie. Treat that cookie as a credential. Temporary keys and immediate revocation remain planned.
+  cookie. Treat that cookie as a credential. Scoped delegated keys and revocation are implemented in source; rollout remains pending.
   A primary-only two-field settings view is implemented; see its rollout checkpoint.
   The [primary-session foundation](docs/internal/session-principal.md) is implemented in source
   and deployed; legacy cookies keep existing access but do not gain management permission.
@@ -169,14 +169,13 @@ runtime overrides is available with a localized, responsive Settings tab with co
 ([rollout/semantics](docs/internal/runtime-settings.md)). Sign out/in with the primary key if your
 existing session cannot edit. A primary-only delegated-access modal now lets the owner
 select individual features and an expiration date or no expiration; it also lists and
-revokes keys. This is still preparation-only: public delegated login is gated pending
-permission-aware navigation and transport integration. Temporary-key management endpoints are implemented but
-not yet deployed; temporary login and management UI remain disabled. See the
-[lifecycle/API checkpoint and activation gates](docs/internal/temporary-access-keys.md).
+revokes keys. Delegated login, permission-aware navigation and guarded transports are
+implemented in source, not yet deployed or browser-homologated. See the
+[activation scope and rollout checklist](docs/internal/delegated-access-activation.md).
 Open-socket revalidation is also implemented but not yet deployed; see the
 [channel coverage and remaining gaps](docs/internal/session-channels.md).
-Signed temporary-session linkage and transitional permissions are tested internally;
-[public login remains disabled](docs/internal/temporary-sessions.md).
+Signed delegated sessions reload persistent validity and selected permissions;
+the primary environment key remains separate and cannot be changed in the dashboard.
 The [restricted temporary MSE bridge](docs/internal/temporary-live-media.md) is tested
 in source; real-browser/proxy validation and backend deployment remain pending.
 [Login pacing](docs/internal/login-abuse-protection.md) is also implemented in source:

@@ -13,8 +13,8 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
 `/api/go2rtc/ws` has a restricted temporary-session MSE path implemented in source,
 not deployed. It accepts only registered HD/web sources and rechecks key validity
 during delivery; arbitrary sources and WebRTC negotiation are denied for temporary
-sessions. Public temporary login remains disabled. Primary/legacy behavior is
-unchanged. See [transport limits and activation gates](../internal/temporary-live-media.md).
+sessions. Public delegated login is implemented in source, with per-key grants.
+Primary/legacy behavior is unchanged. See [activation and rollout](../internal/delegated-access-activation.md).
 
 ## Authentication
 
@@ -65,10 +65,9 @@ Sessions currently expire after seven days. Cookies are bearer credentials: prot
 like passwords and never log/share them. Logout clears the caller's cookie; it is not server-side
 revocation of a stolen copy. Primary-session identification and its management dependency are
 implemented and deployed, along with the two-field settings API described below.
-The settings screen now uses this API. Temporary-key management is implemented in source
-(not yet deployed); temporary login and immediate session/channel invalidation remain
-**disabled/pending**. See the
-[settings/authentication plan](../internal/settings-dashboard-plan.md).
+The settings screen now uses this API. Delegated-key management, login, permission
+enforcement and session/channel invalidation are implemented in source, not yet
+deployed or browser-homologated. See [activation and rollout](../internal/delegated-access-activation.md).
 
 ---
 
@@ -80,7 +79,7 @@ The settings screen now uses this API. Temporary-key management is implemented i
 |---|---|---|---|
 | POST | `/api/login` | `{"key": "..."}` | Sets `ccg_session` cookie. `401` if the key is wrong. |
 | POST | `/api/logout` | — | Clears the cookie. |
-| GET | `/api/me` | — | `{authenticated, authentication, can_manage}`. `authentication` is `primary`, `legacy`, or null. No session ID/token is returned. |
+| GET | `/api/me` | — | `{authenticated, authentication, can_manage}`. `authentication` is `primary`, `legacy`, `temporary`, or null. Delegated sessions also include `permissions`. No session ID/token is returned. |
 
 The dashboard polls `/api/me` without caching and returns to login when the session
 is invalid. The response also declares `Cache-Control:no-store` in source (backend
@@ -90,30 +89,37 @@ suspended browser tabs may react later. See [session cleanup](../internal/dashbo
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
 existing access until their original expiry but cannot pass the new primary-only management
 dependency; a fresh primary-key login is required. Unknown session formats/kinds fail closed.
-The staged parser also recognizes an internally issued `temporary` session tied to
-a valid persisted key, with `can_manage:false`; public login does not issue it yet.
-See its [transitional restrictions](../internal/temporary-sessions.md).
+Delegated login issues a `temporary` session tied to a valid persisted key, with
+`can_manage:false` and current stored grants; the seven-day cookie ceiling remains.
+See [permission enforcement](../internal/delegated-access-activation.md).
 Settings and the new key-management endpoints require primary sessions.
 These backend updates are included in the settings deployment;
 see [session migration and rollout](../internal/session-principal.md).
 
-### Temporary-key management (staged, not yet deployed)
+### Delegated-key management (implemented in source, not yet deployed)
 
 These routes are restricted to verified primary sessions: anonymous/invalid sessions
-receive 401, legacy sessions 403. **Generated keys cannot log in yet.** Creation and
-listing explicitly return `login_enabled: false`; no management UI is enabled.
-Do not distribute these staged credentials as usable access keys.
+receive 401, legacy/delegated sessions 403. Creation and listing return
+`login_enabled: true` in this version. Deploy backend/frontend together before use.
 
 | Method | Path | Body / Params | Response |
 | --- | --- | --- | --- |
-| GET | `/api/access-keys` | `limit` 1–100 (default 50), `offset` ≥0 | `{items, limit, offset, login_enabled: false}`; metadata only |
-| POST | `/api/access-keys` | `{label, expires_at}`; label 1–80 characters, future ISO date with timezone | 201 `{metadata, secret, login_enabled: false}`; secret returned only here |
+| GET | `/api/access-keys` | `limit` 1–100 (default 50), `offset` ≥0 | `{items, limit, offset, login_enabled: true}`; metadata only |
+| POST | `/api/access-keys` | `{label, expires_at, permissions}`; label 1–80 characters, future aware ISO date or explicit null | 201 `{metadata, secret, login_enabled: true}`; secret returned only here |
 | POST | `/api/access-keys/{id}/revoke` | Empty JSON object `{}` | Metadata with first revocation timestamp; repeated revocation is idempotent; unknown ID 404 |
 
-Metadata: `id`, `label`, UTC `created_at`, `expires_at`, nullable `revoked_at`, and
+Metadata: `id`, `label`, UTC `created_at`, nullable `expires_at`, `permissions`, nullable `revoked_at`, and
 `status` (`active`, `expired`, `revoked`). Active here describes a key record, **not**
 permission to log in before rollout. Expiry is absolute, never extended by reading.
 Verifiers are never returned; there is no secret-recovery endpoint.
+
+Permission values: `live`, `recordings`, `ptz`, `intercom`, `reboot`, `white_light`,
+`orientation`, `siren_pulse`, `speaker_volume`, `night_vision`, `smart_protection`,
+`smart_protection_schedule`, `alarm_voice`. Unknown/duplicate values are rejected.
+Always send the chosen list; omission retains the old staged `live,recordings`
+default for compatibility. An empty list grants no feature. Grants apply across
+configured cameras, intersected with driver support; local-only guards remain.
+Null expiry means valid until revoked, not a session cookie without expiration.
 
 All matched-route responses, including handled failures, carry `Cache-Control: no-store`.
 Writes require JSON (415 otherwise); cross-origin/`Sec-Fetch-Site: cross-site` writes
@@ -124,7 +130,7 @@ Creation is not idempotent: if its response is lost, list/revoke the uncertain k
 before deliberately creating another; do not automatically retry creation.
 
 No production keys or schema were created for validation. The staged API needs a
-backend rebuild to be served; see [activation gates](../internal/temporary-access-keys.md).
+backend rebuild to be served; see [rollout checklist](../internal/delegated-access-activation.md).
 
 ### Cameras
 

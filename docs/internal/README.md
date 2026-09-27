@@ -87,3 +87,8 @@ settings, temporary keys and WAN-independent provisioning out of implemented-fea
 `NNNN-short-title.md` — **Status** (proposed/accepted/superseded) · **Date**, then **Context**
 (the forces), **Decision** (what we chose), **Consequences** (results + what we rejected). Keep it
 short; de-identify examples (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`) — never real device data.
+## Latest checkpoint
+
+- [Delegated access activation (2026-09-27)](delegated-access-activation.md): optional
+  expiration, explicit feature grants, owner-only modal, login and guarded transports.
+  Source-tested; deployment and real-browser acceptance remain pending.

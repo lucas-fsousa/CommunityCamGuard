@@ -36,6 +36,7 @@
     "ccg/settings": moduleUrl("/modules/settings.js"),
     "ccg/access-keys": moduleUrl("/modules/access-keys.js"),
     "ccg/access-key-dialog": moduleUrl("/modules/access-key-dialog.js"),
+    "ccg/session-access": moduleUrl("/modules/session-access.js"),
     "ccg/session-watch": moduleUrl("/modules/session-watch.js"),
   } });
   document.head.append(importMap);

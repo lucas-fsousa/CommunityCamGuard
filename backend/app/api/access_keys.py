@@ -1,4 +1,4 @@
-"""Primary-only management; temporary login remains disabled until channel guards land."""
+"""Primary-only management of revocable, permission-scoped delegated credentials."""
 
 import sqlite3
 from typing import Literal
@@ -40,14 +40,14 @@ router = APIRouter(prefix="/api/access-keys", tags=["access keys"], route_class=
 class CreatedKey(BaseModel):
     metadata: access_keys.KeyMetadata
     secret: str = Field(repr=False)
-    login_enabled: Literal[False] = False
+    login_enabled: Literal[True] = True
 
 
 class KeyPage(BaseModel):
     items: list[access_keys.KeyMetadata]
     limit: int
     offset: int
-    login_enabled: Literal[False] = False
+    login_enabled: Literal[True] = True
 
 
 class RevokeKey(BaseModel):

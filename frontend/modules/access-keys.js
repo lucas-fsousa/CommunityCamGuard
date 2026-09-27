@@ -2,7 +2,7 @@ import { api, el, state } from "ccg/core";
 import { t } from "ccg/i18n";
 import { openAccessKeyDialog } from "ccg/access-key-dialog";
 
-// Primary-only management. Public login remains staged until all activation gates pass.
+// Primary-only management; server authorization remains authoritative.
 export function renderAccessKeys(container) {
   if (!state.canManage) return () => {};
   let alive = true, busy = false, blocked = true, offset = 0, count = 0, request, timer;

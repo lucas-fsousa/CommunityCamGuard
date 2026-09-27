@@ -71,6 +71,7 @@ def test_revocation_invalidates_all_sessions_without_affecting_primary(clock, cl
     assert client.get("/api/cameras").status_code == 200
     assert client.get("/api/me").json() == {
         "authenticated": True, "authentication": "temporary", "can_manage": False,
+        "permissions": ["live", "recordings"],
     }
     access_keys.revoke(key.metadata.id)
     for token in (first, second):
@@ -141,7 +142,7 @@ def test_policy_uses_exact_method_and_route_template(method, path):
 
 def test_primary_permissions_and_login_remain_unchanged(clock, client):
     key, _token = issue(clock)
-    assert client.post("/api/login", json={"key": key.secret}).status_code == 401
+    assert client.post("/api/login", json={"key": key.secret}).status_code == 200
     assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
     assert client.post("/api/cameras").status_code == 200
     assert client.get("/api/new-feature").status_code == 200

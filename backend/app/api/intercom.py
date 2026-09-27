@@ -16,7 +16,7 @@ from starlette.websockets import WebSocketState
 from ..audio_diagnostics import PcmLevelAccumulator
 from ..audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES
 from ..auth import COOKIE_NAME, require_auth
-from ..auth import verify_channel_token as verify_token
+from ..auth import verify_intercom_token as verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..origin_policy import browser_origin_allowed
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream

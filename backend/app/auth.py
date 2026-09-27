@@ -62,8 +62,7 @@ def issue_token() -> str:
 def issue_temporary_token(submitted: str) -> str | None:
     """Internal issuance only: verify the whole key, never trust a public ID/role.
 
-    Not exposed by /login until all activation gates are complete. Reads recheck
-    key status, so concurrent revocation cannot produce a usable stale session.
+    Reads recheck key status, so concurrent revocation cannot produce a usable stale session.
     """
     try:
         key = access_keys.authenticate(submitted)
@@ -124,7 +123,7 @@ def verify_token(token: str) -> bool:
 
 
 def verify_channel_token(token: str) -> bool:
-    """Temporary transport access stays closed until all transport guards land."""
+    """The unrestricted proxy remains unavailable to delegated sessions."""
     principal = token_principal(token)
     return principal is not None and principal.authentication != "temporary"
 
@@ -133,6 +132,10 @@ def verify_permission_token(token: str, permission: str) -> bool:
     principal = token_principal(token)
     return principal is not None and (
         principal.authentication != "temporary" or permission in principal.permissions)
+
+
+def verify_intercom_token(token: str) -> bool:
+    return verify_permission_token(token, "intercom")
 
 
 def request_principal(request: Request) -> SessionPrincipal | None:

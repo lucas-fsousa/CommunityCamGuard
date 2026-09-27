@@ -75,6 +75,16 @@ def test_mse_delivers_then_revocation_closes_socket_and_upstream(env, suffix):
     assert connections[0][1]["max_queue"] == 4
 
 
+def test_registered_source_still_requires_live_permission(env):
+    client, cam, _key, connections, _sent, _closed = env
+    key = access_keys.create(access_keys.CreateKey(label="Controls only", expires_at=None, permissions=("ptz",)))
+    client.cookies.set(auth.COOKIE_NAME, auth.issue_temporary_token(key.secret))
+    with pytest.raises(WebSocketDisconnect) as caught, client.websocket_connect(
+            f"/api/go2rtc/ws?src={cam.camera_id}_hd"):
+        raise AssertionError("A control grant opened live media")
+    assert caught.value.code == 1008 and not connections
+
+
 @pytest.mark.parametrize("query", [
     "src=rtsp://192.0.2.1/private", "src=ffmpeg:arbitrary", "src=http://example.invalid",
     "src=cam_" + "f" * 24 + "_hd", "src=", "src=synthetic", "src={id}",

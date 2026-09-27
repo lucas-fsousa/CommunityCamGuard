@@ -1,9 +1,9 @@
-"""Temporary-key lifecycle foundation, deliberately not wired into login yet.
+"""Revocable delegated-key lifecycle and permission metadata.
 
 Keys have a public random ID plus a 256-bit random secret. SHA-256 is a verifier
 for generated high-entropy credentials, NOT a password-hashing substitute.
 Storage errors propagate: HTTP/auth boundaries must fail closed, not grant
-access on DB failure. Session/channel invalidation must land before activation.
+access on DB failure. Session/channel boundaries revalidate persistent state.
 """
 
 import hashlib
@@ -118,7 +118,7 @@ def revoke(key_id: str) -> KeyMetadata | None:
 
 
 def active_key(key_id: str) -> KeyMetadata | None:
-    """Fresh validity read for future session checks; a public ID is NOT a credential."""
+    """Fresh session validity read; a public ID is NOT a credential."""
     if not isinstance(key_id, str) or not _KEY_ID.fullmatch(key_id):
         return None
     row = repository.get(key_id)
@@ -129,7 +129,7 @@ def active_key(key_id: str) -> KeyMetadata | None:
 
 
 def authenticate(secret: str) -> KeyMetadata | None:
-    """Resolve a future login attempt, without issuing a session or renewing expiry."""
+    """Resolve a login attempt, without issuing a session or renewing expiry."""
     if not isinstance(secret, str) or len(secret) != 84:
         return None
     match = _CREDENTIAL.fullmatch(secret)

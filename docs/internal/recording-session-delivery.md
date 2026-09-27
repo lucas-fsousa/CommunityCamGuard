@@ -1,6 +1,7 @@
 # Revocable recording delivery — 2026-09-25
 
-**Implemented/tested in source, not deployed. Public temporary login is still disabled.**
+**Implemented/tested in source, not deployed.** Delegated login now checks the
+recordings grant; see [activation and rollout](delegated-access-activation.md).
 
 `recording/delivery.py` wraps Starlette `FileResponse`; archive routes keep the
 existing root/path checks, codec/cache selection and friendly download filename.

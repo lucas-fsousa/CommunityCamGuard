@@ -1,7 +1,6 @@
-"""Staged temporary-session permissions; unknown operations deny by default.
+"""Delegated-session permissions; unknown operations deny by default.
 
-This is NOT the final guest product role. Login stays disabled until ordinary
-operations, transport invalidation and UI cleanup can be enabled together.
+Each key stores explicit grants; none can grant server administration.
 Use the router's matched template, never substring/prefix matching of user URLs.
 """
 

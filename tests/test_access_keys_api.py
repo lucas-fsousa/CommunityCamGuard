@@ -34,17 +34,18 @@ def check(response, code):
     return response.json()
 
 
-def test_create_list_revoke_and_login_still_disabled(client):
+def test_create_list_revoke_and_login(client):
     result = check(client.post("/api/access-keys", json=body()), 201)
-    assert result["login_enabled"] is False
+    assert result["login_enabled"] is True
     secret, key_id = result["secret"], result["metadata"]["id"]
     assert result["metadata"]["expires_at"] == "2026-09-25T12:00:00Z"
     assert "verifier" not in str(result)
     listed = check(client.get("/api/access-keys"), 200)
-    assert listed == {"items": [result["metadata"]], "limit": 50, "offset": 0, "login_enabled": False}
+    assert listed == {"items": [result["metadata"]], "limit": 50, "offset": 0, "login_enabled": True}
     assert secret not in str(listed)
     assert secret.encode() not in get_settings().db_path.read_bytes()
-    assert client.post("/api/login", json={"key": secret}).status_code == 401
+    assert client.post("/api/login", json={"key": secret}).status_code == 200
+    assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
     revoked = check(client.post(f"/api/access-keys/{key_id}/revoke", json={}), 200)
     assert revoked["status"] == "revoked"
     assert check(client.post(f"/api/access-keys/{key_id}/revoke", json={}), 200) == revoked

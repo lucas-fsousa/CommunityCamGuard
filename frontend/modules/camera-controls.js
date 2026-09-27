@@ -4,6 +4,7 @@ import { t } from "ccg/i18n";
 import { controlWidgets } from "ccg/control-actions";
 import { audioMessageButton } from "ccg/audio-message";
 import { pushToTalkButton } from "ccg/push-to-talk";
+import { allowed, permittedCamera } from "ccg/session-access";
 
 const GROUPS = [
   ["image", [["orientation", "control.orientation"], ["night_vision", "control.nightVision"],
@@ -41,7 +42,7 @@ export function cameraControls(camera, extras = {}) {
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
     // Use the latest server catalogue when opening, not the tile's original snapshot.
-    const cam = state.cameras.find((item) => item.id === camera.id) || camera;
+    const cam = permittedCamera(state.cameras.find((item) => item.id === camera.id) || camera);
     const status = el("small", { className: "camera-control-status" });
     status.setAttribute("role", "status");
     const widgets = new Map([...controlWidgets(cam, status).children]
@@ -58,6 +59,7 @@ export function cameraControls(camera, extras = {}) {
         ...entries.map(([key, label]) => row(label, widgets.get(key)))));
     }
     const recordings = el("button", { type: "button", textContent: t("panel.openRecordings") });
+    recordings.disabled = !allowed("recordings");
     body.append(el("section", { className: "control-section" },
       el("h3", { textContent: t("panel.storage") }),
       row("panel.serverRecordings", recordings),

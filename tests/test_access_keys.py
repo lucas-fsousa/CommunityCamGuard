@@ -165,14 +165,14 @@ def test_storage_failure_is_not_success(clock, monkeypatch):
         issue(clock)
 
 
-def test_temporary_login_remains_disabled_and_incomplete_claims_fail(clock):
+def test_temporary_login_and_incomplete_claims_fail(clock):
     key = issue(clock)
     app = FastAPI()
     app.include_router(router)
     with TestClient(app) as client:
-        assert client.post("/api/login", json={"key": key.secret}).status_code == 401
-        assert not client.cookies.get(auth.COOKIE_NAME)
-        assert client.get("/api/me").json()["authenticated"] is False
+        assert client.post("/api/login", json={"key": key.secret}).status_code == 200
+        assert client.cookies.get(auth.COOKIE_NAME)
+        assert client.get("/api/me").json()["can_manage"] is False
         assert client.post("/api/login", json={"key": "test-secret-key"}).status_code == 200
         assert client.get("/api/me").json()["can_manage"] is True
     forged_kind = auth._serializer().dumps({"v": 1, "authentication": "temporary", "sid": "a" * 32})

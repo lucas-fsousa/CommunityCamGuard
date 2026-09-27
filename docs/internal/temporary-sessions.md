@@ -1,7 +1,8 @@
 # Staged temporary sessions — 2026-09-24
 
-**Implemented/tested in source, not deployed. Public temporary login/UI remains
-disabled. No production keys or cookies were issued.**
+**Current status: login/UI and per-key permissions are implemented in source, not
+deployed.** See [2026-09-27 activation](delegated-access-activation.md). The details
+below describe the original staged checkpoint. No production credentials were issued.
 
 ## Binding and validity
 
