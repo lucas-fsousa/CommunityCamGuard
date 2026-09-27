@@ -73,6 +73,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | [Provisioning public errors](provisioning-public-errors.md) | Safe errors, bounded BLE replies and strict enrollment status; remaining payload/log and firmware acceptance tracked |
 | [Driver response/log audit](driver-response-log-audit.md) | Diagnostic/completion contracts, proxy/AAC fixes and privileged raw-read boundary |
 | [Private media config](private-media-config.md) | Owner-only generated credential config preserving Docker file-bind identity; deployment/ownership caveats |
+| [Safe stream diagnostics](safe-stream-diagnostics.md) | One-shot/recurring metadata-only collection, strict browser telemetry, no direct camera probes |
 | [Dashboard session watch](dashboard-session-watch.md) | UI invalidation polling, stale-response guards and audio cleanup; end-to-end validation pending |
 | [Revocable recording delivery](recording-session-delivery.md) | Temporary file/download cancellation with Range support; not deployed, proxy/browser validation pending |
 | [Runtime settings](runtime-settings.md) | Deployed two-field persistence/API/UI, revision conflicts and next-operation semantics |

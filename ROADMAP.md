@@ -468,6 +468,13 @@ passed (83.4 MiB peak, zero swap), Ruff/mypy passed. No live files/processes tou
 Custom UID ownership, symlink migration and controlled backend rollout need review;
 see `docs/internal/private-media-config.md`.
 
+Safe-diagnostics checkpoint (2026-09-27): versioned safe one-shot watcher wrapper
+added, without camera ffprobe/config/API/log dumps (ignored local helper also updated). Watcher omits
+argv and raw errors, bounds stream API input and re-filters event history. Backend
+client telemetry now has an explicit field/stream contract. 27 focused tests passed
+(67.1 MiB peak, zero swap); no live collection/hardware/deployment. Historical support
+bundles remain untouched. See `docs/internal/safe-stream-diagnostics.md`.
+
 ## Milestone M2 — Architecture & code quality (Feature 2)
 
 | Priority | Item | Status |

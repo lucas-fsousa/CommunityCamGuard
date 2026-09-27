@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import signal
 import subprocess
@@ -30,8 +31,15 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
+# Keep this host tool runnable with stdlib Python; the shared contract has no
+# framework imports or runtime side effects.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend.app.media.diagnostic_fields import public_metrics
+
 DEFAULT_CONTAINERS = ("ccg-go2rtc", "ccg-app")
-_RTSP_USERINFO = re.compile(r"(rtsp://)[^\s/@]+@", re.IGNORECASE)
+_STREAM_ID = re.compile(r"^cam_[0-9a-f]{24}(?:_hd|_web)?$")
+_EVENTS = {"waiting", "stalled", "playing", "catchup_start", "catchup_end",
+           "live_edge_jump", "mse_failure", "watchdog_recovery"}
 
 
 def _run(args: list[str], timeout: float = 4.0) -> tuple[int, str]:
@@ -41,8 +49,8 @@ def _run(args: list[str], timeout: float = 4.0) -> tuple[int, str]:
         )
         output = "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part)
         return result.returncode, output
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        return 127, str(exc)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 127, "diagnostic command unavailable or timed out"
 
 
 def _percent(value: str | None) -> float | None:
@@ -70,7 +78,7 @@ def docker_stats(containers: tuple[str, ...]) -> dict[str, dict[str, Any]]:
         "docker", "stats", "--no-stream", "--format", "{{json .}}", *containers,
     ], timeout=8)
     if code != 0:
-        return {"_error": {"message": output[-500:]}}
+        return {"_error": {"message": "docker stats unavailable"}}
     result: dict[str, dict[str, Any]] = {}
     for line in output.splitlines():
         try:
@@ -96,7 +104,7 @@ def docker_states(containers: tuple[str, ...]) -> dict[str, dict[str, Any]]:
     fmt = '{{json .Name}} {{.RestartCount}} {{json .State}}'
     code, output = _run(["docker", "inspect", "--format", fmt, *containers])
     if code != 0:
-        return {"_error": {"message": output[-500:]}}
+        return {"_error": {"message": "docker state unavailable"}}
     result: dict[str, dict[str, Any]] = {}
     for line in output.splitlines():
         try:
@@ -118,18 +126,20 @@ def docker_states(containers: tuple[str, ...]) -> dict[str, dict[str, Any]]:
 
 def docker_processes(container: str) -> list[dict[str, Any]]:
     code, output = _run([
-        "docker", "top", container, "-eo", "pid,ppid,state,pcpu,pmem,rss,etime,args",
+        "docker", "top", container, "-eo", "pid,ppid,state,pcpu,pmem,rss,etime,comm",
     ])
     if code != 0:
-        return [{"error": output[-500:]}]
+        return [{"error": "docker process sample unavailable"}]
     rows = []
     for line in output.splitlines()[1:]:
         columns = line.split(None, 7)
         if len(columns) != 8:
             continue
         pid, ppid, state, cpu, memory, rss, elapsed, command = columns
-        # Keep commands useful for distinguishing recorder/transcode, but never persist URL userinfo.
-        command = _RTSP_USERINFO.sub(r"\1***@", command)
+        # No argv collection: credentials can occur in URLs, query strings or flags.
+        # Keep only known executable labels; even process names can be user-controlled.
+        command = command.split()[0].rsplit("/", 1)[-1]
+        command = command if command in {"ffmpeg", "go2rtc", "python", "python3", "uvicorn"} else "other"
         rows.append({
             "pid": int(pid), "ppid": int(ppid), "state": state,
             "cpu_percent": _percent(cpu), "memory_percent": _percent(memory),
@@ -141,7 +151,7 @@ def docker_processes(container: str) -> list[dict[str, Any]]:
 
 def docker_client_events(container: str, since: str) -> list[dict[str, Any]]:
     """Extract structured browser events already emitted by the app logger."""
-    code, output = _run(["docker", "logs", "--since", since, container], timeout=5)
+    code, output = _run(["docker", "logs", "--tail", "200", "--since", since, container], timeout=5)
     if code != 0:
         return []
     events = []
@@ -150,7 +160,25 @@ def docker_client_events(container: str, since: str) -> list[dict[str, Any]]:
         if marker not in line:
             continue
         try:
-            events.append(json.loads(line.split(marker, 1)[1]))
+            event = json.loads(line.split(marker, 1)[1])
+            if not isinstance(event, dict) or event.get("event") not in _EVENTS:
+                continue
+            camera = event.get("camera_id")
+            stream = event.get("stream")
+            if not isinstance(camera, str) or not re.fullmatch(r"cam_[0-9a-f]{24}", camera):
+                continue
+            if stream not in (camera, camera + "_hd", camera + "_web"):
+                continue
+            metrics = event.get("metrics")
+            safe = {"event": event["event"], "camera_id": camera, "stream": stream,
+                    "metrics": public_metrics(metrics) if isinstance(metrics, dict) else {}}
+            if isinstance(event.get("at"), str):
+                safe["at"] = datetime.fromisoformat(event["at"]).isoformat()
+            server = event.get("server")
+            if isinstance(server, dict):
+                safe["server"] = {key: server[key] for key in ("video_packets", "consumers")
+                                  if type(server.get(key)) is int and 0 <= server[key] <= 10**15}
+            events.append(safe)
         except (ValueError, TypeError):
             continue
     return events
@@ -159,18 +187,30 @@ def docker_client_events(container: str, since: str) -> list[dict[str, Any]]:
 def go2rtc_streams(api: str) -> dict[str, dict[str, Any]]:
     try:
         with urllib.request.urlopen(api.rstrip("/") + "/api/streams", timeout=3) as response:
-            data = json.loads(response.read())
-    except (urllib.error.URLError, OSError, ValueError) as exc:
-        return {"_error": {"message": str(exc)}}
+            raw = response.read(2 * 1024 * 1024 + 1)
+            if len(raw) > 2 * 1024 * 1024:
+                raise ValueError("stream counter response too large")
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                raise ValueError("invalid stream counter response")
+    except (urllib.error.URLError, OSError, ValueError):
+        return {"_error": {"message": "go2rtc stream counters unavailable"}}
     result = {}
     for stream_id, stream in (data or {}).items():
+        if not _STREAM_ID.fullmatch(stream_id) or not isinstance(stream, dict):
+            continue
         producers = stream.get("producers") or []
         consumers = stream.get("consumers") or []
+        if not isinstance(producers, list) or not isinstance(consumers, list):
+            continue
         video_packets = sum(
             receiver.get("packets", 0)
             for producer in producers
+            if isinstance(producer, dict) and isinstance(producer.get("receivers"), list)
             for receiver in (producer.get("receivers") or [])
-            if (receiver.get("codec") or {}).get("codec_type") == "video"
+            if isinstance(receiver, dict) and isinstance(receiver.get("codec"), dict)
+            and receiver["codec"].get("codec_type") == "video"
+            and type(receiver.get("packets")) is int and 0 <= receiver["packets"] <= 10**15
         )
         result[stream_id] = {
             "video_packets": video_packets,
@@ -272,6 +312,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    os.umask(0o077)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     file_log = logging.getLogger("live_watcher_jsonl")
     file_log.setLevel(logging.INFO)

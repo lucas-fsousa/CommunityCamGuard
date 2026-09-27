@@ -219,6 +219,10 @@ driver control/support decisions still use the unchanged internal evidence.
 Generated go2rtc configuration is [written owner-only](docs/internal/private-media-config.md)
 while preserving its Docker file mount. Custom deployments with different service
 UIDs must review ownership before rollout; existing live files are not yet migrated.
+For a [safe diagnostic snapshot](docs/internal/safe-stream-diagnostics.md), run
+`bash scripts/diagnose_streams_safe.sh`; it collects watcher metadata without opening
+extra camera streams or dumping credentials/configuration. Continuous sampling uses
+`scripts/watch_live_streams.py`; historical bundles are not automatically sanitized.
 The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
 browser background throttling and remaining server-side rollout gates are documented.
 Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)

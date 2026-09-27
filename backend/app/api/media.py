@@ -19,6 +19,7 @@ from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..media import quality
+from ..media.diagnostic_fields import public_metrics
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
@@ -87,7 +88,10 @@ def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
     camera = resolve_camera(reference) if reference else None
     if camera is None:
         raise HTTPException(status_code=422, detail="configured camera_id is required")
-    event = body.model_dump(exclude={"mac"})
+    if body.stream not in {camera.camera_id, camera.camera_id + "_hd", camera.camera_id + "_web"}:
+        raise HTTPException(status_code=422, detail="configured camera stream is required")
+    event = body.model_dump(exclude={"mac", "metrics"})
+    event["metrics"] = public_metrics(body.metrics)
     event["camera_id"] = camera.camera_id
     event["at"] = datetime.now(UTC).isoformat(timespec="milliseconds")
     media = getattr(request.app.state, "media", None)
@@ -95,8 +99,9 @@ def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
         activity = media.stream_activity().get(body.stream) if media else None
     except Exception:  # diagnostics must never interfere with live playback
         activity = None
-    if activity is not None:
-        event["server"] = activity
+    if isinstance(activity, dict):
+        event["server"] = {key: activity[key] for key in ("video_packets", "consumers")
+                           if type(activity.get(key)) is int and 0 <= activity[key] <= 10**15}
     encoded = json.dumps(event, separators=(",", ":"), sort_keys=True)
     if len(encoded) > 8192:
         raise HTTPException(status_code=413, detail="media event too large")

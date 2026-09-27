@@ -11,7 +11,7 @@ def test_human_bytes_and_percent_parsing():
     assert watcher._percent("unknown") is None
 
 
-def test_docker_top_redacts_rtsp_credentials(monkeypatch):
+def test_docker_top_omits_arguments_and_credentials(monkeypatch):
     output = (
         "PID PPID S %CPU %MEM RSS ELAPSED COMMAND\n"
         "42 1 S 87.1 2.5 149472 10:21 ffmpeg -i rtsp://admin:secret@10.0.0.5/onvif1"
@@ -19,7 +19,7 @@ def test_docker_top_redacts_rtsp_credentials(monkeypatch):
     monkeypatch.setattr(watcher, "_run", lambda *_args, **_kwargs: (0, output))
     process = watcher.docker_processes("ccg-go2rtc")[0]
     assert "secret" not in process["command"]
-    assert "rtsp://***@" in process["command"]
+    assert process["command"] == "ffmpeg"
 
 
 def test_three_stationary_packet_samples_raise_stream_anomaly(monkeypatch):

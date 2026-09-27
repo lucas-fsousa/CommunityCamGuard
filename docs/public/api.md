@@ -561,6 +561,11 @@ which representation the player uses. See the [playback guide](recordings.md).
 
 ## Errors
 
+Staged telemetry contract: `/api/media/client-event` requires a stream ID belonging
+to the configured camera. Only known numeric/boolean metrics and enumerated state
+labels are retained. Raw error text becomes `error_present`; unknown metric fields
+are dropped. Server activity contributes only validated packet/consumer counts.
+
 Standard HTTP status codes with a JSON `{"detail": "..."}` body:
 
 Staged backend change: framework HTTP request-validation failures return 422 with

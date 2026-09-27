@@ -91,11 +91,11 @@ def test_media_client_event_captures_server_counter_snapshot():
     registry.init_db()
     camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
     media = SimpleNamespace(stream_activity=lambda: {
-        "cam_x_hd": {"video_packets": 321, "consumers": 1},
+        camera.camera_id + "_hd": {"video_packets": 321, "consumers": 1},
     })
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=media)))
     body = media_routes.MediaClientEventIn(
-        event="catchup_start", camera_id=camera.camera_id, stream="cam_x_hd",
+        event="catchup_start", camera_id=camera.camera_id, stream=camera.camera_id + "_hd",
         metrics={"bufferedGap": 2.4, "playbackRate": 1.25, "transport": "mse"},
     )
     assert media_routes.media_client_event(body, req) == {"ok": True}
@@ -112,7 +112,7 @@ def test_media_client_event_accepts_legacy_mac_but_stores_public_id():
     registry.init_db()
     camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=None)))
-    body = media_routes.MediaClientEventIn(event="playing", mac=camera.mac, stream="cam_x_hd")
+    body = media_routes.MediaClientEventIn(event="playing", mac=camera.mac, stream=camera.camera_id + "_hd")
 
     assert media_routes.media_client_event(body, req) == {"ok": True}
     assert media_routes.media_client_events()[-1]["camera_id"] == camera.camera_id
