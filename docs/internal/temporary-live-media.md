@@ -1,7 +1,7 @@
 # Staged temporary live media — 2026-09-25
 
-Implemented in source, not deployed. [Delegated login activation](delegated-access-activation.md)
-now checks the live grant; intercom has its own grant and guarded transport.
+Deployed locally with [delegated login activation](delegated-access-activation.md).
+The bridge checks the live grant; intercom has its own grant and guarded transport.
 Primary/legacy media behavior is unchanged. Earlier staging notes below are historical.
 
 `api/temporary_media.py` owns a separate restricted bridge. Only a single `src`
@@ -35,6 +35,14 @@ cannot be recalled. No credentials are logged.
 sessions, using an isolated database and fake upstream under a 512 MiB address-space
 cap. No camera command, production stream/key or container restart was involved.
 
-Remaining: final ordinary-control permissions, login abuse resistance, cookie/proxy/
-CSRF review, real multi-tab/browser/proxy validation, then public login/UI activation
-and deployment. See [activation gates](temporary-access-keys.md).
+2026-09-28 multi-session regression: two separate cookies for one key opened MSE
+sockets alongside a third cookie for an independent non-expiring key. Revocation
+and exact expiry each closed both affected sockets with 1008; the independent
+socket delivered another frame afterward. All three upstreams closed on cleanup.
+The 34-test media suite passed against isolated ASGI/SQLite and fake upstreams in
+4.83 seconds, 99.9 MiB peak and zero swap. No production login, stream or key used.
+
+Per-control permissions, login pacing and shared origin policy are implemented;
+deployment/HTTP lifecycle evidence is linked above. Remaining: full-dashboard
+multi-tab/browser, physical mobile and HTTPS-proxy interruption validation. This
+ASGI result does not certify an external reverse proxy or physical browser.

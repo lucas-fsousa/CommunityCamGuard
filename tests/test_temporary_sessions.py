@@ -1,4 +1,4 @@
-"""Staged sessions: fresh persistent validity, limited HTTP policy, no login/stream activation."""
+"""Persistent delegated validity and default-deny HTTP policy; isolated storage only."""
 
 import sqlite3
 from datetime import UTC, datetime, timedelta

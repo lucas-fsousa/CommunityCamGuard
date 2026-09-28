@@ -85,6 +85,64 @@ def test_registered_source_still_requires_live_permission(env):
     assert caught.value.code == 1008 and not connections
 
 
+@pytest.mark.parametrize("invalidation", ["revoke", "expire"])
+def test_two_open_sessions_end_together_without_stopping_another_key(env, monkeypatch, invalidation):
+    client, cam, key, _connections, _sent, _closed = env
+    now = [datetime.now(UTC)]
+    monkeypatch.setattr(access_keys, "_now", lambda: now[0])
+    other = access_keys.create(access_keys.CreateKey(label="Independent", expires_at=None, permissions=("live",)))
+    first_token = auth.issue_temporary_token(key.secret)
+    second_token = auth.issue_temporary_token(key.secret)
+    other_token = auth.issue_temporary_token(other.secret)
+    channels, released = [], []
+
+    class Upstream:
+        async def __aenter__(self):
+            self.pulse = asyncio.Event()
+            self.loop = asyncio.get_running_loop()
+            channels.append(self)
+            return self
+
+        async def __aexit__(self, *args):
+            released.append(self)
+
+        async def send(self, value):
+            assert value == REQUEST
+
+        def __aiter__(self):
+            return self.frames()
+
+        async def frames(self):
+            yield b"initial"
+            await self.pulse.wait()
+            yield b"independent channel still live"
+            await asyncio.Future()
+
+    monkeypatch.setattr(temporary_media.websockets, "connect", lambda *args, **kwargs: Upstream())
+    url = f"/api/go2rtc/ws?src={cam.camera_id}_hd"
+
+    def connect(token):
+        return client.websocket_connect(url, headers={"Cookie": f"{auth.COOKIE_NAME}={token}"})
+
+    with connect(first_token) as first, connect(second_token) as second, connect(other_token) as independent:
+        for ws in (first, second, independent):
+            ws.send_text(REQUEST)
+            assert ws.receive_bytes() == b"initial"
+        if invalidation == "revoke":
+            access_keys.revoke(key.metadata.id)
+        else:
+            now[0] = key.metadata.expires_at
+        for ws in (first, second):
+            with pytest.raises(WebSocketDisconnect) as caught:
+                ws.receive_bytes()
+            assert caught.value.code == 1008
+        survivor = channels[-1]
+        survivor.loop.call_soon_threadsafe(survivor.pulse.set)
+        assert independent.receive_bytes() == b"independent channel still live"
+        assert auth.verify_token(other_token)
+    assert len(channels) == 3 and set(released) == set(channels)
+
+
 @pytest.mark.parametrize("query", [
     "src=rtsp://192.0.2.1/private", "src=ffmpeg:arbitrary", "src=http://example.invalid",
     "src=cam_" + "f" * 24 + "_hd", "src=", "src=synthetic", "src={id}",
