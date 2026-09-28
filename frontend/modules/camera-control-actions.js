@@ -229,7 +229,7 @@ export function controlWidgets(cam, status) {
     select.addEventListener("click", (event) => event.stopPropagation());
     select.addEventListener("change", async (event) => {
       event.stopPropagation();
-      if (!select.value) return;
+      if (!select.isConnected || select.disabled || !select.value) return;
       const selected = select.value;
       if (confirmFor && !confirmFor(selected)) {
         select.value = confirmed;
@@ -242,6 +242,7 @@ export function controlWidgets(cam, status) {
           method: "PUT",
           body: JSON.stringify({ value: valueFor(selected) }),
         });
+        if (!select.isConnected) return;
         if (result?.verified !== true || result.value !== valueFor(selected)) {
           throw new Error(t("control.unconfirmed"));
         }
@@ -249,6 +250,7 @@ export function controlWidgets(cam, status) {
         confirmed = available[controlKey]?.kind === "action" ? "" : selected;
         completed(status, success || t("control.applied"));
       } catch (error) {
+        if (!select.isConnected) return;
         confirmed = "";
         status.classList.add("error");
         completed(status, t("control.failed", { msg: error.message }), true);

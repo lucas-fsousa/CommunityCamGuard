@@ -33,6 +33,11 @@ the session: all overlays and background inertness cleared. Two mocked reads,
 zero network requests/writes, 3.29 seconds, 279.6 MiB peak and zero swap. Full
 proxy-triggered expiry and physical mobile acceptance remain separate.
 
+Ordinary selectors also reject duplicate changes while a request is pending and
+ignore late success/error feedback after their panel disappears. Disconnected
+selectors cannot issue another write. Node tests cover both late outcomes and
+duplicate dispatch; closing a panel still does not undo an accepted command.
+
 ## Directional pad and drag — 2026-09-14
 
 The finite-step PTZ UI is now a cross-shaped pad over the lower-left video area, outside the

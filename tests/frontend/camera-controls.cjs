@@ -189,6 +189,8 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(status.classList.contains("applying"), true);
   assert.equal(status.textContent, "control.applying");
   assert.equal(volume.disabled, true);
+  await volume.dispatch("change");
+  assert.equal(requests.length, 1); // No second write while this selector is busy.
   complete({ verified: true, value: 50 });
   await applying;
   pending = null;
@@ -334,6 +336,24 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(navigated, true);
   assert.equal(app.inert, false);
   assert.equal(shell.isConnected, false);
+  for (const rejects of [false, true]) {
+    await trigger.click();
+    const currentShell = document.body.children.at(-1);
+    const control = walk(currentShell).find(item => item.dataset.controlKey === "speaker_volume");
+    control.value = "50";
+    let finish;
+    pending = new Promise((resolve, reject) => {
+      finish = () => rejects ? reject(new Error("late selector error")) : resolve({ verified: true, value: 50 });
+    });
+    const writing = control.dispatch("change");
+    await walk(currentShell).find(item => item.textContent === "×").click();
+    const notificationCount = notifications.length, requestCount = requests.length;
+    finish(); await writing;
+    assert.equal(notifications.length, notificationCount);
+    control.value = "50"; await control.dispatch("change");
+    assert.equal(requests.length, requestCount);
+  }
+  pending = null;
   console.log("Camera panel contracts passed");
   const finitePtzControls = load("step-ptz.js", { el, api, t }, "finitePtzControls");
   const arrows = finitePtzControls(cam);

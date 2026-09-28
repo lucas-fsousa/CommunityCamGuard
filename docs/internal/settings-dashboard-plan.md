@@ -3,8 +3,9 @@
 ## Current behavior, not a new settings feature
 
 **2026-09-27 update:** [delegated access](delegated-access-activation.md) now implements
-the owner's optional-expiry/per-feature policy, modal and login/channel checks in
-source. Deployment/browser acceptance remain pending; the absence notes below
+the owner's optional-expiry/per-feature policy, modal and login/channel checks.
+Local deployment/HTTP lifecycle and isolated desktop/narrow Chromium checks passed;
+physical mobile/full-page/proxy acceptance remain pending. The absence notes below
 belong to the original inventory checkpoint.
 
 **Implementation update:** [two-field runtime persistence](runtime-settings.md) and
@@ -26,11 +27,12 @@ which only saves values would falsely report applied changes.
 
 ## Proposed exposure and application
 
-All classifications below are **future candidates**, not currently editable fields.
+Except for the first row's two deployed fields, classifications below are future
+candidates, not currently editable fields.
 
 | Classification | Fields | Application/risks |
 | --- | --- | --- |
-| Next operation candidates | `grid_hd_max_cameras`, `playback_cache_mb` | Grid metadata is read by the API, but open clients need an explicit refresh/event; cache cap is read on eviction/warm checks. Lowering a cap evicts only derived media, not originals. `0` means unbounded cache, not disabled playback. Neither is live-editable today. |
+| Implemented next-operation settings | `grid_hd_max_cameras`, `playback_cache_mb` | Persisted revisioned overrides via Settings; grid changes apply when returning to live view (reload other tabs), cache cap on its next policy check. Lowering a cap evicts only derived media, not originals. Cache `0` means unbounded, not disabled playback. |
 | Recorder/retention restart candidates | `segment_seconds`, `recording_retention_days` | Instances snapshot values. Segment length changes require supervised recorder replacement. Reducing retention can delete originals: require explicit impact preview/confirmation and never run purge as a save-validation test. `0` means keep forever. |
 | Media regeneration/restart candidates | `live_fps`, `live_quality` | go2rtc configuration encodes these settings; safe regeneration/recovery is required, not only updating the UI. Changes affect existing consumers and resource usage. Per-camera quality choices remain separate. |
 | Warmer restart candidate | `playback_pretranscode` | Constructor snapshots enabled state; starts/stops a worker. Must stay opt-in and share encoder admission, not create an independent conversion loop. |
@@ -73,7 +75,9 @@ claim that the existing environment parser enforces it.
 and tested, now deployed. The paragraphs below describe the inventory-time
 baseline and requirements; primary/legacy parsing and the management dependency
 are now covered by that follow-up. The two-field settings endpoints/view are deployed;
-temporary-key management remains absent.
+temporary-key management and delegated login are also deployed. The historical
+baseline below is not a description of current authorization behavior; see the
+activation document for current implementation and remaining acceptance.
 
 Current cookies are signed, seven-day **bearer credentials**, not safe to disclose.
 The cookie payload has no session identity, key identity or role; verification
