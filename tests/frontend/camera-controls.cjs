@@ -293,6 +293,38 @@ const cameraControls = load("camera-controls.js", {
       await walk(overlay).find((node) => node.textContent === "×").click();
     }
   }
+  // A session ending (or X) must remove nested configuration dialogs and make
+  // late completion/errors silent. Never replay a write from detached controls.
+  for (const kind of ["choice", "schedule"]) {
+    for (const ending of ["session", "close"]) {
+      for (const rejects of [false, true]) {
+        const cleanups = new Set();
+        const open = load("camera-control-actions.js", { el, api, t, onSessionEnd: callback => {
+          cleanups.add(callback); return () => cleanups.delete(callback);
+        } }, kind === "choice" ? "openDynamicChoice" : "openProtectionSchedule");
+        pending = Promise.resolve(kind === "choice" ? { options: [{ value: "tone", label: "Tone" }] } : { value: schedule });
+        if (kind === "choice") await open(cam, "alarm_voice", feedback, dialogTrigger, strings);
+        else await open(cam, feedback, dialogTrigger);
+        const overlay = document.body.children.at(-1);
+        assert.equal(cleanups.size, 1);
+        if (kind === "choice") walk(overlay).find(node => node.tagName === "select").value = "tone";
+        const submit = walk(overlay).find(node => node.textContent === (kind === "choice" ? "apply" : "control.scheduleSave"));
+        let finish;
+        pending = new Promise((resolve, reject) => {
+          finish = () => rejects ? reject(new Error("late")) : resolve({ verified: true, value: kind === "choice" ? "tone" : schedule });
+        });
+        const writing = submit.click();
+        if (ending === "session") for (const cleanup of [...cleanups]) cleanup();
+        else await walk(overlay).find(node => node.textContent === "×").click();
+        assert.equal(overlay.isConnected, false); assert.equal(cleanups.size, 0);
+        const count = notifications.length, requestCount = requests.length;
+        finish(); await writing;
+        assert.equal(notifications.length, count);
+        await submit.dispatch("click");
+        assert.equal(requests.length, requestCount);
+      }
+    }
+  }
   dialogTrigger.remove();
   pending = null;
   nav.addEventListener("click", () => { navigated = true; });

@@ -82,10 +82,31 @@ try {
   endSession(); await tick();
   check(!document.querySelector('.camera-panel') && !stage.inert, 'Session end retained modal');
   check(requests === 0, 'Fixture sent a network request');
+  // Explicit mock reads only; neither selection nor a schedule is ever applied.
+  let mockReads = 0;
+  window.fetch = async (url, options = {}) => {
+    check(!options.method || options.method === 'GET', 'Unexpected write');
+    let body;
+    if (url === '/api/cameras/synthetic/controls/alarm_voice/options') body = {options: [{value: 'tone', label: 'Synthetic tone'}]};
+    else if (url === '/api/cameras/synthetic/controls/smart_protection_schedule') body = {value: {start: '08:00', end: '18:00', weekdays: ['mon']}};
+    else { requests++; throw new Error('Unexpected request'); }
+    mockReads++;
+    return new Response(JSON.stringify(body), {headers: {'Content-Type': 'application/json'}});
+  };
+  camera.controls.alarm_voice = {writable: true, dynamic_options: true};
+  camera.controls.smart_protection_schedule = {writable: true};
+  for (const key of ['alarm_voice', 'smart_protection_schedule']) {
+    state.authentication = 'primary'; state.cameras = [camera]; trigger.click(); await tick();
+    document.querySelector(`[data-control-key="${key}"]`).click(); await tick(); await tick();
+    check(document.querySelector('.modal'), 'Configuration dialog did not open');
+    endSession(); await tick();
+    check(!document.querySelector('.modal, .camera-panel') && !stage.inert, 'Configuration survived session end');
+  }
+  check(mockReads === 2 && requests === 0, 'Unexpected configuration traffic');
   state.authentication = 'primary'; state.cameras = [camera]; trigger.click(); await tick(); panel = layout();
   window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], requests,
     panelWidth: Math.round(panel.getBoundingClientRect().width), permissions: true, nestedFocus: true,
-    sessionCleanup: true, toastDismissal: true};
+    sessionCleanup: true, toastDismissal: true, configurationCleanup: true, mockReads};
 } catch (error) { window.smokeResult = {ok: false, error: error.message}; }
 </script>
 </html>

@@ -1,5 +1,5 @@
 import { t } from "ccg/i18n";
-import { api, el } from "ccg/core";
+import { api, el, onSessionEnd } from "ccg/core";
 import { notify } from "ccg/notifications";
 
 // Camera controls are grouped behind one compact menu. Nothing is read automatically when a
@@ -7,6 +7,18 @@ import { notify } from "ccg/notifications";
 // cameras. Each option is an explicit target state; the backend performs its own preflight and
 // skips the write when the camera is already in that state.
 const PROTECTION_WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+function mountDialog(overlay, close) {
+  let alive = true;
+  const dismiss = () => {
+    if (!alive) return;
+    alive = false; unregister(); overlay.remove();
+  };
+  const unregister = onSessionEnd(dismiss);
+  close.addEventListener("click", dismiss);
+  document.body.append(overlay);
+  return { dismiss, active: () => alive && overlay.isConnected };
+}
 
 function applying(status) {
   status.classList.remove("error");
@@ -67,9 +79,9 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
       select,
       el("div", { className: "schedule-actions" }, modalStatus, apply));
     const overlay = el("div", { className: "modal" }, card);
-    close.addEventListener("click", () => overlay.remove());
+    const lifecycle = mountDialog(overlay, close);
     apply.addEventListener("click", async () => {
-      if (apply.disabled) return;
+      if (!lifecycle.active() || apply.disabled) return;
       if (!select.value) {
         modalStatus.classList.add("error");
         modalStatus.textContent = strings.required;
@@ -84,13 +96,15 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
           `/cameras/${encodeURIComponent(cam.id)}/controls/${encodeURIComponent(controlKey)}`,
           { method: "PUT", body: JSON.stringify({ value: requested }) },
         );
+        if (!lifecycle.active()) return;
         if (result?.verified !== true || result.value !== requested) {
           throw new Error(t("control.unconfirmed"));
         }
         status.classList.remove("error");
         completed(status, t("control.applied"));
-        overlay.remove();
+        lifecycle.dismiss();
       } catch (error) {
+        if (!lifecycle.active()) return;
         modalStatus.classList.add("error");
         completed(modalStatus, t("control.failed", { msg: error.message }), true);
       } finally {
@@ -99,9 +113,9 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
         select.disabled = false;
       }
     });
-    document.body.append(overlay);
     status.textContent = "";
   } catch (error) {
+    if (!trigger.isConnected) return;
     status.classList.add("error");
     completed(status, t("control.failed", { msg: error.message }), true);
   } finally {
@@ -143,9 +157,9 @@ async function openProtectionSchedule(cam, status, trigger) {
       el("div", { className: "schedule-days" }, ...dayInputs.map((item) => item.label)),
       el("div", { className: "schedule-actions" }, modalStatus, save));
     const overlay = el("div", { className: "modal" }, card);
-    close.addEventListener("click", () => overlay.remove());
+    const lifecycle = mountDialog(overlay, close);
     save.addEventListener("click", async () => {
-      if (save.disabled) return;
+      if (!lifecycle.active() || save.disabled) return;
       const weekdays = dayInputs.filter((item) => item.input.checked).map((item) => item.day);
       if (!start.value || !end.value || !weekdays.length) {
         modalStatus.classList.add("error");
@@ -162,6 +176,7 @@ async function openProtectionSchedule(cam, status, trigger) {
           `/cameras/${encodeURIComponent(cam.id)}/controls/smart_protection_schedule`,
           { method: "PUT", body: JSON.stringify({ value: requested }) },
         );
+        if (!lifecycle.active()) return;
         const confirmed = result?.value;
         if (result?.verified !== true || confirmed?.start !== requested.start
             || confirmed?.end !== requested.end || !Array.isArray(confirmed?.weekdays)
@@ -172,8 +187,9 @@ async function openProtectionSchedule(cam, status, trigger) {
         }
         status.classList.remove("error");
         completed(status, t("control.applied"));
-        overlay.remove();
+        lifecycle.dismiss();
       } catch (error) {
+        if (!lifecycle.active()) return;
         modalStatus.classList.add("error");
         completed(modalStatus, t("control.failed", { msg: error.message }), true);
       } finally {
@@ -182,9 +198,9 @@ async function openProtectionSchedule(cam, status, trigger) {
         inputs.forEach((input) => { input.disabled = false; });
       }
     });
-    document.body.append(overlay);
     status.textContent = "";
   } catch (error) {
+    if (!trigger.isConnected) return;
     status.classList.add("error");
     completed(status, t("control.failed", { msg: error.message }), true);
   } finally {

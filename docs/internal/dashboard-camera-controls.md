@@ -19,6 +19,20 @@ zero-swap, 75%-CPU, 128-task and 65-second limits. Screenshots remain ignored in
 The dated sections below preserve historical PTZ rollout scope; current driver
 selection and shared-pad behavior are documented in `ptz-model-selection.md`.
 
+### Session-bound nested configuration dialogs
+
+The review also found that siren-selection and protection-schedule dialogs lacked
+the session-end registration already present in audio dialogs. Both now register
+and unregister their lifecycle, close on session end and ignore late success/error
+responses after X or logout. Detached submit controls cannot issue another write.
+This does not cancel or undo an already accepted camera command.
+
+Eight Node race cases cover both dialogs × close/logout × late success/failure.
+Real Chromium at 375×667 also opened each dialog with a synthetic read and ended
+the session: all overlays and background inertness cleared. Two mocked reads,
+zero network requests/writes, 3.29 seconds, 279.6 MiB peak and zero swap. Full
+proxy-triggered expiry and physical mobile acceptance remain separate.
+
 ## Directional pad and drag — 2026-09-14
 
 The finite-step PTZ UI is now a cross-shaped pad over the lower-left video area, outside the
