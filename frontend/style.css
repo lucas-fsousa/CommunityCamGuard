@@ -295,11 +295,13 @@ header {
   flex-direction: column; min-height: 0; background: var(--panel); color: var(--text);
   border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 70px rgba(0,0,0,.4); }
 .camera-panel-head, .camera-panel-hint, .camera-panel-status { flex-shrink: 0; }
-.camera-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+.camera-panel-head { display: flex; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: 16px;
   padding: 20px 20px 12px; }
-.camera-panel-head h2 { margin: 4px 0 0; font-size: 20px; overflow-wrap: anywhere; }
+.camera-panel-head > div { min-width: 0; }
+.camera-panel-head h2 { margin: 4px 0 0; font-size: 20px; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .camera-panel-head small, .camera-panel-hint { color: var(--muted); font-size: 12px; }
-.camera-panel-head .icon-btn { font-size: 24px; min-width: 44px; min-height: 44px; }
+.camera-panel-head .icon-btn { flex: 0 0 44px; font-size: 24px; min-width: 44px; min-height: 44px; }
 .camera-panel-hint { margin: 0; padding: 0 20px 16px; line-height: 1.5; border-bottom: 1px solid var(--line); }
 .camera-panel-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 20px 20px; flex: 1; min-height: 0; }
 .control-section { padding: 18px 0; border-bottom: 1px solid var(--line); }

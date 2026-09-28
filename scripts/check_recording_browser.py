@@ -25,6 +25,9 @@ COMPONENT_ASSETS = {
     "recordings.js": "modules/recordings.js", "recording-playback.js": "modules/recording-playback.js",
     "settings.js": "modules/settings.js", "access-keys.js": "modules/access-keys.js",
     "access-key-dialog.js": "modules/access-key-dialog.js",
+    "camera-controls.js": "modules/camera-controls.js", "control-actions.js": "modules/camera-control-actions.js",
+    "audio-message.js": "modules/audio-message.js", "push-to-talk.js": "modules/push-to-talk.js",
+    "session-access.js": "modules/session-access.js", "notifications.js": "modules/notifications.js",
 }
 
 
@@ -35,6 +38,7 @@ def main():
     parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
     parser.add_argument("--recordings", action="store_true", help="Check isolated recordings loading overlay")
     parser.add_argument("--access-keys", action="store_true", help="Check delegated-access modal with synthetic data")
+    parser.add_argument("--camera-controls", action="store_true", help="Check controls and toasts without camera traffic")
     parser.add_argument("--autoplay-block", action="store_true", help="Require a gesture for audible fixture playback")
     parser.add_argument("--seek-seconds", type=float, default=3, help="Seek position in the bounded fixture")
     parser.add_argument("--throttle-kib", type=int, default=0, help="Bound fixture response rate to test seeking before full download")
@@ -43,8 +47,8 @@ def main():
     parser.add_argument("--screenshot", type=Path)
     args = parser.parse_args()
     fixture = args.fixture.resolve() if args.fixture else None
-    component = args.settings or args.recordings or args.access_keys
-    if sum((args.settings, args.recordings, args.access_keys)) > 1:
+    component = args.settings or args.recordings or args.access_keys or args.camera_controls
+    if sum((args.settings, args.recordings, args.access_keys, args.camera_controls)) > 1:
         parser.error("choose one component")
     if component and args.autoplay_block:
         parser.error("autoplay check requires a video fixture, not a component")
@@ -66,6 +70,8 @@ def main():
         page_name = "settings-browser.html" if args.settings else "recordings-overlay-browser.html"
         if args.access_keys:
             page_name = "access-keys-browser.html"
+        if args.camera_controls:
+            page_name = "camera-controls-browser.html"
         assets = {"/": (root / "tests/frontend" / page_name, "text/html")}
         for name, path in COMPONENT_ASSETS.items():
             assets["/" + name] = (root / "frontend" / path, "text/css" if name.endswith("css") else "text/javascript")

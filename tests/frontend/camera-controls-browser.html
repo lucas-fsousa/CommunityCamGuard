@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isolated camera controls: no camera or microphone access</title>
+<link rel="stylesheet" href="/style.css">
+<script>
+window.addEventListener('error', () => { window.smokeResult = {ok: false, error: 'Fixture script error'}; });
+window.addEventListener('unhandledrejection', () => { window.smokeResult = {ok: false, error: 'Unhandled fixture rejection'}; });
+</script>
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/control-actions":"/control-actions.js","ccg/audio-message":"/audio-message.js","ccg/push-to-talk":"/push-to-talk.js","ccg/session-access":"/session-access.js","ccg/notifications":"/notifications.js"}}</script>
+<main id="stage"></main>
+<script type="module">
+import { state, endSession } from '/core.js';
+import { cameraControls } from '/camera-controls.js';
+import { notify } from '/notifications.js';
+import { setLang, t } from '/i18n.js';
+setLang('pt-BR');
+let requests = 0;
+window.fetch = async () => { requests++; throw new Error('No network allowed in control layout fixture'); };
+const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
+const check = (condition, message) => { if (!condition) throw new Error(message); };
+const stage = document.querySelector('#stage');
+const camera = {id: 'synthetic', name: 'Câmera de teste — corredor e entrada principal',
+  audio_messages: true, audio_streams: true, controls: {
+    orientation: {writable: true, options: ['normal', 'inverted']},
+    night_vision: {writable: true, options: ['automatic', 'daytime', 'night']},
+    speaker_volume: {writable: true, options: ['0', '25', '50', '75', '100']},
+  }};
+const trigger = cameraControls(camera);
+stage.append(trigger);
+function layout() {
+  const panel = document.querySelector('.camera-panel');
+  const box = panel.getBoundingClientRect();
+  check(box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight,
+    'Panel escapes viewport');
+  check(Math.abs(box.left + box.width / 2 - document.documentElement.clientWidth / 2) < 2, 'Panel not centered');
+  check(panel.scrollWidth <= panel.clientWidth && document.documentElement.scrollWidth <= innerWidth, 'Horizontal overflow');
+  const body = panel.querySelector('.camera-panel-body');
+  check(body.scrollWidth <= body.clientWidth && body.clientHeight > 80, 'Unusable panel body');
+  const heading = panel.querySelector('h2').getBoundingClientRect();
+  const closeBox = panel.querySelector('.camera-panel-head button').getBoundingClientRect();
+  check(closeBox.left >= heading.right && closeBox.top <= heading.bottom, 'Close wrapped below title');
+  check(heading.height < 65, 'Title consumes too much vertical space');
+  return panel;
+}
+try {
+  state.authentication = 'primary'; state.cameras = [camera];
+  document.body.style.overflow = 'auto';
+  trigger.click(); await tick();
+  let panel = layout();
+  check(requests === 0, 'Opening panel made a request');
+  check(stage.inert && document.body.style.overflow === 'hidden', 'Background not locked');
+  const close = panel.querySelector('.camera-panel-head button');
+  check(document.activeElement === close, 'Close not initially focused');
+  document.querySelector('.camera-panel-shell').click(); check(panel.isConnected, 'Backdrop dismissed panel');
+  const body = panel.querySelector('.camera-panel-body'); body.scrollTop = body.scrollHeight; await tick();
+  check(close.getBoundingClientRect().bottom < body.getBoundingClientRect().top, 'Header moved during scroll');
+  const anchor = panel.querySelector('.camera-control-status');
+  notify('Teste de notificação: alteração confirmada, sem comando real.', {anchor}); await tick();
+  const toast = panel.querySelector('.toast');
+  const toastBox = toast.getBoundingClientRect();
+  check(toastBox.left >= 0 && toastBox.right <= innerWidth && toastBox.bottom <= innerHeight, 'Toast escapes viewport');
+  toast.querySelector('button').click(); check(!panel.querySelector('.toast'), 'Toast not dismissed');
+  body.scrollTop = 0;
+  // Opening this nested dialog must not start recording, capture a mic or make a request.
+  [...panel.querySelectorAll('button')].find(button => button.textContent === t('intercom.open')).click();
+  await tick();
+  const nested = document.querySelector('.modal');
+  check(nested && panel.inert && nested.contains(document.activeElement), 'Nested focus scope not established');
+  nested.querySelector('.icon-btn').click(); await tick();
+  check(!panel.inert && panel.contains(document.activeElement), 'Nested close did not restore focus');
+  close.click();
+  check(!document.querySelector('.camera-panel') && !stage.inert && document.body.style.overflow === 'auto', 'Close did not restore background');
+  check(document.activeElement === trigger, 'Trigger focus not restored');
+  // Hardware support must remain intact even when session permissions disable its UI.
+  state.authentication = 'temporary'; state.permissions = ['ptz'];
+  trigger.click(); await tick(); panel = layout();
+  check([...panel.querySelectorAll('.control-row button, .control-row select')].every(input => input.disabled), 'Unauthorized control enabled');
+  check(panel.textContent.includes(t('panel.accessDenied')), 'Permission reason missing');
+  check(camera.audio_messages && camera.controls.orientation.writable, 'Driver capability mutated');
+  endSession(); await tick();
+  check(!document.querySelector('.camera-panel') && !stage.inert, 'Session end retained modal');
+  check(requests === 0, 'Fixture sent a network request');
+  state.authentication = 'primary'; state.cameras = [camera]; trigger.click(); await tick(); panel = layout();
+  window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], requests,
+    panelWidth: Math.round(panel.getBoundingClientRect().width), permissions: true, nestedFocus: true,
+    sessionCleanup: true, toastDismissal: true};
+} catch (error) { window.smokeResult = {ok: false, error: error.message}; }
+</script>
+</html>

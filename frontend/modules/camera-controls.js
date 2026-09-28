@@ -75,7 +75,7 @@ export function cameraControls(camera, extras = {}) {
     const panel = el("section", { className: "camera-panel" },
       el("header", { className: "camera-panel-head" },
         el("div", {}, el("small", { textContent: t("control.menu") }),
-          el("h2", { textContent: cam.name || t("cam.unnamed") })), close),
+          el("h2", { textContent: cam.name || t("cam.unnamed"), title: cam.name || t("cam.unnamed") })), close),
       el("p", { className: "camera-panel-hint", textContent: t("panel.hint") }), body,
       el("footer", { className: "camera-panel-status" }, status));
     panel.setAttribute("role", "dialog");

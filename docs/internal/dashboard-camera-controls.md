@@ -1,5 +1,24 @@
 # Camera control panel — 2026-09-12
 
+## Browser checkpoint — 2026-09-28
+
+The isolated `--camera-controls` Chromium fixture uses production modules/CSS with
+synthetic capabilities and rejects every fetch. At 320×568 and 1280×900, opening
+and closing, body scroll/inert restoration, nested audio-dialog focus, permission
+filtering without capability mutation, session-end cleanup and toast dismissal
+passed with zero network requests. No microphone, stream or camera was used.
+
+Visual inspection caught the global mobile header rule wrapping the close button
+below a long camera name. The panel header now stays on one row with a fixed-width
+close target and a two-line title (full name retained as text/title/ARIA label).
+The fixture asserts this arrangement and viewport/scroll bounds. Corrected mobile
+run: 1.91 seconds, 175.1 MiB peak, zero swap; all runs sequential under 512 MiB,
+zero-swap, 75%-CPU, 128-task and 65-second limits. Screenshots remain ignored in
+`temp/`. Desktop-Chromium viewport checks are not physical mobile homologation.
+
+The dated sections below preserve historical PTZ rollout scope; current driver
+selection and shared-pad behavior are documented in `ptz-model-selection.md`.
+
 ## Directional pad and drag — 2026-09-14
 
 The finite-step PTZ UI is now a cross-shaped pad over the lower-left video area, outside the

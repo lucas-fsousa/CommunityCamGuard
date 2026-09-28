@@ -13,6 +13,9 @@ Docs are split by audience:
 
 ## `internal/` — for contributors
 
+- **[Camera control panel](internal/dashboard-camera-controls.md)** — real-browser layout/focus,
+  capability-driven controls and camera-free regression checks.
+
 - **[Delegated access browser checks](internal/delegated-access-browser-check.md)** — responsive modal
   repairs, real Chromium viewport checks and mandatory resource caps.
 
@@ -30,7 +33,7 @@ Docs are split by audience:
 - **[Settings inventory and plan](internal/settings-dashboard-plan.md)** — classification of 42
   options and required authentication/application boundaries beyond the two editable fields.
 - **[Session principal](internal/session-principal.md)** — implemented primary/legacy session
-  parsing and management gate, migration policy and rollout status; temporary keys remain pending.
+  parsing and management gate; current temporary-key rollout is covered by delegated access above.
 - **[Runtime settings](internal/runtime-settings.md)** — two-field revisioned persistence/API,
   application semantics, authorization, UI contracts and deployment checkpoint.
 - **[Login pacing](internal/login-abuse-protection.md)** — bounded login attempts, proxy limitations and pending security gates.
