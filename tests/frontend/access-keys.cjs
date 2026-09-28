@@ -22,7 +22,7 @@ function harness(canManage = true) {
   const requests = [], timers = new Map(); let next = 0, changes = 0;
   const api = (url, opts) => new Promise((resolve, reject) => requests.push({ url, opts, resolve, reject }));
   const el = (tag, props, ...children) => { const e = new Element(tag, props); e.append(...children); return e; };
-  const document = { body: el("body"), documentElement: { lang: "en" } };
+  const document = { body: el("body", { style: { overflow: "" } }), documentElement: { lang: "en" } };
   const scope = { api, el, t: key => key, state: { canManage }, document, window: { confirm: () => true },
     setTimeout: (fn, delay) => { timers.set(++next, { fn, delay }); return next; }, clearTimeout: n => timers.delete(n) };
   const evaluate = (name, result) => new Function(...Object.keys(scope), source(name) + ";return " + result)(...Object.values(scope));
@@ -56,6 +56,7 @@ function fill(h) {
   }
   {
     const h = harness(); const dispose = h.open(); fill(h);
+    assert.equal(h.document.body.style.overflow, "hidden");
     const form = h.find(e => e.tag === "form");
     form.fire("submit"); form.fire("submit");
     assert.equal(h.requests.length, 1);
@@ -67,6 +68,7 @@ function fill(h) {
     assert.equal(h.changes(), 1);
     assert(h.find(e => e.textContent === "keys.stagedCreated"));
     dispose(); assert.equal(secret.value, ""); assert.equal(h.timers.size, 0);
+    assert.equal(h.document.body.style.overflow, "");
   }
   {
     const h = harness(); const dispose = h.open(); fill(h);

@@ -1,5 +1,9 @@
 # Delegated access activation and deployment — 2026-09-27
 
+Follow-up: [bounded desktop/narrow-viewport browser validation](delegated-access-browser-check.md)
+fixed stretched checkboxes and checked creation/disposal/scrolling. Physical mobile
+devices and proxy interruption remain separate acceptance work.
+
 ## Deployment checkpoint
 
 Local deployment completed at **2026-09-27 20:42 UTC**, source `844b575`, image

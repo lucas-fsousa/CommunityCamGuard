@@ -13,6 +13,9 @@ Docs are split by audience:
 
 ## `internal/` — for contributors
 
+- **[Delegated access browser checks](internal/delegated-access-browser-check.md)** — responsive modal
+  repairs, real Chromium viewport checks and mandatory resource caps.
+
 - **[Delegated access activation](internal/delegated-access-activation.md)** — optional expiry,
   per-feature grants, modal, deployed login/channel enforcement and pending browser acceptance.
 

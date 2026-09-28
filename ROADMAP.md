@@ -690,5 +690,12 @@ after 30 seconds with an explicit retry, without automatic conversion retries.
 Node lifecycle and 41 focused Python tests passed; browser acceptance remains pending.
 See [playback lifecycle](docs/internal/recordings-playback-lifecycle.md).
 
+2026-09-28: delegated-access modal passed isolated real Chromium at 320×568,
+375×667 and 1280×900 after fixing oversized checkboxes. Creation/grants/secret
+cleanup/navigation and sticky close were exercised with synthetic API data. The
+settings fixture imports are now regression-tested; browser runs require cgroup
+caps and direct ELF launch. Physical mobile/proxy checks remain. See
+[browser checkpoint](docs/internal/delegated-access-browser-check.md).
+
 _Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
 under `docs/internal/`._

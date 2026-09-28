@@ -16,7 +16,7 @@ jobs:
       - name: Install
         run: pip install -e '.[dev]'
       - name: Lint (ruff)
-        run: ruff check backend tests scripts/check_delegated_access.py
+        run: ruff check backend tests scripts/check_delegated_access.py scripts/check_recording_browser.py scripts/browser_test_safety.py
       - name: Type-check (mypy)
         run: mypy backend/app
       - name: Test (pytest)

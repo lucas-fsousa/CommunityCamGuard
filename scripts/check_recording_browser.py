@@ -17,7 +17,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from browser_test_safety import require_bounded_browser, stop_browser
 from websockets.sync.client import connect
+
+COMPONENT_ASSETS = {
+    "style.css": "style.css", "core.js": "modules/core.js", "i18n.js": "i18n.js",
+    "recordings.js": "modules/recordings.js", "recording-playback.js": "modules/recording-playback.js",
+    "settings.js": "modules/settings.js", "access-keys.js": "modules/access-keys.js",
+    "access-key-dialog.js": "modules/access-key-dialog.js",
+}
 
 
 def main():
@@ -26,13 +34,18 @@ def main():
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
     parser.add_argument("--recordings", action="store_true", help="Check isolated recordings loading overlay")
+    parser.add_argument("--access-keys", action="store_true", help="Check delegated-access modal with synthetic data")
     parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=900)
     parser.add_argument("--screenshot", type=Path)
     args = parser.parse_args()
     fixture = args.fixture.resolve() if args.fixture else None
-    component = args.settings or args.recordings
-    if args.settings and args.recordings:
+    component = args.settings or args.recordings or args.access_keys
+    if sum((args.settings, args.recordings, args.access_keys)) > 1:
         parser.error("choose one component")
+    if not 280 <= args.width <= 2560 or not 320 <= args.height <= 1600:
+        parser.error("viewport outside bounded test range")
+    require_bounded_browser(args.browser)
     if not component and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
         parser.error("fixture must be an existing H.264 MP4 below 10 MiB, at least 4 seconds")
     root = Path(__file__).resolve().parents[1]
@@ -42,10 +55,10 @@ def main():
     }
     if component:
         page_name = "settings-browser.html" if args.settings else "recordings-overlay-browser.html"
+        if args.access_keys:
+            page_name = "access-keys-browser.html"
         assets = {"/": (root / "tests/frontend" / page_name, "text/html")}
-        for name, path in {"style.css": "style.css", "core.js": "modules/core.js",
-                           "recordings.js": "modules/recordings.js", "recording-playback.js": "modules/recording-playback.js",
-                           "settings.js": "modules/settings.js", "i18n.js": "i18n.js"}.items():
+        for name, path in COMPONENT_ASSETS.items():
             assets["/" + name] = (root / "frontend" / path, "text/css" if name.endswith("css") else "text/javascript")
 
     class Handler(BaseHTTPRequestHandler):
@@ -100,10 +113,10 @@ def main():
                 "--disable-component-update", "--disable-extensions", "--disable-sync",
                 "--no-first-run", "--no-default-browser-check", "--mute-audio",
                 "--renderer-process-limit=1", "--remote-debugging-port=0",
-                f"--window-size={args.width},900",
+                f"--window-size={args.width},{args.height}",
                 "--autoplay-policy=no-user-gesture-required", f"--user-data-dir={profile}",
                 f"http://127.0.0.1:{server.server_port}/",
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             try:
                 port_file = Path(profile) / "DevToolsActivePort"
                 deadline = time.monotonic() + 45
@@ -118,7 +131,7 @@ def main():
                 with connect(page["webSocketDebuggerUrl"], open_timeout=5) as socket:
                     if component:
                         socket.send(json.dumps({"id": 3, "method": "Emulation.setDeviceMetricsOverride",
-                            "params": {"width": args.width, "height": 900, "deviceScaleFactor": 1, "mobile": False}}))
+                            "params": {"width": args.width, "height": args.height, "deviceScaleFactor": 1, "mobile": False}}))
                         socket.recv(timeout=5)
                         socket.send(json.dumps({"id": 4, "method": "Page.reload"}))
                         socket.recv(timeout=5)
@@ -130,23 +143,18 @@ def main():
                         result = json.loads(socket.recv(timeout=5))["result"]["result"].get("value")
                         if result:
                             print(json.dumps(result), flush=True)
-                            if not result["ok"]:
-                                raise SystemExit(1)
                             if args.screenshot:
                                 socket.send(json.dumps({"id": 2, "method": "Page.captureScreenshot"}))
                                 capture = json.loads(socket.recv(timeout=5))
                                 args.screenshot.write_bytes(base64.b64decode(capture["result"]["data"]))
+                            if not result["ok"]:
+                                raise SystemExit(1)
                             break
                         time.sleep(0.2)
                     else:
                         raise RuntimeError("browser test deadline exceeded")
             finally:
-                browser.terminate()
-                try:
-                    browser.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    browser.kill()
-                    browser.wait(timeout=5)
+                stop_browser(browser)
     finally:
         server.shutdown()
         server.server_close()

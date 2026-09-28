@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isolated delegated-access layout and lifecycle</title>
+<link rel="stylesheet" href="/style.css">
+<script>
+window.addEventListener('error', () => { window.smokeResult = {ok: false, error: 'Fixture script error'}; });
+window.addEventListener('unhandledrejection', () => { window.smokeResult = {ok: false, error: 'Unhandled fixture rejection'}; });
+</script>
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/access-keys":"/access-keys.js","ccg/access-key-dialog":"/access-key-dialog.js"}}</script>
+<main id="stage" class="settings"><div id="settings"></div></main>
+<script type="module">
+import { state } from '/core.js';
+import { renderSettings, stopSettings } from '/settings.js';
+import { setLang, t } from '/i18n.js';
+setLang('pt-BR');
+let creations = 0;
+const response = body => new Response(JSON.stringify(body), {headers: {'Content-Type': 'application/json'}});
+window.fetch = async (url, options = {}) => {
+  if (url === '/api/settings') return response({revision: 0, values: {grid_hd_max_cameras: 0, playback_cache_mb: 2048}, overrides: {}});
+  if (url.startsWith('/api/access-keys?')) return response({items: [], login_enabled: true});
+  if (url === '/api/access-keys' && options.method === 'POST') {
+    const body = JSON.parse(options.body);
+    if (body.expires_at !== null || JSON.stringify(body.permissions) !== '["ptz"]') throw new Error('Wrong grants');
+    creations++;
+    return response({secret: 'synthetic-not-a-real-credential', login_enabled: true});
+  }
+  throw new Error('Unexpected isolated request');
+};
+const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
+const create = () => [...document.querySelectorAll('.access-keys button')].find(b => b.textContent === t('keys.create')).click();
+function layout() {
+  const dialog = document.querySelector('dialog');
+  const box = dialog.getBoundingClientRect();
+  if (!dialog.open || box.width < 200 || box.width > 562 || box.left < 0 || box.right > innerWidth || box.bottom > innerHeight)
+    throw new Error('Dialog escapes viewport');
+  if (Math.abs(box.left + box.width / 2 - document.documentElement.clientWidth / 2) > 2) throw new Error('Dialog not centered');
+  if (dialog.scrollWidth > dialog.clientWidth || document.documentElement.scrollWidth > innerWidth)
+    throw new Error('Horizontal overflow');
+  for (const input of dialog.querySelectorAll('input[type=checkbox]')) {
+    if (input.getBoundingClientRect().width > 24) throw new Error('Oversized checkbox');
+  }
+  return dialog;
+}
+try {
+  state.canManage = true;
+  renderSettings(document.querySelector('#settings')); await tick();
+  create(); await tick();
+  let dialog = layout();
+  if (dialog.querySelector('input:checked')) throw new Error('Implicit grant');
+  const cancel = new Event('cancel', {cancelable: true}); dialog.dispatchEvent(cancel);
+  if (!cancel.defaultPrevented || !dialog.open) throw new Error('Implicit dismissal');
+  dialog.click(); if (!dialog.open) throw new Error('Click dismissed dialog');
+  dialog.querySelector('#access-key-name').value = 'Somente movimentação';
+  dialog.querySelector('.settings-baseline input').click();
+  if (!dialog.querySelector('#access-key-expiry').disabled) throw new Error('Expiry remains required');
+  [...dialog.querySelectorAll('fieldset label')].find(label => label.textContent === t('keys.grant.ptz')).querySelector('input').click();
+  dialog.querySelector('form').requestSubmit(); await tick(); await tick();
+  if (creations !== 1 || !dialog.querySelector('input[readonly]') || getComputedStyle(dialog.querySelector('form')).display !== 'none')
+    throw new Error('Creation not rendered');
+  layout();
+  const secret = dialog.querySelector('input[readonly]');
+  dialog.querySelector('.access-key-close').click();
+  if (document.querySelector('dialog') || secret.value) throw new Error('Secret retained on close');
+  create(); await tick();
+  stopSettings(); if (document.querySelector('dialog')) throw new Error('Dialog retained on navigation');
+  renderSettings(document.querySelector('#settings')); await tick(); create(); await tick();
+  dialog = layout();
+  dialog.scrollTop = dialog.scrollHeight; await tick();
+  const closeBox = dialog.querySelector('.access-key-close').getBoundingClientRect();
+  if (closeBox.top < 0 || closeBox.bottom > innerHeight || closeBox.top > dialog.getBoundingClientRect().top + 80)
+    throw new Error('Close button lost while scrolling');
+  dialog.scrollTop = 0; await tick();
+  window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], creations,
+    dialogWidth: Math.round(dialog.getBoundingClientRect().width), scrollable: dialog.scrollHeight > dialog.clientHeight,
+    secretCleared: true, navigationCleanup: true};
+} catch (error) { window.smokeResult = {ok: false, error: error.message}; }
+</script>
+</html>

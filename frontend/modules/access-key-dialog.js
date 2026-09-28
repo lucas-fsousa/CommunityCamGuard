@@ -25,12 +25,17 @@ export function openAccessKeyDialog(onChanged = () => {}) {
     el("label", { className: "settings-baseline" }, never, el("span", { textContent: t("keys.never") })), fieldset, save);
   const status = el("p", {}); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
   const result = el("div");
-  dialog.append(close, title, el("p", { className: "muted", textContent: t("keys.staged") }), form, status, result);
+  dialog.append(el("header", { className: "access-key-head" }, title, close),
+    el("div", { className: "access-key-body" },
+      el("p", { className: "muted", textContent: t("keys.staged") }), form, status, result));
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
   document.body.append(dialog);
   function dispose() {
     if (!alive) return;
     alive = false; request?.abort(); clearTimeout(timer); clearTimeout(secretTimer);
     if (secretInput) secretInput.value = "";
+    document.body.style.overflow = previousOverflow;
     result.replaceChildren(); dialog.close(); dialog.remove();
   }
   close.addEventListener("click", dispose);
