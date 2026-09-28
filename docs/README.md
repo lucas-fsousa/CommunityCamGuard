@@ -25,6 +25,8 @@ Docs are split by audience:
 - **[Playback lifecycle](internal/recordings-playback-lifecycle.md)** and
   **[measurements](internal/recordings-playback-measurements.md)** — selection cleanup, encoder budget,
   Range delivery, observed latency and scoped logging.
+- **[Recording browser acceptance](internal/recordings-browser-acceptance.md)** — real autoplay
+  denial/recovery and seeking to minute four with only nine seconds buffered.
 - **[Settings inventory and plan](internal/settings-dashboard-plan.md)** — classification of 42
   options and required authentication/application boundaries beyond the two editable fields.
 - **[Session principal](internal/session-principal.md)** — implemented primary/legacy session

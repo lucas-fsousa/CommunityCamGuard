@@ -697,5 +697,12 @@ settings fixture imports are now regression-tested; browser runs require cgroup
 caps and direct ELF launch. Physical mobile/proxy checks remain. See
 [browser checkpoint](docs/internal/delegated-access-browser-check.md).
 
+2026-09-28 recording acceptance: real Chromium passed autoplay denial/trusted-gesture
+recovery without extra preparation, plus seeking to 240 seconds in a 300-second
+H.264 fixture when only nine seconds were buffered (64 KiB/s fixture transport).
+No camera traffic or recoding; peak browser memory 250 MiB, zero swap. Full-page,
+physical mobile and real cold-HEVC conversion acceptance remain; see
+[browser evidence](docs/internal/recordings-browser-acceptance.md).
+
 _Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
 under `docs/internal/`._

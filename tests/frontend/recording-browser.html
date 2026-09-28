@@ -13,9 +13,12 @@ const waitFor = async (check) => {
 const assert = (condition, label) => { if (!condition) throw new Error(label); };
 try {
   const results = [];
-  for (const native of [false, true]) {
+  const blocked = new URLSearchParams(location.search).get('autoplay') === 'blocked';
+  const target = Number(new URLSearchParams(location.search).get('seek') || 3);
+  const throttled = new URLSearchParams(location.search).get('throttled') === '1';
+  for (const native of (blocked ? [false] : [false, true])) {
     const video = document.createElement("video");
-    video.controls = true; video.muted = true; video.playsInline = true;
+    video.controls = true; video.muted = !blocked; video.playsInline = true;
     // Force negotiation only. Actual decoding/events/seek/play promises stay real.
     video.canPlayType = () => native ? "probably" : "";
     const status = document.createElement("span");
@@ -32,22 +35,38 @@ try {
     const states = [];
     const playback = createRecordingPlayback(video, status, api, key => key, value => states.push(value));
     try {
+      const selectedAt = performance.now();
       playback.select("fixture");
       assert(states.at(-1).loading, "selection did not show loading");
+      if (blocked) {
+        await waitFor(() => status.textContent === 'rec.readyPressPlay');
+        assert(video.paused && !states.at(-1).loading, 'autoplay denial retained loading');
+        assert(requests.length === 1, 'autoplay denial requested another conversion');
+        window.resumeRecording = () => { window.smokePhase = 'resuming'; playback.select('fixture'); };
+        window.smokePhase = 'gesture';
+      }
       await waitFor(() => plays > 0 && video.videoWidth > 0 && video.currentTime > 0);
+      const firstFrameMs = Math.round(performance.now() - selectedAt);
       assert(!states.at(-1).loading, "playing retained loading overlay");
       assert(requests.length === (native ? 2 : 1), "unexpected preparation count");
       assert(!video.src.includes("original=true"), "fallback not attached");
+      const bufferedEnd = video.buffered.length ? video.buffered.end(video.buffered.length - 1) : 0;
+      if (throttled) assert(bufferedEnd < target, 'throttled seek target already buffered');
       video.pause();
-      video.currentTime = 3;
-      await waitFor(() => !video.seeking && video.currentTime >= 3);
+      assert(target < video.duration - 0.5, 'seek exceeds fixture duration');
+      const seekAt = performance.now();
+      video.currentTime = target;
+      await waitFor(() => !video.seeking && video.currentTime >= target);
+      const seekMs = Math.round(performance.now() - seekAt);
       const previousLoads = loads;
       playback.select("fixture");
-      await waitFor(() => video.currentTime > 3.1 && !video.paused);
+      await waitFor(() => video.currentTime > target + 0.1 && !video.paused);
       assert(loads === previousLoads, "same-row click reloaded video");
       results.push({ mode: native ? "native-error-fallback" : "compatible",
                      width: video.videoWidth, seek: true, repeatedClickReload: false,
-                     requests: requests.length });
+                     requests: requests.length, autoplayDenied: blocked, gestureResumed: blocked,
+                     duration: Math.round(video.duration), seekSeconds: target, firstFrameMs, seekMs,
+                     bufferedEndBeforeSeek: Math.round(bufferedEnd), soughtBeyondBuffer: throttled });
     } finally {
       playback.dispose();
       assert(!states.at(-1).loading, "dispose retained loading overlay");

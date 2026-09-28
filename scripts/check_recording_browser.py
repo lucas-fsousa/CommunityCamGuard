@@ -35,6 +35,9 @@ def main():
     parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
     parser.add_argument("--recordings", action="store_true", help="Check isolated recordings loading overlay")
     parser.add_argument("--access-keys", action="store_true", help="Check delegated-access modal with synthetic data")
+    parser.add_argument("--autoplay-block", action="store_true", help="Require a gesture for audible fixture playback")
+    parser.add_argument("--seek-seconds", type=float, default=3, help="Seek position in the bounded fixture")
+    parser.add_argument("--throttle-kib", type=int, default=0, help="Bound fixture response rate to test seeking before full download")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=900)
     parser.add_argument("--screenshot", type=Path)
@@ -43,6 +46,12 @@ def main():
     component = args.settings or args.recordings or args.access_keys
     if sum((args.settings, args.recordings, args.access_keys)) > 1:
         parser.error("choose one component")
+    if component and args.autoplay_block:
+        parser.error("autoplay check requires a video fixture, not a component")
+    if not 0 <= args.seek_seconds <= 1800:
+        parser.error("seek position outside bounded test range")
+    if not 0 <= args.throttle_kib <= 1024 or (component and args.throttle_kib):
+        parser.error("throttling requires a video fixture and a rate from 0 to 1024 KiB/s")
     if not 280 <= args.width <= 2560 or not 320 <= args.height <= 1600:
         parser.error("viewport outside bounded test range")
     require_bounded_browser(args.browser)
@@ -95,11 +104,19 @@ def main():
             self.send_header("Content-Type", mime)
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(end - start + 1))
+            self.send_header("Cache-Control", "no-store")
             if ranged:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
             self.end_headers()
             try:
-                self.wfile.write(data[start:end + 1])
+                if args.throttle_kib and mime == "video/mp4":
+                    for offset in range(start, end + 1, 8192):
+                        chunk = data[offset:min(offset + 8192, end + 1)]
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                        time.sleep(len(chunk) / (args.throttle_kib * 1024))
+                else:
+                    self.wfile.write(data[start:end + 1])
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
@@ -114,8 +131,9 @@ def main():
                 "--no-first-run", "--no-default-browser-check", "--mute-audio",
                 "--renderer-process-limit=1", "--remote-debugging-port=0",
                 f"--window-size={args.width},{args.height}",
-                "--autoplay-policy=no-user-gesture-required", f"--user-data-dir={profile}",
-                f"http://127.0.0.1:{server.server_port}/",
+                "--autoplay-policy=" + ("document-user-activation-required" if args.autoplay_block else "no-user-gesture-required"),
+                f"--user-data-dir={profile}",
+                f"http://127.0.0.1:{server.server_port}/?seek={args.seek_seconds}&throttled={int(bool(args.throttle_kib))}" + ("&autoplay=blocked" if args.autoplay_block else ""),
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             try:
                 port_file = Path(profile) / "DevToolsActivePort"
@@ -138,9 +156,15 @@ def main():
                         time.sleep(0.3)
                     while time.monotonic() < deadline:
                         socket.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {
-                            "expression": "window.smokeResult || null", "returnByValue": True,
+                            "expression": "window.smokeResult || (window.smokePhase === 'gesture' ? {gestureNeeded: true} : null)", "returnByValue": True,
                         }}))
                         result = json.loads(socket.recv(timeout=5))["result"]["result"].get("value")
+                        if result and result.get("gestureNeeded") and args.autoplay_block:
+                            socket.send(json.dumps({"id": 5, "method": "Runtime.evaluate", "params": {
+                                "expression": "window.resumeRecording()", "userGesture": True,
+                            }}))
+                            socket.recv(timeout=5)
+                            continue
                         if result:
                             print(json.dumps(result), flush=True)
                             if args.screenshot:

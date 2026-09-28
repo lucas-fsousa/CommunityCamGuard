@@ -113,3 +113,7 @@ Review also fixed intentional pause during a pending `play()` promise: its
 `AbortError` no longer displays a false playback failure when the element is
 paused and has no media error. A fake-media regression covers that race; this
 specific edge case was not part of the real-browser run above.
+
+Follow-up: [real autoplay rejection/recovery and a throttled five-minute seek](recordings-browser-acceptance.md)
+now exercise the production controller under explicit resource caps. The test seeks
+beyond the loaded buffer; cold HEVC conversion and physical mobile acceptance remain separate.
