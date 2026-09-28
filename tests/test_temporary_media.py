@@ -43,16 +43,22 @@ def env(monkeypatch):
     monkeypatch.setattr(session_channels, "CHECK_INTERVAL", 0.005)
     app = FastAPI(); app.include_router(media.router)
     finished = threading.Event()
+    completions = []
     async def application(scope, receive, send):
+        completion = None
         if scope["type"] == "websocket":
             finished.clear()
+            completion = threading.Event()
+            completions.append(completion)
         try:
             await app(scope, receive, send)
         finally:
             if scope["type"] == "websocket":
                 finished.set()
+                completion.set()
     with TestClient(application) as client:
         client.websocket_finished = finished
+        client.websocket_completions = completions
         client.cookies.set(auth.COOKIE_NAME, token)
         yield client, cam, key, connections, sent, closed
 
@@ -140,6 +146,11 @@ def test_two_open_sessions_end_together_without_stopping_another_key(env, monkey
         survivor.loop.call_soon_threadsafe(survivor.pulse.set)
         assert independent.receive_bytes() == b"independent channel still live"
         assert auth.verify_token(other_token)
+        # TestClient cancels its ASGI future when a context exits. Wait for each
+        # application's cleanup, not merely its close frame or a shared event.
+        independent.close()
+        assert len(client.websocket_completions) == 3
+        assert all(completion.wait(1) for completion in client.websocket_completions)
     assert len(channels) == 3 and set(released) == set(channels)
 
 

@@ -42,6 +42,13 @@ socket delivered another frame afterward. All three upstreams closed on cleanup.
 The 34-test media suite passed against isolated ASGI/SQLite and fake upstreams in
 4.83 seconds, 99.9 MiB peak and zero swap. No production login, stream or key used.
 
+CI subsequently exposed a test-client teardown race: receiving close frames did
+not guarantee all three ASGI applications had finished cleanup before TestClient
+cancelled their futures. The fixture now tracks a completion event per socket;
+the survivor is explicitly disconnected and all completions are awaited with a
+one-second bound before contexts exit. No exception is suppressed. The 44 media/
+channel tests passed locally after correction (88.3 MiB peak, zero swap).
+
 Per-control permissions, login pacing and shared origin policy are implemented;
 deployment/HTTP lifecycle evidence is linked above. Remaining: full-dashboard
 multi-tab/browser, physical mobile and HTTPS-proxy interruption validation. This
