@@ -57,7 +57,8 @@ def test_mid_check_failure_still_revokes_created_key(probe, monkeypatch):
     assert [record.status for record in access_keys.list_keys()] == ["revoked"]
 
 
-def test_lost_creation_reply_reports_unknown_outcome_without_retry(probe, monkeypatch, capsys):
+@pytest.mark.parametrize("lost_reply_at", [1, 2])
+def test_lost_creation_reply_reports_unknown_outcome_without_retry(probe, monkeypatch, capsys, lost_reply_at):
     module, client, owner = probe
     original = module.check
     creations = []
@@ -66,7 +67,8 @@ def test_lost_creation_reply_reports_unknown_outcome_without_retry(probe, monkey
         response = original(client, method, path, expected, token, body)
         if method == "POST" and path == "/api/access-keys":
             creations.append(response.json()["metadata"]["id"])
-            raise RuntimeError("simulated lost creation reply")
+            if len(creations) == lost_reply_at:
+                raise RuntimeError("simulated lost creation reply")
         return response
 
     monkeypatch.setattr(module, "check", lose_reply)
@@ -75,5 +77,8 @@ def test_lost_creation_reply_reports_unknown_outcome_without_retry(probe, monkey
     output = capsys.readouterr().out
     assert '"test_key_creation_outcome_unknown": true' in output
     assert '"review_deployment_check_keys": true' in output
-    assert len(creations) == 1 and creations[0] not in output
-    assert [record.status for record in access_keys.list_keys()] == ["active"]
+    assert len(creations) == lost_reply_at
+    assert all(key_id not in output for key_id in creations)
+    records = {record.id: record.status for record in access_keys.list_keys()}
+    assert records[creations[-1]] == "active"
+    assert all(records[key_id] == "revoked" for key_id in creations[:-1])

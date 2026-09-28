@@ -30,6 +30,13 @@ the runner now owns and terminates its browser process group before cleanup. A
 rerun exited successfully; the leftover synthetic profile was removed. No browser
 was left running. The harness now refuses uncapped cgroups and launcher scripts.
 
+After the secret-visibility wording correction, the 320×568 check passed again
+(6.84 seconds, 423.2 MiB peak, zero swap) under the same caps. Node tests verify
+that the 60-second timeout clears the field/instructions, explains that hiding
+does not revoke access, and sends no additional request. Operator-check ASGI tests
+also cover a lost first or second creation response: known IDs are revoked while
+the unknown outcome is reported for manual review, without retry or bulk revocation.
+
 Example (replace repository/browser paths; screenshot destination should be ignored):
 
 ```sh

@@ -96,8 +96,8 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
   **never deletes**. A separate **retention** job (`RECORDING_RETENTION_DAYS`, default **7 days**)
   deletes older footage; set **0** to keep it indefinitely, subject to available storage.
 - **Auth** — a secret key from `.env` gates protected operations via a signed, seven-day session
-  cookie. Treat that cookie as a credential. Scoped delegated keys and revocation are implemented in source; rollout remains pending.
-  A primary-only two-field settings view is implemented; see its rollout checkpoint.
+  cookie. Treat that cookie as a credential. Scoped delegated keys with optional expiry and
+  revocation are implemented and deployed locally; primary-key sessions manage them in Settings.
   The [primary-session foundation](docs/internal/session-principal.md) is implemented in source
   and deployed; legacy cookies keep existing access but do not gain management permission.
 
@@ -179,7 +179,9 @@ The local deployment was updated on 2026-09-27 to build **`b-a84862f46bfb`**.
 Live HTTP checks passed for delegated login, permission denials, expiration,
 revocation and protected public paths; all three cameras resumed recording.
 See [deployment evidence, safe check and remaining acceptance](docs/internal/delegated-access-activation.md).
-Real-browser/mobile layout and proxy/channel interruption acceptance remain pending.
+Isolated real-Chromium component checks passed desktop and narrow-screen layouts;
+see [modal/browser evidence](docs/internal/delegated-access-browser-check.md).
+Physical mobile, full-page and proxy/channel interruption acceptance remain pending.
 
 The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
 [request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),
@@ -249,7 +251,8 @@ API are all **working**. Yoosee two-way audio is physically homologated on every
 the recovered LAN RTSP backchannel, including recorded messages and hold-to-speak from the browser.
 Still open: WAN-independent camera bootstrap/control, long-session intercom hardening, broader
 camera-family coverage for proprietary controls, native HEVC playback validation across desktop/mobile,
-broader settings and temporary access keys, security hardening, and S3 tiering. S3 is not implemented.
+broader settings, delegated-access mobile/proxy acceptance, security hardening, and S3 tiering.
+Scoped temporary keys are implemented; S3 is not implemented.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
