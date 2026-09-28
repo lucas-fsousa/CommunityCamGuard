@@ -1,7 +1,7 @@
 # Dashboard settings
 
-The **Settings / Configurações** tab manages two server preferences in English or
-Portuguese. It is not a camera-control panel or an editor for the whole `.env`.
+The **Settings / Configurações** tab manages two server preferences and delegated
+access in English or Portuguese. It is not a camera-control panel or an editor for the whole `.env`.
 See the [rollout checkpoint](../internal/runtime-settings.md) for deployment status.
 
 ## Access and editing
@@ -9,8 +9,11 @@ See the [rollout checkpoint](../internal/runtime-settings.md) for deployment sta
 Sign in with the server's primary dashboard key. Old sessions can still monitor
 cameras, but cannot administer settings: sign out and sign in again. The backend
 enforces this independently of the UI. Delegated-access login and management are
-deployed locally in build `b-a84862f46bfb`; HTTP lifecycle checks passed. Real-browser
-and mobile layout acceptance remain pending. See [deployment evidence](../internal/delegated-access-activation.md).
+deployed locally in build `b-a84862f46bfb`; HTTP lifecycle checks passed. Isolated
+Chromium component checks passed desktop and narrow-screen layouts; physical mobile
+and full-page/proxy acceptance remain pending. See
+[deployment evidence](../internal/delegated-access-activation.md) and
+[browser checks](../internal/delegated-access-browser-check.md).
 
 The centered panel uses compact numeric fields beside each setting's title, with
 explanations below and separate save/reload actions. It adapts to narrow screens.
@@ -46,11 +49,19 @@ never add a feature the camera driver does not support. Server administration
 cannot be delegated. Local-only camera controls remain local-only.
 
 Copy the generated key from the dialog: it is displayed only once and cleared on
-close or after 60 seconds. Share it securely; do not place it in URLs. The recipient
+close or after 60 seconds. Hiding the key **does not revoke access**. If you did not
+copy it, revoke the entry and create another; its secret cannot be recovered.
+Share it securely; do not place it in URLs. The recipient
 uses the normal login form. Keys without expiration remain valid until revoked;
 each browser login still expires after seven days. **Load / refresh accesses** lists
 metadata and permissions, never secrets. Revoke invalidates that key's sessions;
 the open dashboard returns to login through its periodic session check.
+
+Select only the necessary permissions. For example, PTZ alone does not grant live
+video or recordings; add live viewing if the recipient must see where the camera
+is pointing. The recordings permission includes both playback and download.
+Revocation cannot recall footage already downloaded or undo commands already
+executed. Current permissions cover all configured cameras, not a selected subset.
 
 If creation or revocation cannot be confirmed, reload the list before another
 attempt. Do not assume a failed network response means the server made no change.
