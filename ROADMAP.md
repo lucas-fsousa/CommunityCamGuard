@@ -704,5 +704,11 @@ No camera traffic or recoding; peak browser memory 250 MiB, zero swap. Full-page
 physical mobile and real cold-HEVC conversion acceptance remain; see
 [browser evidence](docs/internal/recordings-browser-acceptance.md).
 
+2026-09-28 delegated-access polish: secret visibility timeout now explicitly differs
+from revocation, without duplicate copy instructions. The operator diagnostic flags
+an unknown creation outcome after a lost response and never retries creation or
+revokes by non-unique label. Node UI and isolated ASGI regression coverage added;
+see [activation/operations](docs/internal/delegated-access-activation.md).
+
 _Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
 under `docs/internal/`._

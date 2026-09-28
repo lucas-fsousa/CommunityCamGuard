@@ -26,14 +26,17 @@ def check(client, method, path, expected=200, token=None, body=None):
 
 def exercise(client, owner):
     keys = []
+    creation_pending = False
     try:
         for expiring in (False, True):
             expires = (datetime.now(UTC) + timedelta(seconds=5)).isoformat() if expiring else None
+            creation_pending = True
             created = check(client, "POST", "/api/access-keys", 201, owner, {
                 "label": "Deployment check — " + ("expiry" if expiring else "revocation"),
                 "expires_at": expires, "permissions": ["ptz"],
             }).json()
             keys.append(created["metadata"]["id"])
+            creation_pending = False
             assert created["login_enabled"] is True
             login = check(client, "POST", "/api/login", body={"key": created["secret"]})
             guest = login.cookies["ccg_session"]
@@ -56,6 +59,11 @@ def exercise(client, owner):
             check(client, "POST", "/api/login", 401, body={"key": created["secret"]})
         return {"delegated_login": True, "permission_denials": True, "expiry": True, "revocation": True}
     finally:
+        if creation_pending:
+            # A lost response can hide a committed key. Do not retry creation or
+            # revoke by label: another operator's check may use the same label.
+            print(json.dumps({"test_key_creation_outcome_unknown": True,
+                              "review_deployment_check_keys": True}))
         failures = 0
         for key_id in keys:
             try:

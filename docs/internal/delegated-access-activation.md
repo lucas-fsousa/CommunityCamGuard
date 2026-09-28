@@ -44,6 +44,18 @@ intended; completed tests leave revoked audit rows. It always connects to loopba
 uses the container's configured primary key internally and prints only aggregates.
 Cleanup failure emits a count requiring operator attention. Isolated ASGI tests
 cover the success path and revocation after an intermediate check failure.
+If creation loses its response, the check emits
+`test_key_creation_outcome_unknown` and `review_deployment_check_keys`: the server
+may have committed a key whose ID was never received. Review the recently created
+`Deployment check` rows using the primary-key dashboard and revoke the matching
+test access. Do not blindly retry or bulk-revoke matching labels; another operator
+may be running a check. Known IDs still receive cleanup. A regression test covers
+this ambiguity against isolated storage, without exposing a credential or ID.
+
+The creation dialog hides its one-time secret after 60 seconds and explicitly
+states that hiding does not revoke access. If it was not copied, revoke the entry
+and create another; there is no secret-recovery endpoint. English and Portuguese
+messages distinguish creation, secret visibility and access validity.
 
 The original implementation checkpoint follows; its pre-deployment statements are
 historical. Do not roll the old image back against the migrated DB without checking

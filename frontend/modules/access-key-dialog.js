@@ -59,13 +59,16 @@ export function openAccessKeyDialog(onChanged = () => {}) {
         body: JSON.stringify({ label: name.value.trim(), expires_at: expires?.toISOString() ?? null, permissions }) });
       if (!alive) return;
       form.hidden = true;
-      status.textContent = t(created.login_enabled === true ? "keys.copyOnce" : "keys.stagedCreated");
+      status.textContent = t(created.login_enabled === true ? "keys.created" : "keys.stagedCreated");
       const secret = el("input", { type: "text", readOnly: true, value: created.secret, autocomplete: "off" });
       secretInput = secret;
       secret.setAttribute("aria-label", t("keys.secret"));
       result.append(secret, el("p", { className: "muted", textContent: t("keys.copyOnce") }));
       // Never persist or auto-copy credentials; bound their visible lifetime.
-      secretTimer = setTimeout(() => { secret.value = ""; result.replaceChildren(); }, 60000);
+      secretTimer = setTimeout(() => {
+        secret.value = ""; result.replaceChildren();
+        status.textContent = t("keys.secretHidden");
+      }, 60000);
       onChanged();
     } catch {
       if (!alive) return;

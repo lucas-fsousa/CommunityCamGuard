@@ -52,7 +52,10 @@ function fill(h) {
     assert.deepEqual(JSON.parse(h.requests[0].opts.body), { label: "Timed",
       expires_at: new Date("2036-01-02T12:30").toISOString(), permissions: ["ptz"] });
     h.requests[0].resolve({ secret: "synthetic", login_enabled: true }); await flush();
-    assert(!h.find(e => e.textContent === "keys.stagedCreated")); dispose();
+    assert(!h.find(e => e.textContent === "keys.stagedCreated"));
+    assert(h.find(e => e.textContent === "keys.created"));
+    assert.equal(walk(h.document.body).filter(e => e.textContent === "keys.copyOnce").length, 1);
+    dispose();
   }
   {
     const h = harness(); const dispose = h.open(); fill(h);
@@ -89,7 +92,12 @@ function fill(h) {
     h.requests[0].resolve({ secret: "synthetic", login_enabled: false }); await flush();
     const secret = h.find(e => e.readOnly);
     [...h.timers.values()].find(timer => timer.delay === 60000).fn();
-    assert.equal(secret.value, ""); dispose();
+    assert.equal(secret.value, "");
+    assert(!h.find(e => e.readOnly));
+    assert(!h.find(e => e.textContent === "keys.copyOnce"));
+    assert(h.find(e => e.textContent === "keys.secretHidden"));
+    assert.equal(h.requests.length, 1); // Hiding a secret must not revoke the key.
+    dispose();
   }
   {
     const h = harness(false); const root = h.el("div"); h.render(root)();

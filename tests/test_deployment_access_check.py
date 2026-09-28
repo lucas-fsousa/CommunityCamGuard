@@ -55,3 +55,25 @@ def test_mid_check_failure_still_revokes_created_key(probe, monkeypatch):
     with pytest.raises(RuntimeError, match="simulated failure"):
         module.exercise(client, owner)
     assert [record.status for record in access_keys.list_keys()] == ["revoked"]
+
+
+def test_lost_creation_reply_reports_unknown_outcome_without_retry(probe, monkeypatch, capsys):
+    module, client, owner = probe
+    original = module.check
+    creations = []
+
+    def lose_reply(client, method, path, expected=200, token=None, body=None):
+        response = original(client, method, path, expected, token, body)
+        if method == "POST" and path == "/api/access-keys":
+            creations.append(response.json()["metadata"]["id"])
+            raise RuntimeError("simulated lost creation reply")
+        return response
+
+    monkeypatch.setattr(module, "check", lose_reply)
+    with pytest.raises(RuntimeError, match="simulated lost creation reply"):
+        module.exercise(client, owner)
+    output = capsys.readouterr().out
+    assert '"test_key_creation_outcome_unknown": true' in output
+    assert '"review_deployment_check_keys": true' in output
+    assert len(creations) == 1 and creations[0] not in output
+    assert [record.status for record in access_keys.list_keys()] == ["active"]
