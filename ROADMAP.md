@@ -704,6 +704,12 @@ No camera traffic or recoding; peak browser memory 250 MiB, zero swap. Full-page
 physical mobile and real cold-HEVC conversion acceptance remain; see
 [browser evidence](docs/internal/recordings-browser-acceptance.md).
 
+2026-09-28 fresh-process access checkpoint: four isolated interpreter launches
+preserved grants/no-expiry and enforced revocation/exact expiry from SQLite while
+keeping primary access independent. No service restart or production credentials.
+Actual deployment restart/browser reconnect acceptance remains. See
+[activation evidence](docs/internal/delegated-access-activation.md).
+
 2026-09-28 control-dialog lifecycle: siren-selection and protection-schedule overlays
 now close on session end and suppress late completion/error feedback after close.
 Detached submit handlers cannot replay writes. Eight Node races plus a 375×667

@@ -101,6 +101,25 @@ downloaded/decoded data cannot be recalled.
 
 ## Verification and rollout
 
+### Fresh-process persistence checkpoint — 2026-09-28
+
+`tests/test_access_restart.py` starts four fresh Python interpreters against one
+isolated SQLite database. The parent issues finite/non-expiring keys and signed
+cookies; fresh processes preserve exact grants, reject a revoked key and reject
+the finite key at its exact expiration boundary. The primary cookie remains valid
+in every case. Verification reads persisted state, not inherited Python objects.
+
+Children run sequentially with ten-second timeouts, a minimal synthetic environment
+and a temporary working directory (no repository `.env`). Tokens travel over stdin,
+not command-line arguments; output contains only booleans and permission names.
+The local test passed in 5.40 seconds with 79.9 MiB peak/zero swap under a 256 MiB
+cgroup. This validates process-independent persistence, not an actual container
+restart, database loss/restore, secret rotation or browser reconnection.
+
+The separate concurrent-MSE test now waits for each ASGI application's cleanup;
+its CI teardown race was fixed and CI passed on `bcd56bf`. Full browser/proxy and
+physical mobile acceptance remain open.
+
 ASGI tests cover owner creation, delegated login, selected rights, denial of key
 management, revocation, exact expiration and independent primary access. A real
 WebSocket-route test proves a PTZ-only key cannot open a registered live source.
