@@ -1,7 +1,7 @@
 # Temporary access keys — lifecycle foundation, 2026-09-24
 
 **Current status (2026-09-27): delegated login and owner-only UI are implemented in
-source, not yet deployed.** See [activation and rollout](delegated-access-activation.md).
+source and locally deployed as `b-a84862f46bfb`.** See [deployment evidence](delegated-access-activation.md).
 The checkpoints below retain the earlier staged history, including former gates.
 The primary environment key remains unchanged.
 

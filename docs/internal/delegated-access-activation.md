@@ -1,4 +1,50 @@
-# Delegated access activation in source — 2026-09-27
+# Delegated access activation and deployment — 2026-09-27
+
+## Deployment checkpoint
+
+Local deployment completed at **2026-09-27 20:42 UTC**, source `844b575`, image
+`44858110e46c`, runtime build **`b-a84862f46bfb`**. Only `ccg-app` was recreated;
+the go2rtc container kept its original startup time. The brief app replacement
+restarted its recorder processes; no camera control commands were issued.
+
+Before replacement, SQLite's online backup API produced a checked, owner-only
+backup under ignored `data/backups/before-delegated-access-20260927T204130Z.sqlite3`.
+The prior image remains tagged `community-cam-guard-app:before-delegated-access-844b575`.
+Build RUN containers were capped at 512 MiB RAM, no extra swap and 75% of one CPU;
+an isolated image smoke test used 256 MiB, no swap and no network. The daemon itself
+is not covered by those per-container caps. WSL swap was already almost full, so
+no browser/SDK process or concurrent build was started.
+
+Real loopback HTTP verification passed primary and delegated login, exact selected
+grants, denials for administration/live/recordings under a PTZ-only key, expiration
+and revocation. Two clearly labeled `Deployment check` key records were created;
+**both were revoked**, not deleted. No usable test credentials remain. No credential,
+device identifier or response body was printed. Anonymous camera/recording APIs
+returned 401; `.env`, `.git/config`, `data`, `temp` and `re` paths returned 404.
+
+All three cameras reported online/recording. Follow-up at 2026-09-28 02:01 UTC
+confirmed six recent finalized chunks across three cameras, a freshly updated
+index, zero container restarts and no OOM. Segments are configured for **300 seconds**;
+an initial three-minute finalized-chunk window was too short and did not establish
+a recording failure. The app used approximately 110 MiB and go2rtc 22 MiB at the
+post-deployment sample. Real browser playback/layout/proxy interruption acceptance
+remains separate and pending.
+
+### Repeatable operator check
+
+From the repository root, `docker exec -i ccg-app python - < scripts/check_delegated_access.py`
+checks health, build and aggregate status without creating keys. Adding
+`--exercise-access-keys` after `python -` explicitly creates and revokes two test
+keys, including one with five-second expiry. Run only when lifecycle testing is
+intended; completed tests leave revoked audit rows. It always connects to loopback,
+uses the container's configured primary key internally and prints only aggregates.
+Cleanup failure emits a count requiring operator attention. Isolated ASGI tests
+cover the success path and revocation after an intermediate check failure.
+
+The original implementation checkpoint follows; its pre-deployment statements are
+historical. Do not roll the old image back against the migrated DB without checking
+schema compatibility/restoring the backup, and preserve newer recordings/index
+changes before considering any restore.
 
 The owner's requested policy is now implemented: each key chooses its own features
 and may expire at a fixed UTC instant or never expire. Creation/revocation and

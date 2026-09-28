@@ -164,77 +164,44 @@ the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
 
 ### Configuration and access: current limits
 
-Most configuration comes from `.env`/environment. A primary-session-only API for two non-secret
-runtime overrides is available with a localized, responsive Settings tab with compact numeric fields
-([rollout/semantics](docs/internal/runtime-settings.md)). Sign out/in with the primary key if your
-existing session cannot edit. A primary-only delegated-access modal now lets the owner
-select individual features and an expiration date or no expiration; it also lists and
-revokes keys. Delegated login, permission-aware navigation and guarded transports are
-implemented in source, not yet deployed or browser-homologated. See the
-[activation scope and rollout checklist](docs/internal/delegated-access-activation.md).
-Open-socket revalidation is also implemented but not yet deployed; see the
-[channel coverage and remaining gaps](docs/internal/session-channels.md).
-Signed delegated sessions reload persistent validity and selected permissions;
-the primary environment key remains separate and cannot be changed in the dashboard.
-The [restricted temporary MSE bridge](docs/internal/temporary-live-media.md) is tested
-in source; real-browser/proxy validation and backend deployment remain pending.
-[Login pacing](docs/internal/login-abuse-protection.md) is also implemented in source:
-fixed-memory origin quotas and explicit no-forwarded-header trust in the bundled
-launcher. Backend deployment and trusted-proxy/cookie review remain pending.
-[Login request boundaries](docs/internal/login-request-boundaries.md) add body/time/work
-limits and transport-based Secure cookies in source; proxy/browser validation and rollout
-remain pending. These staged changes do not establish safe internet exposure.
-The [shared browser-origin policy](docs/internal/browser-origin-policy.md) now adds
-origin checks and an optional server-only `DASHBOARD_PUBLIC_ORIGIN` for HTTPS proxies.
-It remains undeployed; the proxy must preserve Host and restrict its backend port.
-Local-only camera-operation restrictions are unchanged.
-[Public-file hardening](docs/internal/public-file-audit.md) is also staged: an explicit
-dashboard asset allowlist, MP4-only archive paths and stronger build-context exclusions.
-No deployment or complete secret-exposure audit is implied by these source changes.
-The [recording GET boundary](docs/internal/recording-get-boundary.md) is staged too:
-only explicit POST initiates HTTP playback conversion. The dashboard already follows
-this sequence; older API clients may need adjustment before backend rollout.
-[Control/account error hardening](docs/internal/public-control-errors.md) now removes
-raw exception text from covered HTTP/audio responses and selected logs. It is staged,
-not a complete credential audit. Discovery query credentials were a priority finding.
-That finding is now [addressed in source](docs/internal/discovery-credential-body.md):
-discovery accepts credentials only in bounded JSON, and bundled HTTP access logs omit
-query strings. Legacy clients and external proxies need review before backend rollout.
-HTTP schema failures now use a [generic validation response](docs/internal/sensitive-validation.md)
-instead of exposing rejected inputs or validator context. This backend change is also
-staged; business errors and successful driver payloads remain under review.
-The [provisioning error audit](docs/internal/provisioning-public-errors.md) now covers
-Wi-Fi selection, QR and handled BLE/session failures with fixed, actionable messages;
-label resolution and handled privileged errors are now covered as well. Successful
-payloads and lower-level logs remain under review. No backend rollout is implied.
-The Yoosee BLE Wi-Fi confirmation now exposes only a validated connection status;
-unknown response fields are no longer forwarded to the browser or listed in decoder logs.
-BLE network-list/link-type metadata is also projected through explicit field limits;
-alternate firmware response layouts require compatibility validation before rollout.
-Privileged enrollment status also has an explicit vendor-neutral field/type contract;
-driver dictionaries cannot silently expose additional fields to the browser.
-The [driver response/log audit](docs/internal/driver-response-log-audit.md) adds strict
-diagnostic scalars, reviewed completion metadata and safe proxy/AAC failure reporting.
-Raw trusted-LAN property diagnostics are not a public or guest-safe data contract.
-Camera catalogue responses also omit raw stream paths and private capability fields;
-driver control/support decisions still use the unchanged internal evidence.
-Generated go2rtc configuration is [written owner-only](docs/internal/private-media-config.md)
-while preserving its Docker file mount. Custom deployments with different service
-UIDs must review ownership before rollout; existing live files are not yet migrated.
-For a [safe diagnostic snapshot](docs/internal/safe-stream-diagnostics.md), run
-`bash scripts/diagnose_streams_safe.sh`; it collects watcher metadata without opening
-extra camera streams or dumping credentials/configuration. Continuous sampling uses
-`scripts/watch_live_streams.py`; historical bundles are not automatically sanitized.
-The dashboard now [rechecks session validity and cleans up players/audio](docs/internal/dashboard-session-watch.md);
-browser background throttling and remaining server-side rollout gates are documented.
-Temporary recording/download delivery now has a [tested cancellation guard](docs/internal/recording-session-delivery.md)
-in source; backend deployment and temporary login remain pending.
-After environment changes, recreate the app container; merely
-refreshing the browser does not reconfigure workers. Do not publish `.env`, session cookies,
-camera credentials or internal media ports. Authentication alone is not a completed internet-facing
-security audit. The [settings inventory and plan](docs/internal/settings-dashboard-plan.md)
-classifies all 43 declared options, including unused fields, restart requirements and server-only
-secrets. Changes to retention can delete originals; review that policy before deployment.
+Most configuration comes from `.env`/environment. The primary-session-only Settings
+tab exposes two safe runtime preferences (Auto HD limit and playback cache), plus
+delegated-access management. It never displays or rewrites the raw environment or
+the server's primary key. See [Settings](docs/public/settings.md).
+
+Each delegated key has a label, explicit per-feature permissions and an optional
+expiration date; **no expiration** means valid until revoked, not an immortal
+browser session. Only primary-key sessions can create/revoke keys. Rights apply
+across configured cameras and never enable a feature unsupported by its driver.
+Local-only control restrictions remain in force.
+
+The local deployment was updated on 2026-09-27 to build **`b-a84862f46bfb`**.
+Live HTTP checks passed for delegated login, permission denials, expiration,
+revocation and protected public paths; all three cameras resumed recording.
+See [deployment evidence, safe check and remaining acceptance](docs/internal/delegated-access-activation.md).
+Real-browser/mobile layout and proxy/channel interruption acceptance remain pending.
+
+The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
+[request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),
+[public-file restrictions](docs/internal/public-file-audit.md), [guarded recording delivery](docs/internal/recording-session-delivery.md)
+and [restricted delegated MSE](docs/internal/temporary-live-media.md). These are not
+a certification that internet exposure is safe. Review trusted proxies, HTTPS,
+cookie handling and firewall rules; never expose internal media ports.
+
+API clients must [send discovery credentials in JSON](docs/internal/discovery-credential-body.md)
+and [explicitly prepare recordings with POST](docs/internal/recording-get-boundary.md).
+Public [errors](docs/internal/provisioning-public-errors.md) and
+[driver responses](docs/internal/driver-response-log-audit.md) are bounded projections;
+alternate firmware layouts still need compatibility testing. Generated media
+configuration is [owner-only](docs/internal/private-media-config.md); custom service
+UIDs must have compatible ownership.
+
+For a content-free diagnostic snapshot, use `bash scripts/diagnose_streams_safe.sh`;
+see [safe diagnostics](docs/internal/safe-stream-diagnostics.md). Historical logs and
+bundles are not retroactively sanitized. After environment changes, recreate the app
+container; browser refresh does not reconfigure workers. Never publish `.env`,
+cookies, camera credentials or database backups. The [settings inventory](docs/internal/settings-dashboard-plan.md)
+classifies all 43 declared options; retention changes can delete original footage.
 
 ### Tests
 

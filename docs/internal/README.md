@@ -91,4 +91,4 @@ short; de-identify examples (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`) — never real 
 
 - [Delegated access activation (2026-09-27)](delegated-access-activation.md): optional
   expiration, explicit feature grants, owner-only modal, login and guarded transports.
-  Source-tested; deployment and real-browser acceptance remain pending.
+  Source-tested and locally deployed as `b-a84862f46bfb`; real-browser acceptance remains pending.

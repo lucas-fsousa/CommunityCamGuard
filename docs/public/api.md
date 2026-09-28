@@ -8,44 +8,44 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
   raw schema at [`/api/openapi.json`](/api/openapi.json).
 - **Content type:** JSON request/response unless noted.
 
-## Staged live-media authorization
+## Live-media authorization
 
-`/api/go2rtc/ws` has a restricted temporary-session MSE path implemented in source,
-not deployed. It accepts only registered HD/web sources and rechecks key validity
+The local deployment `b-a84862f46bfb` includes the restricted temporary-session MSE
+path. It accepts only registered HD/web sources and rechecks key validity
 during delivery; arbitrary sources and WebRTC negotiation are denied for temporary
-sessions. Public delegated login is implemented in source, with per-key grants.
+sessions. Public delegated login is active, with per-key grants.
 Primary/legacy behavior is unchanged. See [activation and rollout](../internal/delegated-access-activation.md).
 
 ## Authentication
 
-Staged error contract: covered control/PTZ/intercom and vendor-account errors retain
+Error contract: covered control/PTZ/intercom and vendor-account errors retain
 their status codes but use fixed public messages instead of raw provider/transport
 exceptions. Do not parse vendor exception prose. See [scope and remaining audit](../internal/public-control-errors.md).
 
 Public surface: login/logout, session status, build/health, API schema/docs and
 reviewed dashboard assets. Serving the dashboard shell does not authorize API access.
-Staged file hardening (not deployed) rejects unlisted public files and hidden/non-MP4
+Deployed file hardening rejects unlisted public files and hidden/non-MP4
 archive targets. See [file and route audit](../internal/public-file-audit.md).
 
-Staged origin policy (not deployed): login/logout, authenticated mutations and
+Origin policy: login/logout, authenticated mutations and
 WebSocket handshakes reject mismatched Origin/Referer and cross-site/same-site fetch
 metadata. Scripts without these headers remain supported, but no-Origin HTML form
 media types are denied. `DASHBOARD_PUBLIC_ORIGIN` can pin the external origin behind
 HTTPS termination; preserve Host and restrict backend access. This does not relax
 local-only controls. See [policy and migration](../internal/browser-origin-policy.md).
 
-Staged source change (backend deployment pending): POST `/api/login` allows a burst
+POST `/api/login` allows a burst
 of 10 attempts per origin quota, replenishing one every 6 seconds. Excess attempts
 receive 429 with `Retry-After` seconds; successful and malformed requests also count.
 Do not retry in a tight loop. Clients behind a proxy/NAT may share the quota.
 See [identity boundaries and limitations](../internal/login-abuse-protection.md).
 
-Additional staged login limits: 16 KiB JSON envelope (413), a total 5-second body
+Additional login limits: 16 KiB JSON envelope (413), a total 5-second body
 deadline (408), and 8 concurrent handlers (503 + `Retry-After: 1`). Unsupported body
 encoding/type returns 415; invalid input is redacted. HTTPS ASGI requests receive
 Secure cookies; TLS termination outside the app uses the optional canonical origin
 described above and still requires real proxy/browser validation.
-See [request/cookie boundaries](../internal/login-request-boundaries.md). Not deployed.
+See [request/cookie boundaries](../internal/login-request-boundaries.md).
 
 Auth is a **session cookie**, not a token header. Log in once with the dashboard key; the server
 sets an HTTP-only cookie `ccg_session` required by protected endpoints. Health/build and
@@ -66,8 +66,8 @@ like passwords and never log/share them. Logout clears the caller's cookie; it i
 revocation of a stolen copy. Primary-session identification and its management dependency are
 implemented and deployed, along with the two-field settings API described below.
 The settings screen now uses this API. Delegated-key management, login, permission
-enforcement and session/channel invalidation are implemented in source, not yet
-deployed or browser-homologated. See [activation and rollout](../internal/delegated-access-activation.md).
+enforcement and session/channel invalidation are locally deployed and HTTP-tested,
+not yet browser-homologated. See [deployment evidence](../internal/delegated-access-activation.md).
 
 ---
 
@@ -82,8 +82,8 @@ deployed or browser-homologated. See [activation and rollout](../internal/delega
 | GET | `/api/me` | — | `{authenticated, authentication, can_manage}`. `authentication` is `primary`, `legacy`, `temporary`, or null. Delegated sessions also include `permissions`. No session ID/token is returned. |
 
 The dashboard polls `/api/me` without caching and returns to login when the session
-is invalid. The response also declares `Cache-Control:no-store` in source (backend
-deployment pending). Polling complements, rather than replaces, server authorization;
+is invalid. The response also declares `Cache-Control:no-store`.
+Polling complements, rather than replaces, server authorization;
 suspended browser tabs may react later. See [session cleanup](../internal/dashboard-session-watch.md).
 
 New primary-key logins issue versioned sessions. Exact legacy `{"ok":true}` cookies retain
@@ -96,7 +96,7 @@ Settings and the new key-management endpoints require primary sessions.
 These backend updates are included in the settings deployment;
 see [session migration and rollout](../internal/session-principal.md).
 
-### Delegated-key management (implemented in source, not yet deployed)
+### Delegated-key management
 
 These routes are restricted to verified primary sessions: anonymous/invalid sessions
 receive 401, legacy/delegated sessions 403. Creation and listing return
@@ -109,8 +109,7 @@ receive 401, legacy/delegated sessions 403. Creation and listing return
 | POST | `/api/access-keys/{id}/revoke` | Empty JSON object `{}` | Metadata with first revocation timestamp; repeated revocation is idempotent; unknown ID 404 |
 
 Metadata: `id`, `label`, UTC `created_at`, nullable `expires_at`, `permissions`, nullable `revoked_at`, and
-`status` (`active`, `expired`, `revoked`). Active here describes a key record, **not**
-permission to log in before rollout. Expiry is absolute, never extended by reading.
+`status` (`active`, `expired`, `revoked`). Expiry is absolute, never extended by reading.
 Verifiers are never returned; there is no secret-recovery endpoint.
 
 Permission values: `live`, `recordings`, `ptz`, `intercom`, `reboot`, `white_light`,
@@ -129,8 +128,8 @@ body/path/pagination receives sanitized 422; storage failures receive generic 50
 Creation is not idempotent: if its response is lost, list/revoke the uncertain key
 before deliberately creating another; do not automatically retry creation.
 
-No production keys or schema were created for validation. The staged API needs a
-backend rebuild to be served; see [rollout checklist](../internal/delegated-access-activation.md).
+The local lifecycle smoke check created two labeled test keys and revoked both;
+see [deployment evidence and operator check](../internal/delegated-access-activation.md).
 
 ### Cameras
 
@@ -332,7 +331,7 @@ semantics. The Yoosee driver maps the complete value to `guardParm.plan` and req
 
 | Method | Path | Params | Notes |
 |---|---|---|---|
-| POST | `/api/discovery/scan` | Optional JSON `{username, password}`; no query parameters | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Empty body retains credential-free discovery. Credential migration is staged, not deployed. |
+| POST | `/api/discovery/scan` | Optional JSON `{username, password}`; no query parameters | Scan the network (ONVIF WS-Discovery + RTSP probing) and return found cameras. Empty body retains credential-free discovery. Query credentials are no longer accepted. |
 
 ### Factory provisioning (authenticated trusted LAN only)
 
@@ -548,7 +547,7 @@ HEVC only with capability detection and a bounded fallback. On native failure, p
 decoder state. Do not fall back recursively or start an encode for every Range request.
 
 Preparation admits at most four jobs per application process (one encoder, up to three waiting).
-The GET-no-conversion behavior is staged in source, not deployed. Legacy API clients
+The deployed GET-no-conversion behavior requires legacy API clients to change: they
 must explicitly POST preparation: polling after 409 alone will not start a job.
 See [compatibility checkpoint](../internal/recording-get-boundary.md).
 Admission rejection returns `429` with `Retry-After: 5`; queue expiry/conversion failure reports
@@ -589,7 +588,8 @@ retain 502; these handled failures have no-store headers and do not return provi
 exception text. Label/driver-resolution failures now also use fixed 422 instructions.
 Handled privileged state failures return fixed 409 recovery guidance; transport and
 completion failures use fixed 502 messages. Completion error stage strings are no
-longer exposed. Successful payloads are unchanged; these are staged backend changes.
+longer exposed. These backend changes are deployed; the following sections describe
+the additional projections of successful payloads.
 Follow-up for Yoosee BLE command `0x85`: public `json`/`text` now contain only a
 validated signed-32-bit-integer `connectStatus`; unknown camera fields are discarded.
 Invalid/missing status produces null JSON/status and `wifi_connection.connected=false`.
@@ -600,7 +600,7 @@ signed-32-bit integer `level` (first 100 entries inspected). `0x73` projects int
 `linkType`, with derived `linkTypeName="WIFI"` only for type 1. Unknown schemas return
 null metadata; unknown fields are discarded. Public text is regenerated and `hex`
 is empty for all supported replies. Alternate firmware layouts require explicit
-driver mapping before backend rollout; these limits are not a live validation claim.
+driver mapping before use; these limits are not a live validation claim.
 Privileged `/status` permits only `device_id`, `expires_in` and boolean flags
 `handoff_ready`, `bound`, `subscription_material_ready`, `p2p_access_ready`, `rtsp_ready`.
 The identity must match the request's inspected label; expiry must be an integer

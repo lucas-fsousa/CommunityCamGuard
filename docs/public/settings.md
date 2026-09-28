@@ -9,8 +9,8 @@ See the [rollout checkpoint](../internal/runtime-settings.md) for deployment sta
 Sign in with the server's primary dashboard key. Old sessions can still monitor
 cameras, but cannot administer settings: sign out and sign in again. The backend
 enforces this independently of the UI. Delegated-access login and management are
-implemented in source; backend/frontend deployment and browser validation are still
-pending. See [activation and rollout](../internal/delegated-access-activation.md).
+deployed locally in build `b-a84862f46bfb`; HTTP lifecycle checks passed. Real-browser
+and mobile layout acceptance remain pending. See [deployment evidence](../internal/delegated-access-activation.md).
 
 The centered panel uses compact numeric fields beside each setting's title, with
 explanations below and separate save/reload actions. It adapts to narrow screens.

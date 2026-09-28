@@ -1,7 +1,7 @@
 # Staged temporary sessions — 2026-09-24
 
-**Current status: login/UI and per-key permissions are implemented in source, not
-deployed.** See [2026-09-27 activation](delegated-access-activation.md). The details
+**Current status: login/UI and per-key permissions are locally deployed.**
+See [2026-09-27 activation](delegated-access-activation.md). The details
 below describe the original staged checkpoint. No production credentials were issued.
 
 ## Binding and validity
