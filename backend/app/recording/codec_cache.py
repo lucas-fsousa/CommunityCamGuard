@@ -8,6 +8,10 @@ from pathlib import Path
 _LIMIT = 256
 _LOCK = threading.Lock()
 _VALUES: OrderedDict[tuple[str, int, int, int, int, int], str] = OrderedDict()
+# Fixed stripes avoid an unbounded per-file lock registry. Collisions only wait;
+# they never share metadata. Limit subprocesses even for different recordings.
+_STRIPES = tuple(threading.Lock() for _ in range(32))
+_PROBES = threading.BoundedSemaphore(2)
 
 
 def _identity(path: Path) -> tuple[str, int, int, int, int, int]:
@@ -16,17 +20,28 @@ def _identity(path: Path) -> tuple[str, int, int, int, int, int]:
 
 
 def lookup(segment: Path, probe: Callable[[Path], str]) -> str:
-    """Concurrent misses may probe independently; no lock is held over subprocess I/O."""
+    """Coalesce successful same-file probes; allow at most two probes at once.
+
+    The supplied probe must be bounded (production ffprobe times out after 10s).
+    No global metadata lock is held over subprocess I/O, and failures are not cached.
+    """
+    path = segment.resolve()
+    with _STRIPES[hash(str(path)) % len(_STRIPES)]:
+        return _lookup(path, probe)
+
+
+def _lookup(path: Path, probe: Callable[[Path], str]) -> str:
     try:
-        path = segment.resolve()
         key = _identity(path)
     except OSError:
-        return probe(segment)
+        with _PROBES:
+            return probe(path)
     with _LOCK:
         if key in _VALUES:
             _VALUES.move_to_end(key)
             return _VALUES[key]
-    value = probe(path)
+    with _PROBES:
+        value = probe(path)
     if not value:
         return value
     try:

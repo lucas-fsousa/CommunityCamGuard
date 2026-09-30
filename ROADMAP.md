@@ -6,6 +6,12 @@ Living document: backlog, priorities and milestones. Technical detail and ration
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
 
+2026-09-30 recording metadata checkpoint: concurrent successful same-file codec
+probes are coalesced; at most two ffprobe inspections run per server process, with
+fixed-size admission bookkeeping. This reduces redundant subprocesses before
+encoder admission, not the cost of cold HEVC conversion. See
+[cache/probe identity](docs/internal/recording-cache-identity.md).
+
 PTZ update (2026-09-14): **user physically validated all four directions and fluidity
 on camera 3**. Dashboard API validation also passed all four; warm alternating
 actions took 391–411 ms end-to-end. Update 2026-09-15: driver-owned model/profile

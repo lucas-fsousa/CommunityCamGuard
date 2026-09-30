@@ -26,3 +26,28 @@ bulk re-encoding, background warmer activation or original deletion is introduce
 Synthetic tests cover growth/replacement/removal while queued and during encoding,
 cache invalidation, empty-cache rebuilding, missing originals and existing encoder
 budget/logging behavior. No camera or real encoder is used in these tests.
+
+## Codec probe admission
+
+Concurrent cold requests previously could each launch ffprobe for the same file,
+before reaching the encoder budget. Metadata lookup now serializes each resolved
+path using 32 fixed lock stripes and permits at most two probes per server process.
+Successful concurrent lookups reuse the identity-checked LRU entry. Stripe
+collisions may wait but cannot share another recording's metadata; there is no
+growing lock registry, worker pool or media buffer. The global metadata lock is
+never held during subprocess I/O. Probe exceptions release both admission locks;
+unknown results and failures remain uncached, not fabricated successful results.
+
+The production subprocess timeout remains ten seconds per probe. Admission wait
+is additional and heavy contention can still exceed the browser request deadline;
+this change bounds subprocess pressure, not total first-frame latency. Limits are
+per process, not a cross-worker/distributed budget. Complete-file HEVC conversion
+is unchanged, with one encoder and no automatically enabled warmer. Synthetic
+concurrency tests cover same-file reuse, two distinct simultaneous probes and
+exception cleanup, without invoking ffprobe or accessing cameras.
+
+The optional warmer now uses the same cache-validity check: an empty derived file
+is pending work, not a completed conversion. Its inspections explicitly do not
+touch cache modification times, so merely scanning recent archives cannot promote
+unused entries in LRU. A synthetic regression covers both behaviors. The warmer
+remains opt-in and disabled by default.

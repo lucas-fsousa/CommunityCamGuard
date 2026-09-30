@@ -139,8 +139,8 @@ def _ffmpeg_cmd(src: Path, dst: Path) -> list[str]:
             "-movflags", "+faststart", "-f", "mp4", str(dst)]
 
 
-def cached_path(segment: Path) -> Path | None:
-    """Return and touch an existing derived cache file, without starting any work."""
+def cached_path(segment: Path, *, touch: bool = True) -> Path | None:
+    """Return a valid derived file; background inspection must not refresh LRU."""
     identity = signature(segment)
     cache = cache_path(segment)
     if not segment.is_file() or not cache.is_file():
@@ -150,10 +150,11 @@ def cached_path(segment: Path) -> Path | None:
             return None
     except OSError:
         return None
-    try:
-        os.utime(cache, None)                # mark recently used -> survives LRU eviction
-    except OSError:
-        pass
+    if touch:
+        try:
+            os.utime(cache, None)            # actual viewer use refreshes LRU
+        except OSError:
+            pass
     if identity is None or signature(segment) != identity:
         return None
     return cache
@@ -322,7 +323,7 @@ class Warmer:
         from . import recorder  # local import: recorder doesn't import playback (no cycle)
         for it in recorder.query_segments(limit=self.window, offset=0)["items"]:
             seg = Path(it["path"])
-            if seg.is_file() and not cache_path(seg).is_file() and needs_transcode(seg):
+            if seg.is_file() and cached_path(seg, touch=False) is None and needs_transcode(seg):
                 return seg
         return None
 

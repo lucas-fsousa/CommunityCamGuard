@@ -1,3 +1,5 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -70,3 +72,80 @@ def test_failed_ffprobe_output_is_not_published(tmp_path, monkeypatch):
                         lambda *a, **k: SimpleNamespace(returncode=1, stdout="hevc\n"))
     assert playback.video_codec(path) == ""
     assert not codec_cache._VALUES
+
+
+def test_concurrent_same_file_misses_share_successful_probe(tmp_path):
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"sample")
+    started, release = threading.Event(), threading.Event()
+    calls = []
+
+    def probe(value):
+        calls.append(value)
+        started.set()
+        assert release.wait(2)
+        return "hevc"
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        first = pool.submit(codec_cache.lookup, path, probe)
+        try:
+            assert started.wait(2)
+            others = [pool.submit(codec_cache.lookup, path, probe) for _ in range(3)]
+        finally:
+            release.set()
+        assert first.result(timeout=2) == "hevc"
+        assert [future.result(timeout=2) for future in others] == ["hevc"] * 3
+    assert calls == [path.resolve()]
+
+
+def test_distinct_files_have_bounded_parallel_probes(tmp_path):
+    # Select different stripes deterministically for this interpreter's hash seed.
+    paths = {}
+    for index in range(10000):
+        path = tmp_path / f"{index}.mp4"
+        paths.setdefault(hash(str(path)) % len(codec_cache._STRIPES), path)
+        if len(paths) == 4:
+            break
+    assert len(paths) == 4
+    for path in paths.values():
+        path.write_bytes(b"sample")
+    lock = threading.Lock()
+    two_started, release = threading.Event(), threading.Event()
+    active = peak = 0
+
+    def probe(_):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+            if active == 2:
+                two_started.set()
+        try:
+            assert release.wait(2)
+            return "h264"
+        finally:
+            with lock:
+                active -= 1
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(codec_cache.lookup, path, probe) for path in paths.values()]
+        try:
+            assert two_started.wait(2)
+        finally:
+            release.set()
+        assert [future.result(timeout=2) for future in futures] == ["h264"] * 4
+    assert peak == 2
+
+
+def test_probe_exception_releases_admission_and_does_not_cache(tmp_path):
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"sample")
+
+    def broken(_):
+        raise RuntimeError("probe failed")
+
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match="probe failed"):
+            codec_cache.lookup(path, broken)
+    assert not codec_cache._VALUES
+    assert codec_cache.lookup(path, lambda _: "h264") == "h264"

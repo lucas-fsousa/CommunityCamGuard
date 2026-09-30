@@ -1,5 +1,6 @@
 """Cover the playback Warmer's thread lifecycle + a couple of transcoded_path edges the main
 test_playback.py leaves out."""
+import os
 import threading
 
 from backend.app.recording import playback
@@ -42,3 +43,22 @@ def test_transcoded_path_swallows_a_transcode_exception(monkeypatch, tmp_path):
     assert playback.transcoded_path(seg) is None            # no crash
     assert not playback.cache_path(seg).is_file()
     assert not list(playback.cache_path(seg).parent.glob("*.part"))   # temp cleaned up
+
+
+def test_warmer_rebuilds_empty_cache_without_refreshing_valid_entries(monkeypatch, tmp_path):
+    from backend.app.recording import recorder
+
+    valid, empty = tmp_path / "valid.mp4", tmp_path / "empty.mp4"
+    for source in (valid, empty):
+        source.write_bytes(b"source")
+    cached = playback.cache_path(valid)
+    cached.write_bytes(b"derived")
+    os.utime(cached, ns=(1_000_000_000, 1_000_000_000))
+    original_mtime = cached.stat().st_mtime_ns
+    playback.cache_path(empty).write_bytes(b"")
+    monkeypatch.setattr(recorder, "query_segments", lambda **kw: {
+        "items": [{"path": str(valid)}, {"path": str(empty)}],
+    })
+    monkeypatch.setattr(playback, "needs_transcode", lambda _: True)
+    assert Warmer(enabled=True)._next_segment() == empty
+    assert cached.stat().st_mtime_ns == original_mtime
