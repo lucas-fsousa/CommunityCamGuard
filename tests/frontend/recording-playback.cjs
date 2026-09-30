@@ -234,5 +234,30 @@ function harness(support = "") {
     assert.notEqual(h.status.textContent, "rec.startTimedOut");
     h.controller.dispose();
   }
+  for (const failure of ["NotSupportedError", "NetworkError", "AbortError", "media-event"]) {
+    const h = harness();
+    h.player.paused = false;
+    if (failure !== "media-event") h.player.reject = failure;
+    h.controller.select("broken");
+    h.requests[0].resolve({ ready: true, cached: true }); await flush();
+    if (failure === "media-event") {
+      h.player.error = { code: 2 }; h.player.emit("error");
+    }
+    assert.equal(h.status.textContent, "rec.playbackFailed");
+    assert.equal(h.states.at(-1).loading, false);
+    assert.equal(h.player.src, "");
+    assert.equal(h.timers.size, 0);
+    for (const event of ["waiting", "playing", "canplay", "pause", "error"]) h.player.emit(event);
+    assert.equal(h.status.textContent, "rec.playbackFailed");
+    assert.equal(h.requests.length, 1); // Failure must not reprepare automatically.
+    h.player.reject = null; h.player.error = null;
+    h.controller.select("broken");
+    assert.equal(h.requests.length, 2); // One explicit click starts a fresh attempt.
+    h.requests[1].resolve({ ready: true, cached: true }); await flush();
+    h.player.emit("playing");
+    assert.equal(h.status.textContent, "");
+    assert(h.player.src.endsWith("path=broken"));
+    h.controller.dispose();
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

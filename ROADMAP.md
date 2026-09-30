@@ -13,6 +13,10 @@ encoder admission, not the cost of cold HEVC conversion. See
 [cache/probe identity](docs/internal/recording-cache-identity.md).
 Follow-up: codec admission now has a shared one-second wait budget and explicit
 HTTP 429 on saturation, preserving original downloads without probing.
+Playback retry follow-up: failed media/play attempts now detach their source and
+clear readiness so one explicit selection starts a fresh attempt; autoplay denial
+and deliberate pause retain normal resume behavior. See
+[lifecycle evidence](docs/internal/recordings-playback-lifecycle.md).
 
 PTZ update (2026-09-14): **user physically validated all four directions and fluidity
 on camera 3**. Dashboard API validation also passed all four; warm alternating

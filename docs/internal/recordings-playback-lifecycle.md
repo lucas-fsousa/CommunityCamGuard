@@ -131,3 +131,31 @@ desktop, 176.1 MiB mobile, 236 MiB media lifecycle; all exited. Optional reprodu
 --screenshot temp/recordings-overlay-mobile.png` inside the same resource limits.
 The existing `--fixture` mode checks actual playback. No camera/production recording
 was requested. Frontend bind mounts serve this after reload, without app recreation.
+
+## Failed play attempt cleanup — 2026-09-30
+
+A rejected `video.play()` promise (other than autoplay denial or deliberate pause)
+previously showed an error but left the selection marked ready. Re-selecting that
+row could reuse a failed media source instead of starting a fresh attempt. Media
+error events also left the source attached, allowing subsequent events to overwrite
+the failure feedback.
+
+Both paths now invalidate the attempt, cancel startup timers, detach the media
+source and clear loading. A single explicit row selection can prepare/load again;
+there is no automatic request, conversion retry or new UI control. Late events
+before retry cannot overwrite the error. Native decode failures still use the
+existing one-shot compatibility fallback; autoplay denial and intentional pause
+retain their source and seek position. This is a demonstrated lifecycle defect,
+not evidence that it caused all earlier production stalls.
+
+Node contracts cover unsupported/network/interrupted play rejections, media-error
+events, late-event suppression and single-click recovery, alongside the existing
+autoplay, pause, native fallback and selection cancellation cases.
+
+The integrated production-view Chromium fixture also passed at 375×667 using the
+existing local five-second H.264 file: playback, seek, same-row resume, rapid switch,
+download isolation, cleanup and list timeout/retry. It ran in a 512 MiB/no-swap,
+75%-CPU cgroup and reached that memory cap (zero swap); no additional browser run
+was launched. First-frame 715 ms is a fixture observation, not production latency.
+New rejection races are covered by Node; this browser run checks normal-flow
+regressions, not physical mobile or authenticated production failure recovery.

@@ -66,8 +66,23 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
       clearTimeout(item.startTimer);
       // A deliberate pause can reject the pending play promise; it is not a media failure.
       if (error?.name === "AbortError" && player.paused && !player.error) return message("");
-      message(error?.name === "NotAllowedError" ? "rec.readyPressPlay" : "rec.playbackFailed");
+      if (error?.name === "NotAllowedError") return message("rec.readyPressPlay");
+      fail(item);
     }).finally(() => { if (item.attempt === attempt) item.playPending = false; });
+  }
+
+  function fail(item) {
+    if (!active(item)) return;
+    item.failed = true;
+    item.ready = false;
+    item.attempt++; // Reject late promises/events from this failed source.
+    item.playPending = false;
+    clearTimeout(item.nativeTimer);
+    clearTimeout(item.startTimer);
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    message("rec.playbackFailed");
   }
 
   function fallback(item) {
@@ -161,10 +176,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
   function onError() {
     if (!current?.ready || disposed) return;
     if (current.original && [3, 4].includes(player.error?.code)) return fallback(current);
-    clearTimeout(current.nativeTimer);
-    clearTimeout(current.startTimer);
-    message("rec.playbackFailed");
-    current.failed = true;
+    fail(current);
   }
   player.addEventListener("playing", onPlaying);
   player.addEventListener("error", onError);
