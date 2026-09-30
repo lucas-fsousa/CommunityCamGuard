@@ -11,6 +11,8 @@ probes are coalesced; at most two ffprobe inspections run per server process, wi
 fixed-size admission bookkeeping. This reduces redundant subprocesses before
 encoder admission, not the cost of cold HEVC conversion. See
 [cache/probe identity](docs/internal/recording-cache-identity.md).
+Follow-up: codec admission now has a shared one-second wait budget and explicit
+HTTP 429 on saturation, preserving original downloads without probing.
 
 PTZ update (2026-09-14): **user physically validated all four directions and fluidity
 on camera 3**. Dashboard API validation also passed all four; warm alternating

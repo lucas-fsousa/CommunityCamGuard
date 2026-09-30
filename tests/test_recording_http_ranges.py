@@ -143,6 +143,30 @@ def test_busy_encoder_only_affects_explicit_post(archive, monkeypatch):
     assert response.status_code == 429 and response.headers["retry-after"] == "5"
 
 
+def test_busy_codec_inspection_is_retryable_without_blocking_original_download(archive, monkeypatch):
+    client, source, _ = archive
+    monkeypatch.setattr(recordings.registry, "list_cameras", lambda: [])
+
+    def busy(_):
+        raise recordings.PlaybackBusy("private diagnostic")
+
+    monkeypatch.setattr(recordings.playback, "needs_transcode", busy)
+    monkeypatch.setattr(recordings.playback, "video_codec", busy)
+    monkeypatch.setattr(recordings.playback, "prepare_transcode",
+                        lambda _: pytest.fail("saturated probe started encoding"))
+    params = {"path": str(source)}
+    for method, route, extra in [
+        ("GET", "file", {}), ("GET", "playback-status", {}),
+        ("POST", "prepare", {}), ("POST", "prepare", {"native_hevc": True}),
+    ]:
+        response = client.request(method, f"/api/recordings/{route}", params=params | extra)
+        assert response.status_code == 429
+        assert response.headers["retry-after"] == "5"
+        assert "private diagnostic" not in response.text
+    assert client.get("/api/recordings/file", params=params | {"original": True}).status_code == 200
+    assert client.get("/api/recordings/download", params=params).status_code == 200
+
+
 @pytest.mark.parametrize("codec", ["h264", ""])
 def test_native_hint_does_not_select_unknown_or_other_codecs(archive, monkeypatch, codec):
     client, source, _ = archive

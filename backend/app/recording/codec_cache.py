@@ -1,9 +1,12 @@
 """Bounded codec metadata cache; never retain media bytes or cache probe failures."""
 
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from pathlib import Path
+
+from .playback_budget import PlaybackBusy
 
 _LIMIT = 256
 _LOCK = threading.Lock()
@@ -12,6 +15,7 @@ _VALUES: OrderedDict[tuple[str, int, int, int, int, int], str] = OrderedDict()
 # they never share metadata. Limit subprocesses even for different recordings.
 _STRIPES = tuple(threading.Lock() for _ in range(32))
 _PROBES = threading.BoundedSemaphore(2)
+ADMISSION_SECONDS = 1.0
 
 
 def _identity(path: Path) -> tuple[str, int, int, int, int, int]:
@@ -26,22 +30,35 @@ def lookup(segment: Path, probe: Callable[[Path], str]) -> str:
     No global metadata lock is held over subprocess I/O, and failures are not cached.
     """
     path = segment.resolve()
-    with _STRIPES[hash(str(path)) % len(_STRIPES)]:
-        return _lookup(path, probe)
+    deadline = time.monotonic() + ADMISSION_SECONDS
+    stripe = _STRIPES[hash(str(path)) % len(_STRIPES)]
+    if not stripe.acquire(timeout=ADMISSION_SECONDS):
+        raise PlaybackBusy("codec inspection wait budget exhausted")
+    try:
+        return _lookup(path, probe, deadline)
+    finally:
+        stripe.release()
 
 
-def _lookup(path: Path, probe: Callable[[Path], str]) -> str:
+def _probe(path: Path, probe: Callable[[Path], str], deadline: float) -> str:
+    if not _PROBES.acquire(timeout=max(0.0, deadline - time.monotonic())):
+        raise PlaybackBusy("codec inspection wait budget exhausted")
+    try:
+        return probe(path)
+    finally:
+        _PROBES.release()
+
+
+def _lookup(path: Path, probe: Callable[[Path], str], deadline: float) -> str:
     try:
         key = _identity(path)
     except OSError:
-        with _PROBES:
-            return probe(path)
+        return _probe(path, probe, deadline)
     with _LOCK:
         if key in _VALUES:
             _VALUES.move_to_end(key)
             return _VALUES[key]
-    with _PROBES:
-        value = probe(path)
+    value = _probe(path, probe, deadline)
     if not value:
         return value
     try:

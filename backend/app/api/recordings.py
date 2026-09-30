@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +18,15 @@ from ..recording.delivery import SessionFileResponse as FileResponse
 from ..recording.playback_budget import PlaybackBusy
 
 router = APIRouter(prefix="/api", tags=["recordings"])
+
+
+@contextmanager
+def _playback_admission() -> Iterator[None]:
+    """Resource saturation is retryable, never an unknown-codec success."""
+    try:
+        yield
+    except PlaybackBusy:
+        raise HTTPException(429, "playback preparation is busy", headers={"Retry-After": "5"}) from None
 
 
 def _legacy_recording_mac(value: str) -> str:
@@ -77,8 +88,9 @@ def recording_file(path: str, original: bool = False):
     playable = playback.cached_path(target)
     if playable is not None:
         return FileResponse(playable, media_type="video/mp4")
-    if not playback.needs_transcode(target):
-        return FileResponse(target, media_type="video/mp4")
+    with _playback_admission():
+        if not playback.needs_transcode(target):
+            return FileResponse(target, media_type="video/mp4")
     raise HTTPException(
         status_code=409,
         detail="compatible playback is not ready; POST /api/recordings/prepare before polling playback status",
@@ -91,7 +103,8 @@ def _recording_playback_state(target: Path) -> dict:
         return {"ready": True, "cached": True, "transcoding": False}
     if playback.transcode_in_progress(target):
         return {"ready": False, "cached": False, "transcoding": True}
-    browser_playable = not playback.needs_transcode(target)
+    with _playback_admission():
+        browser_playable = not playback.needs_transcode(target)
     return {"ready": browser_playable, "cached": False, "transcoding": False}
 
 
@@ -101,14 +114,13 @@ def prepare_recording_playback(path: str, native_hevc: bool = False) -> dict:
     _root, target = _recording_target(path)
     # Client capability is a playback preference, never an authorization bypass.
     # Original delivery stays seekable and never starts a conversion job.
-    if native_hevc and playback.video_codec(target) == "hevc":
-        return {"ready": True, "cached": False, "transcoding": False, "original": True}
+    with _playback_admission():
+        if native_hevc and playback.video_codec(target) == "hevc":
+            return {"ready": True, "cached": False, "transcoding": False, "original": True}
     state = _recording_playback_state(target)
     if not state["ready"] and not state["transcoding"]:
-        try:
+        with _playback_admission():
             playback.prepare_transcode(target)
-        except PlaybackBusy:
-            raise HTTPException(429, "playback preparation is busy", headers={"Retry-After": "5"}) from None
         state = _recording_playback_state(target)
     return state
 

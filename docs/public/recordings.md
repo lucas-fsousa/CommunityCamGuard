@@ -59,8 +59,10 @@ does not speed up conversion or create any additional media process.
 
 - Codec inspection permits at most two `ffprobe` processes per application process.
   Concurrent requests for the same unchanged file reuse successful metadata;
-  failed inspections are not cached. Each probe has a ten-second execution timeout;
-  waiting for admission can add latency under contention.
+  failed inspections are not cached. Each lookup has a shared one-second admission
+  budget (same-file lock and probe slot), then at most ten seconds of probe execution.
+  Exhausted admission returns HTTP 429 with `Retry-After: 5`, not a ready response.
+  Explicit original delivery and downloads do not wait for codec inspection.
 - One compatibility encoder per application process; up to three additional jobs
   may wait. Requests for the same archive share work. Saturation returns HTTP 429
   with `Retry-After: 5`; the dashboard explains that playback preparation is busy.

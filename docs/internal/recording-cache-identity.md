@@ -38,9 +38,15 @@ growing lock registry, worker pool or media buffer. The global metadata lock is
 never held during subprocess I/O. Probe exceptions release both admission locks;
 unknown results and failures remain uncached, not fabricated successful results.
 
-The production subprocess timeout remains ten seconds per probe. Admission wait
-is additional and heavy contention can still exceed the browser request deadline;
-this change bounds subprocess pressure, not total first-frame latency. Limits are
+The production subprocess timeout remains ten seconds per probe. Admission now
+has one shared monotonic one-second budget across stripe and subprocess-slot waits.
+Exhaustion raises `PlaybackBusy`, releases held admission resources and becomes
+HTTP 429 with `Retry-After: 5` on prepare (including native HEVC negotiation), status
+and compatible-file requests. It is never converted into an empty/unknown codec or
+successful readiness. Explicit originals/downloads bypass probe admission. The
+dashboard already reports preparation/status 429 without automatic resubmission.
+Tests cover saturation/recovery and the HTTP boundaries. This bounds inspection
+pressure and admission wait, not total first-frame latency. Limits are
 per process, not a cross-worker/distributed budget. Complete-file HEVC conversion
 is unchanged, with one encoder and no automatically enabled warmer. Synthetic
 concurrency tests cover same-file reuse, two distinct simultaneous probes and

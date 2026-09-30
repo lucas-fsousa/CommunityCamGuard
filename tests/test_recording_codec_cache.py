@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.recording import codec_cache, playback
+from backend.app.recording.playback_budget import PlaybackBusy
 
 
 @pytest.fixture(autouse=True)
@@ -149,3 +150,40 @@ def test_probe_exception_releases_admission_and_does_not_cache(tmp_path):
             codec_cache.lookup(path, broken)
     assert not codec_cache._VALUES
     assert codec_cache.lookup(path, lambda _: "h264") == "h264"
+
+
+@pytest.mark.parametrize("resource", ["stripe", "probes"])
+def test_saturated_admission_is_bounded_and_recoverable(tmp_path, monkeypatch, resource):
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"sample")
+    monkeypatch.setattr(codec_cache, "ADMISSION_SECONDS", 0.01)
+    held = (codec_cache._STRIPES[hash(str(path.resolve())) % len(codec_cache._STRIPES)]
+            if resource == "stripe" else threading.BoundedSemaphore(1))
+    if resource == "probes":
+        monkeypatch.setattr(codec_cache, "_PROBES", held)
+    held.acquire()
+    try:
+        with pytest.raises(PlaybackBusy):
+            codec_cache.lookup(path, lambda _: pytest.fail("saturated probe ran"))
+        assert not codec_cache._VALUES
+    finally:
+        held.release()
+    assert codec_cache.lookup(path, lambda _: "hevc") == "hevc"
+
+
+def test_stripe_and_probe_slot_share_one_deadline(tmp_path, monkeypatch):
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"sample")
+    clock = iter([100.0, 100.75])
+    monkeypatch.setattr(codec_cache.time, "monotonic", lambda: next(clock))
+    timeouts = []
+
+    class Saturated:
+        def acquire(self, *, timeout):
+            timeouts.append(timeout)
+            return False
+
+    monkeypatch.setattr(codec_cache, "_PROBES", Saturated())
+    with pytest.raises(PlaybackBusy):
+        codec_cache.lookup(path, lambda _: pytest.fail("probe ran without admission"))
+    assert timeouts == [0.25]
