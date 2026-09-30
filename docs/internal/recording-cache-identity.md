@@ -51,3 +51,17 @@ is pending work, not a completed conversion. Its inspections explicitly do not
 touch cache modification times, so merely scanning recent archives cannot promote
 unused entries in LRU. A synthetic regression covers both behaviors. The warmer
 remains opt-in and disabled by default.
+
+## Validation and rollout
+
+Commit `594660c` passed the complete GitHub CI (run `36791566646`), including
+ruff, mypy, Python and frontend contracts. The focused local suite passed 53
+tests under a 256 MiB/no-swap/50%-CPU cap, with 94 MiB peak and zero swap.
+The image was rebuilt with a 512 MiB/no-swap/75%-CPU build limit; only the app
+service was recreated. Runtime build `b-2ceb15b4dbc8` reported all three cameras
+online and recording. The first immediate health request preceded HTTP startup;
+the subsequent check passed. Both containers reported OOM=false and go2rtc's
+start time was unchanged. No physical camera control or bulk preparation ran.
+
+These checks establish admission/cache behavior and deployment health, not a
+new end-to-end latency measurement or proof that every recording stall is fixed.

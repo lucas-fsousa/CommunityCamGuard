@@ -57,6 +57,10 @@ does not speed up conversion or create any additional media process.
 
 ## Resource limits and settings
 
+- Codec inspection permits at most two `ffprobe` processes per application process.
+  Concurrent requests for the same unchanged file reuse successful metadata;
+  failed inspections are not cached. Each probe has a ten-second execution timeout;
+  waiting for admission can add latency under contention.
 - One compatibility encoder per application process; up to three additional jobs
   may wait. Requests for the same archive share work. Saturation returns HTTP 429
   with `Retry-After: 5`; the dashboard explains that playback preparation is busy.
@@ -67,6 +71,8 @@ does not speed up conversion or create any additional media process.
   **0 means unbounded cache**, not disabled conversion.
 - `PLAYBACK_PRETRANSCODE` defaults to false. Enabling it spends CPU preparing
   recent clips even before a viewer selects them, using the same encoder budget.
+  Empty derived files are not considered ready; background inspection does not
+  refresh a cached file's least-recently-used retention priority.
 - `RECORDING_RETENTION_DAYS` defaults to **7** and deletes older original footage.
   **0 keeps originals indefinitely**, but recording can pause when storage fills.
   The disk monitor and retention cleaner are separate policies.
