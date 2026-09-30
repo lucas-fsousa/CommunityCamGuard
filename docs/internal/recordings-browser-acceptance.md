@@ -44,6 +44,32 @@ HEVC cold conversion, full Recordings-page gestures, Android/iOS, slow disks or 
 reverse proxy. They establish real controller behavior for decoded playback,
 gesture denial/recovery, long duration and seeking outside the available buffer.
 
+## Integrated Recordings view — 2026-09-30
+
+The new `--recordings-playback --fixture <short-H264.mp4>` mode loads the production
+Recordings view, list, player controller, loading overlay and stylesheet together.
+Only the API metadata/preparation replies are simulated; Chromium actually decodes
+the existing five-second file through the bounded local fixture server.
+
+Desktop 1280×900 and narrow 375×667 runs passed first-selection playback, seeking
+to two seconds, same-row resume without reload/repreparation, isolated download
+clicks, switching past a pending preparation and rejecting its late response,
+active-row consistency and source/overlay cleanup on leaving the view. Initial
+first-frame measurements were 761/541 ms; these are fixture timings, not production
+or cold-HEVC measurements. Peak browser memory was 359.9/236.8 MiB, zero swap.
+
+The review found an unbounded list request (distinct from media preparation).
+Production now aborts list retrieval after 15 seconds and shows a localized list
+error instructing the user to search again. Superseding searches and navigation
+clear the timer; stale responses cannot overwrite the list, and no automatic
+retry is added. Node contracts run in CI. A final 375×667 browser run also passed
+the timeout/manual-retry path using an accelerated test timer (234.7 MiB, zero swap).
+No production recording, camera connection, conversion or server setting changed.
+
+Still open: authenticated full-dashboard/proxy behavior, physical mobile browsers
+and representative cold-HEVC preparation. Successful fixture playback does not
+disprove the user's earlier production stalls.
+
 ## Repeating the checks
 
 Use the same capped service command in [native playback](recordings-native-playback.md).

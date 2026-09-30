@@ -25,6 +25,8 @@ jobs:
         run: node --max-old-space-size=64 tests/frontend/camera-controls.cjs
       - name: Recording playback lifecycle (Node)
         run: node --max-old-space-size=64 tests/frontend/recording-playback.cjs
+      - name: Recording list lifecycle (Node)
+        run: node --max-old-space-size=64 tests/frontend/recordings-view.cjs
       - name: Settings view contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/settings.cjs
       - name: Delegated access contracts (Node)

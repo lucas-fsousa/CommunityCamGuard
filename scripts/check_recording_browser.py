@@ -38,6 +38,7 @@ def main():
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--settings", action="store_true", help="Check isolated settings layout instead")
     parser.add_argument("--recordings", action="store_true", help="Check isolated recordings loading overlay")
+    parser.add_argument("--recordings-playback", action="store_true", help="Exercise the recordings view with a local MP4")
     parser.add_argument("--access-keys", action="store_true", help="Check delegated-access modal with synthetic data")
     parser.add_argument("--camera-controls", action="store_true", help="Check controls and toasts without camera traffic")
     parser.add_argument("--autoplay-block", action="store_true", help="Require a gesture for audible fixture playback")
@@ -48,8 +49,8 @@ def main():
     parser.add_argument("--screenshot", type=Path)
     args = parser.parse_args()
     fixture = args.fixture.resolve() if args.fixture else None
-    component = args.settings or args.recordings or args.access_keys or args.camera_controls
-    if sum((args.settings, args.recordings, args.access_keys, args.camera_controls)) > 1:
+    component = args.settings or args.recordings or args.access_keys or args.camera_controls or args.recordings_playback
+    if sum((args.settings, args.recordings, args.access_keys, args.camera_controls, args.recordings_playback)) > 1:
         parser.error("choose one component")
     if component and args.autoplay_block:
         parser.error("autoplay check requires a video fixture, not a component")
@@ -60,7 +61,7 @@ def main():
     if not 280 <= args.width <= 2560 or not 320 <= args.height <= 1600:
         parser.error("viewport outside bounded test range")
     require_bounded_browser(args.browser)
-    if not component and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
+    if (not component or args.recordings_playback) and (not fixture or not fixture.is_file() or not 0 < fixture.stat().st_size <= 10 * 1024 * 1024):
         parser.error("fixture must be an existing H.264 MP4 below 10 MiB, at least 4 seconds")
     root = Path(__file__).resolve().parents[1]
     assets = {
@@ -73,6 +74,8 @@ def main():
             page_name = "access-keys-browser.html"
         if args.camera_controls:
             page_name = "camera-controls-browser.html"
+        if args.recordings_playback:
+            page_name = "recordings-view-browser.html"
         assets = {"/": (root / "tests/frontend" / page_name, "text/html")}
         for name, path in COMPONENT_ASSETS.items():
             assets["/" + name] = (root / "frontend" / path, "text/css" if name.endswith("css") else "text/javascript")
@@ -83,7 +86,7 @@ def main():
 
         def do_GET(self):
             url = urlparse(self.path)
-            if url.path == "/api/recordings/file" and not component:
+            if url.path == "/api/recordings/file" and (not component or args.recordings_playback):
                 if parse_qs(url.query).get("original") == ["true"]:
                     data, mime = b"deliberately invalid native fixture", "video/mp4"
                 else:

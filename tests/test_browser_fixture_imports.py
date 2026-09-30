@@ -9,7 +9,7 @@ import pytest
 
 
 @pytest.mark.parametrize("page", ["settings-browser.html", "access-keys-browser.html", "recordings-overlay-browser.html",
-                                  "camera-controls-browser.html"])
+                                  "camera-controls-browser.html", "recordings-view-browser.html"])
 def test_component_import_graph_resolves_to_served_assets(page, monkeypatch):
     root = Path(__file__).parents[1]
     monkeypatch.syspath_prepend(str(root / "scripts"))

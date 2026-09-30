@@ -1,6 +1,6 @@
 # Recordings: playback, downloads and resource usage
 
-Staged backend change (not deployed): media GET requests no longer start conversion.
+Media GET requests no longer start conversion.
 The dashboard already requests preparation via POST. Custom API clients must also
 POST preparation before polling/loading an incompatible uncached recording; a 409
 does not mean conversion started. [Compatibility details](../internal/recording-get-boundary.md).
@@ -38,9 +38,10 @@ conversion with a duration that grows a few seconds at a time. HTTP Range reques
 serve requested portions without requiring the browser to download the entire file.
 The live-camera player is a different pipeline from archive playback.
 
-The staged temporary-access implementation adds revocable file/download delivery
-while retaining Range/seek behavior. It is not deployed and temporary login remains
-disabled. See [interruption semantics and limits](../internal/recording-session-delivery.md);
+Delegated access includes revocable file/download delivery while retaining
+Range/seek behavior; login and permission checks are deployed locally. See
+[deployment evidence](../internal/delegated-access-activation.md) and
+[interruption semantics and limits](../internal/recording-session-delivery.md);
 already-delivered bytes cannot be recalled.
 
 While preparing/starting a recording or waiting for playback data, a localized
@@ -73,6 +74,12 @@ Environment changes require application recreation/reconfiguration;
 browser reload alone does not update service settings. Never share the `.env` file.
 
 ## Troubleshooting and validation limits
+
+If retrieving the recording list takes longer than 15 seconds, the dashboard
+aborts that request and shows a list-specific error. Click **Search / Buscar** to
+retry. This timeout is separate from video preparation and does not cancel a
+recording or start another encoder. Changing filters or leaving the view also
+cancels the obsolete list request.
 
 An initial preparation delay is expected for an uncached compatibility conversion.
 On the prototype, five-minute 1080p clips took roughly 18–22 seconds to convert.

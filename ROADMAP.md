@@ -156,6 +156,16 @@ preferences and access management. Mobile uses a horizontal tab bar. Preferences
 have their own module and preserve drafts while switching sections; access cleanup
 runs when leaving its tab. Keyboard navigation, exclusive visibility and draft
 preservation have automated coverage. See `docs/public/settings.md`.
+User validated the deployed sidebar/tab workflow on 2026-09-30 (build
+`b-bf1d86005bdf`); this is no longer awaiting local UI confirmation.
+
+2026-09-30 recordings-view checkpoint: production list/player/overlay modules
+passed first-click playback, seek/reselection without reload, rapid switching with
+a late preparation response, download isolation and teardown in real Chromium at
+desktop/narrow widths. Added a 15-second abortable list deadline and localized
+retry guidance; no automatic retries. The fixture uses a local five-second H.264
+file and synthetic APIs, not cold-HEVC conversion or full authenticated dashboard
+homologation. See `docs/internal/recordings-browser-acceptance.md`.
 
 These are acceptance/rollout criteria, not blanket security guarantees. Source
 implementation has progressed beyond the original inventory: settings are available,

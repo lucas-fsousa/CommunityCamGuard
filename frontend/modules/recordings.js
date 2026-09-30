@@ -49,15 +49,20 @@ export function renderRecordings(stage) {
   });
   let disposed = false;
   let listRequest = null;
-  cleanup = () => { disposed = true; listRequest?.abort(); playback.dispose(); };
+  let listTimer = null;
+  cleanup = () => { disposed = true; clearTimeout(listTimer); listRequest?.abort(); playback.dispose(); };
   const info = el("span", { className: "muted" });
   const prev = el("button", { textContent: t("rec.prev") });
   const next = el("button", { textContent: t("rec.next") });
   const list = el("div", { className: "rec-list" });
 
   async function load() {
+    if (disposed) return;
+    clearTimeout(listTimer);
     listRequest?.abort();
     const request = listRequest = new AbortController();
+    let timedOut = false;
+    const timer = listTimer = setTimeout(() => { timedOut = true; request.abort(); }, 15000);
     r.cameraId = camSel.value; r.from = fromI.value; r.to = toI.value;
     list.innerHTML = `<p class='muted'>${t("rec.loading")}</p>`;
     const qs = new URLSearchParams({
@@ -68,12 +73,12 @@ export function renderRecordings(stage) {
     try {
       res = await api("/recordings?" + qs.toString(), { signal: request.signal });
     } catch (_) {
-      if (!disposed && listRequest === request && !request.signal.aborted) {
-        list.replaceChildren(el("p", { className: "muted", textContent: t("rec.playbackFailed") }));
+      if (!disposed && listRequest === request && (!request.signal.aborted || timedOut)) {
+        list.replaceChildren(el("p", { className: "muted", textContent: t("rec.loadFailed") }));
       }
       return;
-    }
-    if (disposed || listRequest !== request) return;
+    } finally { clearTimeout(timer); }
+    if (disposed || listRequest !== request || request.signal.aborted) return;
     retention.textContent = res.retention_days
       ? t("rec.retention", { days: res.retention_days })
       : t("rec.retentionOff");

@@ -15,6 +15,7 @@
 const STRINGS = {
   en: {
     "panel.accessDenied": "Not permitted for this access.",
+    "rec.loadFailed": "Could not load recordings. Try searching again.",
     "settings.accessTab": "Access",
     "settings.sections": "Settings sections",
     "keys.title": "Delegated access",
@@ -397,6 +398,7 @@ const STRINGS = {
   },
   "pt-BR": {
     "panel.accessDenied": "Não permitido para este acesso.",
+    "rec.loadFailed": "Não foi possível carregar as gravações. Tente buscar novamente.",
     "settings.accessTab": "Acessos",
     "settings.sections": "Seções de configurações",
     "keys.title": "Acessos delegados",
