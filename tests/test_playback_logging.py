@@ -45,6 +45,7 @@ assert logging.getLogger().level == root_level
 def test_job_reports_safe_reason_and_always_releases(monkeypatch, tmp_path, case, reason):
     messages = []
     monkeypatch.setattr(playback.log, "info", lambda fmt, *args: messages.append(fmt % args))
+    (tmp_path / "private-camera-secret.mp4").write_bytes(b"source")
     job = playback._TranscodeJob(tmp_path / "private-camera-secret.mp4")
     if case == "cached":
         job.cache.write_bytes(b"cached")

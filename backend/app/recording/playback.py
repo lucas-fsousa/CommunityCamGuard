@@ -14,7 +14,6 @@ are served as-is.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import shutil
@@ -34,6 +33,7 @@ from .playback_budget import (
     PlaybackBusy,
     encoder_slot,
 )
+from .playback_identity import cache_key, signature
 
 # Codecs a browser plays natively in a <video> tag → serve the original, don't transcode.
 _BROWSER_VIDEO = {"h264", "avc1", "vp8", "vp9", "av1"}
@@ -50,7 +50,7 @@ def _cache_root() -> Path:
 
 def cache_path(segment: Path) -> Path:
     """Deterministic cache location for a segment's transcoded H.264 copy."""
-    key = hashlib.sha1(str(segment.resolve()).encode()).hexdigest()[:20]
+    key = cache_key(segment)
     return _cache_root() / f"{key}.mp4"
 
 
@@ -141,13 +141,21 @@ def _ffmpeg_cmd(src: Path, dst: Path) -> list[str]:
 
 def cached_path(segment: Path) -> Path | None:
     """Return and touch an existing derived cache file, without starting any work."""
+    identity = signature(segment)
     cache = cache_path(segment)
-    if not cache.is_file():
+    if not segment.is_file() or not cache.is_file():
+        return None
+    try:
+        if cache.stat().st_size == 0:
+            return None
+    except OSError:
         return None
     try:
         os.utime(cache, None)                # mark recently used -> survives LRU eviction
     except OSError:
         pass
+    if identity is None or signature(segment) != identity:
+        return None
     return cache
 
 
@@ -179,6 +187,7 @@ class _TranscodeJob:
 
     def __init__(self, segment: Path) -> None:
         self.segment = segment.resolve()
+        self.source_signature = signature(self.segment)
         self.cache = cache_path(self.segment)
         nonce = uuid.uuid4().hex
         self.part = self.cache.with_name(f"{self.cache.stem}.{nonce}.part.mp4")
@@ -196,7 +205,11 @@ class _TranscodeJob:
         try:
             with encoder_slot():
                 acquired = time.monotonic()
-                if self.cache.is_file():
+                if self.source_signature is None or signature(self.segment) != self.source_signature:
+                    self.failed = True
+                    reason = "source_changed"
+                    return
+                if cached_path(self.segment) is not None:
                     reason = "cache_hit"
                     return
                 encoded = subprocess.run(
@@ -205,12 +218,15 @@ class _TranscodeJob:
                     stderr=subprocess.DEVNULL,
                     timeout=ENCODE_TIMEOUT_SECONDS,
                 )
-                if encoded.returncode != 0 or not self.part.is_file():
+                if encoded.returncode != 0 or not self.part.is_file() or self.part.stat().st_size == 0:
                     self.failed = True
                     reason = "encoder_failed" if encoded.returncode != 0 else "output_missing"
                     return
-                if not self.cache.is_file():
-                    os.replace(self.part, self.cache)
+                if signature(self.segment) != self.source_signature:
+                    self.failed = True
+                    reason = "source_changed"
+                    return
+                os.replace(self.part, self.cache)
                 _evict(keep=self.cache)
         except PlaybackBusy:
             self.failed = True

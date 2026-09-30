@@ -26,6 +26,10 @@ filename. Original resolution is not reduced for browser playback.
 3. Otherwise, or if the native attempt fails, CCG prepares a complete H.264 MP4
    with duration/seek metadata. AAC audio is copied, not re-encoded. The first
    uncached opening waits for this conversion; subsequent views reuse its cache.
+   Cache reuse requires the same source-file version. If the source grows or is
+   replaced, an older conversion is not reused. The source-identity cache upgrade
+   also requires one new on-demand preparation for older path-only cache entries;
+   it does not delete original recordings or start a bulk conversion.
 4. Native decoding/format failure, audio-only playback or no initial playback
    within 12 seconds causes at most one compatibility fallback. Explicit network
    errors and browser autoplay denial do not automatically start conversion.

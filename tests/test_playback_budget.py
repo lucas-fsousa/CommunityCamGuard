@@ -41,6 +41,8 @@ def test_different_files_are_serialized_and_admission_is_bounded(monkeypatch, tm
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(playback.subprocess, "run", encode)
     files = [tmp_path / f"{i}.mp4" for i in range(5)]
+    for source in files:
+        source.write_bytes(b"source")
     jobs = []
     try:
         jobs.append(playback._prepare_job(files[0]))

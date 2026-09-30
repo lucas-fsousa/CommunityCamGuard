@@ -151,6 +151,12 @@ reliability remains the highest-priority independent implementation task.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
+2026-09-30 playback cache: replaced path-only cache identity with a source-version
+key and before/after encoding checks. Growing/replaced originals cannot reuse or
+publish stale conversions. Old derived entries need on-demand preparation again;
+no originals deleted and no bulk work enabled. See
+`docs/internal/recording-cache-identity.md` for scope and regression evidence.
+
 2026-09-30: Settings now uses an extensible side-menu/tab shell instead of stacking
 preferences and access management. Mobile uses a horizontal tab bar. Preferences
 have their own module and preserve drafts while switching sections; access cleanup
