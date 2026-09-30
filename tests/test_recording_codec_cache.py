@@ -1,6 +1,7 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -66,7 +67,6 @@ def test_lru_capacity_and_hits_refresh_recency(tmp_path, monkeypatch):
 
 
 def test_failed_ffprobe_output_is_not_published(tmp_path, monkeypatch):
-    from types import SimpleNamespace
     path = tmp_path / "clip.mp4"
     path.write_bytes(b"a")
     monkeypatch.setattr(playback.subprocess, "run",
@@ -175,7 +175,7 @@ def test_stripe_and_probe_slot_share_one_deadline(tmp_path, monkeypatch):
     path = tmp_path / "clip.mp4"
     path.write_bytes(b"sample")
     clock = iter([100.0, 100.75])
-    monkeypatch.setattr(codec_cache.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(codec_cache, "time", SimpleNamespace(monotonic=lambda: next(clock)))
     timeouts = []
 
     class Saturated:
