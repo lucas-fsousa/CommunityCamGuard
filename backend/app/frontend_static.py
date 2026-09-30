@@ -8,7 +8,7 @@ from starlette.staticfiles import StaticFiles
 PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "boot.js", "i18n.js", "style.css", "player.js", "video-rtc.js",
     "modules/core.js", "modules/recordings.js", "modules/settings.js", "modules/access-keys.js",
-    "modules/access-key-dialog.js",
+    "modules/access-key-dialog.js", "modules/settings-preferences.js",
     "modules/session-access.js",
     "modules/session-watch.js", "modules/push-to-talk.js", "modules/step-ptz.js",
     "modules/camera-control-actions.js", "modules/notifications.js", "modules/audio-message.js",

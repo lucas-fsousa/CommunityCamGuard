@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Isolated settings layout check</title>
 <link rel="stylesheet" href="/style.css">
-<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/access-keys":"/access-keys.js","ccg/access-key-dialog":"/access-key-dialog.js"}}</script>
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/settings-preferences":"/settings-preferences.js","ccg/access-keys":"/access-keys.js","ccg/access-key-dialog":"/access-key-dialog.js"}}</script>
 <main id="stage" class="settings"><div id="settings"></div></main>
 <script type="module">
 import { state } from '/core.js';
@@ -30,7 +30,22 @@ try {
     return rect.width;
   });
   if (document.documentElement.scrollWidth > innerWidth) throw new Error('Horizontal overflow');
-  window.smokeResult = {ok: true, viewport: innerWidth, inputWidths: widths};
+  const preferences = document.querySelector('#settings-panel-preferences');
+  const access = document.querySelector('#settings-panel-access');
+  const input = preferences.querySelector('input[type=number]');
+  preferences.querySelector('input[type=checkbox]').click(); input.value = '3';
+  input.dispatchEvent(new Event('input'));
+  const nav = document.querySelector('.settings-nav').getBoundingClientRect();
+  const content = preferences.getBoundingClientRect();
+  if (innerWidth > 700 && nav.right >= content.left) throw new Error('Sidebar is not beside content');
+  if (innerWidth <= 700 && nav.bottom > content.top) throw new Error('Mobile navigation overlaps content');
+  document.querySelector('#settings-tab-access').click();
+  if (getComputedStyle(preferences).display !== 'none' || access.hidden || !access.querySelector('.access-keys'))
+    throw new Error('Sections are stacked or access did not mount');
+  document.querySelector('#settings-tab-preferences').click();
+  if (input.value !== '3' || preferences.hidden || !access.hidden || access.children.length)
+    throw new Error('Draft lost or access cleanup missing');
+  window.smokeResult = {ok: true, viewport: innerWidth, inputWidths: widths, sidebar: true, exclusiveTabs: true, draftPreserved: true};
 } catch (error) { window.smokeResult = {ok: false, error: error.message}; }
 </script>
 </html>

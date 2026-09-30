@@ -34,6 +34,7 @@
     "ccg/recordings": moduleUrl("/modules/recordings.js"),
     "ccg/recording-playback": moduleUrl("/modules/recording-playback.js"),
     "ccg/settings": moduleUrl("/modules/settings.js"),
+    "ccg/settings-preferences": moduleUrl("/modules/settings-preferences.js"),
     "ccg/access-keys": moduleUrl("/modules/access-keys.js"),
     "ccg/access-key-dialog": moduleUrl("/modules/access-key-dialog.js"),
     "ccg/session-access": moduleUrl("/modules/session-access.js"),

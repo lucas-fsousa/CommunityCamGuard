@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules/settings.js"), "utf8")
+const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules/settings-preferences.js"), "utf8")
   .replace(/^import .*;$/gm, "").replaceAll("export function", "function");
 const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
 class Element {
@@ -11,7 +11,8 @@ class Element {
   setAttribute(name, value) { this[name] = value; }
   addEventListener(name, fn) { this.events[name] = fn; }
   reportValidity() { return true; }
-  fire(name) { return this.events[name]?.({ preventDefault() {} }); }
+  fire(name, extra = {}) { return this.events[name]?.({ preventDefault() {}, ...extra }); }
+  focus() { this.focused = true; }
 }
 const walk = e => [e, ...e.children.flatMap(walk)];
 function harness(canManage = true) {
@@ -20,7 +21,7 @@ function harness(canManage = true) {
   const el = (tag, props = {}, ...children) => { const e = new Element(tag, props); e.append(...children); return e; };
   const api = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
   const controller = new Function("api", "el", "state", "t", "setTimeout", "clearTimeout", "renderAccessKeys",
-    source + "; return {renderSettings, stopSettings};")(api, el, state, key => key,
+    source + "; let cleanup; return {renderSettings: container => { cleanup = renderPreferences(container); }, stopSettings: () => cleanup?.()};")(api, el, state, key => key,
     fn => { timers.set(++id, fn); return id; }, n => timers.delete(n), () => () => {});
   const container = el("div"); controller.renderSettings(container);
   const find = predicate => walk(container).find(predicate);
@@ -40,6 +41,31 @@ function edit(h, name, value) {
   return checkbox;
 }
 (async () => {
+  {
+    const code = fs.readFileSync(path.join(__dirname, "../../frontend/modules/settings.js"), "utf8")
+      .replace(/^import .*;$/gm, "").replaceAll("export function", "function");
+    const root = new Element("div"), counts = { preferences: 0, access: 0, cleaned: 0 };
+    const el = (tag, props = {}, ...children) => { const node = new Element(tag, props); node.append(...children); return node; };
+    let listening = false;
+    const media = { matches: false, addEventListener() { listening = true; }, removeEventListener() { listening = false; } };
+    const controller = new Function("el", "state", "t", "window", "renderPreferences", "renderAccessKeys",
+      code + ";return {renderSettings, stopSettings};")(el, { canManage: true }, key => key,
+      { matchMedia: () => media }, () => { counts.preferences++; return () => counts.cleaned++; },
+      () => { counts.access++; return () => counts.cleaned++; });
+    controller.renderSettings(root);
+    const find = id => walk(root).find(node => node.id === id);
+    const settings = find("settings-tab-preferences"), access = find("settings-tab-access");
+    assert.equal(counts.preferences, 1); assert.equal(counts.access, 0);
+    assert.equal(settings["aria-selected"], "true"); assert(find("settings-panel-access").hidden);
+    settings.fire("keydown", { key: "ArrowDown" });
+    assert(access.focused); assert.equal(counts.access, 1); assert(find("settings-panel-preferences").hidden);
+    access.fire("click"); assert.equal(counts.access, 1);
+    access.fire("keydown", { key: "Home" });
+    assert.equal(counts.cleaned, 1); assert.equal(counts.preferences, 1);
+    settings.fire("keydown", { key: "End" }); assert.equal(counts.access, 2);
+    controller.stopSettings(); assert.equal(counts.cleaned, 3); assert(!listening);
+    settings.fire("click"); assert.equal(counts.preferences, 1);
+  }
   {
     const h = harness(false);
     assert.equal(h.requests.length, 0); assert(!h.find(e => e.tag === "form"));

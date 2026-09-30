@@ -24,6 +24,7 @@ COMPONENT_ASSETS = {
     "style.css": "style.css", "core.js": "modules/core.js", "i18n.js": "i18n.js",
     "recordings.js": "modules/recordings.js", "recording-playback.js": "modules/recording-playback.js",
     "settings.js": "modules/settings.js", "access-keys.js": "modules/access-keys.js",
+    "settings-preferences.js": "modules/settings-preferences.js",
     "access-key-dialog.js": "modules/access-key-dialog.js",
     "camera-controls.js": "modules/camera-controls.js", "control-actions.js": "modules/camera-control-actions.js",
     "audio-message.js": "modules/audio-message.js", "push-to-talk.js": "modules/push-to-talk.js",

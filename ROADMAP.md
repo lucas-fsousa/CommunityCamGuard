@@ -151,6 +151,12 @@ reliability remains the highest-priority independent implementation task.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
+2026-09-30: Settings now uses an extensible side-menu/tab shell instead of stacking
+preferences and access management. Mobile uses a horizontal tab bar. Preferences
+have their own module and preserve drafts while switching sections; access cleanup
+runs when leaving its tab. Keyboard navigation, exclusive visibility and draft
+preservation have automated coverage. See `docs/public/settings.md`.
+
 These are acceptance/rollout criteria, not blanket security guarantees. Source
 implementation has progressed beyond the original inventory: settings are available,
 and delegated login/per-feature grants are now implemented and CI-tested. See the

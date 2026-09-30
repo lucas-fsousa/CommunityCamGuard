@@ -15,8 +15,15 @@ and full-page/proxy acceptance remain pending. See
 [deployment evidence](../internal/delegated-access-activation.md) and
 [browser checks](../internal/delegated-access-browser-check.md).
 
-The centered panel uses compact numeric fields beside each setting's title, with
-explanations below and separate save/reload actions. It adapts to narrow screens.
+The screen has a side menu: **Settings / Configurações** for server preferences
+and **Access / Acessos** for delegated keys. Only the selected section is displayed;
+on narrow screens the menu becomes a horizontal tab bar above the content.
+Arrow keys and Home/End navigate the tabs. Unsaved preferences survive switching
+between these sections; leaving Settings discards that view's unsaved edits.
+Access dialogs and pending requests are cleaned up when leaving the Access section.
+
+The preferences panel uses compact numeric fields beside each setting's title,
+with explanations below and separate save/reload actions.
 
 Each field shows its current resolved value, including when disabled. **Use server default**
 means no database override, so the number input is disabled. Uncheck it to enter a
@@ -42,7 +49,7 @@ view/signing out cancels browser requests, not a completed server transaction.
 
 ## Delegated access
 
-The separate access card is available only to the primary session. Choose **Create
+The **Access / Acessos** tab is available only to the primary session. Choose **Create
 access**, enter a name, select allowed features and choose a future expiration in
 your local time or **No expiration**. Rights apply across configured cameras, but
 never add a feature the camera driver does not support. Server administration

@@ -15,6 +15,8 @@
 const STRINGS = {
   en: {
     "panel.accessDenied": "Not permitted for this access.",
+    "settings.accessTab": "Access",
+    "settings.sections": "Settings sections",
     "keys.title": "Delegated access",
     "keys.refresh": "Load / refresh accesses",
     "keys.previous": "Previous",
@@ -395,6 +397,8 @@ const STRINGS = {
   },
   "pt-BR": {
     "panel.accessDenied": "Não permitido para este acesso.",
+    "settings.accessTab": "Acessos",
+    "settings.sections": "Seções de configurações",
     "keys.title": "Acessos delegados",
     "keys.refresh": "Carregar / atualizar acessos",
     "keys.previous": "Anterior",

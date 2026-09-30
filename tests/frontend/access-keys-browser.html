@@ -8,7 +8,7 @@
 window.addEventListener('error', () => { window.smokeResult = {ok: false, error: 'Fixture script error'}; });
 window.addEventListener('unhandledrejection', () => { window.smokeResult = {ok: false, error: 'Unhandled fixture rejection'}; });
 </script>
-<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/access-keys":"/access-keys.js","ccg/access-key-dialog":"/access-key-dialog.js"}}</script>
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/settings-preferences":"/settings-preferences.js","ccg/access-keys":"/access-keys.js","ccg/access-key-dialog":"/access-key-dialog.js"}}</script>
 <main id="stage" class="settings"><div id="settings"></div></main>
 <script type="module">
 import { state } from '/core.js';
@@ -29,7 +29,10 @@ window.fetch = async (url, options = {}) => {
   throw new Error('Unexpected isolated request');
 };
 const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
-const create = () => [...document.querySelectorAll('.access-keys button')].find(b => b.textContent === t('keys.create')).click();
+const create = () => {
+  document.querySelector('#settings-tab-access').click();
+  [...document.querySelectorAll('.access-keys button')].find(b => b.textContent === t('keys.create')).click();
+};
 function layout() {
   const dialog = document.querySelector('dialog');
   const box = dialog.getBoundingClientRect();
