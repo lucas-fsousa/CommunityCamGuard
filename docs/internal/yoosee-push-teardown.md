@@ -90,16 +90,17 @@ at `0x255a48`. Do not treat receipt of E4 alone as ready.
 returns true if any signed 16-bit counter at channel `+0x1c` exceeds 5. The timer
 also sets the selected channel's counter to 75 when its state byte `+0x20 == 2`
 (`0x2558d0–0x255910`, SDK log calls this certified). These are SDK predicates,
-not yet a reproduced authentication handshake. The receive-side transitions and
-counter increments still need tracing before implementing a relay connection.
+not yet a reproduced authentication handshake. Receive-side certification and
+recertification transitions are mapped in [certification evidence](yoosee-push-certification.md).
+Counter increments and upstream validation still need tracing.
 
 ## Validation limits / next checkpoint
 
 Disassembly remained sequential under 256 MiB/no-swap/50%-CPU/40-second caps;
 observed peaks were at most 40.4 MiB. No camera, broker or relay was contacted.
 The codec does not make an E4 solicitation safe yet. Field population, outer timer
-cleanup and the ready predicate are now mapped offline. Next: trace certification
-receive-side state/counter transitions and pre-ready remote lifetime, then define
+cleanup and the ready predicate are now mapped offline. Next: trace remaining
+counter transitions and pre-ready remote lifetime, then define
 an explicitly bounded diagnostic. Do not enable relay advertisement in the default
 live path. Synthetic tests also cover wrong device/link, malformed envelopes,
 every truncated prefix, relay bounds and credential-free representations.

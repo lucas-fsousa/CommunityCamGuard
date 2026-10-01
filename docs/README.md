@@ -16,6 +16,9 @@ Docs are split by audience:
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
   version-specific MTP/E4 evidence, A4 relay advertisement and remaining native-HD gate.
 
+- **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
+  wire codecs, E4 correlation, certification/recertification and safe teardown gates.
+
 - **[Camera control panel](internal/dashboard-camera-controls.md)** — real-browser layout/focus,
   capability-driven controls and camera-free regression checks.
 
