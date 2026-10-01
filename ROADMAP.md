@@ -3,6 +3,13 @@
 Living document: backlog, priorities and milestones. Technical detail and rationale live in
 `docs/` (ADRs); this file is **what** and **in what order**, not **how**.
 
+2026-10-01 priority correction: defer further server-recordings playback polish
+unless a concrete user-reported failure requires it. Resume the existing Yoosee
+native-media/platform RE blocker. Offline comparison established distinct platform
+sources in the older SDK (positive MTP flags) versus 6.45 (E4 push distribution).
+Next: trace the push trigger or establish exact-device positive MTP provenance,
+not repeat identical LAN probes. See [SDK evidence](docs/internal/yoosee-platform-sdk-versions.md).
+
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
 
@@ -161,8 +168,8 @@ substituted for it. Startup plumbing is implemented, but a camera-3 HD attempt i
 not currently ready. Unblocking RE: recover the SDK exchange that delivers E4 (or
 prove an equivalent platform source), correlate it to the exact device and retain
 its provenance before enabling operator profile selection. Do not repeat the
-same media probe or select both platform fields speculatively. Recordings playback
-reliability remains the highest-priority independent implementation task.
+same media probe or select both platform fields speculatively. The 2026-10-01
+SDK comparison above refines the E4-only assumption; recordings polish is deferred.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
