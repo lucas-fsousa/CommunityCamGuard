@@ -112,6 +112,50 @@ decoder reuse and read/frame-count limits. No production callers were added.
 
 ## Remaining work
 
+### Event dispatcher follow-up and local generation guard
+
+`ivtcp_start_connect` (`0x1ed00c`, 1452 bytes) creates a nonblocking socket and
+`bufferevent_socket_new` with option argument zero (`0x1ed404`). It registers
+`iv_session_cb_read` and `iv_session_cb_event` through GOT `0x2a8418`/`0x2a8420`
+at `0x1ed538`, with the socket object as callback context. Output evbuffer locking
+is enabled separately; this is not evidence that parent-session access is locked.
+
+`iv_session_cb_read` (`0x1ec748`, 592 bytes) invokes socket callback `+0x80`, or
+the communication object's fallback. Positive return can resume paused reads;
+-2 pauses reads and schedules an event; other negative values except -3 close
+and notify. Thus missing push-channel return -2 is handled as backpressure here,
+not necessarily permanent rejection. Our diagnostic must not inherit that retry
+behavior for malformed/uncorrelated protocol input.
+
+`iv_session_cb_event` (`0x1ecd24`, 744 bytes) handles raw event bit 4 by draining
+pending output then closing/notifying. Bit 5 handles errors: connected status 3
+closes/notifies, while connecting status 2 invokes socket callback `+0x70` and
+then reconnects only for policy 2, otherwise unlinks/frees. Bit 7 calls socket
+initialization and helper `0x1ed7e8`; bit 6 can pass buffered input to the read
+callback. These functions carry raw socket/session pointers, without an explicit
+connection-generation check in the inspected bodies. This is not proof of a
+native use-after-free: event-loop cancellation semantics still matter.
+
+`p2p/push_reception.py` now provides our own **offline**, single-event-loop
+generation guard around framing. Each `begin()` returns an opaque object captured
+by that connection's callbacks, aborts old partial bytes and creates a fresh
+decoder. Stale reads/EOF are ignored before parsing; malformed current reads,
+EOF and explicit cancellation invalidate the current generation. No old callback
+can close or complete the replacement decoder through this API. Decoder abort
+is idempotent and clears partial input.
+
+This is local isolation, not authentication, thread synchronization or actual
+socket/task cancellation. It does not revoke frames already handed to downstream
+consumers; any asynchronously queued downstream work must also carry connection
+identity and be cancelled/rechecked before changing state. The future transport
+must own socket shutdown and task cancellation explicitly. No production caller,
+success-state transition, retry loop or camera command was introduced.
+
+Synthetic tests cover old data, old malformed reads, old EOF, unrelated receiver
+tokens, cancellation, partial EOF, clean EOF and recovery with a new generation.
+
+### Open gates
+
 - Resolve terminal modes and the callback asymmetry at the `ivtcp` factory.
 - Local socket destruction order is mapped; queued callback cancellation and
   thread/event-loop ownership still require proof before live transport integration.

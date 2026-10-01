@@ -67,3 +67,8 @@ class PushTcpFramer:
         if self._buffer:
             self._fail("truncated push stream")
         self._closed = True
+
+    def abort(self) -> None:
+        """Discard partial input on local cancellation; idempotent, unlike EOF."""
+        self._buffer.clear()
+        self._closed = True

@@ -39,6 +39,11 @@ Socket-lifetime follow-up: node teardown disables internal reconnect, closes the
 socket and invokes its close callback before freeing local storage. Parent-session
 ownership must survive this callback. Queued callback/thread semantics and remote
 release remain unproven; no live relay integration was enabled.
+Callback-isolation follow-up: socket-free reception now uses per-connection opaque
+generations, discarding old reads/EOF and partial input on replacement/cancel.
+Read/event dispatch return semantics are mapped; downstream queued work and real
+socket cancellation still require integration. This does not validate relay replies
+or enable certification success automatically.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
