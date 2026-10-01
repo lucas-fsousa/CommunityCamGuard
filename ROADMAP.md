@@ -13,6 +13,10 @@ Follow-up: SDK 6.45 advertises push relay on its broker A4; our default broker A
 does not, while explicit-metadata requests do. Copy/send chain and socket-free
 option regression tests are documented. Do not globally enable an unimplemented
 relay transport merely to solicit platform metadata.
+Push teardown follow-up: SDK 6.45 reason-zero `03 0B` hangup layout/checksum is
+implemented as a socket-free driver codec with synthetic tests. It differs from
+B9 route release. Field provenance, acknowledgement and outer timer cleanup remain
+before any relay-enabled diagnostic; see [teardown evidence](docs/internal/yoosee-push-teardown.md).
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

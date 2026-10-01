@@ -113,3 +113,7 @@ implemented in our runtime. Socket-free regression tests pin current default,
 explicit-live and explicit-SD options without contacting any device. Next useful
 work is a separately gated observation design with push-session cleanup accounted
 for, or exact-device historical MTP provenance under the older SDK contract.
+
+The next teardown investigation recovered a separate reason-zero push hangup
+frame and checksum; its socket-free encoder remains unconnected to runtime.
+See [push teardown and remaining lifecycle gaps](yoosee-push-teardown.md).
