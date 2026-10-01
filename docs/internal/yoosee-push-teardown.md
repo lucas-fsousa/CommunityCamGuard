@@ -87,12 +87,13 @@ If not connected and elapsed time exceeds 5000 ms, it calls `iv_push_link_reset`
 at `0x255a48`. Do not treat receipt of E4 alone as ready.
 
 `iv_check_push_session_connected` (`0x27c544`, 148 bytes) iterates channels and
-returns true if any signed 16-bit counter at channel `+0x1c` exceeds 5. The timer
-also sets the selected channel's counter to 75 when its state byte `+0x20 == 2`
+returns true if any signed 16-bit score at channel `+0x1c` exceeds 5. The timer
+also sets the selected channel's score to 75 when its state byte `+0x20 == 2`
 (`0x2558d0–0x255910`, SDK log calls this certified). These are SDK predicates,
 not yet a reproduced authentication handshake. Receive-side certification and
 recertification transitions are mapped in [certification evidence](yoosee-push-certification.md).
-Counter increments and upstream validation still need tracing.
+The score calculation is also mapped there; its statistic sources and callback
+scheduling still need tracing.
 
 ## Validation limits / next checkpoint
 
@@ -100,7 +101,7 @@ Disassembly remained sequential under 256 MiB/no-swap/50%-CPU/40-second caps;
 observed peaks were at most 40.4 MiB. No camera, broker or relay was contacted.
 The codec does not make an E4 solicitation safe yet. Field population, outer timer
 cleanup and the ready predicate are now mapped offline. Next: trace remaining
-counter transitions and pre-ready remote lifetime, then define
+statistic updates and pre-ready remote lifetime, then define
 an explicitly bounded diagnostic. Do not enable relay advertisement in the default
 live path. Synthetic tests also cover wrong device/link, malformed envelopes,
 every truncated prefix, relay bounds and credential-free representations.

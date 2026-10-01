@@ -17,12 +17,18 @@ Push teardown follow-up: SDK 6.45 reason-zero `03 0B` hangup layout/checksum is
 implemented as a socket-free driver codec with synthetic tests. It differs from
 B9 route release. E4 field provenance, outer timer cleanup and ready predicates
 are mapped; a socket-free context parser correlates device and MTP link. Remaining:
-upstream receive validation, certification scheduling/counters, pre-ready remote
+connected-score statistic sources/scheduling, reconnect callback ownership, pre-ready remote
 lifetime and acknowledgement semantics before any relay-enabled diagnostic; see
 [teardown evidence](docs/internal/yoosee-push-teardown.md).
 The single-terminal certification encoder and receive-side recertification
 transition are now mapped offline; 77 synthetic tests pass. No relay transport is
 enabled. See [certification evidence](docs/internal/yoosee-push-certification.md).
+Follow-up: TCP/UDP selection, receive dispatch, timer intervals, recertification
+retry branches and peer-limit notifications are documented. The future transport
+must validate frames more strictly than the inspected SDK receive branch; these
+offline results do not homologate camera-3 HD or prove remote cleanup.
+The connected predicate uses a 0–75 quality score (>5), not an elapsed-time counter;
+its arithmetic is mapped, with zero-denominator behavior still requiring care.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
