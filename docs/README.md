@@ -13,6 +13,9 @@ Docs are split by audience:
 
 ## `internal/` — for contributors
 
+- **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
+  version-specific MTP/E4 evidence, A4 relay advertisement and remaining native-HD gate.
+
 - **[Camera control panel](internal/dashboard-camera-controls.md)** — real-browser layout/focus,
   capability-driven controls and camera-free regression checks.
 

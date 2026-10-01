@@ -75,3 +75,41 @@ from silence, overwrite both quality fields, or substitute inventory flags.
 
 Related: [quality encoding](native-video-definition.md),
 [first native decode](native-av-first-live-decode.md).
+
+## A4 advertisement traced — 2026-10-01 follow-up
+
+Same 6.45 binary and resource limits. `iv_init_frm_CALLING` (`0x24fd70`,
+1,184 bytes) unconditionally ORs `0x4000` into the 16-bit options at A4 `+0x18`
+at `0x24ff44–0x24ff50`. Its log string at `0x2501b8–0x2501bc` names bit 14
+`opt_support_psrelay`. Combined with its other unconditional option writes,
+the base options are `0x4581` (before optional user-ID and direct-path changes).
+This is a support advertisement, not proof of a command forcing E4 delivery.
+
+`iv_process_calling` constructs that A4 at `0x2503ac–0x2503b8`. For a known
+LAN endpoint it clones the packet at `0x25048c–0x2504e0`, then alters the original
+for direct mode at `0x25066c–0x25069c` (header direct flag, mode 1, option bit 1).
+The clone is submitted separately at `0x2506e0–0x250704`; the non-LAN branch
+submits the original broker packet at `0x250794–0x2507b8`. The advertisement
+therefore originates before splitting direct and broker request paths.
+
+Current standalone codec comparison (no runtime changes):
+
+| Path | A4 options | Push-relay bit |
+| --- | --- | --- |
+| Default broker request | `0x0581` | absent |
+| Broker with explicit live/SD connection metadata | `0x4581` | present |
+| Default direct request | `0x4483` | present |
+
+The existing passive-only platform probe uses default broker metadata. Its failure
+to observe E4 is consequently not equivalent to the full SDK's broker request.
+This is a concrete request difference and a plausible explanation, **not proof**
+of the broker's policy or a guaranteed way to solicit E4. The original SD mapping
+had already identified the bit; this follow-up closes its general CALLING builder
+and direct/broker copy chain and compares the live probe's default path.
+
+Do not enable the bit globally or manufacture HD/SD userdata just to obtain it:
+the E4 handler can replace MTP with a push/relay session whose lifecycle is not
+implemented in our runtime. Socket-free regression tests pin current default,
+explicit-live and explicit-SD options without contacting any device. Next useful
+work is a separately gated observation design with push-session cleanup accounted
+for, or exact-device historical MTP provenance under the older SDK contract.

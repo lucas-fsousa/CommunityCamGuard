@@ -9,6 +9,10 @@ native-media/platform RE blocker. Offline comparison established distinct platfo
 sources in the older SDK (positive MTP flags) versus 6.45 (E4 push distribution).
 Next: trace the push trigger or establish exact-device positive MTP provenance,
 not repeat identical LAN probes. See [SDK evidence](docs/internal/yoosee-platform-sdk-versions.md).
+Follow-up: SDK 6.45 advertises push relay on its broker A4; our default broker A4
+does not, while explicit-metadata requests do. Copy/send chain and socket-free
+option regression tests are documented. Do not globally enable an unimplemented
+relay transport merely to solicit platform metadata.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

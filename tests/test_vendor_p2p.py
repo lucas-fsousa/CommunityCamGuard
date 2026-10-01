@@ -139,6 +139,27 @@ def test_broker_calling_accepts_exact_request_user_data():
     assert calling[0xB0] == 0x40
 
 
+@pytest.mark.parametrize("connection_type", [None, 1, 2])
+def test_push_relay_advertisement_is_not_added_to_default_broker_request(connection_type):
+    """Pin the SDK comparison without enabling an unimplemented relay transport."""
+    node = client.CertifiedNode(("192.0.2.10", 19800), 9, bytes(range(32)), 17)
+    device = client.OnlineDevice(7000000002, 1, False, 1, bytes(16))
+    attempt = client.CallingAttempt(123, 456, bytes(8))
+    metadata = None if connection_type is None else bytes(range(32))
+    frame = gute_mode2_decrypt(client.build_calling_request(
+        node, 123, device, "192.0.2.20", 45678, attempt, 18,
+        connection_type=connection_type, request_user_data=metadata,
+    ), node.session_key)
+    options = struct.unpack_from("<H", frame, 0x18)[0]
+    assert options == (0x0581 if connection_type is None else 0x4581)
+    assert bool(options & 0x4000) == (connection_type is not None)
+    assert len(frame) == 177
+    assert struct.unpack_from("<I", frame, 0x1C)[0] == attempt.link_id
+    if metadata is not None:
+        assert frame[0x90:0xB0] == metadata
+        assert frame[0xB0] == (0x40 if connection_type == 2 else 0)
+
+
 def test_parse_mtp_peer_endpoint_rejects_another_link():
     frame = bytearray(0x64)
     frame[1] = 0xA3
