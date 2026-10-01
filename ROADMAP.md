@@ -48,6 +48,11 @@ Static callback-signature follow-up: the mode-2 branch registers a three-argumen
 receive handler where the connect dispatcher only supplies the socket argument.
 Reachability and terminal-mode meaning remain unproven; do not copy/execute that
 SDK branch blindly or attribute historical crashes to it without runtime evidence.
+Capture checkpoint: bounded content-free triage of the existing 12,436-packet PCAP
+found no protocol-3 headers at inspected datagram/segment boundaries; no TCP
+reassembly/decryption was performed, so absence is not conclusive. GAT E3 is a
+separate broker response, not relay certification or proven release. See
+[capture evidence](docs/internal/yoosee-push-capture-evidence.md).
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
