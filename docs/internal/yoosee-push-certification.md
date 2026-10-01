@@ -150,6 +150,9 @@ do not invent inactivity timeout semantics from it or copy it without validating
 the statistic sources and floating-point edge cases. The packet-counter writers
 and scheduling of this statistic callback remain to trace. The earlier term
 “counter refresh/decay” refers to this now-identified score, not elapsed seconds.
+Follow-up: the ready-path timers do **not** register `iv_timer_calc_stat`, and no
+direct caller/relocation was found in the bounded search. Its execution on this
+path is unproven; see [callback and reception evidence](yoosee-push-reception.md).
 
 ## Remaining gate before a live diagnostic
 

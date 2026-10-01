@@ -29,6 +29,12 @@ must validate frames more strictly than the inspected SDK receive branch; these
 offline results do not homologate camera-3 HD or prove remote cleanup.
 The connected predicate uses a 0–75 quality score (>5), not an elapsed-time counter;
 its arithmetic is mapped, with zero-denominator behavior still requiring care.
+Reception follow-up: bounded socket-free TCP framing now handles fragmented and
+coalesced reads with fail-closed EOF/admission tests. Connect/close callback
+transitions are mapped; the score helper's execution is unproven because actual
+ready-path timer registrations differ. Remaining: socket cancellation ownership,
+terminal-mode callback asymmetry and remote lifetime. See
+[reception evidence](docs/internal/yoosee-push-reception.md).
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

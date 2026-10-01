@@ -19,6 +19,9 @@ Docs are split by audience:
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.
 
+- **[Yoosee push reception](internal/yoosee-push-reception.md)** — bounded TCP
+  framing, callback ownership, reconnect transitions and score-scheduling caveat.
+
 - **[Camera control panel](internal/dashboard-camera-controls.md)** — real-browser layout/focus,
   capability-driven controls and camera-free regression checks.
 
