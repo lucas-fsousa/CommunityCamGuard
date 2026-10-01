@@ -94,6 +94,11 @@ recording or start another encoder. Changing filters or leaving the view also
 cancels the obsolete list request.
 
 An initial preparation delay is expected for an uncached compatibility conversion.
+After playback starts, buffering without progress for 30 seconds clears loading
+and offers explicit retry by selecting the same row. That retry restores the saved
+position when metadata loads; no automatic conversion retry is started. Browser
+background-tab throttling can delay this timeout.
+
 On the prototype, five-minute 1080p clips took roughly 18–22 seconds to convert.
 A separate native HTTP check returned ready in 159 ms without conversion. These
 are specific backend observations, **not a promised time to first visible frame**.

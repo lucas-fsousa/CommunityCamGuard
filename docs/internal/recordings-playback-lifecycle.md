@@ -159,3 +159,22 @@ download isolation, cleanup and list timeout/retry. It ran in a 512 MiB/no-swap,
 was launched. First-frame 715 ms is a fixture observation, not production latency.
 New rejection races are covered by Node; this browser run checks normal-flow
 regressions, not physical mobile or authenticated production failure recovery.
+
+## Post-start buffering deadline — 2026-10-01
+
+The startup watchdog did not cover a `waiting` event after successful playback;
+this could leave the spinner indefinitely if the browser emitted no media error.
+Once playback has started, waiting now owns one 30-second timer. Repeated waiting
+or timeupdate events without a position advance cannot renew it. Actual forward
+progress outside an ongoing seek renews the observation window; playing, pause,
+end, source replacement, fallback and disposal cancel it. A timer identity plus
+attempt/selection checks reject already-queued stale callbacks.
+
+Exhaustion clears loading and detaches the source with localized retry guidance,
+without requests or automatic conversion/fallback. Explicitly reselecting the
+same failed row restores its saved position after metadata arrives. Selecting
+another row does not inherit that position. This is recovery from prolonged
+buffering, not a transport-performance fix or a detector of every frozen frame.
+Background-tab timer throttling can delay enforcement. Node contracts exercise
+deadline, no-progress/seek events, resume position and cancellation races; no new
+real-browser or physical-camera validation is claimed for this change.

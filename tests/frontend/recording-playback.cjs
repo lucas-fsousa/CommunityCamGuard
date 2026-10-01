@@ -259,5 +259,49 @@ function harness(support = "") {
     assert(h.player.src.endsWith("path=broken"));
     h.controller.dispose();
   }
+  {
+    const h = harness(); h.controller.select("stalled");
+    h.requests[0].resolve({ ready: true }); await flush();
+    h.player.paused = false; h.player.currentTime = 42; h.player.emit("playing");
+    h.player.emit("waiting");
+    const entry = [...h.timers].find(([, timer]) => timer.delay === 30000);
+    assert(entry);
+    h.player.emit("waiting");
+    assert(h.timers.has(entry[0])); // Repeated waiting cannot extend the deadline.
+    h.player.emit("timeupdate");
+    assert(h.timers.has(entry[0])); // An event without actual progress is not recovery.
+    h.player.seeking = true; h.player.currentTime = 70; h.player.emit("timeupdate");
+    assert(h.timers.has(entry[0])); // A pending seek alone is not playback progress.
+    h.player.seeking = false; h.player.currentTime = 42;
+    h.timers.delete(entry[0]); entry[1].fn();
+    assert.equal(h.status.textContent, "rec.bufferTimedOut");
+    assert.equal(h.states.at(-1).loading, false);
+    assert.equal(h.player.src, ""); assert.equal(h.requests.length, 1);
+    h.player.currentTime = 0; // load() resets the real media element's position.
+    h.controller.select("stalled"); assert.equal(h.requests.length, 2);
+    h.requests[1].resolve({ ready: true }); await flush();
+    h.player.duration = 300; h.player.emit("loadedmetadata");
+    assert.equal(h.player.currentTime, 42);
+    h.controller.dispose(); assert.equal(h.timers.size, 0);
+  }
+  for (const transition of ["progress", "playing", "pause", "ended", "replace", "dispose", "fallback"]) {
+    const h = harness("probably"); h.controller.select("a");
+    h.requests[0].resolve({ ready: true, original: true }); await flush();
+    h.player.videoWidth = 1920; h.player.paused = false; h.player.currentTime = 12;
+    h.player.emit("playing"); h.player.emit("waiting");
+    const entry = [...h.timers].find(([, timer]) => timer.delay === 30000);
+    assert(entry);
+    if (transition === "progress") {
+      h.player.currentTime = 13; h.player.emit("timeupdate");
+      assert.equal([...h.timers.values()].filter(t => t.delay === 30000).length, 1);
+    } else if (transition === "replace") h.controller.select("b");
+    else if (transition === "dispose") h.controller.dispose();
+    else if (transition === "fallback") { h.player.error = { code: 3 }; h.player.emit("error"); }
+    else { h.player.paused = transition === "pause"; h.player.emit(transition); }
+    assert(!h.timers.has(entry[0]));
+    entry[1].fn(); // Already queued callbacks cannot affect another timer/attempt.
+    assert.notEqual(h.status.textContent, "rec.bufferTimedOut");
+    h.controller.dispose(); assert.equal(h.timers.size, 0);
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -20,6 +20,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
       clearTimeout(current.requestTimer);
       clearTimeout(current.nativeTimer);
       clearTimeout(current.startTimer);
+      clearBuffer(current);
     }
     current = null;
     message("");
@@ -71,18 +72,38 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     }).finally(() => { if (item.attempt === attempt) item.playPending = false; });
   }
 
-  function fail(item) {
+  function clearBuffer(item) {
+    clearTimeout(item.bufferTimer);
+    item.bufferTimer = null;
+  }
+
+  function watchBuffer(item) {
+    if (!item.started || item.bufferTimer != null) return;
+    const attempt = item.attempt;
+    item.bufferPosition = player.currentTime;
+    const timer = item.bufferTimer = setTimeout(() => {
+      if (!active(item) || item.attempt !== attempt || item.bufferTimer !== timer) return;
+      item.bufferTimer = null;
+      if (player.paused || player.ended) return;
+      if (!player.seeking && player.currentTime > item.bufferPosition) return watchBuffer(item);
+      fail(item, "rec.bufferTimedOut");
+    }, 30000);
+  }
+
+  function fail(item, key = "rec.playbackFailed") {
     if (!active(item)) return;
+    item.resume = player.currentTime || 0;
     item.failed = true;
     item.ready = false;
     item.attempt++; // Reject late promises/events from this failed source.
     item.playPending = false;
     clearTimeout(item.nativeTimer);
     clearTimeout(item.startTimer);
+    clearBuffer(item);
     player.pause();
     player.removeAttribute("src");
     player.load();
-    message("rec.playbackFailed");
+    message(key);
   }
 
   function fallback(item) {
@@ -96,6 +117,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     item.playPending = false;
     clearTimeout(item.nativeTimer);
     clearTimeout(item.startTimer);
+    clearBuffer(item);
     player.pause();
     player.removeAttribute("src");
     player.load();
@@ -150,6 +172,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
     current.started = true;
     clearTimeout(current.nativeTimer);
     clearTimeout(current.startTimer);
+    clearBuffer(current);
     message("");
   }
   function onMetadata() {
@@ -163,15 +186,24 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
   function onPause() {
     if (current) clearTimeout(current.nativeTimer);
     if (current) clearTimeout(current.startTimer);
+    if (current) clearBuffer(current);
     if (current?.ready && !disposed && player.paused) message("");
   }
   function onWaiting() {
     if (current?.ready && !current.failed && !disposed && !player.paused) {
       message("rec.buffering", true);
+      watchBuffer(current);
     }
   }
   function onCanPlay() {
     if (current?.ready && !disposed && player.paused) message("");
+  }
+  function onTimeUpdate() {
+    if (!current?.ready || disposed || current.bufferTimer == null || player.seeking) return;
+    if (player.currentTime > current.bufferPosition) {
+      clearBuffer(current);
+      if (!player.paused && !player.ended) watchBuffer(current);
+    }
   }
   function onError() {
     if (!current?.ready || disposed) return;
@@ -186,6 +218,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
   player.addEventListener("waiting", onWaiting);
   player.addEventListener("canplay", onCanPlay);
   player.addEventListener("ended", onPause);
+  player.addEventListener("timeupdate", onTimeUpdate);
 
   return {
     select(path) {
@@ -194,8 +227,9 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
         if (current.ready) play(current); // A second click must not reload/lose seek position.
         return;
       }
+      const resume = current?.path === path && current.failed ? current.resume : 0;
       stop();
-      current = { path, abort: new AbortController(), deadline: Date.now() + 650000, attempt: 0 };
+      current = { path, resume, abort: new AbortController(), deadline: Date.now() + 650000, attempt: 0 };
       message("rec.startingPlayback", true);
       void check(current, true);
     },
@@ -211,6 +245,7 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
       player.removeEventListener("waiting", onWaiting);
       player.removeEventListener("canplay", onCanPlay);
       player.removeEventListener("ended", onPause);
+      player.removeEventListener("timeupdate", onTimeUpdate);
     },
   };
 }

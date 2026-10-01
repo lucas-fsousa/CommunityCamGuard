@@ -17,6 +17,9 @@ Playback retry follow-up: failed media/play attempts now detach their source and
 clear readiness so one explicit selection starts a fresh attempt; autoplay denial
 and deliberate pause retain normal resume behavior. See
 [lifecycle evidence](docs/internal/recordings-playback-lifecycle.md).
+2026-10-01: post-start buffering now has a 30-second no-progress deadline,
+explicit same-row retry with saved position, and cancellation/late-timer tests.
+No automatic conversion retry or live-camera change.
 
 PTZ update (2026-09-14): **user physically validated all four directions and fluidity
 on camera 3**. Dashboard API validation also passed all four; warm alternating
