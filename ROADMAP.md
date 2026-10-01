@@ -15,8 +15,11 @@ option regression tests are documented. Do not globally enable an unimplemented
 relay transport merely to solicit platform metadata.
 Push teardown follow-up: SDK 6.45 reason-zero `03 0B` hangup layout/checksum is
 implemented as a socket-free driver codec with synthetic tests. It differs from
-B9 route release. Field provenance, acknowledgement and outer timer cleanup remain
-before any relay-enabled diagnostic; see [teardown evidence](docs/internal/yoosee-push-teardown.md).
+B9 route release. E4 field provenance, outer timer cleanup and ready predicates
+are mapped; a socket-free context parser correlates device and MTP link. Remaining:
+certification receive transitions, pre-ready remote lifetime and acknowledgement
+semantics before any relay-enabled diagnostic; see
+[teardown evidence](docs/internal/yoosee-push-teardown.md).
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
