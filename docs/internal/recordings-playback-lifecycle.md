@@ -178,3 +178,9 @@ buffering, not a transport-performance fix or a detector of every frozen frame.
 Background-tab timer throttling can delay enforcement. Node contracts exercise
 deadline, no-progress/seek events, resume position and cancellation races; no new
 real-browser or physical-camera validation is claimed for this change.
+
+Follow-up retry-chain regression: a failed retry before metadata must not overwrite
+the saved position with the newly reset media element's zero. The position now
+survives both pre-metadata play failure and preparation saturation, is clamped to
+the next file duration, and is never transferred to a different selected recording.
+These cases are covered by the lightweight Node suite.

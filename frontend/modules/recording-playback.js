@@ -92,7 +92,8 @@ export function createRecordingPlayback(player, status, api, t, onState = () => 
 
   function fail(item, key = "rec.playbackFailed") {
     if (!active(item)) return;
-    item.resume = player.currentTime || 0;
+    // A failed retry may not have loaded metadata/restored the saved position yet.
+    item.resume = player.currentTime || item.resume || 0;
     item.failed = true;
     item.ready = false;
     item.attempt++; // Reject late promises/events from this failed source.

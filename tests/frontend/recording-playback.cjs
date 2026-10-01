@@ -303,5 +303,25 @@ function harness(support = "") {
     assert.notEqual(h.status.textContent, "rec.bufferTimedOut");
     h.controller.dispose(); assert.equal(h.timers.size, 0);
   }
+  {
+    const h = harness(); h.controller.select("a");
+    h.requests[0].resolve({ ready: true }); await flush();
+    h.player.currentTime = 80; h.player.error = { code: 2 }; h.player.emit("error");
+    h.player.currentTime = 0; h.player.reject = "NetworkError";
+    h.controller.select("a"); h.requests[1].resolve({ ready: true }); await flush();
+    assert.equal(h.status.textContent, "rec.playbackFailed");
+    h.player.reject = null; h.player.error = null;
+    h.controller.select("a"); h.requests[2].reject({ status: 429 }); await flush();
+    assert.equal(h.status.textContent, "rec.playbackBusy");
+    h.controller.select("a"); h.requests[3].resolve({ ready: true }); await flush();
+    h.player.duration = 60; h.player.emit("loadedmetadata");
+    assert.equal(h.player.currentTime, 60); // Retained through failures, bounded by actual duration.
+    h.player.currentTime = 20; h.player.error = { code: 2 }; h.player.emit("error");
+    h.player.currentTime = 0; h.player.error = null;
+    h.controller.select("b"); h.requests[4].resolve({ ready: true }); await flush();
+    h.player.emit("loadedmetadata");
+    assert.equal(h.player.currentTime, 0); // Another recording never inherits the resume position.
+    h.controller.dispose(); assert.equal(h.timers.size, 0);
+  }
   console.log("Recording playback lifecycle contracts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
