@@ -44,6 +44,10 @@ generations, discarding old reads/EOF and partial input on replacement/cancel.
 Read/event dispatch return semantics are mapped; downstream queued work and real
 socket cancellation still require integration. This does not validate relay replies
 or enable certification success automatically.
+Static callback-signature follow-up: the mode-2 branch registers a three-argument
+receive handler where the connect dispatcher only supplies the socket argument.
+Reachability and terminal-mode meaning remain unproven; do not copy/execute that
+SDK branch blindly or attribute historical crashes to it without runtime evidence.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

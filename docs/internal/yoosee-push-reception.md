@@ -156,6 +156,23 @@ tokens, cancellation, partial EOF, clean EOF and recovery with a new generation.
 
 ### Open gates
 
+Callback-signature checkpoint: connected-event helper `0x1ed7e8–0x1ed8c8`
+invokes socket `+0x70` at `0x1ed894` with only x0 (socket) explicitly supplied;
+the connection-error path likewise supplies only x0 at `0x1ece98`. This matches
+`iv_on_push_tcp_connect_finished`, but the previously identified mode-2 registration
+points to `iv_on_push_rcv_tcp_data`, whose entry consumes x0/x1/w2 (socket, input
+buffer, length). The inspected caller does not prepare those extra arguments.
+The mismatch is static evidence against copying that mode-2 branch, not proof
+that a deployed camera/emulator reaches it or that it caused previous crashes.
+Do not run the SDK branch to "see what happens" or infer the mode from camera model.
+
+Response-validation limit: the available `iv_rcv_certify_frm_rsp` consumer does
+not establish a success status/body schema; no push certification-response builder
+was found in the exported-symbol search. This is not an exhaustive binary search.
+No response parser or checksum-success shortcut was invented. Certification remains
+unconfirmed until peer/session correlation and message-specific response semantics
+have independent evidence; local generation tokens cannot provide that evidence.
+
 - Resolve terminal modes and the callback asymmetry at the `ivtcp` factory.
 - Local socket destruction order is mapped; queued callback cancellation and
   thread/event-loop ownership still require proof before live transport integration.
