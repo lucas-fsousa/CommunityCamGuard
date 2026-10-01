@@ -35,6 +35,10 @@ transitions are mapped; the score helper's execution is unproven because actual
 ready-path timer registrations differ. Remaining: socket cancellation ownership,
 terminal-mode callback asymmetry and remote lifetime. See
 [reception evidence](docs/internal/yoosee-push-reception.md).
+Socket-lifetime follow-up: node teardown disables internal reconnect, closes the
+socket and invokes its close callback before freeing local storage. Parent-session
+ownership must survive this callback. Queued callback/thread semantics and remote
+release remain unproven; no live relay integration was enabled.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

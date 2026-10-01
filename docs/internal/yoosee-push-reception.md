@@ -25,13 +25,49 @@ source**. Other status values leave without that transition.
 the session in this function; the previously mapped disconnect timer handles
 the retry/reset state. These callbacks retain the session pointer, so teardown
 must unregister/cancel socket callbacks before releasing session ownership.
-Lower-level `ivtcp` destruction and late-callback suppression remain unproven.
+Lower-level destruction is mapped below; suppression of already queued callbacks
+across threads remains unproven.
 
 The mode-2 creation branch stores socket at node `+0x40` and passes GOT `0x2a8708`
 (receive callback) directly to the connection factory. The common close callback
 still clears `+0x38`. This asymmetry is observed, not a corrected or homologated
 alternate path. Address-family/mode interpretation and callback-factory semantics
 must be traced before adopting it. Do not generalize the other branch blindly.
+
+### Factory and local destruction follow-up
+
+`ivtcp_comm_add_connect` (`0x1ede90`, 528 bytes) stores callback argument x3 at
+socket `+0x70` (`0x1edf1c`) and context x5 at `+0x90`. Thus the mode-2 callback
+asymmetry is real at registration, not a disassembler guessing the wrong parameter.
+Its reconnect policy at `+0x5c` is 1 when argument w2 is zero (as in push setup),
+2 otherwise. It calls `ivtcp_start_connect`, then links successful allocations
+into the communication object's list. Its address copy checks sockaddr family 2
+for a 16-byte copy, otherwise 28 bytes; that does not by itself establish the
+meaning of the separate terminal-mode enum.
+
+`iv_push_rly_node_free` (`0x278494`, 564 bytes) iterates eight session node slots.
+For each present socket (`+0x38`, then `+0x40`) it sets socket policy `+0x5c = 0`,
+calls `ivtcp_close_socket`, then `ivtcp_close_notify`, and clears the node pointer.
+Only afterward does it free node receive storage and the node itself.
+
+`ivtcp_close_socket` (`0x1eca2c`, 316 bytes), for an open descriptor in status 2/3,
+flushes/disables the bufferevent, calls shutdown, frees the bufferevent, closes the
+descriptor and sets it to -1; it then sets socket status to 1. This is local
+resource cleanup, not a wire-level relay hangup acknowledgement.
+
+`ivtcp_close_notify` (`0x1ecb68`, 444 bytes) invokes the close callback **before**
+branching on policy. Policies 0/1 unlink and call `ivtcp_session_free`; policy 2
+requeues and calls `ivtcp_start_connect`. Clearing policy in node teardown prevents
+this internal reconnect branch, but does not suppress the close callback itself.
+The callback can therefore still touch the parent push session during cleanup;
+that parent must remain alive until node cleanup returns.
+
+`ivtcp_session_free` (`0x1ed5b8`, 136 bytes) frees any remaining bufferevent and
+deletes/frees its event before freeing the socket object. A nonzero `event_del`
+result returns early instead of freeing the socket object. The inspected path
+establishes local ordering, not a proof of race-free destruction under every
+event-loop/thread condition. Our future transport should use explicit cancellation
+and connection generations, not reproduce implicit pointer ownership.
 
 ## Correcting the score scheduling assumption
 
@@ -77,7 +113,8 @@ decoder reuse and read/frame-count limits. No production callers were added.
 ## Remaining work
 
 - Resolve terminal modes and the callback asymmetry at the `ivtcp` factory.
-- Verify cancellation/ownership in socket destruction and queued callbacks.
+- Local socket destruction order is mapped; queued callback cancellation and
+  thread/event-loop ownership still require proof before live transport integration.
 - Trace the actual ready-path statistics callback before assigning score semantics.
 - Keep pre-ready remote lifetime and safe relay release as live-diagnostic gates.
 
