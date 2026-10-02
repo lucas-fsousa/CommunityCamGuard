@@ -58,6 +58,16 @@ def test_fresh_route_release_precedes_socket_close(env):
     assert env == ["bind", ("call", attempt), "probe", ("release", attempt.link_id, 19), "socket_close"]
 
 
+@pytest.mark.parametrize("platform", [None, 2])
+def test_platform_evidence_survives_route_cleanup(env, monkeypatch, platform):
+    monkeypatch.setattr(av_route, "open_media_channel",
+                        lambda *a, **k: replace(CHANNEL, device_platform_version=platform))
+    result = run()
+    assert result.device_platform_version == platform
+    assert result.route_release_acknowledged
+    assert env[-1] == "socket_close"
+
+
 @pytest.mark.parametrize("where", ["call_device", "open_media_channel", "probe_av_socket"])
 def test_ambiguous_failure_still_releases_preallocated_route(env, monkeypatch, where):
     def fail(*args, **kwargs):

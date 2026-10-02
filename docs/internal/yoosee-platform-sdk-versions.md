@@ -83,6 +83,42 @@ none with positive bit `0x20`. This does not establish platform 1 and supplies n
 positive candidate to correlate to camera 3. The content-free diagnostic and limits
 are recorded in [capture evidence](yoosee-push-capture-evidence.md).
 
+### Passive MTP collector — 2026-10-02
+
+`open_media_channel` now consumes the older SDK's positive bit `0x20` only
+inside its existing successful meter-roundtrip branch. This requires the exact
+peer, valid MTP checksum, device/access IDs, current link, channel 4, correct
+record length, supported reply extension, kind 2, and an echoed sequence/full
+timestamp belonging to a sent measurement. It sets platform 2; missing evidence
+does not establish platform 1 or erase a prior E4 observation. Request-only
+meters cannot promote it, even though the older SDK also promotes in its request
+handler. Our deliberately narrower acceptance requires the roundtrip.
+
+The source instruction sequence was rechecked at `0x20e970–0x20e9b4`: bit 5
+of body `+8` leads to session `+0xa4e = 2` and the registry setter. This remains
+the older binary's contract, not proof that every firmware advertises the bit.
+No historical positive sample or live camera-3 platform observation was found.
+
+The inspected outgoing builder (`iv_mtp_chnnel_send_meter_frm`, `0x2095ac`)
+sets body flag `0x08` at `0x2098b8–0x2098c8`, with conditional `0x10` at
+`0x2097fc–0x20980c`; it provides no evidence for adding `0x20` to our request
+as a query switch. Request bytes/retries/timeouts are unchanged, and tests
+explicitly assert our outgoing flags stay 8. No extra socket or packet is added.
+
+The internal AV route result now retains the optional platform value after
+successful AV CLOSE/B9/socket cleanup. The existing authenticated, loopback-only,
+single-use diagnostic serializes it without identifiers. It remains disabled by
+default and does not select HD automatically, persist a capability or modify the
+dashboard. The older live result predates this field and must not be retroactively
+interpreted as a positive observation.
+
+Synthetic regression cases cover all existing peer/route/checksum/record/timestamp
+rejections with and without the positive flag, preservation of prior platform 2,
+request-only rejection, route cleanup and diagnostic serialization. Analysis and
+tests ran sequentially under 256 MiB/no-swap/50%-CPU limits; no live traffic or
+container rebuild was performed.
+The combined focused run passed 188 tests, with 88.3 MiB peak memory and no swap.
+
 ## SDK 6.45: E4 participates in push/relay setup
 
 The same reverse-reference scan finds `gat_rcv_PushStreamDistribute` at

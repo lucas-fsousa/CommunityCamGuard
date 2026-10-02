@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 class AvRouteResult:
     media: AvProbeResult
     route_release_acknowledged: bool
+    device_platform_version: int | None = None
 
 
 class AvBootstrapError(P2PProbeError):
@@ -169,4 +170,4 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
                             int((time.monotonic() - started) * 1000))
     if not released:
         raise P2PProbeError("native AV route release receipt not confirmed")
-    return AvRouteResult(result, released)
+    return AvRouteResult(result, released, channel.device_platform_version)

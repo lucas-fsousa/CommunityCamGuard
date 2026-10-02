@@ -69,6 +69,10 @@ Session-correlation follow-up: passive E4 evidence now requires the current MTP
 link as well as device identity; responses for other links cannot change the
 platform. 63 focused tests passed. This does not resolve remote relay lifetime
 or provide a positive camera-3 platform observation.
+2026-10-02: the passive MTP collector now recognizes positive older-SDK platform
+evidence only after a fully correlated sent-meter roundtrip. The internal AV
+diagnostic preserves this optional value after cleanup. No extra packets or
+automatic HD selection; historical capture still has no positive observation.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

@@ -47,6 +47,17 @@ def test_single_use_fixed_target_and_safe_counts(setup):
     assert PATH not in client.get("/openapi.json").json()["paths"]
 
 
+@pytest.mark.parametrize("platform", [None, 2])
+def test_returns_optional_platform_without_identifiers(setup, monkeypatch, platform):
+    client, _, _ = setup
+    monkeypatch.setattr(api, "run_reviewed_native_av",
+                        lambda **kwargs: AvRouteResult(RESULT, True, platform))
+    response = client.post(PATH)
+    assert response.status_code == 200
+    assert response.json()["device_platform_version"] == platform
+    assert "123" not in response.text and CAMERA not in response.text
+
+
 def test_disabled_and_unconfigured_never_run(setup):
     client, settings, calls = setup
     settings.native_av_diagnostic_enabled = False

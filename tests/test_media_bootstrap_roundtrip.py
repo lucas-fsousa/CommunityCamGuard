@@ -1,11 +1,16 @@
 """Synthetic UDP only: bootstrap evidence must belong to a sent measurement."""
 
 import struct
+from dataclasses import replace
 
 import pytest
 
 from backend.app.drivers.yoosee.p2p import media_session
-from backend.app.drivers.yoosee.p2p.media_protocol import build_media_meter_ack, build_mtp_frame
+from backend.app.drivers.yoosee.p2p.media_protocol import (
+    build_media_meter_ack,
+    build_mtp_frame,
+    parse_media_meter,
+)
 from tests.test_vendor_media_session import _route
 
 
@@ -14,8 +19,13 @@ from tests.test_vendor_media_session import _route
                                   "timestamp_high", "call", "checksum", "sdk68", "sdk72",
                                   "captured68", "bad_zero_call", "bad_zero_role", "bad_tail",
                                   "zero_request"])
-def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
+@pytest.mark.parametrize("platform_flag", [0, 0x20])
+@pytest.mark.parametrize("prior_platform", [None, 2])
+def test_only_correlated_meter_ack_confirms_roundtrip(
+    monkeypatch, fault, platform_flag, prior_platform,
+):
     node, device, attempt, calling = _route()
+    calling = replace(calling, device_platform_version=prior_platform)
     sent = []
 
     class Socket:
@@ -27,7 +37,10 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
 
     def receive(*args):
         request = next(wire for wire, _ in reversed(sent) if wire[:2] == b"\xc0\x90")
+        sent_meter = parse_media_meter(request)
+        assert sent_meter is not None and sent_meter.flags == 8
         inner = bytearray(build_media_meter_ack(request)[6:])
+        struct.pack_into("<I", inner, 8, platform_flag)
         mutations = {"link": (4, "I"), "source": (12, "Q"), "destination": (20, "Q"),
                      "kind": (1, "B"), "channel": (48, "I"), "length": (52, "I"),
                      "role": (65, "B"), "sequence": (28, "I"), "timestamp": (32, "I"),
@@ -68,6 +81,9 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
                                                require_roundtrip=True)
     accepted = fault in (None, "sdk68", "sdk72", "captured68")
     assert result.meter_roundtrip_confirmed is accepted
+    assert result.device_platform_version == (
+        2 if accepted and platform_flag else prior_platform
+    )
     assert not result.direct_acknowledged
     expected = {None: ("reply",), "peer": (), "node": (), "link": (), "source": (),
                 "destination": (), "checksum": (), "kind": ("unknown_kind",),
@@ -86,7 +102,8 @@ def test_only_correlated_meter_ack_confirms_roundtrip(monkeypatch, fault):
     assert len(sent) == (2 if accepted else 4)
 
 
-def test_request_only_is_not_roundtrip_proof(monkeypatch):
+@pytest.mark.parametrize("platform_flag", [0, 0x20])
+def test_request_only_is_not_roundtrip_proof(monkeypatch, platform_flag):
     from backend.app.drivers.yoosee.p2p.media_protocol import build_media_meter_request
 
     node, device, attempt, calling = _route()
@@ -100,6 +117,9 @@ def test_request_only_is_not_roundtrip_proof(monkeypatch):
             sent.append(wire)
 
     request = build_media_meter_request(device.device_id, 123, attempt.link_id, attempt.call_id)
+    body = bytearray(request[6:])
+    struct.pack_into("<I", body, 8, 8 | platform_flag)
+    request = build_mtp_frame(0x90, body)
     monkeypatch.setattr(media_session, "local_route_ip", lambda peer: "192.0.2.20")
     monkeypatch.setattr(media_session, "build_direct_calling_request", lambda *a, **k: b"direct")
     monkeypatch.setattr(media_session, "receive_datagrams",
@@ -107,5 +127,6 @@ def test_request_only_is_not_roundtrip_proof(monkeypatch):
     result = media_session.open_media_channel(Socket(), node, 123, device, calling, 0.1,
                                                require_roundtrip=True)
     assert result.meter_acknowledged and not result.meter_roundtrip_confirmed
+    assert result.device_platform_version is None
     assert result.meter_observations == ("request",)
     assert len(sent) == 6  # Two bounded attempts, including replies to peer requests.

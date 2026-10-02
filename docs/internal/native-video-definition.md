@@ -5,6 +5,10 @@ SDK 6.45. The older binary used here also promotes platform 2 from positive MTP
 meter flags. Camera-3 correlation is still required; no runtime gate was changed.
 See [version-specific evidence](yoosee-platform-sdk-versions.md).
 
+2026-10-02: positive, fully correlated MTP replies can now populate platform 2
+in the passive collector, and the internal AV diagnostic retains the value.
+This is tested plumbing, not a new camera observation or HD homologation.
+
 The first real native decode negotiated 640×360. This document maps a quality
 selection mechanism; it does not claim HD works, selects the sensor's maximum
 resolution, or leaves other sessions unaffected. No quality command was sent.

@@ -150,6 +150,11 @@ def open_media_channel(
                     and struct.unpack_from("<Q", wire, 38)[0] == parsed.timestamp
                     and (parsed.sequence, parsed.timestamp) in sent_meters):
                 meter_roundtrip_confirmed = True
+                # Older SDK iv_rcv_meter_ack promotes on bit 5. Only consume
+                # positive evidence after all route and sent-meter checks;
+                # absence never establishes platform 1 or erases E4 evidence.
+                if parsed.flags & 0x20:
+                    device_platform_version = 2
             if parsed.kind == 1:
                 if not require_roundtrip or valid_record:
                     sock.sendto(build_media_meter_ack(wire), peer)
