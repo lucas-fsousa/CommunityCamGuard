@@ -208,8 +208,9 @@ def test_media_channel_fails_closed_without_private_attempt() -> None:
     [(None, (1,), 2), (None, (0,), None), (None, (1, 0), 2),
      (None, (0, 1), 2), (2, (0,), 2)],
 )
+@pytest.mark.parametrize("matching_link", [True, False])
 def test_media_channel_passively_collects_correlated_platform_metadata(
-    monkeypatch, prior_version, flags, expected_version,
+    monkeypatch, prior_version, flags, expected_version, matching_link,
 ) -> None:
     node, device, attempt, calling = _route()
     calling = replace(calling, device_platform_version=prior_version)
@@ -219,6 +220,7 @@ def test_media_channel_passively_collects_correlated_platform_metadata(
     distribution[:2] = b"\x7e\xe4"
     struct.pack_into("<H", distribution, 2, len(distribution))
     distribution[0x18] = 1
+    struct.pack_into("<I", distribution, 0x28, attempt.link_id + int(not matching_link))
     struct.pack_into("<Q", distribution, 0x38, device.device_id)
     direct_ack = bytearray(32)
     direct_ack[:2] = b"\x7e\xa4"
@@ -266,4 +268,4 @@ def test_media_channel_passively_collects_correlated_platform_metadata(
 
     assert result.direct_acknowledged is True
     assert result.meter_acknowledged is True
-    assert result.device_platform_version == expected_version
+    assert result.device_platform_version == (expected_version if matching_link else prior_version)

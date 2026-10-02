@@ -65,6 +65,10 @@ platform evidence instead of inventing platform 1 or downgrading platform 2.
 The SDK quality getter reads player cache, not camera-applied resolution; it is
 not an alternative provenance source. 49 focused offline tests passed. Native HD
 remains gated; see the linked SDK evidence for exact addresses and limits.
+Session-correlation follow-up: passive E4 evidence now requires the current MTP
+link as well as device identity; responses for other links cannot change the
+platform. 63 focused tests passed. This does not resolve remote relay lifetime
+or provide a positive camera-3 platform observation.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

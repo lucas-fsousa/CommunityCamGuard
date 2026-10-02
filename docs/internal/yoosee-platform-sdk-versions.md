@@ -32,6 +32,23 @@ The separate [getter audit](native-video-definition.md#gettercache-audit--2026-1
 also rules out the local player quality getter as an independent query of the
 camera's applied resolution.
 
+### Active-link correlation
+
+The passive parser now also requires the expected MTP link ID and matches E4
+`+0x28`, the field used by the SDK to locate its active channel. Both rendezvous
+and direct-media collectors supply their current attempt's link ID. A valid
+frame for the same device but a different link cannot supply platform evidence.
+Push-context extraction reuses the same check instead of maintaining a duplicate.
+This is correlation, not replay-proof authentication: a repeated/reused link ID
+alone cannot distinguish sessions, and trusted broker transport remains required.
+
+63 focused offline cases passed, including mismatched-link sequences in both
+collectors, preservation of prior evidence, invalid link IDs and independent
+push-context parsing. Peak memory was 49.3 MiB with no swap; Ruff passed. No
+camera commands, relay connection, container rebuild or dashboard changes.
+The combined capture/push/platform/rendezvous/media regression run passed all
+169 cases, peaking at 54.2 MiB without swap under the same resource ceiling.
+
 ## Binary identity
 
 | ARM64 `libiotvideomulti.so` source | SHA-256 | Registry setter |

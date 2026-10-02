@@ -31,11 +31,9 @@ def parse_push_context(
     envelope/relay-table checks; it neither consumes nor connects to relay URLs.
     Empty/one-byte tokens are unusable for our separately validated hangup codec.
     """
-    if type(expected_link_id) is not int or not 0 <= expected_link_id <= 0xFFFFFFFF:
-        raise ValueError("expected push-context link id is invalid")
-    if parse_push_stream_platform_metadata(frame, expected_device_id=expected_device_id) is None:
-        return None
-    if struct.unpack_from("<I", frame, 0x28)[0] != expected_link_id:
+    if parse_push_stream_platform_metadata(
+        frame, expected_device_id=expected_device_id, expected_link_id=expected_link_id,
+    ) is None:
         return None
     token_size = struct.unpack_from("<H", frame, 0x1E)[0]
     if token_size < 2:

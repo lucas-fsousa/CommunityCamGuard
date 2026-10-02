@@ -72,8 +72,9 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
     ("flags", "expected_version"),
     [((1,), 2), ((0,), None), ((1, 0), 2), ((0, 1), 2)],
 )
+@pytest.mark.parametrize("matching_link", [True, False])
 def test_rendezvous_passively_carries_correlated_platform_metadata(
-    monkeypatch, flags, expected_version,
+    monkeypatch, flags, expected_version, matching_link,
 ):
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     device = OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -82,6 +83,7 @@ def test_rendezvous_passively_carries_correlated_platform_metadata(
     distribution[:2] = b"\x7e\xe4"
     struct.pack_into("<H", distribution, 2, len(distribution))
     distribution[0x18] = 1
+    struct.pack_into("<I", distribution, 0x28, 7 if matching_link else 8)
     struct.pack_into("<Q", distribution, 0x38, device.device_id)
     direct = bytearray(52)
     struct.pack_into("<I", direct, 0x24, 7)
@@ -129,7 +131,7 @@ def test_rendezvous_passively_carries_correlated_platform_metadata(
     )
 
     assert result.direct_handshake is True
-    assert result.device_platform_version == expected_version
+    assert result.device_platform_version == (expected_version if matching_link else None)
 
 
 def test_route_hangup_matches_the_native_p2p_inner_layout():

@@ -22,6 +22,7 @@ def _distribution(
     frame[:2] = bytes((0x7E, PUSH_STREAM_DISTRIBUTE_TYPE))
     struct.pack_into("<H", frame, 2, length)
     frame[0x18] = int(new_platform)
+    struct.pack_into("<I", frame, 0x28, 123)
     struct.pack_into("<H", frame, 0x1E, len(token))
     struct.pack_into("<Q", frame, 0x38, device_id)
     frame[0x88 : 0x88 + len(token)] = token
@@ -44,35 +45,36 @@ def test_decodes_only_positive_platform_evidence(
     assert parse_push_stream_platform_metadata(
         frame,
         expected_device_id=7_443_576_841,
+        expected_link_id=123,
     ) == DevicePlatformMetadata(7_443_576_841, expected_version, new_platform)
 
 
 def test_rejects_wrong_device_type_length_ack_and_truncated_relay_table():
     frame = bytearray(_distribution())
     assert (
-        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_842)
+        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_842, expected_link_id=123)
         is None
     )
 
     frame[1] = 0xE3
     assert (
-        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841)
+        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841, expected_link_id=123)
         is None
     )
     frame = bytearray(_distribution())
     struct.pack_into("<H", frame, 2, len(frame) - 1)
     assert (
-        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841)
+        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841, expected_link_id=123)
         is None
     )
     frame = bytearray(_distribution())
     struct.pack_into("<I", frame, 0x14, 1 << 20)
     assert (
-        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841)
+        parse_push_stream_platform_metadata(bytes(frame), expected_device_id=7_443_576_841, expected_link_id=123)
         is None
     )
     frame = _distribution()[:-1]
-    assert parse_push_stream_platform_metadata(frame, expected_device_id=7_443_576_841) is None
+    assert parse_push_stream_platform_metadata(frame, expected_device_id=7_443_576_841, expected_link_id=123) is None
 
 
 def test_accepts_bounded_future_trailing_distribution_fields():
@@ -83,6 +85,7 @@ def test_accepts_bounded_future_trailing_distribution_fields():
     parsed = parse_push_stream_platform_metadata(
         bytes(frame),
         expected_device_id=7_443_576_841,
+        expected_link_id=123,
     )
 
     assert parsed is not None and parsed.version == 2
@@ -91,4 +94,18 @@ def test_accepts_bounded_future_trailing_distribution_fields():
 @pytest.mark.parametrize("device_id", [None, True, 0, -1, 0x10000000000000000])
 def test_expected_device_id_must_be_a_positive_u64(device_id):
     with pytest.raises(ValueError):
-        parse_push_stream_platform_metadata(_distribution(), expected_device_id=device_id)
+        parse_push_stream_platform_metadata(_distribution(), expected_device_id=device_id, expected_link_id=123)
+
+
+@pytest.mark.parametrize("link_id", [None, True, -1, 0x100000000])
+def test_expected_link_id_must_be_a_u32(link_id):
+    with pytest.raises(ValueError):
+        parse_push_stream_platform_metadata(
+            _distribution(), expected_device_id=7_443_576_841, expected_link_id=link_id,
+        )
+
+
+def test_rejects_other_session_of_the_same_device():
+    assert parse_push_stream_platform_metadata(
+        _distribution(), expected_device_id=7_443_576_841, expected_link_id=124,
+    ) is None

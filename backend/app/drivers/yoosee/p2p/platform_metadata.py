@@ -24,18 +24,21 @@ def parse_push_stream_platform_metadata(
     frame: bytes,
     *,
     expected_device_id: int,
+    expected_link_id: int,
 ) -> DevicePlatformMetadata | None:
     """Parse one decrypted GAT E4 distribution frame without opening a connection.
 
     SDK 6.45 promotes the registry to platform 2 when option bit 0 is set;
     a clear bit does not reset it or positively identify platform 1. In that
     case version remains unknown. Older SDKs also have an MTP promotion path.
-    Envelope/device checks are not authentication: callers must establish the
+    Envelope/device/link checks are not authentication: callers must establish the
     trusted transport and session provenance before using this metadata.
     """
 
     if type(expected_device_id) is not int or not 0 < expected_device_id <= 0xFFFFFFFFFFFFFFFF:
         raise ValueError("expected platform-metadata device id is invalid")
+    if type(expected_link_id) is not int or not 0 <= expected_link_id <= 0xFFFFFFFF:
+        raise ValueError("expected platform-metadata link id is invalid")
     if not PUSH_STREAM_DISTRIBUTE_BASE_SIZE <= len(frame) <= PUSH_STREAM_DISTRIBUTE_MAX_SIZE:
         return None
     if frame[0] not in (0x7E, 0x7F) or frame[1] != PUSH_STREAM_DISTRIBUTE_TYPE:
@@ -44,6 +47,8 @@ def parse_push_stream_platform_metadata(
         return None
     flags = struct.unpack_from("<I", frame, 0x14)[0]
     if flags & (1 << 20):
+        return None
+    if struct.unpack_from("<I", frame, 0x28)[0] != expected_link_id:
         return None
 
     token_size = struct.unpack_from("<H", frame, 0x1E)[0]

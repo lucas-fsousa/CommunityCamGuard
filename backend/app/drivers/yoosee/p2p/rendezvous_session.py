@@ -114,6 +114,7 @@ def call_device(
                 metadata = parse_push_stream_platform_metadata(
                     plain,
                     expected_device_id=device.device_id,
+                    expected_link_id=attempt.link_id,
                 )
                 if metadata is not None and metadata.version is not None:
                     device_platform_version = metadata.version
