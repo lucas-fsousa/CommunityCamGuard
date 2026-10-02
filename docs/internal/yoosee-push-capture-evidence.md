@@ -31,6 +31,24 @@ same resource caps used for RE. Eight synthetic tests cover bounds, fragments,
 UDP exact lengths, TCP partial/coalesced prefixes and content-free output.
 The real scan peaked at 12.3 MiB with no swap under a 128 MiB/30-second/50%-CPU cap.
 
+### Follow-up: bounded reconstruction of captured TCP prefixes
+
+A second offline inspection grouped payload-bearing IPv4 TCP segments by directional
+address/port tuple, ordered them by sequence number (accounting for SYN), validated
+identical retransmission overlaps and assembled only continuous captured data.
+Limits were 8 MiB retained payload total, 128 directions, 4096 segments per direction
+and 256 KiB assembled per direction, under the same 128 MiB/no-swap/30-second cap.
+No files or content were exported; memory peaked at 7.3 MiB.
+
+All **60 payload-bearing directions** assembled continuously within those limits;
+none produced a known protocol-3 candidate at its **captured stream prefix**.
+This eliminates initial TCP segmentation as the explanation for the first-pass
+result for these prefixes. It still does not inspect arbitrary later offsets,
+decrypt TLS/proprietary encryption, identify camera sessions or prove the capture
+starts at application-stream boundaries. Numeric sequence sorting is not a general
+wraparound/reused-four-tuple TCP implementation. This follow-up is an evidence
+audit, not a production reassembly transport or a missing-feature conclusion.
+
 ## E3 is not a relay certification response
 
 `gat_send_push_stream_rsp` (`0x27cdc0`, 624 bytes, SDK 6.45) builds a **GAT** frame
@@ -53,9 +71,9 @@ resource release, and do not add a shutdown sender based on the string alone.
 
 ## Next evidence needed
 
-- Bounded TCP reassembly/offline decryption may recover additional capture evidence;
-  this first-pass absence must not become a capability flag or justify repeated
-  live probes.
+- Capture-prefix reconstruction is complete for the 60 observed directions;
+  application-layer decoding may still recover additional evidence. Neither
+  negative result may become a capability flag or justify repeated live probes.
 - Trace any independently evidenced response schema and its peer/session binding
   before declaring certification success.
 - Keep broker E3 acknowledgement, broker B9 release and relay `03/0b` hangup as

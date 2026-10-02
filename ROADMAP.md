@@ -53,6 +53,10 @@ found no protocol-3 headers at inspected datagram/segment boundaries; no TCP
 reassembly/decryption was performed, so absence is not conclusive. GAT E3 is a
 separate broker response, not relay certification or proven release. See
 [capture evidence](docs/internal/yoosee-push-capture-evidence.md).
+Follow-up: all 60 payload-bearing TCP directions reconstructed continuously within
+offline limits, still with no known protocol-3 header at their captured prefixes.
+Application encryption/later offsets remain outside this evidence; no capability
+or certification-success inference was made.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.
