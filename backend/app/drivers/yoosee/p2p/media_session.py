@@ -150,8 +150,8 @@ def open_media_channel(
                     and struct.unpack_from("<Q", wire, 38)[0] == parsed.timestamp
                     and (parsed.sequence, parsed.timestamp) in sent_meters):
                 meter_roundtrip_confirmed = True
-                # Older SDK iv_rcv_meter_ack promotes on bit 5. Only consume
-                # positive evidence after all route and sent-meter checks;
+                # Both inspected SDKs promote on bit 5 (6.45 uses the x-version
+                # setter). Consume evidence only after route/sent-meter checks;
                 # absence never establishes platform 1 or erases E4 evidence.
                 if parsed.flags & 0x20:
                     device_platform_version = 2

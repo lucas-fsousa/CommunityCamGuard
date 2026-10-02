@@ -1,11 +1,12 @@
-# Platform provenance differs between SDK builds — 2026-10-01
+# Platform provenance across SDK builds — 2026-10-02
 
-The E4-only conclusion applies to SDK 6.45, not every SDK in the RE workspace.
-The older binary used for native-video research also has an MTP promotion path.
-Neither finding identifies camera 3 without a device-correlated observation.
-No runtime parser, capability, quality selection or camera session was changed.
+Both inspected builds have positive MTP platform evidence. The initial E4-only
+conclusion for SDK 6.45 was incomplete: its MTP handlers call a differently named
+setter, `giot_eif_set_device_x_version`, which updates the same registry field.
+This was verified on 2026-10-02; the exact chain is below. Neither static finding
+identifies camera 3 without a device-correlated observation.
 
-The initial investigation above was documentation-only. The follow-up below
+The initial investigation was documentation-only. The follow-up below
 corrects the passive parser; it does not enable a new transport or camera action.
 
 ## Clear E4 bit is not a platform-1 observation
@@ -96,7 +97,7 @@ handler. Our deliberately narrower acceptance requires the roundtrip.
 
 The source instruction sequence was rechecked at `0x20e970–0x20e9b4`: bit 5
 of body `+8` leads to session `+0xa4e = 2` and the registry setter. This remains
-the older binary's contract, not proof that every firmware advertises the bit.
+the older binary's contract, also confirmed in 6.45 below, not proof that every firmware advertises the bit.
 No historical positive sample or live camera-3 platform observation was found.
 
 The inspected outgoing builder (`iv_mtp_chnnel_send_meter_frm`, `0x2095ac`)
@@ -123,8 +124,8 @@ The combined focused run passed 188 tests, with 88.3 MiB peak memory and no swap
 
 The same reverse-reference scan finds `gat_rcv_PushStreamDistribute` at
 `0x24dfec`, the getter at `0x1dc08c`, and session creation at `0x25a890`,
-not the older MTP setter call sites. This resolves the apparent contradiction
-with the previous 6.45 SD notes.
+not the older MTP setter call sites. This scan of one setter alone was incomplete:
+the MTP handlers use the separate setter documented below. E4 is not exclusive.
 
 `gat_rcv_PushStreamDistribute` starts at `0x24d5fc`, size 2,956 bytes:
 
@@ -142,6 +143,29 @@ with the previous 6.45 SD notes.
 message. Repeating the same LAN probe is not justified as an E4 recovery strategy.
 The full upstream triggering exchange remains to be traced; receiver-side evidence
 does not establish a safe request recipe.
+
+## SDK 6.45: MTP writes the same registry through another setter
+
+The same pinned 6.45 binary preserves the positive bit-5 semantics:
+
+| Location | Evidence |
+| --- | --- |
+| `iv_rcv_meter_ack`, `0x25dc64–0x25dca4` | Tests body `+8` bit 5, stores 2 at session `+0xa4e`, calls `giot_eif_set_device_x_version` with context and device ID. |
+| `iv_rcv_meter_req`, `0x25cea4–0x25cee0` | Same positive-bit transition and setter. |
+| `giot_eif_set_device_x_version`, `0x27768c` | Looks up the device in the registry rooted at context `+0x1950`; the existing-entry branch writes byte 1 at entry `+0x290` (`0x277844–0x27784c`). It also has a missing-entry insertion path, unlike a simple alias of the older setter. |
+| `giot_eif_get_set_device_version`, `0x277550–0x2775f4` | Walks the same registry; getter reads entry `+0x290` and returns platform 2 if nonzero. |
+
+Direct/PLT reverse references to the **new setter** identify both MTP calls
+(`0x25cee0`, `0x25dca4`). This closes the gap left by searching only callers of
+`giot_eif_get_set_device_version`. The independent setter name does not indicate
+an unrelated capability: its existing-entry write and the getter's read have
+the same registry root and field offset. No claim about universal firmware
+advertisement, platform 1 from silence, or camera-3 HD support follows.
+
+The passive MTP collector therefore has support in both pinned SDK builds.
+It remains stricter than the SDK's unsolicited request path and never advertises
+the bit to force a reply. This investigation used sequential 256 MiB/50%-CPU/
+40-second cgroups, peaking below 38 MiB without swap. No SDK was executed.
 
 ## Reproduction and next step
 

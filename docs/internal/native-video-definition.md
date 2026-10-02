@@ -1,8 +1,9 @@
 # Native video-definition encoding — offline SDK evidence, 2026-09-22
 
-2026-10-01 provenance update: the E4-only platform conclusion below is scoped to
-SDK 6.45. The older binary used here also promotes platform 2 from positive MTP
-meter flags. Camera-3 correlation is still required; no runtime gate was changed.
+2026-10-02 provenance correction: both pinned SDK builds promote platform 2
+from positive MTP meter flags. SDK 6.45 uses a differently named setter targeting
+the same registry, so the prior E4-only conclusion was incomplete.
+Camera-3 correlation is still required; no runtime capability gate was changed.
 See [version-specific evidence](yoosee-platform-sdk-versions.md).
 
 2026-10-02: positive, fully correlated MTP replies can now populate platform 2

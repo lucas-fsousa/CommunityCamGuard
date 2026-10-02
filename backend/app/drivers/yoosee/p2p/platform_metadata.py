@@ -30,7 +30,7 @@ def parse_push_stream_platform_metadata(
 
     SDK 6.45 promotes the registry to platform 2 when option bit 0 is set;
     a clear bit does not reset it or positively identify platform 1. In that
-    case version remains unknown. Older SDKs also have an MTP promotion path.
+    case version remains unknown. Both inspected SDKs also have an MTP promotion path.
     Envelope/device/link checks are not authentication: callers must establish the
     trusted transport and session provenance before using this metadata.
     """
