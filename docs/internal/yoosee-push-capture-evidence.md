@@ -49,7 +49,32 @@ starts at application-stream boundaries. Numeric sequence sorting is not a gener
 wraparound/reused-four-tuple TCP implementation. This follow-up is an evidence
 audit, not a production reassembly transport or a missing-feature conclusion.
 
-## E3 is not a relay certification response
+## Historical MTP platform-bit follow-up
+
+The same bounded diagnostic now also counts `c0/90` meter candidates using the
+existing production `parse_media_meter` checksum/length parser. On this capture:
+
+| Measurement | Count |
+| --- | --- |
+| Meter candidates | 671 |
+| Parsed / rejected | 669 / 2 |
+| Parsed requests / replies | 311 / 358 |
+| Expected channel and matching record length | 355 |
+| Parsed messages with positive platform bit `0x20` | 0 |
+
+No positive older-SDK platform evidence was found. This does **not** prove platform
+1: the SDK only promotes on the positive bit. The counts are not device/session
+authentication, and this scan deliberately does not print identities or modify
+camera capabilities. A future positive observation would still require expected
+peer, device, route and request/reply correlation before being usable. Because no
+positive candidate exists here, correlating these absent flags to an inventory ID
+cannot resolve camera 3's HD gate.
+
+Nine synthetic tests now include a positive-bit frame and rejection after checksum
+corruption. The enhanced real scan peaked at 28.8 MiB, no swap. This adds MTP header
+inspection, not application-media decryption.
+
+## E3 is not a relay certification response (SDK evidence)
 
 `gat_send_push_stream_rsp` (`0x27cdc0`, 624 bytes, SDK 6.45) builds a **GAT** frame
 starting `7f e3`, with declared size `0x90`, terminal identity at `+4`, operator at

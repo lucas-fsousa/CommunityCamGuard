@@ -4,6 +4,7 @@ import struct
 
 import pytest
 
+from backend.app.drivers.yoosee.p2p.media_protocol import build_media_meter_request, build_mtp_frame
 from scripts.inspect_push_capture import classify, inspect, tcp_payload
 
 
@@ -57,3 +58,29 @@ def test_report_never_contains_payload(tmp_path):
                                 "tcp_payload_packets": 1, "tcp_type_07_complete_prefix": 1}
     assert report["authenticated"] is False
     assert "secret" not in str(report)
+
+
+def test_meter_bit_is_only_a_candidate_not_a_capability(tmp_path):
+    wire = build_media_meter_request(11, 22, 33, 44, timestamp=55)
+    inner = bytearray(wire[6:])
+    struct.pack_into("<I", inner, 8, 0x28)
+    wire = build_mtp_frame(0x90, bytes(inner))
+    packet = bytearray(28)
+    packet[0], packet[9] = 0x45, 17
+    struct.pack_into("!H", packet, 2, 28 + len(wire))
+    struct.pack_into("!HHH", packet, 20, 1000, 2000, 8 + len(wire))
+    packet.extend(wire)
+    header = struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 101)
+    record = struct.pack("<IIII", 1, 0, len(packet), len(packet))
+    path = tmp_path / "meter.pcap"
+    path.write_bytes(header + record + packet)
+    report = inspect(path)
+    assert report["counts"]["meter_positive_platform_bit_candidates"] == 1
+    assert report["counts"]["meter_channel_and_record_valid"] == 1
+    assert report["authenticated"] is False
+    assert "device_id" not in str(report)
+    packet[14 + 28] ^= 1  # Flags are checksummed: this corruption must be rejected.
+    path.write_bytes(header + record + packet)
+    report = inspect(path)
+    assert report["counts"]["meter_rejected"] == 1
+    assert "meter_positive_platform_bit_candidates" not in report["counts"]

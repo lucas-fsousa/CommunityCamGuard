@@ -57,6 +57,9 @@ Follow-up: all 60 payload-bearing TCP directions reconstructed continuously with
 offline limits, still with no known protocol-3 header at their captured prefixes.
 Application encryption/later offsets remain outside this evidence; no capability
 or certification-success inference was made.
+Historical MTP checkpoint: the same capture has 669 parsed meters, none with
+positive platform bit `0x20`. No platform-1 fallback or HD capability was inferred.
+The offline diagnostic now counts this evidence without exposing device/session IDs.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

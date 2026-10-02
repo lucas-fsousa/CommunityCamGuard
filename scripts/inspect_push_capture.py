@@ -10,6 +10,7 @@ import struct
 from collections import Counter
 from pathlib import Path
 
+from backend.app.drivers.yoosee.p2p.media_protocol import parse_media_meter
 from scripts.pcap_input import packets, udp
 
 PUSH_TYPES = frozenset((4, 5, 6, 7, 8, 11, 13))
@@ -62,6 +63,19 @@ def inspect(path: Path) -> dict:
         counts[transport + "_packets"] += 1
         if payload:
             counts[transport + "_payload_packets"] += 1
+        if transport == "udp" and payload[:2] == b"\xc0\x90":
+            counts["meter_candidates"] += 1
+            meter = parse_media_meter(payload)
+            if meter is None:
+                counts["meter_rejected"] += 1
+            else:
+                counts["meter_parsed"] += 1
+                if meter.kind in (1, 2):
+                    counts["meter_requests" if meter.kind == 1 else "meter_replies"] += 1
+                if meter.flags & 0x20:
+                    counts["meter_positive_platform_bit_candidates"] += 1
+                if meter.channel_type == 4 and meter.record_length == len(payload) - 6:
+                    counts["meter_channel_and_record_valid"] += 1
         candidate = classify(payload, tcp=transport == "tcp")
         if candidate is not None:
             counts[transport + "_" + candidate] += 1

@@ -34,6 +34,11 @@ This evidence is specific to the binary above. Future observations must preserve
 device/session provenance and the existing peer/checksum/route/sent-meter checks.
 Uncorrelated historical flags must not silently enable a camera capability.
 
+Historical capture follow-up: 671 meter candidates yielded 669 parsed messages,
+none with positive bit `0x20`. This does not establish platform 1 and supplies no
+positive candidate to correlate to camera 3. The content-free diagnostic and limits
+are recorded in [capture evidence](yoosee-push-capture-evidence.md).
+
 ## SDK 6.45: E4 participates in push/relay setup
 
 The same reverse-reference scan finds `gat_rcv_PushStreamDistribute` at
