@@ -60,6 +60,11 @@ or certification-success inference was made.
 Historical MTP checkpoint: the same capture has 669 parsed meters, none with
 positive platform bit `0x20`. No platform-1 fallback or HD capability was inferred.
 The offline diagnostic now counts this evidence without exposing device/session IDs.
+Platform follow-up: an E4 with a clear promotion bit now retains unknown/previous
+platform evidence instead of inventing platform 1 or downgrading platform 2.
+The SDK quality getter reads player cache, not camera-applied resolution; it is
+not an alternative provenance source. 49 focused offline tests passed. Native HD
+remains gated; see the linked SDK evidence for exact addresses and limits.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

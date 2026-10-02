@@ -107,7 +107,7 @@ def open_media_channel(
                         plain,
                         expected_device_id=device.device_id,
                     )
-                    if metadata is not None:
+                    if metadata is not None and metadata.version is not None:
                         device_platform_version = metadata.version
                 continue
             if source != peer:

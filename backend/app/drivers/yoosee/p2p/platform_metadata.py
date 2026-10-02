@@ -16,7 +16,7 @@ _V6_RELAY_SIZE: Final = 28
 @dataclass(frozen=True, slots=True)
 class DevicePlatformMetadata:
     device_id: int
-    version: int
+    version: int | None
     new_platform: bool
 
 
@@ -27,9 +27,11 @@ def parse_push_stream_platform_metadata(
 ) -> DevicePlatformMetadata | None:
     """Parse one decrypted GAT E4 distribution frame without opening a connection.
 
-    The native SDK defaults a device to platform 1 and promotes it to platform 2 only when this
-    frame's option bit 0 is set. Relay-table bounds are checked so unrelated/truncated E4 data
-    cannot become authoritative metadata.
+    SDK 6.45 promotes the registry to platform 2 when option bit 0 is set;
+    a clear bit does not reset it or positively identify platform 1. In that
+    case version remains unknown. Older SDKs also have an MTP promotion path.
+    Envelope/device checks are not authentication: callers must establish the
+    trusted transport and session provenance before using this metadata.
     """
 
     if type(expected_device_id) is not int or not 0 < expected_device_id <= 0xFFFFFFFFFFFFFFFF:
@@ -65,6 +67,6 @@ def parse_push_stream_platform_metadata(
     new_platform = bool(frame[0x18] & 1)
     return DevicePlatformMetadata(
         device_id=device_id,
-        version=2 if new_platform else 1,
+        version=2 if new_platform else None,
         new_platform=new_platform,
     )

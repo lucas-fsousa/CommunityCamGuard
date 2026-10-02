@@ -182,6 +182,30 @@ container restart or build was performed. Commit CI verifies the full suite.
 
 ## Next
 
+### Getter/cache audit — 2026-10-01
+
+In the pinned older ARM64 binary above, `LivePlayer::get_definitions`
+(`0x104754`, 736 bytes) does not query the camera for its applied profile.
+It calls `Connection::get_device_platform` at `0x104820`, then reads the
+player's cached packed halfword at `+0x67` (`0x10482c`) or legacy byte at
+`+0x50` (`0x1048fc`, returning that value plus one). Together with the
+setter callback caching the requested value, this means the getter is not
+independent evidence of decoded resolution or camera-side acceptance.
+
+`Connection::get_device_platform` returns Impl `+0x190` immediately if nonzero
+(`0xf8570–0xf8574`); otherwise it reads the native registry (`0xf85b8`), stores
+the result (`0xf85c4`) and returns it. The constructor initializes this cache
+to zero at `0xf7c50` (`x20` is Impl `+0x40`). No direct reset of this field was
+seen in the inspected `prepare_for_connect` and `on_disconn` bodies; this is
+not a whole-program proof that no other path invalidates it. A getter result
+of 1 may therefore reflect the registry default, not positive device evidence.
+Do not substitute a Frida getter result for the originating MTP/E4 observation.
+
+Sequential offline disassembly peaked at 34.8 MiB with no swap, under
+256 MiB/50%-CPU/40-second limits. No SDK execution or camera traffic occurred.
+The related [platform parser correction](yoosee-platform-sdk-versions.md#clear-e4-bit-is-not-a-platform-1-observation)
+preserves unknown/previously proven values instead of inferring platform 1.
+
 **Live HD attempt is blocked as of 2026-09-23.** Review of the existing platform
 parser, rendezvous/media collectors and private SD-investigation evidence confirms
 that camera 3's prior bounded collection returned no authoritative E4. The stored

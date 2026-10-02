@@ -68,7 +68,13 @@ def test_direct_rendezvous_counts_and_acknowledges_camera_datagram(monkeypatch):
     ]
 
 
-def test_rendezvous_passively_carries_correlated_platform_metadata(monkeypatch):
+@pytest.mark.parametrize(
+    ("flags", "expected_version"),
+    [((1,), 2), ((0,), None), ((1, 0), 2), ((0, 1), 2)],
+)
+def test_rendezvous_passively_carries_correlated_platform_metadata(
+    monkeypatch, flags, expected_version,
+):
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     device = OnlineDevice(7000000002, 1, False, 1, bytes(16))
     peer = ("198.51.100.9", 32100)
@@ -98,7 +104,7 @@ def test_rendezvous_passively_carries_correlated_platform_metadata(monkeypatch):
     monkeypatch.setattr(
         rendezvous_session,
         "decrypt_node_frame",
-        lambda wire, _node: bytes(distribution) if wire == b"distribution" else None,
+        lambda wire, _node: wire if wire[:2] == b"\x7e\xe4" else None,
     )
     monkeypatch.setattr(rendezvous_session, "acknowledge_reliable_node_frame", lambda *_args: True)
     monkeypatch.setattr(
@@ -106,7 +112,8 @@ def test_rendezvous_passively_carries_correlated_platform_metadata(monkeypatch):
         "receive_datagrams",
         lambda *_args: iter(
             (
-                (b"distribution", node.address),
+                *((bytes(distribution[:0x18]) + bytes((flag,))
+                   + bytes(distribution[0x19:]), node.address) for flag in flags),
                 (b"\x7f\xca" + bytes(50), peer),
             )
         ),
@@ -122,7 +129,7 @@ def test_rendezvous_passively_carries_correlated_platform_metadata(monkeypatch):
     )
 
     assert result.direct_handshake is True
-    assert result.device_platform_version == 2
+    assert result.device_platform_version == expected_version
 
 
 def test_route_hangup_matches_the_native_p2p_inner_layout():

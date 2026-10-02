@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+from dataclasses import replace
 
 import pytest
 
@@ -202,8 +203,16 @@ def test_media_channel_fails_closed_without_private_attempt() -> None:
     )
 
 
-def test_media_channel_passively_collects_correlated_platform_metadata(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("prior_version", "flags", "expected_version"),
+    [(None, (1,), 2), (None, (0,), None), (None, (1, 0), 2),
+     (None, (0, 1), 2), (2, (0,), 2)],
+)
+def test_media_channel_passively_collects_correlated_platform_metadata(
+    monkeypatch, prior_version, flags, expected_version,
+) -> None:
     node, device, attempt, calling = _route()
+    calling = replace(calling, device_platform_version=prior_version)
     peer = calling.peer_endpoint
     assert peer is not None
     distribution = bytearray(0x8A)
@@ -230,7 +239,7 @@ def test_media_channel_passively_collects_correlated_platform_metadata(monkeypat
     monkeypatch.setattr(
         media_session,
         "decrypt_node_frame",
-        lambda wire, _node: bytes(distribution) if wire == b"distribution" else None,
+        lambda wire, _node: wire if wire[:2] == b"\x7e\xe4" else None,
     )
     monkeypatch.setattr(media_session, "acknowledge_reliable_node_frame", lambda *_args: True)
     monkeypatch.setattr(
@@ -238,7 +247,8 @@ def test_media_channel_passively_collects_correlated_platform_metadata(monkeypat
         "receive_datagrams",
         lambda *_args: iter(
             (
-                (b"distribution", node.address),
+                *((bytes(distribution[:0x18]) + bytes((flag,))
+                   + bytes(distribution[0x19:]), node.address) for flag in flags),
                 (bytes(direct_ack), peer),
                 (meter, peer),
             )
@@ -256,4 +266,4 @@ def test_media_channel_passively_collects_correlated_platform_metadata(monkeypat
 
     assert result.direct_acknowledged is True
     assert result.meter_acknowledged is True
-    assert result.device_platform_version == 2
+    assert result.device_platform_version == expected_version

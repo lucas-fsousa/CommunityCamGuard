@@ -5,6 +5,33 @@ The older binary used for native-video research also has an MTP promotion path.
 Neither finding identifies camera 3 without a device-correlated observation.
 No runtime parser, capability, quality selection or camera session was changed.
 
+The initial investigation above was documentation-only. The follow-up below
+corrects the passive parser; it does not enable a new transport or camera action.
+
+## Clear E4 bit is not a platform-1 observation
+
+Reinspection of SDK 6.45 `0x24dfcc–0x24dff4` confirms that a clear option bit
+skips the registry setter entirely. A positive bit invokes the promotion setter;
+the negative branch does not reset the device to platform 1. The prior parser's
+`2 if bit else 1` therefore overstated the evidence and could downgrade a
+previously positive observation during rendezvous/media setup.
+
+`DevicePlatformMetadata.version` is now optional: a structurally valid,
+device-correlated E4 without the bit yields `None`, while a set bit yields 2.
+Collectors retain their previously observed version on unknown metadata.
+Envelope parsing still succeeds for unknown platform, so independent push-context
+extraction is preserved. These checks establish neither authentication nor a
+functional relay session; callers retain responsibility for trusted transport and
+session provenance. There is no new platform-1 inference or HD activation.
+
+49 focused offline tests passed, including clear-only, positive-then-clear,
+clear-then-positive and preservation of rendezvous evidence during media setup.
+Existing push-context tests cover clear-bit envelopes. Peak test memory was
+59.6 MiB, no swap, under a 256 MiB/50%-CPU cgroup; Ruff passed.
+The separate [getter audit](native-video-definition.md#gettercache-audit--2026-10-01)
+also rules out the local player quality getter as an independent query of the
+camera's applied resolution.
+
 ## Binary identity
 
 | ARM64 `libiotvideomulti.so` source | SHA-256 | Registry setter |

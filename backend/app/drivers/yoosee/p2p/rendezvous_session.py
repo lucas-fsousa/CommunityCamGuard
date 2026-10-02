@@ -115,7 +115,7 @@ def call_device(
                     plain,
                     expected_device_id=device.device_id,
                 )
-                if metadata is not None:
+                if metadata is not None and metadata.version is not None:
                     device_platform_version = metadata.version
             elif plain[1] == 0xA4 and len(plain) >= 0x20:
                 node_acknowledged = True

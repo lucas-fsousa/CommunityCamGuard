@@ -14,7 +14,8 @@ Docs are split by audience:
 ## `internal/` — for contributors
 
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
-  version-specific MTP/E4 evidence, A4 relay advertisement and remaining native-HD gate.
+  version-specific MTP/E4 evidence, unknown-platform preservation, A4 relay
+  advertisement and remaining native-HD gate.
 
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.

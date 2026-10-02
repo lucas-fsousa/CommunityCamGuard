@@ -33,9 +33,9 @@ def _distribution(
 
 @pytest.mark.parametrize(
     ("new_platform", "expected_version"),
-    [(False, 1), (True, 2)],
+    [(False, None), (True, 2)],
 )
-def test_decodes_correlated_authoritative_platform_version(
+def test_decodes_only_positive_platform_evidence(
     new_platform,
     expected_version,
 ):
