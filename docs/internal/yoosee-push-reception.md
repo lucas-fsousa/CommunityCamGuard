@@ -213,6 +213,8 @@ unconfirmed until peer/session correlation and message-specific response semanti
 have independent evidence; local generation tokens cannot provide that evidence.
 
 - Resolve terminal modes and the callback asymmetry at the `ivtcp` factory.
+- Address storage is now independently mapped below; terminal-mode assignment
+  remains distinct from the numeric sockaddr family.
 - Local socket destruction order is mapped; queued callback cancellation and
   thread/event-loop ownership still require proof before live transport integration.
 - Trace the actual ready-path statistics callback before assigning score semantics.
@@ -220,3 +222,42 @@ have independent evidence; local generation tokens cannot provide that evidence.
 
 Inspections ran sequentially with 256 MiB/no-swap/50%-CPU/40-second caps;
 the largest inspected callback run peaked at 40.8 MiB. No emulation or rebuild.
+
+## Relay descriptor construction and transport flags (2026-10-03)
+
+`iv_push_session_add_tcp_rly` (`0x279e5c`, 1352 bytes) receives the session,
+IPv4 descriptor and IPv6 descriptor in x0/x1/x2. The constructor establishes:
+
+| Source | Destination / evidence |
+| --- | --- |
+| IPv4 descriptor `+0x0a` | Host-order u16 port, byte-swapped into node `+0x0a` at `0x279ffc–0x27a00c`. Zero port skips this address branch. |
+| IPv4 descriptor `+0x0c` | Four address bytes copied to node `+0x0c`; node `+8` receives family 2 at `0x279ff0–0x279ff4`. |
+| IPv4 descriptor `+8` | Bits 4–7 populate node cluster ID at `0x279fc4–0x279fd8`. |
+| IPv6 descriptor `+0x0a` | Host-order u16 port, byte-swapped to node `+0x1a` at `0x27a094–0x27a0a8`. |
+| IPv6 descriptor `+0x0c` | Sixteen address bytes copied to node `+0x20`; node `+0x18` receives family 10 at `0x27a088–0x27a0e0`. |
+
+For the first added node, bit 0 of the **IPv4 descriptor** flags at `+8` selects
+`iv_create_push_tcp_channel` (`0x27a1c0–0x27a1d8`). If that branch is not taken,
+bit 1 selects a UDP channel (`0x27a2a0–0x27a2bc`). These are advertisements and
+selection inputs, not evidence of certification or reachability. The analogous
+IPv6 flags' meaning is not established: this function still reads the IPv4
+descriptor for transport selection. Do not infer family pairing by table index.
+
+Together with the earlier connect function, this proves node socket `+0x38`
+uses its IPv4 sockaddr and `+0x40` its IPv6 sockaddr. Terminal mode 2 chooses
+the IPv6 branch in that function; mode assignment/other enum meanings remain
+unmapped. The callback-signature mismatch is not resolved by naming the address.
+
+`push_relays.py` now extracts descriptors from correlated, bounded E4 envelopes
+without sockets, DNS, selection, persistence or runtime callers. Ports remain
+zero when advertised zero. It interprets TCP/UDP/cluster bits only for IPv4;
+IPv6 properties return unknown. Local policy admits at most eight entries per
+family and rejects trailing extensions. This limit is not a vendor capacity
+claim. Addresses are omitted from repr, but dataclass serialization needs
+redaction; future connectors still require authenticated provenance and explicit
+endpoint policy, particularly for local/special addresses.
+
+The combined six-module relay test set passed 118 synthetic tests (70.1 MiB
+peak, no swap, 256 MiB/50%-CPU cap); Ruff passed. No build/restart or camera test
+was needed. Independent frame/certification evidence is still required before
+connecting to any parsed address.

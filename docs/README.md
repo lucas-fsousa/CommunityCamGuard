@@ -27,7 +27,8 @@ Docs are split by audience:
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.
 
 - **[Yoosee push reception](internal/yoosee-push-reception.md)** — bounded TCP
-  framing, callback ownership, reconnect transitions and score-scheduling caveat.
+  framing, deferred-work generation checks, relay address descriptors, callback
+  ownership, ready-path telemetry and score-scheduling caveat.
 
 - **[Yoosee push capture evidence](internal/yoosee-push-capture-evidence.md)** —
   content-free PCAP triage and why broker E3 is not relay certification/release.
