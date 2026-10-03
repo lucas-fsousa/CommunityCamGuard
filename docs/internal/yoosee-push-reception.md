@@ -212,9 +212,8 @@ No response parser or checksum-success shortcut was invented. Certification rema
 unconfirmed until peer/session correlation and message-specific response semantics
 have independent evidence; local generation tokens cannot provide that evidence.
 
-- Resolve terminal modes and the callback asymmetry at the `ivtcp` factory.
-- Address storage is now independently mapped below; terminal-mode assignment
-  remains distinct from the numeric sockaddr family.
+- Terminal address-family modes and the callback mismatch are now mapped below;
+  runtime reachability and safe alternate transport integration remain unproven.
 - Local socket destruction order is mapped; queued callback cancellation and
   thread/event-loop ownership still require proof before live transport integration.
 - Trace the actual ready-path statistics callback before assigning score semantics.
@@ -245,8 +244,8 @@ descriptor for transport selection. Do not infer family pairing by table index.
 
 Together with the earlier connect function, this proves node socket `+0x38`
 uses its IPv4 sockaddr and `+0x40` its IPv6 sockaddr. Terminal mode 2 chooses
-the IPv6 branch in that function; mode assignment/other enum meanings remain
-unmapped. The callback-signature mismatch is not resolved by naming the address.
+the IPv6 branch in that function; its assignment is mapped below. The
+callback-signature mismatch is not resolved by naming the address.
 
 `push_relays.py` now extracts descriptors from correlated, bounded E4 envelopes
 without sockets, DNS, selection, persistence or runtime callers. Ports remain
@@ -261,3 +260,46 @@ The combined six-module relay test set passed 118 synthetic tests (70.1 MiB
 peak, no swap, 256 MiB/50%-CPU cap); Ruff passed. No build/restart or camera test
 was needed. Independent frame/certification evidence is still required before
 connecting to any parsed address.
+
+## Terminal mode assignment (2026-10-03 follow-up)
+
+`gat_on_rcvpkt_LIST_RESP` (`0x246bdc`) stores its terminal argument x0 at stack
+`+0xa8` and packet argument x1 at `+0xa0`. The receive context's sockaddr begins
+at packet `+0x18`. Once an existing list server is found, the code at
+`0x246e10–0x246eb0` updates terminal `+0xa0` as follows:
+
+| Received sockaddr family | Previous terminal mode | New mode |
+| --- | --- | --- |
+| 2 (IPv4) | 2 or 3 | 3 |
+| 2 (IPv4) | Otherwise | 1 |
+| Non-2 branch (IPv6 path) | 1 or 3 | 3 |
+| Non-2 branch (IPv6 path) | Otherwise | 2 |
+
+Thus 1/2/3 represent IPv4/IPv6/both-family observations on this path, not camera
+models or platform versions. The native branch tests **non-2**, not explicitly
+family 10; a future implementation must reject unsupported address families
+rather than copying that permissive else branch. This local network state is
+not proof of camera capabilities or a trustworthy remote endpoint.
+
+The separate receive path at `0x21a810–0x21a8b8` writes mode 1 and clears counter
+`+0xa4` for a family-2 socket. For its other-family branch it increments that
+counter and sets mode 2 only when the previous mode is zero and the count reaches
+six. Do not mistake that observation counter for a retry timer. The containing
+local function is stripped; the nearest exported `iv_comm_exit` label is not its
+identity. `iv_reset_network` clears terminal mode/counter at `0x1daecc/0x1daed4`;
+`iv_unit_init` also initializes mode zero at `0x2386d4`.
+
+This connects the mode-2 callback mismatch to the IPv6-selected relay branch,
+without establishing runtime reachability or a cause for any emulator crash.
+Mode 3 chooses the IPv4 connect branch here; the send helper has separately
+mapped socket fallback behavior. No network reset or SDK function was executed.
+
+### Analysis resource correction
+
+An attempted whole-section Capstone scan hit its **256 MiB cgroup limit** and was
+OOM-killed inside that isolated unit (no swap). The replacement scanned only the
+native subsystem `0x1d0000..0x280000` in **1 KiB instruction blocks**, under a
+smaller 128 MiB cap; it completed at 26.6 MiB peak. Subsequent address-range reads
+also stayed below 27 MiB. All containers remained running and host swap stayed
+zero. Use bounded chunks for future scans: Capstone's iterator-looking API must
+not be assumed to allocate lazily over a large supplied buffer.

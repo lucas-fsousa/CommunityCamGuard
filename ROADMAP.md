@@ -11,8 +11,13 @@ tests pass. No relay sender, camera traffic or native-HD capability enabled.
 Relay address follow-up: SDK constructor now proves separate IPv4/IPv6 sockaddr
 storage and IPv4 TCP/UDP advertisement bits. Bounded, socket-free E4 descriptor
 parser added; it does not pair families, select routes or authorize connections.
-IPv6 transport-bit semantics, terminal-mode assignment, response authentication
-and remote lifetime remain gates. SD remains last priority.
+IPv6 transport-bit semantics, response authentication and remote lifetime remain
+gates. Follow-up mapped terminal modes 1/2/3 to IPv4/IPv6/both-family observations
+in the list-response handler, linking mode 2 to the previously observed IPv6
+callback mismatch. This does not prove runtime reachability or camera support.
+SDK scanning must use small instruction blocks: one whole-section scan was
+terminated at its isolated 256 MiB cap; the 1 KiB-block replacement used 26.6 MiB.
+SD remains last priority.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
