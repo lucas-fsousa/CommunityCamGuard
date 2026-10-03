@@ -206,3 +206,8 @@ interchangeable. The selective decryption helper still rejects 0xf0/0xf3:
 dispatch support is not proof of encryption handling. Fragment assembly remains
 unimplemented. Table inspection peaked at 20.2 MiB, with no network access.
 The first parser checkpoint passed 229 focused tests at 79.5 MiB/no swap.
+
+Fragment follow-up: all four handlers are now traced, with a separate bounded
+offline envelope parser and assembly helper. See [fragment ownership and
+deliberate SDK divergences](yoosee-push-fragments.md). This does not enable
+live media, recursive parsing, or decryption of previously unsupported types.

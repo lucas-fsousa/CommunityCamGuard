@@ -60,6 +60,12 @@ avhead, with distinct SDK output discriminators. Offline header parsing now
 accepts both while retaining caller responsibility for the original type.
 Fragment handlers 0xf0..0xf3 are mapped, not implemented or enabled. Next:
 entry consumers/media semantics and bounded fragment ownership.
+Fragment checkpoint: traced begin/data/end/error handlers and added isolated
+envelope parsing plus bounded ordered concatenation (four IDs, 256 KiB total,
+256 records per ID). Invalid transitions close/clear state; cancellation requires
+owner close and a new instance. 267 focused tests pass, peak 82.3 MiB/no swap.
+No live capability enabled. Next: end-handler virtual target/inner boundaries,
+then media metadata consumers. [Evidence](docs/internal/yoosee-push-fragments.md).
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
