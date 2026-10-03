@@ -85,10 +85,20 @@ diagnostic preserves this optional value after cleanup. No extra packets or
 automatic HD selection; historical capture still has no positive observation.
 2026-10-03: a server-selected platform-only diagnostic reuses the reserved route
 owner but stops after correlated MTP metering and B9 cleanup, before AV INIT/START
-or decoding. 68 focused tests passed; not deployed or tested live. Use this mode
-for the next camera-3 platform observation instead of starting another video stream.
+or decoding. 68 focused tests passed. One deployed camera-3-only observation on
+2026-10-03 returned HTTP 200 with correlated metering and B9 receipt, but platform
+remained null. No AV stream/control was started. Diagnostic disabled/targets
+cleared afterward; health 200 and all three recorder MP4s growing. HD remains
+blocked; do not repeat this probe or infer a legacy platform from silence. Next:
+offline protocol work and independently proven platform provenance.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
+
+2026-10-03 offline SD follow-up: command 25's four-byte strategy body is confirmed
+in SDK 6.45; its getter returns requested local state, not a camera query. Reply
+success requires nonempty payload starting with 1 or 2, unlike the mapped video
+quality callback. Enum semantics and indirect caller remain unknown, so no live
+builder/control is exposed. See [strategy evidence](docs/internal/yoosee-playback-strategy.md).
 Status: `todo` · `wip` · `done` · `blocked`.
 
 2026-09-30 recording metadata checkpoint: concurrent successful same-file codec

@@ -17,7 +17,10 @@ Docs are split by audience:
   version-specific MTP/E4 evidence, correlated passive MTP collection, unknown-platform preservation, A4 relay
   advertisement and remaining native-HD gate.
 - **[Reserved native diagnostic](internal/native-av-operator-trigger.md)** —
-  single-use AV or platform-only collection; camera identity, cleanup and resource gates.
+  single-use AV or platform-only collection; camera identity, cleanup and resource gates;
+  camera-3 platform-only result remains unknown after successful metering/release.
+- **[Yoosee SD playback strategy](internal/yoosee-playback-strategy.md)** — command-25
+  layout, command-specific ACK semantics and requested-state cache caveat; enum still unknown.
 
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.

@@ -1,5 +1,10 @@
 # Native video-definition encoding — offline SDK evidence, 2026-09-22
 
+2026-10-03: one bounded, platform-only camera-3 diagnostic confirmed the MTP
+roundtrip and B9 receipt but returned an unknown platform. No AV INIT/START or
+quality change was sent. HD remains gated; see the
+[operator checkpoint](native-av-operator-trigger.md).
+
 2026-10-02 provenance correction: both pinned SDK builds promote platform 2
 from positive MTP meter flags. SDK 6.45 uses a differently named setter targeting
 the same registry, so the prior E4-only conclusion was incomplete.

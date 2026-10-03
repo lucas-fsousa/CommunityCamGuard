@@ -32,7 +32,21 @@ The existing procedure below still applies: camera 3 only, same server process,
 bounded memory, account for any deployment's recorder interruption, and remove
 all temporary diagnostic settings afterward. Browser parameters cannot select
 this mode. Source implementation has 68 focused passing tests, peak 91.1 MiB
-without swap in a 256 MiB/50%-CPU cgroup; no deployment or live attempt yet.
+without swap in a 256 MiB/50%-CPU cgroup.
+
+Live checkpoint, 2026-10-03: one same-process camera-3 request returned HTTP 200:
+`device_platform_version=null`, `meter_roundtrip_confirmed=true`, and
+`route_release_acknowledged=true`. The exact device ID and MAC matched the private
+inventory and enrolled registry before activation. No AV stream, decoder or camera
+control was invoked. Unknown remains unknown; this does not unblock HD selection.
+Do not repeat the same observation expecting a different platform inference.
+
+The client cgroup completed in 4.042 seconds, peak 9.1 MiB without swap (client
+only, not the server's memory). App-only recreation was required to arm/disarm;
+the disk override was reset before the request. After restoration both opt-ins
+were false, target fields empty and health HTTP 200. Three recorder MP4s grew
+1,310,720 bytes in aggregate over ten seconds. go2rtc was not recreated. The
+two app restarts briefly interrupted recording; no zero-gap claim is made.
 
 ### Existing AV mode
 
