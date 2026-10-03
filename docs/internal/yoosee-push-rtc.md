@@ -211,3 +211,27 @@ Fragment follow-up: all four handlers are now traced, with a separate bounded
 offline envelope parser and assembly helper. See [fragment ownership and
 deliberate SDK divergences](yoosee-push-fragments.md). This does not enable
 live media, recursive parsing, or decryption of previously unsupported types.
+
+## AV payload branch evidence (not codec identification)
+
+`unpacking_rtcfrm_avdata` (`0x17d358`, 1148 bytes) requires a 24-byte
+prefix and at least `u32(+4) - 16` further bytes. At `0x17d460` it tests
+byte +8: bit 0 selects grouped subframes; otherwise bit 1 selects a single
+payload. Neither bit set skips payload extraction in this handler; that is
+not a valid-media guarantee we should copy.
+
+Single-payload output has SDK discriminator 1, copies u64(+16), extracts
+bit 2 of byte +8, subtracts one from byte +10, and copies byte +12.
+Grouped output has discriminator 0 and uses the low nibble of byte +11 as
+the subframe count. Each subframe has an eight-byte prefix: low u16 is payload
+length, bits 16..47 form an unsigned delta added to u64(+16). Its last two
+prefix bytes are not interpreted in this routine. Each output copies byte
++10 minus one and byte +12; its other integer flag is set to 1.
+
+Evidence spans: single metadata `0x17d4c0–0x17d4e8`; grouped count
+`0x17d534–0x17d560`; per-subframe bounds `0x17d564–0x17d5ec`; grouped
+metadata `0x17d630–0x17d65c`. Time units, codec meanings, channel semantics
+and output discriminator names still require consumer evidence. The handler's
+subframe checks use remaining ring bytes, not an explicit per-record slice;
+our future payload parser must never read into a subsequent RTC record.
+Symbol-only analysis peaked at 27.2 MiB under a 128 MiB/no-swap cap.

@@ -75,3 +75,22 @@ record-count limits, reject nested fragment types until a bounded policy is
 explicitly supported, and publish nothing if any inner record is incomplete.
 The current assembly helper intentionally returns opaque bytes only; it is
 not safe to wire directly into an AV decoder. Vtable inspection used 19.4 MiB.
+
+## Atomic inner record boundaries implemented
+
+`push_rtc_inner.split_inner_rtc_records` now validates the entire assembled
+immutable byte stream before returning a tuple of opaque records. Local limits
+are 256 KiB total and 256 records. Unlike outer relay envelopes, a reassembled
+inner AV record may exceed `0x8400 - 20`; applying that transport bound here
+would incorrectly reject larger assembled frames.
+
+Only 0x80/0x81/0x82/0x83 are accepted. Nested fragments and unknown types are
+rejected without recursion or resynchronization. Every declared body must fit;
+AV prefixes require 24 bytes, header entries require exact count/length agreement,
+and user-data bodies must be nonempty. AV payload semantics are not validated by
+this boundary. Trailing partial records fail the whole call; no generator or
+callback can publish an earlier record before the final validation succeeds.
+
+Synthetic tests cover mixed types, 256 KiB and 256-record boundaries, forged
+lengths, nested fragments, partial tails, and fragment assembly split inside
+inner headers/payloads. This remains offline, without production callers.

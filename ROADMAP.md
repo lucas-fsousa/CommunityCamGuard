@@ -70,6 +70,11 @@ End-handler follow-up: vtable relocation confirms return to the same v2 RTC
 dispatcher; assembled payload is an inner record stream, not proven raw video.
 Next: iterative bounded inner-record validation with nested-fragment rejection,
 then media metadata interpretation. Do not reproduce SDK recursion.
+Inner-boundary checkpoint: added atomic iterative validation (256 KiB/256
+records), rejecting nested fragments and incomplete tails while allowing large
+reassembled AV records. Mapped AV single/grouped payload branches and raw
+metadata offsets; codec names/time units remain unverified. Next: bounded AV
+subframe parsing and consumer evidence. No runtime camera capability changed.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
