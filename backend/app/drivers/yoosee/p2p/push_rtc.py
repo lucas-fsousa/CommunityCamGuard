@@ -11,7 +11,8 @@ def selective_rtc_cipher_span(frame: bytes) -> tuple[int, int]:
 
     Does not decrypt, authorize a peer, infer the session's encryption mode or
     validate media contents. Mode 2 is an encryption setting, not platform 2.
-    Cipher block/remainder handling and key provenance require separate evidence.
+    Block/remainder handling lives in the isolated push_rtc_crypto helper;
+    the caller must independently establish mode and key/session provenance.
     Unknown record types fail closed rather than inheriting the SDK's no-op.
     """
     if not isinstance(frame, bytes) or not 8 <= len(frame) <= _MAX_RTC_BYTES:

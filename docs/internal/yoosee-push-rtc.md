@@ -106,3 +106,30 @@ in `tests/test_vendor_push_rc5_schedule.py` match `RC5(key, rounds=6, w=32).S`.
 The 45 schedule/span tests passed under 256 MiB/no-swap/50%-CPU limits (68.1 MiB
 peak); Ruff passed. This is an independently calculated key-expansion check,
 not execution of the native binary or a captured-media decryption test.
+
+## Independent block transform and offline decryption
+
+SDK `rc5_ctx_enc` at `0x261ca4` selects the eight-byte helper `0x261ea4`;
+`rc5_ctx_dec` at `0x26218c` selects `0x262390`. The former adds S[0]/S[1]
+to two little-endian u32 words, then performs six canonical RC5 rounds with
+data-dependent rotations. The latter reverses the rounds and subtracts the
+whitening words. Variable AArch64 shift counts are masked to five bits.
+
+Four fixed block vectors for synthetic key `00..07` were independently computed
+with JavaScript unsigned-u32 arithmetic and the previously derived schedule.
+They include zero/all-one/ascending plaintext and a block cancelling whitening
+to exercise zero rotation counts. Both directions match the existing Python
+cipher; these are not native execution or captured-media fixtures.
+
+`push_rtc_crypto.decrypt_selective_rtc` is an **offline-only** helper, with no
+production caller. It validates the bounded record before constructing RC5,
+requires an explicit eight-byte immutable key, transforms full blocks only,
+and preserves the clear prefix and 1–7 byte remainder. All six known record
+types are covered with zero/one/four blocks and every remainder size. Short
+spans remain unchanged; that is not evidence of valid media. RC5 supplies no
+integrity or authentication and cannot detect a wrong key.
+
+205 focused cipher/span tests passed under 256 MiB/no-swap/50%-CPU limits,
+with 76.4 MiB peak. No camera connection, runtime capability change, or
+deployment occurred. Remaining gates: real-record interoperability, strict
+type-specific unpacking, authenticated relay/session ownership and teardown.

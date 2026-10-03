@@ -40,6 +40,12 @@ Key-expansion checkpoint: SDK's 32-bit helper is now traced; three independently
 calculated synthetic 14-word schedules match our existing six-round RC5. Added
 fixed regression vectors; 45 schedule/span tests passed. Native block-transform
 and real-record interoperability still need validation; no decryption enabled.
+Offline block checkpoint: native RC5 block arithmetic now matches four fixed,
+independently calculated synthetic vectors (including zero rotation counts).
+Added an isolated bounded mode-2 decrypt helper; 205 focused tests pass, including
+all six prefixes and every short-tail length. No production wiring or camera
+traffic. Next: type-specific RTC unpacking and real-record interoperability;
+relay authentication/ownership/teardown remain independent gates. SD stays last.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
