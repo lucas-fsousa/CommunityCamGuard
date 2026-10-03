@@ -36,6 +36,10 @@ Cipher follow-up: E4 `+0x1b` selects encryption mode; its separate eight bytes a
 are 8/6; the transform processes complete eight-byte blocks and leaves a trailing
 partial block unchanged. No actual key or media was accessed. Next: independent
 key-expansion vectors and bounded RTC unpacking before enabling decryption.
+Key-expansion checkpoint: SDK's 32-bit helper is now traced; three independently
+calculated synthetic 14-word schedules match our existing six-round RC5. Added
+fixed regression vectors; 45 schedule/span tests passed. Native block-transform
+and real-record interoperability still need validation; no decryption enabled.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

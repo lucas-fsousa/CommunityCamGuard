@@ -83,8 +83,26 @@ media. These findings come exclusively from instructions and field offsets.
 
 ## Next evidence
 
-Key source and block/remainder handling are mapped above. Next: verify native
-key expansion against independent vectors, then the type-specific RTC unpackers
+Key source and block/remainder handling are mapped above. Key expansion was
+subsequently checked against the independent vectors below. Next: native block
+transform/real-record interoperability, then the type-specific RTC unpackers
 with bounded record/fragment ownership. Keep relay certification/session
 provenance and teardown as independent gates. Neither this boundary nor the
 keepalive encoder homologates HD, relay media reception or LAN-only operation.
+
+## Independent key-schedule regression vectors
+
+`rc5_ctx_setkey` (`0x261454`) selects helper `0x2617ac` for context word size 32
+at `0x2614d8–0x2614e4`. That helper copies the eight key bytes into little-endian
+u32 words, initializes 14 schedule words from `0xb7e15163` with increment
+`0x9e3779b9`, then performs 42 mixing iterations. The rotations are
+`ROR32(S[i] + A + B, 29)` and `ROR32(L[j] + A + B, -(A + B))`, with u32
+arithmetic; indices wrap modulo 14 and 2 respectively (`0x26192c–0x2619c4`).
+
+Three complete 14-word schedules were calculated separately with a JavaScript
+unsigned-32-bit transcription of those operations, without calling the production
+Python cipher: all-zero key, ascending `00..07`, and all-`ff`. The static vectors
+in `tests/test_vendor_push_rc5_schedule.py` match `RC5(key, rounds=6, w=32).S`.
+The 45 schedule/span tests passed under 256 MiB/no-swap/50%-CPU limits (68.1 MiB
+peak); Ruff passed. This is an independently calculated key-expansion check,
+not execution of the native binary or a captured-media decryption test.
