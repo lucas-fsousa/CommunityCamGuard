@@ -251,3 +251,41 @@ branches are rejected. Zero-byte individual payloads remain structurally allowed
 not homologated media. No partial units escape if a later unit is truncated.
 Single/grouped vectors, clock wrap, malformed inputs, maximum record and count
 boundaries are synthetic checks, not real media interoperability.
+
+## Consumer-confirmed AV semantics
+
+`DataTypeName` (`0x16a434`, 936 bytes) initializes explicit labels:
+0 = `AU_DATA`, 1 = `VI_DATA`, 2 = `HEADER_ONLY`, 3 = `USR_DATA`,
+4 = `SEQUENCE_USR_DATA`, 5 = `FILE_DATA`, 6 = `HEADER_ENC`.
+Assignments for audio/video are at `0x16a4e0–0x16a518`; header-encrypted
+at `0x16a5a4–0x16a5c4`. These are output discriminators, not RTC wire types.
+
+`BasePlayer::Impl::on_rcv_data` (`0x11a5b4`, 2520 bytes) consumes `Unpacked`:
+u64 +0x20 is logged as `pts`, u32 +0x28 as `key`, and byte +0x30 as
+`seq_num` (`0x11a644–0x11a6d8`). The video path uses +0x28 to identify
+key frames, with payload inspection only when its high bit is set
+(`0x11ab0c–0x11ab6c`). Our RTC parser produces the observed boolean bit,
+not that fallback sentinel. The key-frame property remains a metadata hint,
+not validation of the compressed stream. Audio's fixed integer 1 must not
+be exposed as a video key-frame assertion.
+
+The offline unit now exposes `media_kind`, `pts_raw`, `is_key_frame` (None
+for audio/unknown discriminator), and `sequence_number`, retaining raw fields.
+No PTS scaling or codec mapping is inferred. The eight-bit sequence label is
+not an ordering/retransmission mechanism implemented by this parser.
+
+The same consumer iterates twenty-byte header entries: byte +1 equal to 1
+feeds `VideoFormat`, equal to 2 feeds `AudioFormat`. For video it reads a
+float32 frame rate at +8 (`0x11a838`) and substitutes 15 when below 5
+(`0x11a898–0x11a8a0`). We do not copy this silent correction. It also reads
+u16 +4/+6, byte +12, and byte +2 (zero maps to index zero, otherwise minus
+one). Audio reads u32 +4, u16 +8, and bytes +10..13; their individual field
+names/codec enums still need the format consumers. Do not assume video and
+audio indexes share the same numbering: this consumer offsets audio indexes
+by the video map size (`0x11a9d8–0x11a9ec`, `0x11aad8–0x11aaf0`).
+
+309 focused tests passed at 93.9 MiB/no swap under 256 MiB/50%-CPU limits;
+Ruff passed. Symbol-sized audits peaked at 40.6 MiB under a 128 MiB cap.
+No media capture, device command, production wiring or deployment occurred.
+Next: format consumers for codec enums and PTS time base, then real-media
+fixtures. Driver capabilities remain unchanged by this static SDK evidence.

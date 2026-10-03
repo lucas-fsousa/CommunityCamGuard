@@ -22,6 +22,10 @@ def test_single_raw_fields_and_hidden_payload():
     assert (unit.discriminator, unit.clock_raw, unit.flag_raw, unit.index_raw, unit.tag_raw) == (1, 100, 1, -1, 9)
     assert unit.payload == b"secret"
     assert "secret" not in repr(unit)
+    assert unit.media_kind == "video"
+    assert unit.pts_raw == 100
+    assert unit.is_key_frame is True
+    assert unit.sequence_number == 9
 
 
 def test_grouped_precedence_count_nibble_and_clock_wrap():
@@ -31,6 +35,17 @@ def test_grouped_precedence_count_nibble_and_clock_wrap():
     assert [u.payload for u in units] == [b"a", b"b"]
     assert [u.clock_raw for u in units] == [0xFFFFFFFFFFFFFFFE, 1]
     assert all(u.discriminator == 0 and u.flag_raw == 1 for u in units)
+    assert all(u.media_kind == "audio" and u.is_key_frame is None for u in units)
+
+
+def test_non_key_video_and_unmapped_discriminator():
+    from dataclasses import replace
+
+    unit, = parse_rtc_av_units(record(flags=2))
+    assert unit.is_key_frame is False
+    unknown = replace(unit, discriminator=99)
+    assert unknown.media_kind is None
+    assert unknown.is_key_frame is None
 
 
 @pytest.mark.parametrize("count", [1, 15])

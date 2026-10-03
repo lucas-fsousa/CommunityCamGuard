@@ -2,6 +2,7 @@
 
 import struct
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -12,6 +13,30 @@ class RTCAVUnit:
     index_raw: int  # SDK byte +10 minus one; may be -1.
     tag_raw: int
     payload: bytes = field(repr=False)
+
+    @property
+    def media_kind(self) -> Literal["audio", "video"] | None:
+        """SDK DataTypeName mapping, not a codec or device capability."""
+        if self.discriminator == 0:
+            return "audio"
+        if self.discriminator == 1:
+            return "video"
+        return None
+
+    @property
+    def pts_raw(self) -> int:
+        """Presentation timestamp; its time base is not established yet."""
+        return self.clock_raw
+
+    @property
+    def is_key_frame(self) -> bool | None:
+        """Video metadata hint only, not validation of the compressed payload."""
+        return bool(self.flag_raw) if self.discriminator == 1 else None
+
+    @property
+    def sequence_number(self) -> int:
+        """SDK's eight-bit seq_num; not proof of transport ordering."""
+        return self.tag_raw
 
 
 def parse_rtc_av_units(frame: bytes) -> tuple[RTCAVUnit, ...]:

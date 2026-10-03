@@ -79,6 +79,11 @@ AV parsing checkpoint: offline single/grouped subframes now have per-record
 bounds, atomic return and raw SDK metadata preservation. Nested/inner record
 validation remains separate from AV parsing; no recursive production path added.
 Next: trace consumers to identify codecs/time units, then real-media fixtures.
+Consumer checkpoint: SDK DataTypeName confirms audio=0/video=1, and BasePlayer
+labels PTS/key-frame/sequence fields. Added semantic read-only properties while
+retaining raw values; no time-base/codec guessing. Header entries split into
+video/audio formats with distinct indexing; format field enums remain pending.
+309 focused tests pass (93.9 MiB peak/no swap). No runtime capability changes.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
