@@ -31,6 +31,8 @@ Docs are split by audience:
   ownership, ready-path telemetry and score-scheduling caveat.
 - **[Yoosee relay keepalive](internal/yoosee-push-keepalive.md)** — outbound
   type-4 encoding, asymmetric receive semantics and limits of local peer expiry.
+- **[Yoosee relay RTC boundary](internal/yoosee-push-rtc.md)** — selective cipher
+  spans, strict record length checks and remaining key/media-decoder provenance.
 
 - **[Yoosee push capture evidence](internal/yoosee-push-capture-evidence.md)** —
   content-free PCAP triage and why broker E3 is not relay certification/release.

@@ -25,6 +25,12 @@ The SDK's >8s removal helper only frees local peer entries and has no proven
 scheduler in the inspected direct call graph. It is not remote session expiry.
 145 focused relay tests passed; no keepalive timer/sender or live probe enabled.
 See [keepalive evidence](docs/internal/yoosee-push-keepalive.md).
+RTC follow-up: type-8 relay body dispatch and selective-encryption prefixes are
+mapped. Added socket-free strict length/type/span validation, with 187 combined
+relay tests passing. The SDK's log-and-continue on length mismatch is not copied.
+Encryption-mode values are distinct from device-platform values. Next: cipher
+key/block provenance and bounded RTC unpacking; no decryption or media capability
+enabled. See [RTC boundary](docs/internal/yoosee-push-rtc.md).
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
