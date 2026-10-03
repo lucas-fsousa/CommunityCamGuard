@@ -66,6 +66,10 @@ envelope parsing plus bounded ordered concatenation (four IDs, 256 KiB total,
 owner close and a new instance. 267 focused tests pass, peak 82.3 MiB/no swap.
 No live capability enabled. Next: end-handler virtual target/inner boundaries,
 then media metadata consumers. [Evidence](docs/internal/yoosee-push-fragments.md).
+End-handler follow-up: vtable relocation confirms return to the same v2 RTC
+dispatcher; assembled payload is an inner record stream, not proven raw video.
+Next: iterative bounded inner-record validation with nested-fragment rejection,
+then media metadata interpretation. Do not reproduce SDK recursion.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

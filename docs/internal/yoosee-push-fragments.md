@@ -57,3 +57,21 @@ explicit close and source isolation. Symbol-sized SDK audits peaked at 27.1 MiB.
 Next: resolve the end-handler virtual target, validate inner record boundaries
 without recursive/unbounded parsing, and map AV metadata consumers. Real media,
 session authentication and production lifecycle integration remain unverified.
+
+## End-handler virtual target confirmed
+
+ELF `_ZTVN8iotvideo14trans_proto_v2E` is at `0x2a1cc0` (32 bytes).
+Its function slot at +0x10 resolves through the symbol relocation to
+`trans_proto_v2::unpacking_data` (`0x17ce10`); +0x18 is `packing_data`.
+Consequently the first virtual slot invoked by the fragment-end handler
+returns to the same RTC dispatcher for a normal v2 instance. This establishes
+that assembled bytes are an inner RTC stream, not necessarily a raw video NAL.
+Other subclasses/overrides are not covered by this symbol check.
+
+No recursion-depth check was found in the inspected dispatcher/end pair.
+Do not reproduce this recursive path in the local implementation. The next
+boundary should inspect inner complete-record lengths iteratively with byte and
+record-count limits, reject nested fragment types until a bounded policy is
+explicitly supported, and publish nothing if any inner record is incomplete.
+The current assembly helper intentionally returns opaque bytes only; it is
+not safe to wire directly into an AV decoder. Vtable inspection used 19.4 MiB.

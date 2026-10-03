@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Native relay RE (offline, not production capabilities): [RTC boundaries and
+decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).
+
 | ADR | Decision |
 |---|---|
 | [0001](0001-pluggable-camera-drivers.md) | Pluggable camera drivers (the core extensibility architecture) |
