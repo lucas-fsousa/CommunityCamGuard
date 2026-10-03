@@ -84,6 +84,33 @@ revocation, IPv6, hostile/sibling origins, public peers and forwarding spoofing.
 Peak memory 73.1 MiB, no swap, under a 256 MiB/50%-CPU cgroup. Real browser and
 camera-stream acceptance remain separate from these synthetic tests.
 
+### Local rollout evidence — 2026-10-03
+
+Commit `02de214` passed full CI `37092184405`, including the corrected settings
+inventory. A focused combined run passed 118 tests before rollout. Built image
+`community-cam-guard-app:dual-origin-02de214` with 512 MiB/no-swap/50%-CPU build
+container limits and a separately capped 192 MiB build client. The previous image
+was retained as `community-cam-guard-app:before-dual-origin-02de214` for rollback.
+Only the app was recreated; go2rtc retained its existing uptime.
+
+Configured the deployment's actual public HTTPS origin plus the local exception
+in its ignored `.env`; existing authentication secrets/keys were not changed.
+The deployed content-derived build is `b-b93ca4beefe6`. Live checks established:
+
+- Local `/health` and public anonymous `/api/me`: HTTP 200.
+- Public same-origin HTTPS login and direct localhost/loopback login with empty
+  JSON: HTTP 422 (request validation reached, no longer blocked with 403).
+- Public login carrying an unrelated Origin: HTTP 403 as expected.
+- Three recorder MP4s open and all three growing over a ten-second observation
+  (1,835,008 aggregate bytes added); no recording paths or identifiers retained.
+- Native diagnostic remains disabled; no RE route or camera control was invoked.
+
+The first checks during app startup briefly saw connection refusal/502; the
+post-start checks above passed. No actual user's credential, cookie or temporary
+key was supplied to these live probes. Valid delegated authentication/revocation
+was tested in isolated databases; user-browser login/stream acceptance is still
+required. This does not certify the entire internet-facing deployment.
+
 ### Rollout checklist
 
 1. Terminate valid HTTPS at the proxy; preserve the browser-facing Host and WebSocket

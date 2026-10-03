@@ -4,7 +4,9 @@
 with an unset public origin behind TLS termination. Added opt-in direct-local
 access alongside a pinned public HTTPS origin, retaining exact-origin checks,
 host-only cookies, temporary permissions and revocation. Synthetic tests pass;
-deployment/browser acceptance must be recorded separately. Also corrected the
+deployed as `b-b93ca4beefe6` after CI: HTTPS/local origin checks pass and all three
+recorders resumed growing. Actual user-browser delegated login remains to confirm.
+Also corrected the
 server-only inventory classification omitted for the platform-only RE setting.
 
 Living document: backlog, priorities and milestones. Technical detail and rationale live in
