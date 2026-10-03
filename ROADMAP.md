@@ -31,6 +31,11 @@ relay tests passing. The SDK's log-and-continue on length mismatch is not copied
 Encryption-mode values are distinct from device-platform values. Next: cipher
 key/block provenance and bounded RTC unpacking; no decryption or media capability
 enabled. See [RTC boundary](docs/internal/yoosee-push-rtc.md).
+Cipher follow-up: E4 `+0x1b` selects encryption mode; its separate eight bytes at
+`+0x20` supply the RC5 key (not the certification token). SDK context parameters
+are 8/6; the transform processes complete eight-byte blocks and leaves a trailing
+partial block unchanged. No actual key or media was accessed. Next: independent
+key-expansion vectors and bounded RTC unpacking before enabling decryption.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

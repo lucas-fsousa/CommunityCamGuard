@@ -55,9 +55,36 @@ cipher rounding. Eight-module relay suite: **187 tests passed**, peak 76.9 MiB,
 no swap under 256 MiB/50%-CPU limits; Ruff passed. Symbol-sized disassembly stayed
 below 28 MiB under 128 MiB caps. No runtime deployment or camera traffic occurred.
 
+## Cipher/key provenance follow-up
+
+`iv_push_session_app_new` stores its E4 argument x2 at stack `+0x50`
+(`0x277e48`). It copies E4 byte `+0x1b` into session encryption setting `+0x20`
+at `0x277f20–0x277f2c`, and E4 bytes `+0x20..+0x27` into session `+0x10`
+at `0x277f50–0x277f5c`. It calls `rc5_ctx_new(8, 6)` at `0x277f60–0x277f6c`,
+stores the result at session `+0x18`, then calls `rc5_ctx_setkey` with the eight
+bytes at session `+0x10` (`0x277f70–0x277f8c`). These key bytes are distinct
+from the variable relay-certification token at E4 `+0x88`; do not substitute it.
+
+`rc5_ctx_new` (`0x26130c`, 292 bytes) records the second argument as rounds at
+context byte 0 and the first at byte 1; context byte 2 is first argument ×4
+(`0x2613dc–0x261400`). For this call the values are 6, 8 and 32, consistent with
+six rounds, eight-byte blocks and 32-bit words. Native key expansion and actual
+encrypted-record fixtures remain independent verification steps before claiming
+interoperable decryption with the existing Python RC5 implementation.
+
+`rc5_enc_dec_data` (`0x278f1c`, 280 bytes) rejects nonpositive byte counts, then
+processes **floor(count / 8)** independent eight-byte blocks through `rc5_ctx_enc`
+or `rc5_ctx_dec`. There is no IV/chaining or padding in this wrapper, and a final
+1–7 bytes remain unchanged. The selective-mode wrapper ignores its return value,
+including for an empty span; an empty span alone is not valid media evidence.
+
+No key was extracted from a live capture, printed, retained, or used to decrypt
+media. These findings come exclusively from instructions and field offsets.
+
 ## Next evidence
 
-Trace cipher/key setup and block handling, then the type-specific RTC unpackers
+Key source and block/remainder handling are mapped above. Next: verify native
+key expansion against independent vectors, then the type-specific RTC unpackers
 with bounded record/fragment ownership. Keep relay certification/session
 provenance and teardown as independent gates. Neither this boundary nor the
 keepalive encoder homologates HD, relay media reception or LAN-only operation.
