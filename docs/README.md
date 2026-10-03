@@ -16,6 +16,8 @@ Docs are split by audience:
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
   version-specific MTP/E4 evidence, correlated passive MTP collection, unknown-platform preservation, A4 relay
   advertisement and remaining native-HD gate.
+- **[Reserved native diagnostic](internal/native-av-operator-trigger.md)** —
+  single-use AV or platform-only collection; camera identity, cleanup and resource gates.
 
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.

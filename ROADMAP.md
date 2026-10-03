@@ -74,6 +74,10 @@ or provide a positive camera-3 platform observation.
 evidence only after a fully correlated sent-meter roundtrip. The internal AV
 diagnostic preserves this optional value after cleanup. No extra packets or
 automatic HD selection; historical capture still has no positive observation.
+2026-10-03: a server-selected platform-only diagnostic reuses the reserved route
+owner but stops after correlated MTP metering and B9 cleanup, before AV INIT/START
+or decoding. 68 focused tests passed; not deployed or tested live. Use this mode
+for the next camera-3 platform observation instead of starting another video stream.
 
 Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunistic.
 Status: `todo` · `wip` · `done` · `blocked`.

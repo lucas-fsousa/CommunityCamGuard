@@ -36,6 +36,13 @@ class AvRouteResult:
     device_platform_version: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class PlatformRouteResult:
+    device_platform_version: int | None
+    meter_roundtrip_confirmed: bool
+    route_release_acknowledged: bool
+
+
 class AvBootstrapError(P2PProbeError):
     """Safe bootstrap observations, not decrypted payload or network identity."""
 
@@ -61,20 +68,36 @@ def probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
     support; the diagnostic policy must validate those before selecting a profile.
     """
     try:
-        return _probe_av_route(enrollment, camera_id=camera_id, device_id=device_id,
+        result = _probe_av_route(enrollment, camera_id=camera_id, device_id=device_id,
                                duration=duration, sample=sample, cancelled=cancelled,
                                request_user_data=request_user_data)
+        assert isinstance(result, AvRouteResult)
+        return result
     except BaseException:
         if sample is not None:
             sample.close()
         raise
 
 
+def probe_platform_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
+                         cancelled: Callable[[], bool] = lambda: False) -> PlatformRouteResult:
+    """Same reserved route owner, stopping before AV INIT/START or media reception.
+
+    Caller must hold the same camera reservation as the AV diagnostic. Unknown
+    platform is a valid result, not permission to retry or select legacy quality.
+    """
+    result = _probe_av_route(enrollment, camera_id=camera_id, device_id=device_id,
+                             duration=3.0, sample=None, cancelled=cancelled, platform_only=True)
+    assert isinstance(result, PlatformRouteResult)
+    return result
+
+
 def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                    duration: float,
                    sample: AvVideoSample | None,
                    request_user_data: bytes | None = None,
-                   cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult:
+                   cancelled: Callable[[], bool] = lambda: False,
+                   platform_only: bool = False) -> AvRouteResult | PlatformRouteResult:
     """One fresh route: <=20s preparation, <=12s AV and <=1s B9 cleanup.
 
     No credential refresh, reconnect, legacy AV initializer or microphone calls.
@@ -132,15 +155,17 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
         if calling.peer_endpoint is None:
             raise P2PProbeError("native AV route has no correlated endpoint")
         bounded.check()
-        bounded.phase(duration + 2)
-        stage = "av_receive_close"
-        result = probe_av_socket(sock, calling, channel, duration=duration,
-                                 cancelled=cancelled, close_socket=False, sample=sample,
-                                 request_user_data=request_user_data,
-                                 meter=AvMeter(calling.peer_endpoint, attempt.link_id,
-                                               attempt.call_id, enrollment.access_id, target.device_id))
+        result = None
+        if not platform_only:
+            bounded.phase(duration + 2)
+            stage = "av_receive_close"
+            result = probe_av_socket(sock, calling, channel, duration=duration,
+                                     cancelled=cancelled, close_socket=False, sample=sample,
+                                     request_user_data=request_user_data,
+                                     meter=AvMeter(calling.peer_endpoint, attempt.link_id,
+                                                   attempt.call_id, enrollment.access_id, target.device_id))
         stage = "route_release"
-        outcome = "av_completed"
+        outcome = "platform_collected" if platform_only else "av_completed"
     except P2PProbeError as exc:
         outcome, failure_type = "failed", type(exc).__name__
         raise
@@ -170,4 +195,8 @@ def _probe_av_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
                             int((time.monotonic() - started) * 1000))
     if not released:
         raise P2PProbeError("native AV route release receipt not confirmed")
+    if platform_only:
+        return PlatformRouteResult(channel.device_platform_version,
+                                   channel.meter_roundtrip_confirmed, released)
+    assert result is not None
     return AvRouteResult(result, released, channel.device_platform_version)

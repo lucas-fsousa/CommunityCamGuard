@@ -65,6 +65,29 @@ def test_failure_releases_application_lock(env, monkeypatch):
         pass
 
 
+def test_platform_only_uses_same_reservation_without_decoder(env, monkeypatch):
+    def platform_probe(*args, **kwargs):
+        assert kwargs["device_id"] == "123"
+        with pytest.raises(camera_controls.ControlBusy):
+            camera_controls.read_control("cam_test", "orientation")
+        return "platform evidence"
+    def forbidden(*args, **kwargs):
+        pytest.fail("platform-only path must not start media or decoder")
+    monkeypatch.setattr(diagnostics, "probe_platform_route", platform_probe)
+    monkeypatch.setattr(diagnostics, "probe_av_route", forbidden)
+    monkeypatch.setattr(diagnostics, "require_decoder_tools", forbidden)
+    assert run(platform_only=True) == "platform evidence"
+    assert not env
+    with camera_controls._exclusive("cam_test"):
+        pass
+
+
+def test_platform_and_decode_conflict_before_route(env):
+    with pytest.raises(ValueError, match="cannot decode"):
+        run(platform_only=True, decode_video=True)
+    assert not env
+
+
 @pytest.mark.parametrize("fault", [None, "route", "decoder", "tools"])
 def test_decode_opt_in_orders_route_before_decoder_and_always_clears(env, monkeypatch, fault):
     events, retained = [], []

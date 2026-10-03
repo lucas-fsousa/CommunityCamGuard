@@ -55,6 +55,7 @@ def native_av(request: Request) -> dict:
     try:
         result = run_reviewed_native_av(camera_id=camera_id, reviewed_camera_id=camera_id,
                                         reviewed_device_id=device_id,
+                                        platform_only=settings.native_av_diagnostic_platform_only,
                                         decode_video=settings.native_av_diagnostic_decode_video)
     except (ControlBusy, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None

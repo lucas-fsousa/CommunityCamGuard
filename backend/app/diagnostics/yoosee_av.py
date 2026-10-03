@@ -9,7 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..db import p2p, registry
-from ..drivers.yoosee.p2p.av_route import AvRouteResult, probe_av_route
+from ..drivers.yoosee.p2p.av_route import (
+    AvRouteResult,
+    PlatformRouteResult,
+    probe_av_route,
+    probe_platform_route,
+)
 from ..drivers.yoosee.p2p.av_sample import AvVideoSample
 from ..services.camera_controls import CameraNotFound, _exclusive
 from .native_video_decode import DecodedVideo, decode_sample, require_decoder_tools
@@ -24,7 +29,9 @@ class DecodedAvResult:
 def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
                            reviewed_device_id: str,
                            decode_video: bool = False,
-                           cancelled: Callable[[], bool] = lambda: False) -> AvRouteResult | DecodedAvResult:
+                           platform_only: bool = False,
+                           cancelled: Callable[[], bool] = lambda: False
+                           ) -> AvRouteResult | DecodedAvResult | PlatformRouteResult:
     """One fixed three-second sample under the existing PTZ/audio/control lock.
 
     The two reviewed IDs must come from trusted internal configuration, not HTTP.
@@ -32,6 +39,8 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
     """
     if not reviewed_camera_id or camera_id != reviewed_camera_id or not reviewed_device_id:
         raise ValueError("native AV diagnostic target is not the reviewed test camera")
+    if platform_only and decode_video:
+        raise ValueError("platform-only diagnostic cannot decode video")
     with _exclusive(camera_id):
         camera = registry.get_camera_by_id(camera_id)
         if camera is None:
@@ -40,6 +49,9 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
         if (enrollment is None or enrollment.camera_id != camera_id
                 or enrollment.device_id != reviewed_device_id):
             raise ValueError("native AV diagnostic enrollment mismatch")
+        if platform_only:
+            return probe_platform_route(enrollment, camera_id=camera_id,
+                                        device_id=reviewed_device_id, cancelled=cancelled)
         if not decode_video:
             return probe_av_route(enrollment, camera_id=camera_id, device_id=reviewed_device_id,
                                   duration=3.0, cancelled=cancelled)

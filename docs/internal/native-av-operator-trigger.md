@@ -6,6 +6,36 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 
 ## Gates and limits
 
+### Platform-only mode (2026-10-03)
+
+`NATIVE_AV_DIAGNOSTIC_PLATFORM_ONLY=true` selects a bootstrap-only attempt through
+the same endpoint, operator target checks, shared camera reservation and single-use
+guard. It is false by default. Set decode-video **false**: the two modes conflict
+and are rejected before any camera route is opened.
+
+This path authenticates, performs one rendezvous and the existing bounded MTP
+measurement exchange, then releases the route with B9 and closes the socket.
+It does **not** call the AV probe or send AV INIT/START, allocate a video sample,
+run FFmpeg/ffprobe, or invoke audio/PTZ/settings controls. Preparation retains its
+20-second budget and cleanup its independent one-second budget; no retry or
+extra background connection is added. Route setup itself still contacts the
+camera/broker and is not a guarantee of zero camera-resource impact.
+
+The result contains only `device_platform_version` (2 or unknown/null from current
+evidence), `meter_roundtrip_confirmed` and `route_release_acknowledged`. Unknown
+is a valid outcome: do not auto-retry, infer platform 1 or activate HD. Missing
+roundtrip or release receipt fails instead of reporting success. No AV CLOSE is
+needed because this mode never invokes AV INIT; B9 receipt still does not prove
+physical release of every remote resource.
+
+The existing procedure below still applies: camera 3 only, same server process,
+bounded memory, account for any deployment's recorder interruption, and remove
+all temporary diagnostic settings afterward. Browser parameters cannot select
+this mode. Source implementation has 68 focused passing tests, peak 91.1 MiB
+without swap in a 256 MiB/50%-CPU cgroup; no deployment or live attempt yet.
+
+### Existing AV mode
+
 - Disabled by default: `NATIVE_AV_DIAGNOSTIC_ENABLED=false`.
 - Optional post-teardown video decoding is separately disabled by default:
   `NATIVE_AV_DIAGNOSTIC_DECODE_VIDEO=false`. Its ownership/resource bounds and

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.auth import COOKIE_NAME, issue_token
 from backend.app.diagnostics import yoosee_av_api as api
-from backend.app.drivers.yoosee.p2p.av_route import AvRouteResult
+from backend.app.drivers.yoosee.p2p.av_route import AvRouteResult, PlatformRouteResult
 from backend.app.drivers.yoosee.p2p.contracts import P2PProbeError
 from backend.app.services.camera_controls import ControlBusy
 from tests.test_av_route import RESULT
@@ -19,6 +19,7 @@ CAMERA = "cam_" + "a" * 24
 def setup(monkeypatch):
     settings = SimpleNamespace(native_av_diagnostic_enabled=True,
                                native_av_diagnostic_decode_video=False,
+                               native_av_diagnostic_platform_only=False,
                                native_av_diagnostic_camera_id=CAMERA,
                                native_av_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
@@ -41,7 +42,7 @@ def test_single_use_fixed_target_and_safe_counts(setup):
     assert result.json()["route_release_acknowledged"] is True
     assert "123" not in result.text and "token" not in result.text
     assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA, reviewed_device_id="123",
-                         decode_video=False)]
+                         decode_video=False, platform_only=False)]
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
@@ -56,6 +57,23 @@ def test_returns_optional_platform_without_identifiers(setup, monkeypatch, platf
     assert response.status_code == 200
     assert response.json()["device_platform_version"] == platform
     assert "123" not in response.text and CAMERA not in response.text
+
+
+def test_platform_only_is_server_selected_and_single_use(setup, monkeypatch):
+    client, settings, calls = setup
+    settings.native_av_diagnostic_platform_only = True
+    def run(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["platform_only"] and not kwargs["decode_video"]
+        return PlatformRouteResult(None, True, True)
+    monkeypatch.setattr(api, "run_reviewed_native_av", run)
+    result = client.post(PATH)
+    assert result.status_code == 200
+    assert result.json() == dict(device_platform_version=None,
+                                 meter_roundtrip_confirmed=True,
+                                 route_release_acknowledged=True)
+    assert client.post(PATH).status_code == 409
+    assert len(calls) == 1
 
 
 def test_disabled_and_unconfigured_never_run(setup):
