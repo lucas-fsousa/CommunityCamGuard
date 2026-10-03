@@ -32,7 +32,9 @@ WebSocket handshakes reject mismatched Origin/Referer and cross-site/same-site f
 metadata. Scripts without these headers remain supported, but no-Origin HTML form
 media types are denied. `DASHBOARD_PUBLIC_ORIGIN` can pin the external origin behind
 HTTPS termination; preserve Host and restrict backend access. This does not relax
-local-only controls. See [policy and migration](../internal/browser-origin-policy.md).
+local-only controls. `DASHBOARD_ALLOW_LOCAL_ORIGIN=true` additionally permits direct
+localhost/literal private-LAN access from local peers, with exact same-origin checks
+and no forwarding headers. See [policy and migration](../internal/browser-origin-policy.md).
 
 POST `/api/login` allows a burst
 of 10 attempts per origin quota, replenishing one every 6 seconds. Excess attempts

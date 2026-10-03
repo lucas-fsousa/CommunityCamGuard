@@ -1,6 +1,7 @@
 # Browser origin / proxy checkpoint — 2026-09-25
 
-Implemented in source; not deployed. Public temporary login remains disabled.
+Historical 2026-09-25 checkpoint: implemented in source, then not deployed;
+temporary login was still disabled. It was subsequently activated (see README).
 No camera operations, production authentication, environment changes or container
 restarts were performed. This is an origin-based CSRF boundary, not a token system
 or a completed internet-exposure audit.
@@ -52,6 +53,39 @@ login quota; this step does not introduce trusted per-user forwarded IP handling
 
 ## Proxy migration checklist (not production-homologated)
 
+### Public HTTPS plus direct local access — 2026-10-03
+
+The reported deployment returned 200 for anonymous `/api/me`, but browser-shaped
+login returned 403 `Cross-origin request denied` before key verification. The
+container had an empty `DASHBOARD_PUBLIC_ORIGIN`; HTTPS termination with an HTTP
+backend hop therefore produced a scheme mismatch. An empty JSON login without
+browser-origin headers reached request validation (422). No actual key was used
+in those probes; they do not validate an individual delegated credential.
+
+Set the exact public HTTPS origin and optionally
+`DASHBOARD_ALLOW_LOCAL_ORIGIN=true` (default false). With this opt-in, a different
+Host is accepted only for a direct loopback/RFC1918/IPv6 ULA/link-local peer and a
+localhost/literal address in those ranges. A non-loopback LAN peer cannot claim
+localhost/loopback Host. Forwarded, X-Forwarded-* identity/protocol/port and common
+proxy identity headers prevent this exception, even with empty values. DNS names
+other than the configured public name and exact localhost are not resolved/trusted.
+
+The direct exception uses its actual HTTP/HTTPS (or WS/WSS) scheme and still
+requires an exact Origin/Referer match and existing fetch-metadata checks. The
+public proxy path remains pinned and issues Secure cookies. Sessions are host-only:
+log in separately on the public name and local address. Revocation, expiry,
+delegated permissions and local-only provisioning/controls remain unchanged.
+This is not a CORS wildcard, a forwarded-header trust switch or TLS on local HTTP.
+Only use local HTTP on a trusted LAN. Proxy infrastructure must preserve the
+public Host and backend/media ports must remain restricted.
+
+98 focused tests passed for local/proxy login, temporary permission denial and
+revocation, IPv6, hostile/sibling origins, public peers and forwarding spoofing.
+Peak memory 73.1 MiB, no swap, under a 256 MiB/50%-CPU cgroup. Real browser and
+camera-stream acceptance remain separate from these synthetic tests.
+
+### Rollout checklist
+
 1. Terminate valid HTTPS at the proxy; preserve the browser-facing Host and WebSocket
    upgrades/cookies. Configure the exact external origin in the server environment.
 2. Restrict the backend port to the proxy/trusted infrastructure. This setting does
@@ -63,8 +97,8 @@ login quota; this step does not introduce trusted per-user forwarded IP handling
 4. Recreate the backend during a controlled rollout, then validate login/logout,
    settings writes and MSE streaming through the proxy. Verify alternate Host/Origin
    denial and expired/revoked session cleanup without physical camera commands.
-5. A pinned origin intentionally rejects API access by an alternative LAN IP/localhost
-   Host. Use the configured origin or remove the setting and restart to return to
+5. A pinned origin rejects API access by an alternative LAN IP/localhost Host unless
+   the restricted direct-local exception above is explicitly enabled. Use the configured origin or remove the setting and restart to return to
    direct mode. An HTTPS tunnel with a changing hostname requires an operator update.
 
 ## Evidence and remaining work

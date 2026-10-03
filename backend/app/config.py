@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     session_signing_key: str = ""
     # Optional canonical browser origin for a proxy deployment; never inferred from headers.
     dashboard_public_origin: str = ""
+    # Opt-in direct localhost/private-LAN access alongside a pinned public origin.
+    dashboard_allow_local_origin: bool = False
 
     @field_validator("dashboard_public_origin")
     @classmethod

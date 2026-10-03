@@ -16,10 +16,12 @@
     {
       "classification": "server_only",
       "fields": [
-        "dashboard_secret_key", "session_signing_key", "dashboard_public_origin", "host", "port",
+        "dashboard_secret_key", "session_signing_key", "dashboard_public_origin",
+        "dashboard_allow_local_origin", "host", "port",
         "autostart_services", "manage_go2rtc", "db_path", "recordings_dir",
         "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
+        "native_av_diagnostic_platform_only",
         "native_av_diagnostic_camera_id", "native_av_diagnostic_device_id",
         "provisioning_ble_material_file", "provisioning_ble_material_max_age_seconds",
         "provisioning_remote_ble_enabled", "aws_access_key_id", "aws_secret_access_key",

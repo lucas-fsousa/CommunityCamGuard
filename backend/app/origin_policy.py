@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request
 from starlette.requests import HTTPConnection
 
 from .config import get_settings
+from .local_origin import direct_local_origin_allowed
 
 
 def normalize_origin(value: str) -> str:
@@ -36,11 +37,16 @@ def target_origin(connection: HTTPConnection) -> str:
     hosts = connection.headers.getlist("host")
     if len(hosts) != 1 or "/" in hosts[0]:
         raise ValueError("Invalid host")
-    configured = get_settings().dashboard_public_origin
+    settings = get_settings()
+    configured = settings.dashboard_public_origin
     scheme = (urlsplit(configured).scheme if configured else
               "https" if connection.url.scheme in {"https", "wss"} else "http")
     actual = normalize_origin(f"{scheme}://{hosts[0]}")
     if configured and actual != configured:
+        if (settings.dashboard_allow_local_origin
+                and direct_local_origin_allowed(connection, urlsplit(actual).hostname or "")):
+            direct_scheme = "https" if connection.url.scheme in {"https", "wss"} else "http"
+            return normalize_origin(f"{direct_scheme}://{hosts[0]}")
         raise ValueError("Host does not match configured origin")
     return configured or actual
 

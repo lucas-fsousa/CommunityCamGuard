@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
+with an unset public origin behind TLS termination. Added opt-in direct-local
+access alongside a pinned public HTTPS origin, retaining exact-origin checks,
+host-only cookies, temporary permissions and revocation. Synthetic tests pass;
+deployment/browser acceptance must be recorded separately. Also corrected the
+server-only inventory classification omitted for the platform-only RE setting.
+
 Living document: backlog, priorities and milestones. Technical detail and rationale live in
 `docs/` (ADRs); this file is **what** and **in what order**, not **how**.
 

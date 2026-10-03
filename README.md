@@ -190,6 +190,16 @@ and [restricted delegated MSE](docs/internal/temporary-live-media.md). These are
 a certification that internet exposure is safe. Review trusted proxies, HTTPS,
 cookie handling and firewall rules; never expose internal media ports.
 
+For an HTTPS reverse proxy, set `DASHBOARD_PUBLIC_ORIGIN=https://cameras.example.org`
+to your exact public origin and preserve the incoming Host. Otherwise HTTPS browser
+login can be rejected as cross-origin when the backend hop uses HTTP. To keep
+direct localhost/private-LAN access too, set `DASHBOARD_ALLOW_LOCAL_ORIGIN=true`.
+Recreate the app container after changing these environment settings. Public HTTPS
+cookies remain Secure; direct local HTTP uses a separate host-only session.
+The local exception requires a local peer and localhost/literal private-IP Host,
+rejects forwarding headers, and does not bypass permissions or local-only controls.
+See [origin policy](docs/internal/browser-origin-policy.md) for deployment limits.
+
 API clients must [send discovery credentials in JSON](docs/internal/discovery-credential-body.md)
 and [explicitly prepare recordings with POST](docs/internal/recording-get-boundary.md).
 Public [errors](docs/internal/provisioning-public-errors.md) and
