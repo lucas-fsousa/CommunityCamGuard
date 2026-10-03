@@ -154,6 +154,45 @@ success-state transition, retry loop or camera command was introduced.
 Synthetic tests cover old data, old malformed reads, old EOF, unrelated receiver
 tokens, cancellation, partial EOF, clean EOF and recovery with a new generation.
 
+2026-10-03: `is_current(generation)` now lets downstream queued consumers recheck
+the **captured original** token immediately before a synchronous state change.
+Recheck after each await; this is not a cross-thread lock, automatic queue
+cancellation or authentication. Parsed bytes remain readable after retirement,
+but consumers can reject their expired ownership. Tests cover replacement,
+cancellation, clean/partial EOF, malformed input and foreign/absent generations.
+The combined framing/context/certification/teardown/reception set passed 97 tests
+under 256 MiB/no-swap/50%-CPU limits, with 99.2 MiB peak; Ruff passed.
+
+### Actual ready-path quality timer (2026-10-03)
+
+`iv_timer_calc_push_stream_quality` (`0x27e530`, 164 bytes) invokes
+`iv_calc_push_stream_quality` at `0x27e58c`. When sample count at channel `+0x328`
+reaches 16, it calls `iv_report_push_stream_quality` with arguments `(channel, 0, 1)`.
+It does not invoke the previously mapped `iv_timer_calc_stat` score helper.
+
+The collector (`0x27e1a4`, 908 bytes) bounds collection to 16 records of 24 bytes
+at channel `+0x1a8`. Its observed record fields are:
+
+| Offset | Source/operation |
+| --- | --- |
+| 0 | UDP: object `channel +0x358`, field `+0x38`; TCP: selected node socket `+0x38`, field `+0x6c`. These counter meanings need separate writer provenance. |
+| 4 | UDP object field `+0x64`; TCP `ivtcp_get_sndbuf_datalen(socket)`. |
+| 8 | Delta of channel `+0x19c` versus snapshot `+0x190`; log calls it `block_times`. |
+| 12 | Delta of `+0x1a0` versus `+0x194`, divided by elapsed whole seconds; log calls it `rate_data_send`. Units are not established here. |
+| 16 | Delta of `+0x1a4` versus `+0x198`, divided by the same interval; log calls it `rate_data_recv`. |
+| 20 | Low 32 bits of `time(NULL)`. |
+
+Elapsed seconds use the low 32 bits of `getTickCount64()` minus channel `+0x330`,
+divided by 1000; a zero result is replaced by one. Counter/tick wrap behavior is
+not validated and must not be copied uncritically. The three counter snapshots
+are copied, sample count incremented and tick baseline updated afterward.
+
+The report helper (`0x27d9bc`, 2024 bytes) calls `iv_gutes_add_send_pkt` at
+`0x27e168`; it is not merely local logging. Its packet schema/destination are
+not yet mapped. No equivalent reporting traffic is implemented. This closes the
+ready-timer identity question, **not** the separate score scheduling or remote
+lifetime gates, and provides no platform enum or HD resolution selection.
+
 ### Open gates
 
 Callback-signature checkpoint: connected-event helper `0x1ed7e8–0x1ed8c8`

@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+User priority override (2026-10-03): camera-card/SD work is the **last priority**.
+Do not resume its enum/listing investigation while native live-streaming work is
+available. Current focus: native relay/platform provenance and safe HD preparation.
+
+Native relay follow-up: mapped the actual ready-path quality timer to bounded
+telemetry, not resolution selection or the disconnected score helper. Added an
+offline generation recheck for already-parsed queued work; retirement/replacement
+tests pass. No relay sender, camera traffic or native-HD capability enabled.
+
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
 access alongside a pinned public HTTPS origin, retaining exact-origin checks,

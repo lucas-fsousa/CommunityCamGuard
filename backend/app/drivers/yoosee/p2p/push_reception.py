@@ -30,8 +30,17 @@ class PushReception:
             self._decoder.abort()
         self._decoder = None
 
+    def is_current(self, generation: object) -> bool:
+        """Recheck queued work immediately before a synchronous state change.
+
+        Capture the original begin() token with the work. Recheck after every
+        await; this predicate does not lock threads or revoke returned frames.
+        A live generation is local ownership, never relay authentication.
+        """
+        return self._decoder is not None and generation is self._generation
+
     def receive(self, generation: object, data: bytes) -> list[bytes]:
-        if generation is not self._generation or self._decoder is None:
+        if not self.is_current(generation) or self._decoder is None:
             return []
         try:
             return self._decoder.feed(data)
@@ -40,7 +49,7 @@ class PushReception:
             raise
 
     def eof(self, generation: object) -> None:
-        if generation is not self._generation or self._decoder is None:
+        if not self.is_current(generation) or self._decoder is None:
             return
         try:
             self._decoder.finish()

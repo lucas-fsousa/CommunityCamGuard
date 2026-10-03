@@ -89,3 +89,42 @@ def test_abort_clears_partial_buffer_and_is_terminal():
     assert decoder.buffered_bytes == 0
     with pytest.raises(PushFrameError, match="closed"):
         decoder.feed(FRAME)
+
+
+@pytest.mark.parametrize("retire", ["replace", "cancel", "eof", "malformed", "partial_eof"])
+def test_already_parsed_queued_work_is_rejected_after_retirement(retire):
+    receiver = PushReception()
+    token = receiver.begin()
+    queued = [(token, frame) for frame in receiver.receive(token, FRAME)]
+    assert receiver.is_current(token)
+    if retire == "replace":
+        replacement = receiver.begin()
+        assert receiver.is_current(replacement)
+    elif retire == "cancel":
+        receiver.cancel()
+    elif retire == "eof":
+        receiver.eof(token)
+    elif retire == "malformed":
+        with pytest.raises(PushFrameError):
+            receiver.receive(token, b"\xff" + FRAME[1:])
+    else:
+        receiver.receive(token, FRAME[:10])
+        with pytest.raises(PushFrameError):
+            receiver.eof(token)
+    applied = [frame for generation, frame in queued if receiver.is_current(generation)]
+    assert applied == []
+    # Retiring ownership does not mutate bytes already returned to consumers.
+    assert queued == [(token, FRAME)]
+
+
+def test_generation_predicate_fails_closed_before_begin_and_for_foreign_owner():
+    receiver = PushReception()
+    other = PushReception()
+    assert not receiver.is_current(None)
+    assert not receiver.is_current(object())
+    token = receiver.begin()
+    assert not receiver.is_current(other.begin())
+    assert receiver.is_current(token)
+    receiver.cancel()
+    assert not receiver.is_current(None)
+    assert not receiver.is_current(token)
