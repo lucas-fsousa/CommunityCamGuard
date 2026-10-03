@@ -18,6 +18,13 @@ callback mismatch. This does not prove runtime reachability or camera support.
 SDK scanning must use small instruction blocks: one whole-section scan was
 terminated at its isolated 256 MiB cap; the 1 KiB-block replacement used 26.6 MiB.
 SD remains last priority.
+Keepalive follow-up: outbound type-4 44-byte frame is mapped and encoded offline
+with strict integer bounds. Incoming type 4 treats the same offset as user ID,
+not the sent tick; direction-specific semantics prevent inventing an echo ACK.
+The SDK's >8s removal helper only frees local peer entries and has no proven
+scheduler in the inspected direct call graph. It is not remote session expiry.
+145 focused relay tests passed; no keepalive timer/sender or live probe enabled.
+See [keepalive evidence](docs/internal/yoosee-push-keepalive.md).
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

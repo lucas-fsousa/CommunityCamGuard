@@ -29,6 +29,8 @@ Docs are split by audience:
 - **[Yoosee push reception](internal/yoosee-push-reception.md)** — bounded TCP
   framing, deferred-work generation checks, relay address descriptors, callback
   ownership, ready-path telemetry and score-scheduling caveat.
+- **[Yoosee relay keepalive](internal/yoosee-push-keepalive.md)** — outbound
+  type-4 encoding, asymmetric receive semantics and limits of local peer expiry.
 
 - **[Yoosee push capture evidence](internal/yoosee-push-capture-evidence.md)** —
   content-free PCAP triage and why broker E3 is not relay certification/release.
