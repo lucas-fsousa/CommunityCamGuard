@@ -46,6 +46,10 @@ Added an isolated bounded mode-2 decrypt helper; 205 focused tests pass, includi
 all six prefixes and every short-tail length. No production wiring or camera
 traffic. Next: type-specific RTC unpacking and real-record interoperability;
 relay authentication/ownership/teardown remain independent gates. SD stays last.
+RTC header-only checkpoint: SDK type-0x81 packing/unpacking establishes a
+ten-byte prefix, byte-9 count and twenty-byte opaque entries. Caller-level
+length checks and entry semantics remain unverified; no decoder enabled.
+Next audit: dispatcher bounds before implementing strict complete-record parsing.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

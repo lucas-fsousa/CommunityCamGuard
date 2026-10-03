@@ -133,3 +133,27 @@ integrity or authentication and cannot detect a wrong key.
 with 76.4 MiB peak. No camera connection, runtime capability change, or
 deployment occurred. Remaining gates: real-record interoperability, strict
 type-specific unpacking, authenticated relay/session ownership and teardown.
+
+## Header-only RTC record: first unpacking checkpoint
+
+`packing_rtcfrm_header_only` (`0x17f3fc`, 196 bytes) writes type `0x81`,
+a ten-byte prefix, and a count at byte 9. It appends count ×20 bytes from
+the source payload after its first two bytes. The length at byte 4 comes
+from the source vector's byte count, not an independently recomputed count.
+Do not assign codec/stream meanings to these opaque twenty-byte entries yet.
+
+`unpacking_rtcfrm_avhead` (`0x17d7d4`, 852 bytes) checks at least ten ring
+bytes, copies the prefix, reads byte 9, then copies count twenty-byte entries.
+Its output payload starts with zero and count, followed by those entries.
+The output discriminator is 2, or 6 when the optional context's first byte
+equals `0x83` (`0x17d958–0x17d96c`). Those are SDK output discriminators,
+not proven video/audio codec identifiers.
+
+This function itself does not recheck the available ring size for the complete
+count before the entry loop. Caller-level validation remains to be traced;
+this observation alone is **not** proof of a reachable SDK vulnerability.
+A future local parser must validate the complete `10 + 20 * count` extent
+before reading or publishing entries, independently of caller assumptions.
+Length agreement with the enclosing record and the entry field meanings still
+need evidence. No speculative parser or capability was enabled. These two
+symbol-bounded disassemblies peaked at 27 MiB under a 128 MiB/no-swap cap.
