@@ -181,3 +181,28 @@ otherwise valid outer length, truncation, trailing data, forged huge lengths,
 mutable input and unsupported types. The dispatcher audit peaked at 27.3 MiB.
 Next: resolve the dispatch table and entry consumers before interpreting codecs;
 real-media interoperability and relay session gates remain pending.
+
+### Resolved dispatch table
+
+Read the eight 16-byte table entries at `0x2a1bd0`, resolving pointer slots
+through ELF `R_AARCH64_ABS64` relocations (symbol value plus addend, not the
+zero bytes stored in the unrelocated pointer slots):
+
+| RTC type | Handler address | SDK handler suffix |
+| --- | --- | --- |
+| 0x80 | 0x17d358 | avdata |
+| 0x81 | 0x17d7d4 | avhead |
+| 0x82 | 0x17db28 | usrdata |
+| 0x83 | 0x17d7d4 | avhead |
+| 0xf0 | 0x17dda8 | frag_begin |
+| 0xf1 | 0x17e1b0 | frag_data |
+| 0xf2 | 0x17e47c | frag_end |
+| 0xf3 | 0x17e878 | frag_error |
+
+This closes the earlier 0x83 routing uncertainty: the header parser now accepts
+both 0x81 and 0x83. Callers must retain the original record type because output
+discriminators 2/6 differ; a shared entry layout does not make them semantically
+interchangeable. The selective decryption helper still rejects 0xf0/0xf3:
+dispatch support is not proof of encryption handling. Fragment assembly remains
+unimplemented. Table inspection peaked at 20.2 MiB, with no network access.
+The first parser checkpoint passed 229 focused tests at 79.5 MiB/no swap.

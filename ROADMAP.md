@@ -55,6 +55,11 @@ does not cross-check the header entry count at dispatch. Added an offline strict
 type-0x81 parser requiring exact count/length agreement, preserving opaque entries.
 Next: dispatch table/entry consumer evidence; no production media capability
 enabled and no camera traffic. SD remains last priority.
+Dispatch table resolved via ELF symbol relocations: 0x81 and 0x83 both use
+avhead, with distinct SDK output discriminators. Offline header parsing now
+accepts both while retaining caller responsibility for the original type.
+Fragment handlers 0xf0..0xf3 are mapped, not implemented or enabled. Next:
+entry consumers/media semantics and bounded fragment ownership.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

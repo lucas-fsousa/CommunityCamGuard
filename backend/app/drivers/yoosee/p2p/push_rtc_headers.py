@@ -6,14 +6,16 @@ from .push_rtc import selective_rtc_cipher_span
 
 
 def parse_rtc_header_entries(frame: bytes) -> tuple[bytes, ...]:
-    """Return opaque twenty-byte entries from one complete type-0x81 record.
+    """Return opaque twenty-byte entries from one complete 0x81/0x83 record.
 
     Caller owns decryption and session provenance. This does not authenticate
-    contents or identify codecs/capabilities. Unknown prefix bytes are preserved
+    contents or identify codecs/capabilities. Caller retains the original type:
+    the SDK gives 0x81 and 0x83 distinct output discriminators despite sharing
+    this entry layout. Unknown prefix bytes are preserved
     in the caller's record, not assigned speculative meanings here.
     """
     selective_rtc_cipher_span(frame)
-    if struct.unpack_from("<H", frame)[0] != 0x81:
+    if struct.unpack_from("<H", frame)[0] not in (0x81, 0x83):
         raise ValueError("RTC header-only type is unsupported")
     if len(frame) < 10:
         raise ValueError("RTC header-only prefix is truncated")

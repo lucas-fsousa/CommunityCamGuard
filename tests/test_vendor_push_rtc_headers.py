@@ -13,9 +13,10 @@ def record(count, entries, *, kind=0x81):
 
 
 @pytest.mark.parametrize("count", [0, 1, 2, 255])
-def test_entries_remain_opaque_and_ordered(count):
+@pytest.mark.parametrize("kind", [0x81, 0x83])
+def test_entries_remain_opaque_and_ordered(count, kind):
     entries = tuple(bytes([index]) * 20 for index in range(count))
-    assert parse_rtc_header_entries(record(count, b"".join(entries))) == entries
+    assert parse_rtc_header_entries(record(count, b"".join(entries), kind=kind)) == entries
 
 
 @pytest.mark.parametrize("count,size", [(0, 20), (1, 0), (1, 19), (1, 21), (2, 20), (255, 0)])
@@ -24,7 +25,7 @@ def test_count_must_match_even_when_outer_length_is_valid(count, size):
         parse_rtc_header_entries(record(count, bytes(size)))
 
 
-@pytest.mark.parametrize("kind", [0x80, 0x82, 0x83, 0xF1, 0xF2, 0x99])
+@pytest.mark.parametrize("kind", [0x80, 0x82, 0xF0, 0xF1, 0xF2, 0xF3, 0x99])
 def test_other_kinds_not_inferred(kind):
     with pytest.raises(ValueError):
         parse_rtc_header_entries(record(1, bytes(20), kind=kind))
