@@ -24,15 +24,49 @@ means success” rule would therefore be wrong. These checks occur **after** SDK
 message dispatch; they do not replace route, command or pending-request correlation.
 Even a correlated application ACK is not proof of a physical playback effect.
 
+## Indirect caller and startup default (follow-up)
+
+The direct-call scan missed a virtual call, now resolved from ELF relocations:
+
+* `_ZTVN8iotvideo14PlaybackPlayerE` starts at `0x29fea8`. Relocations at
+  `0x29fed0` and `0x29fed8` reference the strategy setter/getter respectively.
+  Constructor `0x1537b8–0x1537c0` installs the primary vptr at table `+0x18`,
+  making the setter's virtual slot **+0x10** from that address point.
+* `PlaybackPlayer::play`, `0x155ec8`, loads the cached strategy from `+0x218`.
+  `0x155ecc` skips the call if zero. Otherwise `0x155ed0–0x155edc` invokes
+  that exact virtual slot, forwarding the cached value as `w1` and player as
+  `x0`. This follows `set_opt_conn_params` and precedes `BasePlayer::play`.
+* The constructor initializes `q0` to zero at `0x15379c`. At `0x1537e8` it
+  sets `x8 = this + 0x1f0`; `stur q0, [x8, #0x1d]` at `0x1537f4` clears
+  bytes `+0x20d..+0x21c`, including the complete four-byte strategy cache.
+  Thus a freshly constructed player has zero here without calling the setter.
+
+In the inspected `play` branch, connection state must compare greater than 4 and
+the connection-parameter buffer at `+0x50/+0x58` must be nonempty to reach this
+replay. The other state branch calls `BasePlayer::play` directly. Numeric state
+names are not established by this trace; it does not prove a complete network
+handshake or that every SDK entrypoint behaves identically.
+
+Consequences: the default startup path can omit command 25. Do not make a guessed
+strategy request a prerequisite for SD listing/playback, and do not send a zero
+payload just because the constructor uses zero locally. A nonzero requested value
+can be replayed by `play` even if its earlier command failed, because the setter
+caches before ACK. A future implementation must track requested/acknowledged
+state separately instead of copying that behavior blindly.
+
+The targeted indirect-call scan used 53.8 MiB peak without swap, under the same
+256 MiB/50%-CPU/40-second limits. No camera traffic or runtime changes occurred.
+
 ## Still blocked
 
 The Java BuiltIn command catalog establishes the name/number but not the strategy
-enum's values or meanings. A bounded direct B/BL cross-reference scan found no
-caller of this setter; virtual/indirect callers are not excluded. No value should
+enum's values or meanings. The direct B/BL scan found no caller, but the virtual
+startup replay above is now established. Its input is the cache, not a named enum
+constant, so it does not establish supported values or their meanings. No value should
 be guessed from speed presets, integer range or the setter's lack of validation.
 
-Next evidence needed: actual enum declaration or a traced indirect caller with
-known semantics, followed by response identity mapping and a reviewed camera-3
+Next evidence needed: actual enum declaration or a traced caller assigning a value
+with known semantics, followed by response identity mapping and a reviewed camera-3
 playback test once SD listing/transport works. Until then there is no strategy
 builder, live sender or feature advertisement. This does not unblock SD listing
 or native HD platform selection.

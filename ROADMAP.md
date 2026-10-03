@@ -97,8 +97,11 @@ Priority: **P0** critical · **P1** high · **P2** medium · **P3** opportunisti
 2026-10-03 offline SD follow-up: command 25's four-byte strategy body is confirmed
 in SDK 6.45; its getter returns requested local state, not a camera query. Reply
 success requires nonempty payload starting with 1 or 2, unlike the mapped video
-quality callback. Enum semantics and indirect caller remain unknown, so no live
-builder/control is exposed. See [strategy evidence](docs/internal/yoosee-playback-strategy.md).
+quality callback. Follow-up resolved the virtual startup caller: `play` replays
+only a nonzero cached strategy; the constructor initializes it to zero. Command
+25 is therefore not mandatory on the inspected default playback path. Enum
+semantics remain unknown; do not send a guessed strategy to unblock SD listing.
+No live builder/control is exposed. See [strategy evidence](docs/internal/yoosee-playback-strategy.md).
 Status: `todo` · `wip` · `done` · `blocked`.
 
 2026-09-30 recording metadata checkpoint: concurrent successful same-file codec

@@ -20,7 +20,8 @@ Docs are split by audience:
   single-use AV or platform-only collection; camera identity, cleanup and resource gates;
   camera-3 platform-only result remains unknown after successful metering/release.
 - **[Yoosee SD playback strategy](internal/yoosee-playback-strategy.md)** — command-25
-  layout, command-specific ACK semantics and requested-state cache caveat; enum still unknown.
+  layout, command-specific ACK semantics and conditional virtual startup replay;
+  zero-initialized cache does not require sending a strategy; enum still unknown.
 
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.
