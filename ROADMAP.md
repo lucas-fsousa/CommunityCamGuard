@@ -50,6 +50,11 @@ RTC header-only checkpoint: SDK type-0x81 packing/unpacking establishes a
 ten-byte prefix, byte-9 count and twenty-byte opaque entries. Caller-level
 length checks and entry semantics remain unverified; no decoder enabled.
 Next audit: dispatcher bounds before implementing strict complete-record parsing.
+Dispatcher follow-up: verified the SDK waits for declared body length +8, but
+does not cross-check the header entry count at dispatch. Added an offline strict
+type-0x81 parser requiring exact count/length agreement, preserving opaque entries.
+Next: dispatch table/entry consumer evidence; no production media capability
+enabled and no camera traffic. SD remains last priority.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

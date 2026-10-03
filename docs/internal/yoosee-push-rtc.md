@@ -157,3 +157,27 @@ before reading or publishing entries, independently of caller assumptions.
 Length agreement with the enclosing record and the entry field meanings still
 need evidence. No speculative parser or capability was enabled. These two
 symbol-bounded disassemblies peaked at 27 MiB under a 128 MiB/no-swap cap.
+
+## Dispatcher bounds and strict header entry parser
+
+`trans_proto_v2::unpacking_data` (`0x17ce10`, 1352 bytes) peeks eight
+bytes, checks `(type & 0xff80) == 0x80` (`0x17cf0c–0x17cf18`), rejects
+zero body length and waits for `u32(body_length) + 8` ring bytes before
+dispatch (`0x17cf1c–0x17cf38`). The addition is performed in a 64-bit
+register. At `0x17d144–0x17d160`, types 0x81/0x83 receive the optional
+type context. This validates declared outer availability, **not** agreement
+between that length and the header entry count read by the callee.
+
+Added offline `push_rtc_headers.parse_rtc_header_entries`, accepting only a
+complete decrypted type-0x81 record. It reuses bounded outer length checking
+and requires exact `len(frame) == 10 + 20 * frame[9]` before returning an
+immutable tuple of opaque entries. Zero through 255 entries are structurally
+representable; this does not certify their media semantics. Type 0x83 is
+deliberately not accepted until its dispatch mapping is independently checked.
+No byte-scanning recovery, network, codec inference or production wiring.
+
+Regression coverage includes zero/one/two/255 entries, mismatched count with
+otherwise valid outer length, truncation, trailing data, forged huge lengths,
+mutable input and unsupported types. The dispatcher audit peaked at 27.3 MiB.
+Next: resolve the dispatch table and entry consumers before interpreting codecs;
+real-media interoperability and relay session gates remain pending.
