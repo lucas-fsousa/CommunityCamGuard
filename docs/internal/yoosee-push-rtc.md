@@ -235,3 +235,19 @@ and output discriminator names still require consumer evidence. The handler's
 subframe checks use remaining ring bytes, not an explicit per-record slice;
 our future payload parser must never read into a subsequent RTC record.
 Symbol-only analysis peaked at 27.2 MiB under a 128 MiB/no-swap cap.
+
+### Offline AV subframe parsing
+
+`push_rtc_av.parse_rtc_av_units` now implements the two observed branches for
+one complete plaintext type-0x80 record, capped locally at 256 KiB. It preserves
+the SDK discriminator, raw u64 clock arithmetic (including wrap), raw flag,
+byte +10 minus one and byte +12, without naming codecs/channels/time units.
+Payloads are excluded from dataclass representations. Group count is the low
+nibble (maximum 15); bit 0 takes precedence when bits 0 and 1 are both set.
+
+Unlike the SDK ring access, each subframe prefix/length must remain within this
+record, and grouped parsing must consume it exactly. Empty groups and unknown
+branches are rejected. Zero-byte individual payloads remain structurally allowed,
+not homologated media. No partial units escape if a later unit is truncated.
+Single/grouped vectors, clock wrap, malformed inputs, maximum record and count
+boundaries are synthetic checks, not real media interoperability.

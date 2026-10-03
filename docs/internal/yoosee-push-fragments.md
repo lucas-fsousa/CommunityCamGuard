@@ -94,3 +94,5 @@ callback can publish an earlier record before the final validation succeeds.
 Synthetic tests cover mixed types, 256 KiB and 256-record boundaries, forged
 lengths, nested fragments, partial tails, and fragment assembly split inside
 inner headers/payloads. This remains offline, without production callers.
+The inner-boundary checkpoint passed 292 focused tests with 77 MiB peak/no swap
+under a 256 MiB/50%-CPU cap; Ruff and GitHub CI passed.

@@ -75,6 +75,10 @@ records), rejecting nested fragments and incomplete tails while allowing large
 reassembled AV records. Mapped AV single/grouped payload branches and raw
 metadata offsets; codec names/time units remain unverified. Next: bounded AV
 subframe parsing and consumer evidence. No runtime camera capability changed.
+AV parsing checkpoint: offline single/grouped subframes now have per-record
+bounds, atomic return and raw SDK metadata preservation. Nested/inner record
+validation remains separate from AV parsing; no recursive production path added.
+Next: trace consumers to identify codecs/time units, then real-media fixtures.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
