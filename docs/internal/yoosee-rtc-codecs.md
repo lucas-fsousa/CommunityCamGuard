@@ -93,3 +93,45 @@ Next bounded targets: factory `0x27afac` (184 bytes), common `on_rcv_pkt`
 `0x2805d4` (3144 bytes), `get_packet` `0x283dac` (1400 bytes), and video
 receiver `0x27c72c` (1468 bytes). Do not copy unchecked 32-bit duration
 multiplication or fallback into production. No new timing conversion enabled.
+
+### Common packet storage and queue output inspected
+
+`StreamingIO::on_rcv_pkt` (`0x2805d4`, 3144 bytes) saves incoming x4
+(PTS) in x20 at `0x280608`, allocates via `av_packet_alloc`/`av_new_packet`,
+and copies the payload. At `0x280658` it stores that same value at packet
++8 and +16 (the PTS/DTS pair); duration x6 is saved in x28 and written
+at +0x40 at `0x28065c`. No timestamp rescaling occurs at these stores.
+The queue stores the allocated packet pointer at entry +8, alongside two
+32-bit generation counters (`0x280898–0x2808a0`, growth path
+`0x280934–0x280940`). These counters are not packet timestamp fields.
+
+`get_packet` (`0x283dac`, 1400 bytes) loads the queue entry at `0x2840a4`
+into x26/x25, removes that entry and returns the same pair through `ResPkt`
+at `0x28410c`. The packet pointer is not replaced or its timestamps rescaled
+on this successful dequeue path. Generation changes and not-ready/flush cases
+have separate branches; do not interpret every return as a media packet.
+Listener callbacks after dequeue remain outside this limited proof.
+
+This narrows the missing timing proof to the concrete interface bindings and
+downstream time-base consumer. It does **not** turn `pts_raw` into a Unix
+timestamp, prove wall-clock synchronization, or authorize a conversion in the
+driver. Static inspection peaked at 33.6 MiB with no swap under the same
+128 MiB/50%-CPU cap; no device traffic or runtime changes.
+
+### Receiver demuxer names (not capability evidence)
+
+`get_ff_avfmt` (`0x27e634`, 888 bytes) chooses a string and passes it to
+`av_find_input_format` at `0x27e92c`. Its audio branches explicitly select:
+
+| Audio SDK code | Input-format string | Evidence address |
+| --- | --- | --- |
+| 3 | `g726` | `0x27e898` |
+| 4 | `aac` | `0x27e83c` |
+| 5 | `amr` | `0x27e87c` |
+| 6 | `adpcm_adx` | `0x27e8a4` |
+| 7 | `opus` | `0x27e860` |
+
+Codes 1/2 leave the string empty on this path. Video uses a relative string
+table at `0x1030ec`, not yet decoded here. These are **input-format selectors**,
+not a substitute for verifying decoder descriptors, bitstream framing or actual
+camera support. Keep unknown codec names unknown in production.

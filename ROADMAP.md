@@ -96,8 +96,11 @@ or capability inference. PTS remains raw: capture-input 1/1000000 configuration
 is not yet receive-side timing evidence. Next: receiver packet path and fixtures.
 Receive timing follow-up: located BasePlayer's IStreamingIO factory and audio
 receiver; audio duration uses sample_count * 1000000 / sample_rate while PTS
-passes unchanged at this hop. Common packet storage/output and vtable binding
-remain to verify before enabling timestamp conversion; targets documented.
+passes unchanged at this hop. Common packet allocation and successful queue
+output now traced: the raw PTS is stored unchanged and the same packet pointer
+is returned. Concrete vtable binding/downstream time base remain to verify
+before timestamp conversion. Audio demuxer selectors 3–7 recovered separately;
+not decoder/camera-support proof. Bounded static inspection: 33.6 MiB/no swap.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
