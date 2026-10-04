@@ -191,6 +191,6 @@ def test_failed_heartbeat_closes_instead_of_claiming_readiness(pool, monkeypatch
     def fail():
         raise OSError("offline")
     monkeypatch.setattr(route, "keepalive", fail)
-    with pytest.raises(OSError):
+    with pytest.raises(ptz_cache.PtzKeepaliveError):
         cache.warm(("camera",), state.prepare)
     assert not cache._idle and route.closed == 1

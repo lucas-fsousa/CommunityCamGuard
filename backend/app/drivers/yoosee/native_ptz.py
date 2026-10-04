@@ -54,6 +54,18 @@ def warm(camera: Camera, profile: PtzProfile) -> bool:
                 budget=12, reviewed_directions=profile.directions))
 
         return run_with_fresh_access(entry, prepare)
+    except Exception as exc:
+        # Fixed labels only: never emit vendor replies, tokens or arbitrary errors.
+        reason = {
+            "native PTZ model profile is not supported": "unsupported_model",
+            "native PTZ direction lacks current axis evidence": "unsupported_axis",
+            "native PTZ identity does not match reviewed evidence": "identity_mismatch",
+            "native PTZ correlated preflight read failed": "identity_read_failed",
+            "selected P2P camera is not online": "offline",
+            "PTZ broker liveness check failed": "broker_keepalive",
+        }.get(str(exc), "transport_or_auth")
+        log.warning("native_ptz warm_failed camera=%s reason=%s", camera.camera_id, reason)
+        raise
     finally:
         with _guard:
             _warming.pop(camera.camera_id, None)

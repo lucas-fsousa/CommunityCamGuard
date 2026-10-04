@@ -10,6 +10,10 @@ from .contracts import P2PProbeError
 from .ptz_route import NativePtzRoute
 
 
+class PtzKeepaliveError(P2PProbeError):
+    """A cached broker route failed its read-only liveness check."""
+
+
 @dataclass
 class _Idle:
     route: NativePtzRoute
@@ -44,8 +48,10 @@ class PtzRouteCache:
             if now < idle.expires and now - idle.created < 15:
                 try:
                     idle.route.keepalive()
-                except BaseException:
+                except BaseException as exc:
                     idle.route.close()
+                    if isinstance(exc, Exception):
+                        raise PtzKeepaliveError("PTZ broker liveness check failed") from exc
                     raise
                 lease = CachedPtzRoute(self, key, idle.route, idle.created, True)
                 return self._return(lease, prepared=True)
