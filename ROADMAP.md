@@ -84,6 +84,11 @@ labels PTS/key-frame/sequence fields. Added semantic read-only properties while
 retaining raw values; no time-base/codec guessing. Header entries split into
 video/audio formats with distinct indexing; format field enums remain pending.
 309 focused tests pass (93.9 MiB peak/no swap). No runtime capability changes.
+Codec-map checkpoint: recovered all seven audio/five video SDK-to-AVCodecID
+pairs from libgwplayer's map initializer, with explicit media kind and unknown
+values preserved as unknown. No decoder selection or capability inference.
+Next: pinned codec names, descriptor field mapping and PTS units.
+[Evidence](docs/internal/yoosee-rtc-codecs.md).
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local

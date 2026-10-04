@@ -11,6 +11,7 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 Native relay RE (offline, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).
+See also [pinned SDK codec enum translation](yoosee-rtc-codecs.md).
 
 | ADR | Decision |
 |---|---|
