@@ -89,6 +89,11 @@ pairs from libgwplayer's map initializer, with explicit media kind and unknown
 values preserved as unknown. No decoder selection or capability inference.
 Next: pinned codec names, descriptor field mapping and PTS units.
 [Evidence](docs/internal/yoosee-rtc-codecs.md).
+Descriptor checkpoint (2026-10-04): offline video width/height/FPS/codec and
+audio channels/bit-width/sample-rate/frame-size/codec fields are now parsed
+from consumer-confirmed offsets. 350 focused tests pass. No SDK silent defaults
+or capability inference. PTS remains raw: capture-input 1/1000000 configuration
+is not yet receive-side timing evidence. Next: receiver packet path and fixtures.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
