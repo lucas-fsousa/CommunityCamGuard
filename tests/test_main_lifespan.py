@@ -40,6 +40,7 @@ def _patch_services(monkeypatch, events):
     monkeypatch.setattr(main, "StorageMonitor", _fake_service("storage", events))
     monkeypatch.setattr(main, "RetentionCleaner", _fake_service("retention", events))
     monkeypatch.setattr(main, "Warmer", _fake_service("warmer", events))
+    monkeypatch.setattr(main, "ControlSessions", _fake_service("controls", events))
 
 
 def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
@@ -52,11 +53,23 @@ def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
         pass                                       # enter + exit the lifespan
     # started (owned go2rtc -> start, then recorder/storage/retention/warmer)
     assert "media.start" in events
-    for svc in ("rec", "storage", "retention", "warmer"):
+    for svc in ("rec", "storage", "retention", "warmer", "controls"):
         assert f"{svc}.start" in events
     # cleanly stopped on shutdown
-    for svc in ("warmer", "retention", "storage", "rec", "media"):
+    for svc in ("controls", "warmer", "retention", "storage", "rec", "media"):
         assert f"{svc}.stop" in events
+    config.get_settings.cache_clear()
+
+
+def test_control_session_warmup_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("AUTOSTART_SERVICES", "true")
+    monkeypatch.setenv("CONTROL_SESSION_WARMUP", "false")
+    config.get_settings.cache_clear()
+    events = []
+    _patch_services(monkeypatch, events)
+    with TestClient(main.app):
+        pass
+    assert "controls.start" not in events and "controls.stop" in events
     config.get_settings.cache_clear()
 
 

@@ -107,6 +107,25 @@ def test_non_stale_rejection_is_not_refreshed(monkeypatch):
         )
 
 
+def test_another_cameras_account_refresh_is_adopted_without_login(monkeypatch):
+    old = _enrollment(bytes(range(64)))
+    fresh = _enrollment(bytes(reversed(range(64))))
+    monkeypatch.setattr(renewal.p2p, "get_enrollment", lambda _: old)
+    monkeypatch.setattr(renewal.account_store, "get_account",
+                        lambda: SimpleNamespace(session=_session(fresh.access_token)))
+    monkeypatch.setattr(renewal, "refresh_account_session",
+                        lambda _: pytest.fail("second account refresh"))
+    monkeypatch.setattr(renewal.p2p, "upsert_enrollment", lambda *a, **kw: fresh)
+    calls = []
+    def operation(entry):
+        calls.append(entry)
+        if entry is old:
+            raise InitInfoRejectedError(0x216B)
+        return "ok"
+    assert renewal.run_with_fresh_access(old, operation) == "ok"
+    assert calls == [old, fresh]
+
+
 def test_stuck_device_session_lock_fails_with_a_bounded_error(monkeypatch):
     enrollment = _enrollment(bytes(range(64)))
     lock = renewal._session_lock(enrollment.device_id)

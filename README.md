@@ -40,6 +40,13 @@ Verified: **Yoosee / generic HiSilicon** (ONVIF PTZ plus typed P2P controls). Sh
 drivers: XiongMai / XMEye, Dahua- and Hikvision-style, plus a generic fallback. See
 `CONTRIBUTING.md`; contributions for specific models are very welcome.
 
+Enrolled, PTZ-capable Yoosee cameras get read-only control-session preparation in
+the background, reducing cold-click setup latency without moving the camera.
+One worker maintains at most four idle PTZ routes, with bounded lifetimes and
+failure backoff. Set `CONTROL_SESSION_WARMUP=false` and restart the app to disable
+the periodic broker traffic. Account credentials remain server-side; other control
+transports are not yet pooled. See [session lifecycle](docs/internal/ptz-credential-renewal.md).
+
 ## Why it exists
 
 Cheap IP cameras usually speak **ONVIF + RTSP** on the LAN, but their official apps lock you

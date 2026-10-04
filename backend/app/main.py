@@ -50,6 +50,7 @@ from .recording.recorder import Recorder
 from .recording.retention import RetentionCleaner
 from .recording.storage import StorageMonitor
 from .services.address_recovery import AddressRecovery
+from .services.control_sessions import ControlSessions
 from .validation_errors import invalid_request
 
 
@@ -67,12 +68,14 @@ async def lifespan(app: FastAPI):
     retention = RetentionCleaner()
     warmer = Warmer()
     address_recovery = AddressRecovery(media, rec)
+    control_sessions = ControlSessions()
     app.state.media = media
     app.state.rec = rec
     app.state.storage = storage
     app.state.retention = retention
     app.state.warmer = warmer
     app.state.address_recovery = address_recovery
+    app.state.control_sessions = control_sessions
     app.state.startup_error = None
 
     if settings.autostart_services:
@@ -95,10 +98,13 @@ async def lifespan(app: FastAPI):
         except Exception as exc:  # missing binary, etc. — keep the API usable
             app.state.startup_error = str(exc)
         address_recovery.start()
+        if settings.control_session_warmup:
+            control_sessions.start()
 
     try:
         yield
     finally:
+        control_sessions.stop()
         address_recovery.stop()
         warmer.stop()
         retention.stop()

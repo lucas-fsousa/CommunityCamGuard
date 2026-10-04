@@ -18,6 +18,8 @@ class Route:
         return Route()
     def send_start(self):
         pass
+    def keepalive(self):
+        pass
     def send_release(self):
         pass
     def confirm_release(self, **kwargs):
@@ -90,6 +92,7 @@ def test_changed_credentials_do_not_reuse_and_idle_timer_closes(pool):
     second = cache.acquire(("camera", "new"), state.prepare)
     assert not second.reused
     timer = state.timers[0]
+    state.now = 8
     timer.callback(*timer.args)
     assert first.route.closed == 1
     second.close()
@@ -146,3 +149,48 @@ def test_old_timer_cannot_close_renewed_socket_owner(pool):
     assert second.route.closed == 0
     with pytest.raises(RuntimeError):
         second.send_release()
+
+
+def test_warm_route_is_used_without_second_preparation(pool):
+    cache, state = pool
+    assert cache.warm(("camera",), state.prepare)
+    lease = cache.acquire(("camera",), state.prepare, direction="up")
+    assert lease.reused and state.prepares == 1
+    lease.close()
+
+
+def test_warming_refreshes_idle_but_not_absolute_lifetime(pool):
+    cache, state = pool
+    for now in (0, 3, 6, 9, 12):
+        state.now = now
+        assert cache.warm(("camera",), state.prepare)
+    assert state.prepares == 1
+    old = state.timers[0]
+    old.callback(*old.args)  # cancelled timer racing with extension of same route
+    assert cache._idle[("camera",)].route.closed == 0
+    state.now = 15
+    cache.warm(("camera",), state.prepare)
+    assert state.prepares == 2
+    cache.close_idle()
+    assert not cache._idle
+
+
+def test_warm_capacity_does_not_prepare_discarded_connections(pool):
+    cache, state = pool
+    for index in range(4):
+        assert cache.warm((index,), state.prepare)
+    assert not cache.warm((4,), state.prepare)
+    assert state.prepares == 4
+    cache.close_idle()
+
+
+def test_failed_heartbeat_closes_instead_of_claiming_readiness(pool, monkeypatch):
+    cache, state = pool
+    cache.warm(("camera",), state.prepare)
+    route = cache._idle[("camera",)].route
+    def fail():
+        raise OSError("offline")
+    monkeypatch.setattr(route, "keepalive", fail)
+    with pytest.raises(OSError):
+        cache.warm(("camera",), state.prepare)
+    assert not cache._idle and route.closed == 1

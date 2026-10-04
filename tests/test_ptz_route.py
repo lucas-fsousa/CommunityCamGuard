@@ -110,8 +110,6 @@ def test_release_only_prevents_later_start(prepared):
 
 def test_renew_transfers_socket_with_new_motion_identity(prepared):
     route, sock = prepared
-    with pytest.raises(RuntimeError):
-        route.renew()
     route.send_release()
     sock.incoming.extend((packet(ack=True), packet(kind=0xBA)))
     assert route.confirm_release(deadline=101)
@@ -125,6 +123,46 @@ def test_renew_transfers_socket_with_new_motion_identity(prepared):
     assert struct.unpack_from("<I", plain, 0x38)[0] == 203
     fresh.close()
     assert sock.closed == 1
+
+
+def test_pristine_preparation_transfers_without_sending_any_command(prepared):
+    route, sock = prepared
+    fresh = route.renew()
+    route.close()
+    assert fresh._sock is sock and sock.closed == 0 and not sock.sent
+    fresh.close()
+    assert sock.closed == 1
+
+
+def test_started_unconfirmed_route_cannot_be_warmed_or_renewed(prepared):
+    route, _ = prepared
+    route.send_start()
+    with pytest.raises(RuntimeError):
+        route.renew()
+    with pytest.raises(RuntimeError):
+        route.keepalive()
+    route.send_release()
+    with pytest.raises(RuntimeError):
+        route.renew()
+
+
+def test_keepalive_reserves_sequence_without_actuating_camera(prepared, monkeypatch):
+    from dataclasses import replace
+
+    route, sock = prepared
+    seen = []
+    def heartbeat(socket, node, timeout):
+        assert socket is sock and timeout == 0.75
+        seen.append(node.next_sequence)
+        return replace(node, next_sequence=node.next_sequence + 1)
+    monkeypatch.setattr(ptz_route, "heartbeat_node", heartbeat)
+    route.keepalive()
+    route.keepalive()
+    assert seen == [20, 21] and route._receipt_sequence == 22
+    assert not sock.sent
+    fresh = route.renew()
+    assert fresh._receipt_sequence == 24
+    fresh.close()
 
 
 def test_renew_cannot_grant_unverified_direction(prepared):

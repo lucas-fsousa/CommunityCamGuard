@@ -21,6 +21,46 @@ log = logging.getLogger(__name__)
 _guard = threading.Lock()
 _active: dict[str, PtzMotion] = {}
 _routes = PtzRouteCache()
+_warming: dict[str, threading.Event] = {}
+
+
+def close_idle() -> None:
+    """Called after the maintenance worker stops; active gestures retain ownership."""
+    _routes.close_idle()
+
+
+def warm(camera: Camera, profile: PtzProfile) -> bool:
+    """Prepare authenticated control state with correlated reads only; no motion."""
+    with _guard:
+        if camera.camera_id in _active or camera.camera_id in _warming:
+            return False
+        done = threading.Event()
+        _warming[camera.camera_id] = done
+    started = time.monotonic()
+    try:
+        entry = p2p.get_enrollment_for_camera(camera.camera_id)
+        if entry is None or not profile.directions:
+            return False
+        direction = "right" if "right" in profile.directions else sorted(profile.directions)[0]
+
+        def prepare(current: P2PEnrollment) -> bool:
+            if (current.camera_id != camera.camera_id or current.device_id != entry.device_id
+                    or (profile.identity is not None and current.device_id != profile.identity.device_id)):
+                raise ControlNotReady("native PTZ renewed enrollment requires review")
+            key = (camera.camera_id, profile.identity, profile.directions,
+                   current.access_id, current.access_token, current.dev_token)
+            return _routes.warm(key, lambda: prepare_ptz_route(
+                current, profile.identity, camera_id=camera.camera_id, direction=direction,
+                budget=12, reviewed_directions=profile.directions))
+
+        return run_with_fresh_access(entry, prepare)
+    finally:
+        with _guard:
+            _warming.pop(camera.camera_id, None)
+            done.set()
+        elapsed = int((time.monotonic() - started) * 1000)
+        if elapsed >= 100:
+            log.info("native_ptz warm_prepare_ms=%d", elapsed)
 
 
 def stop(camera_id: str) -> bool:
@@ -39,7 +79,12 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
         if camera.camera_id in _active or len(_active) >= 4:
             raise ControlNotReady("another PTZ operation is running; do not queue movements")
         _active[camera.camera_id] = motion
+        warming = _warming.get(camera.camera_id)
     try:
+        # Join an already running read-only preparation, never open a duplicate
+        # session or reject the user's first click just because warming is active.
+        if warming is not None and not warming.wait(15):
+            raise ControlNotReady("native PTZ preparation is still running")
         entry = p2p.get_enrollment_for_camera(camera.camera_id)
         if entry is None or (profile.identity is not None and entry.device_id != profile.identity.device_id):
             raise ControlNotReady("native PTZ enrollment requires review")

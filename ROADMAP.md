@@ -4,6 +4,16 @@ User priority override (2026-10-03): camera-card/SD work is the **last priority*
 Do not resume its enum/listing investigation while native live-streaming work is
 available. Current focus: native relay/platform provenance and safe HD preparation.
 
+2026-10-04 PTZ latency priority: implemented optional driver-owned background
+preparation (one worker, four idle routes, broker-only heartbeats, fresh preparation
+at 15s without extending the 20s absolute limit). First clicks join in-progress
+preparation; no motion is sent/replayed by maintenance. Shared account renewal now
+adopts another camera's refreshed token before issuing another cloud refresh.
+148 focused tests pass. Camera-3 read-only check: cold setup 2762 ms, broker
+keepalive 38 ms, cached handoff 1 ms; no movement sent. Pending: physical first-click latency verification,
+authoritative credential TTL/longer route lifetime and session pooling for other
+control transports. See [lifecycle](docs/internal/ptz-credential-renewal.md).
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

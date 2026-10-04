@@ -47,8 +47,13 @@ def _run_with_renewal(
                     "P2P session expired and no renewable vendor account is configured"
                 )
             try:
-                session = refresh_account_session(stored.session)
-                account_store.update_session(session)
+                # Another camera may have renewed the shared account, while this
+                # enrollment still contains its old token. Adopt it before doing
+                # another cloud login that could invalidate other ready sessions.
+                session = stored.session
+                if session.access_token == enrollment.access_token:
+                    session = refresh_account_session(session)
+                    account_store.update_session(session)
                 current = p2p.upsert_enrollment(
                     current.device_id,
                     access_id=session.p2p_access_id,

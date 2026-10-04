@@ -18,7 +18,7 @@
       "fields": [
         "dashboard_secret_key", "session_signing_key", "dashboard_public_origin",
         "dashboard_allow_local_origin", "host", "port",
-        "autostart_services", "manage_go2rtc", "db_path", "recordings_dir",
+        "autostart_services", "control_session_warmup", "manage_go2rtc", "db_path", "recordings_dir",
         "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
         "native_av_diagnostic_platform_only",

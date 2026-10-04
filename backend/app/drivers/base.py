@@ -118,6 +118,12 @@ class CameraDriver:
     rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
     transport: str = "auto"  # media-layer hint: auto | tcp | udp
 
+    def maintain_control_session(self, camera: Camera) -> None:
+        """Optional read-only, bounded session preparation. Never actuate hardware."""
+
+    def close_control_sessions(self) -> None:
+        """Release idle control sessions after the maintenance worker stops."""
+
     def unavailable_control(self, camera: Camera, key: str) -> None:
         """Explain an absent descriptor; never authorize it or perform camera I/O.
 

@@ -1,7 +1,7 @@
 """Prepared native PTZ UDP route; no discovery, login, reconnect or fallback.
 
 The caller must reserve the camera and validate exact identity/axis/profile BEFORE
-constructing this adapter. Not registered as a production driver transport yet.
+constructing this adapter. Driver selection never bypasses those checks.
 """
 from __future__ import annotations
 
@@ -9,8 +9,10 @@ import secrets
 import select
 import socket
 import time
+from dataclasses import replace
 from typing import TypedDict
 
+from .access_session import heartbeat_node
 from .contracts import CertifiedNode
 from .ptz_protocol import build_ptz_receipt, build_ptz_request, parse_ptz_reply
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame
@@ -107,9 +109,23 @@ class NativePtzRoute:
         # A later explicit error in this observation window beats earlier receipts/success.
         return not self._error and (self._application or (self._transport and self._peer))
 
+    def keepalive(self) -> None:
+        """Confirm broker liveness only; never send a camera motion/STOP request."""
+        pristine = not self._started and not self._released
+        if self._closed or self._error or (not pristine and not self._confirmed):
+            raise RuntimeError("cannot maintain an uncertain PTZ route")
+        node = replace(self._node, next_sequence=self._receipt_sequence)
+        # Reserve before sending, including ambiguous failure paths.
+        self._receipt_sequence = (self._receipt_sequence + 1) & 0xFFFFFFFF
+        try:
+            self._node = heartbeat_node(self._sock, node, 0.75)
+        finally:
+            self._sock.setblocking(False)
+
     def renew(self, direction: str | None = None) -> NativePtzRoute:
-        """Transfer one clean stopped socket to fresh request IDs and sequences."""
-        if self._closed or not self._released or not self._confirmed or self._error:
+        """Transfer a pristine or confirmed-stopped socket, never an uncertain motion."""
+        pristine = not self._started and not self._released
+        if self._closed or self._error or (not pristine and (not self._released or not self._confirmed)):
             raise RuntimeError("only a confirmed stopped PTZ route can be renewed")
         direction = self._direction if direction is None else direction
         if direction not in self._allowed_directions:

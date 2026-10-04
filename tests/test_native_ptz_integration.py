@@ -55,6 +55,52 @@ def test_success_does_not_fallback(prepared):
     assert (prepared.runs, prepared.fallback) == (1, 0)
 
 
+def test_warm_prepares_without_motion_and_cleans_reservation(prepared, monkeypatch):
+    keys = []
+    def warm(key, prepare):
+        keys.append(key)
+        prepare()
+        return True
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(warm=warm))
+    assert native_ptz.warm(CAMERA, PROFILE)
+    assert prepared.prepared == 1 and prepared.runs == 0 and prepared.fallback == 0
+    assert keys[0][-3:] == (1, b"test", "test-device")
+    assert not native_ptz._warming
+
+
+def test_warm_skips_active_gesture(prepared):
+    native_ptz._active[CAMERA.camera_id] = SimpleNamespace()
+    try:
+        assert not native_ptz.warm(CAMERA, PROFILE)
+        assert prepared.prepared == 0
+    finally:
+        native_ptz._active.clear()
+
+
+def test_click_joins_background_preparation_without_moving_early(prepared):
+    waited = []
+    def wait(timeout):
+        assert prepared.runs == 0
+        waited.append(timeout)
+        return True
+    native_ptz._warming[CAMERA.camera_id] = SimpleNamespace(wait=wait)
+    try:
+        assert native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+        assert waited == [15] and prepared.runs == 1
+    finally:
+        native_ptz._warming.clear()
+
+
+def test_warm_failure_clears_reservation_and_does_not_fallback(prepared, monkeypatch):
+    def fail(*args):
+        raise P2PProbeError("test")
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(warm=fail))
+    with pytest.raises(P2PProbeError):
+        native_ptz.warm(CAMERA, PROFILE)
+    assert not native_ptz._warming
+    assert prepared.runs == prepared.fallback == 0
+
+
 def test_enrolled_camera_selects_driver_preflight_without_rollout_row(prepared):
     profile = native_ptz_policy.selected(CAMERA.camera_id)
     assert profile.identity is None
