@@ -147,7 +147,7 @@ def test_camera_operations_address_api_by_opaque_id():
     live = (Path(__file__).parents[1] / "frontend" / "modules" / "live-cameras.js").read_text()
     panel = (Path(__file__).parents[1] / "frontend" / "modules" / "camera-controls.js").read_text()
     ptz = (Path(__file__).parents[1] / "frontend" / "modules" / "step-ptz.js").read_text()
-    assert 'if (caps.ptz && allowed("ptz")) actions.append(ptzControls(cam))' in live
+    assert 'if (caps.ptz && allowed("ptz")) actions.append(el("span", { className: "ptz-slot" }, ptzControls(cam)))' in live
     assert "extras.movement" not in panel
     assert '"panel.movement"' not in panel
 

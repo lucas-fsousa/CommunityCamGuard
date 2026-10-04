@@ -216,3 +216,26 @@ its original start time and neither container reported OOM. The image passed an 
 network-disabled import/OpenAPI smoke check before deployment. Validation: 1,384 tests under
 the Python address-space bound plus the separate 64 MiB Node DOM harness, Ruff and mypy
 (159 source files). Native PTZ ownership/route modules are included but remain unregistered.
+
+## Mobile live-view layout regression
+
+The overlay DPAD grew on touch devices while mobile grid rows were constrained
+to a short viewport fraction. Tile overflow clipped controls; wrapping actions
+also reduced usable video height. Reproduced with an isolated 360px browser.
+
+At widths up to 760px, PTZ now occupies its own centered row below the video,
+outside the controls modal. Grid tracks use max-content and override inline row
+sizing; videos retain 16:9 and do not flex-shrink. Single view scrolls its player
+area, with an auto-height selected tile. Touch targets are at least 44px. Desktop
+retains its overlay layout; permission and driver capability checks are unchanged.
+
+`scripts/check_recording_browser.py --live-layout` serves a synthetic three-camera
+fixture using the real stylesheet and DPAD module, without streams or API calls.
+Checks cover clipping, horizontal overflow, touch targets and grid/single layout.
+Browser checks passed at 320, 360, 740 and 1280px; inspected the 360px screenshot.
+All runs were sequential under 512 MiB/no-swap/one-core caps, with browsers stopped
+after each run. This does not replace physical-phone or full-dashboard validation.
+
+The running container bind-mounts frontend assets; verified the updated CSS is
+served at localhost:3200 without rebuilding/restarting streams. Reload the page
+to load the new content-derived asset version.

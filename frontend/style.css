@@ -233,6 +233,7 @@ header {
 /* Action cluster + inline PTZ arrows (all one row, right-aligned). */
 .bar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
   flex-wrap: wrap; max-width: 100%; justify-content: flex-end; }
+.ptz-slot { display: contents; }
 .bar { flex-wrap: wrap; }
 .ptz-inline { display: inline-flex; align-items: center; gap: 3px; padding-right: 6px;
   border-right: 1px solid var(--line); }
@@ -464,10 +465,25 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   #stage { padding: 8px; }
 
   /* Grid: one column, each camera a comfortable height, scroll the rest. */
-  #stage.grid #players { grid-template-columns: 1fr !important; grid-auto-rows: minmax(210px, 46vh) !important; }
+  #stage.grid #players { grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important; grid-auto-rows: max-content !important; align-content: start; }
+  .cam { min-width: 0; }
+  .cam .frame { flex: none; height: auto; aspect-ratio: 16 / 9; }
+  .bar { min-width: 0; }
+  .bar .name { flex: 1 1 120px; }
+  .bar-spacer { display: none; }
+  .bar-actions { flex: 1 1 100%; width: 100%; min-width: 0; justify-content: center; }
+  .ptz-slot { display: flex; flex: 0 0 100%; justify-content: center; }
+  .ptz-pad { position: relative; left: auto; bottom: auto; margin: 4px 0;
+    grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); }
+  .ptz-pad button { min-width: 44px; min-height: 44px; padding: 0; }
+  .bar-actions .icon-btn, .bar-actions .quality-select { min-width: 44px; min-height: 44px; }
+  .quality-select { max-width: 100%; }
 
   /* Single: rail becomes a horizontal strip above the large player. */
   #stage.single { flex-direction: column; }
+  #stage.single #players { height: auto; min-height: 0; overflow-y: auto; }
+  #stage.single #players .cam.selected { height: auto; }
   #rail { flex: 0 0 auto; flex-direction: row; overflow-x: auto; overflow-y: hidden;
     gap: 6px; padding: 0 0 6px; }
   .rail-item { flex: 0 0 auto; }

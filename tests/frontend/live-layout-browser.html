@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js"}}</script>
+<div id="dash"><header>Monitoramento — layout isolado</header><main id="stage" class="grid"><div id="players"></div></main></div>
+<script type="module">
+import {el} from '/core.js';
+import {finitePtzControls} from '/step-ptz.js';
+const check = (ok, message) => {if (!ok) throw new Error(message);};
+const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
+let requests = 0;
+window.fetch = async () => {requests++; throw new Error('No camera traffic allowed');};
+try {
+  const players = document.querySelector('#players');
+  players.style.gridTemplateRows = 'repeat(2, 1fr)';
+  players.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+  for (let i = 0; i < 3; i++) {
+    const pad = finitePtzControls({id: `synthetic-${i}`});
+    const actions = el('span', {className: 'bar-actions'}, el('span', {className: 'ptz-slot'}, pad),
+      el('select', {className: 'quality-select'}, el('option', {textContent: 'Qualidade máxima'})),
+      ...['−', '+', '↻', '⚙'].map(textContent => el('button', {className: 'icon-btn', textContent})));
+    players.append(el('section', {className: 'cam selected'},
+      el('div', {className: 'frame', textContent: 'Vídeo sintético — sem streaming'}),
+      el('div', {className: 'bar'}, el('span', {className: 'camera-status online'}),
+        el('span', {className: 'name', textContent: 'Câmera com nome bastante longo para testar telas pequenas'}),
+        el('span', {className: 'ip', textContent: '192.0.2.10'}), actions)));
+  }
+  await tick();
+  const mobile = innerWidth <= 760;
+  function validate() {
+    check(document.documentElement.scrollWidth <= innerWidth, 'Page horizontal overflow');
+    for (const cam of players.querySelectorAll('.cam')) {
+      const box = cam.getBoundingClientRect(), pad = cam.querySelector('.ptz-pad').getBoundingClientRect();
+      check(pad.left >= box.left && pad.right <= box.right && pad.bottom <= box.bottom, 'DPAD clipped');
+      if (mobile) {
+        const video = cam.querySelector('.frame').getBoundingClientRect();
+        check(pad.top >= video.bottom, 'DPAD overlaps mobile video');
+        check(video.height >= 150, 'Video collapsed');
+        for (const button of cam.querySelectorAll('.ptz-pad button')) {
+          const r = button.getBoundingClientRect();
+          check(r.width >= 44 && r.height >= 44, 'Undersized touch target');
+        }
+      }
+      check(cam.scrollWidth <= cam.clientWidth, 'Tile horizontal overflow');
+    }
+  }
+  validate();
+  if (mobile) {
+    document.querySelector('#stage').className = 'single';
+    players.querySelectorAll('.cam').forEach((cam, i) => cam.classList.toggle('selected', i === 0));
+    await tick();
+    const cam = players.querySelector('.selected');
+    check(cam.querySelector('.ptz-pad').getBoundingClientRect().bottom <= cam.getBoundingClientRect().bottom, 'Single DPAD clipped');
+    document.querySelector('#stage').className = 'grid'; await tick();
+  }
+  check(requests === 0, 'Unexpected network traffic');
+  window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], mobile, requests};
+} catch (error) {window.smokeResult = {ok: false, error: error.message};}
+</script>
+</html>
