@@ -72,3 +72,24 @@ Both AVInput configuration routines write a packed 1/1000000 rational. These
 are capture/encoder input configuration routines; that alone does not establish
 RTC receive-side PTS units. Keep `pts_raw` unscaled until the receive packet
 path is traced. No live camera traffic, production caller or rebuild added.
+
+### Receive-side timing route located
+
+In libiotvideomulti, `BasePlayer::Impl` constructor `0x11a130` creates an
+`IStreamingIO` at `0x11a1c8`, storing its shared pointer at +0x38. Its factory
+boolean comes from route field +0x20 equal to 1; do not equate this with the
+device-platform or encryption enums. This identifies the receive-side family
+used by the previously traced virtual packet calls, unlike capture AVInput.
+
+In libgwplayer, `StreamingIO::on_rcv_apkt` (`0x27c450`, 732 bytes) preserves
+incoming x3 in x20 (`0x27c4c0`) and forwards it as x4 to `on_rcv_pkt` at
+`0x27c604–0x27c610`. Separately it computes a duration as
+`frame_size * 1000000 / sample_rate` (`0x27c5ac–0x27c5d0`), with fallback
+60000 when either field is zero. This is receive-side microsecond-duration
+evidence, but not yet sufficient to assert the incoming PTS scale without
+checking common packet storage/output and concrete vtable bindings.
+
+Next bounded targets: factory `0x27afac` (184 bytes), common `on_rcv_pkt`
+`0x2805d4` (3144 bytes), `get_packet` `0x283dac` (1400 bytes), and video
+receiver `0x27c72c` (1468 bytes). Do not copy unchecked 32-bit duration
+multiplication or fallback into production. No new timing conversion enabled.

@@ -94,6 +94,10 @@ audio channels/bit-width/sample-rate/frame-size/codec fields are now parsed
 from consumer-confirmed offsets. 350 focused tests pass. No SDK silent defaults
 or capability inference. PTS remains raw: capture-input 1/1000000 configuration
 is not yet receive-side timing evidence. Next: receiver packet path and fixtures.
+Receive timing follow-up: located BasePlayer's IStreamingIO factory and audio
+receiver; audio duration uses sample_count * 1000000 / sample_rate while PTS
+passes unchanged at this hop. Common packet storage/output and vtable binding
+remain to verify before enabling timestamp conversion; targets documented.
 
 2026-10-03 remote-login fix: reproduced HTTPS/browser 403 before authentication
 with an unset public origin behind TLS termination. Added opt-in direct-local
