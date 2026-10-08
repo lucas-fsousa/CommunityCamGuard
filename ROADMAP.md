@@ -18,8 +18,18 @@ heartbeat failures. PTZ now shares one account channel with independently verifi
 native-ID-bound target profiles; cached foreground use verifies liveness before
 movement. A reentrant driver control lock protects the entire START/release boundary
 from other helper users' authentication. No movement retries or shared capability
-grants. Production stability/physical latency remain to verify; other control
-transports' full pooling remains pending.
+grants. Deployed as build `b-f0275f718943`, exact-commit CI passed; all three
+PTZ cameras prepared successfully with no failures in the initial two-minute
+observation. Longer production stability/physical latency remain to verify;
+other control transports' full pooling remains pending.
+
+2026-10-08 offline RTC checkpoint: factory/vtable relocations establish the
+concrete receive callbacks, and the pinned codec dependency resolves all twelve
+mapped AVCodecIDs to descriptor names. Video enum 3's descriptor is jpeg2000
+but its input-format selector says mjpeg; preserve that distinction until real
+bitstream validation. Small metadata helpers/tests added, no camera traffic or
+runtime media capability enabled. Next: downstream receive PTS time-base proof
+and real-record interoperability. See [codec evidence](docs/internal/yoosee-rtc-codecs.md).
 
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an

@@ -135,3 +135,11 @@ Shared-channel validation: **177 focused tests passed**, including native bindin
 changes, independent target validation, stale broker recovery before motion,
 cross-thread ownership through motion, lifecycle and logging. Peak 107.4 MiB/no
 swap under the 256 MiB/50%-CPU test cap. Ruff and full-app Mypy passed separately.
+
+Deployment checkpoint (2026-10-08): commit `8782a45` passed GitHub CI run
+`37724189763`. App build `b-f0275f718943` started at 03:47:06 UTC; go2rtc was
+not restarted. All three registered PTZ cameras logged successful preparation.
+Through 03:49:22 UTC (multiple renewal cycles), no preparation/heartbeat failure
+was observed. This is a short observation window, not a long-running reliability
+claim or physical first-click validation. Both containers reported OOMKilled=false;
+app/go2rtc memory was approximately 119/334 MiB. No motion command was sent.

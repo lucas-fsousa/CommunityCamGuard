@@ -4,7 +4,7 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-from .push_rtc_codecs import rtc_avcodec_id
+from .push_rtc_codecs import rtc_avcodec_id, rtc_codec_name
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,10 @@ class RTCVideoFormat:
     @property
     def avcodec_id(self) -> int | None:
         return rtc_avcodec_id("video", self.codec_id)
+
+    @property
+    def codec_name(self) -> str | None:
+        return rtc_codec_name("video", self.codec_id)
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,10 @@ class RTCAudioFormat:
     @property
     def avcodec_id(self) -> int | None:
         return rtc_avcodec_id("audio", self.codec_id)
+
+    @property
+    def codec_name(self) -> str | None:
+        return rtc_codec_name("audio", self.codec_id)
 
 
 def parse_rtc_format(entry: bytes) -> RTCVideoFormat | RTCAudioFormat:

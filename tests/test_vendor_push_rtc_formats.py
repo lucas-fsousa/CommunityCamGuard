@@ -21,6 +21,7 @@ def test_video_fields_and_no_rate_correction():
     assert isinstance(item, RTCVideoFormat)
     assert (item.stream_index, item.width, item.height, item.frame_rate) == (2, 1920, 1080, 2.5)
     assert item.codec_id == 5 and item.avcodec_id == 173
+    assert item.codec_name == "hevc"
     assert item.raw == video(2.5)
 
 
@@ -31,6 +32,7 @@ def test_audio_fields_and_distinct_index_namespace():
     assert (item.stream_index, item.codec_id, item.codec_option) == (2, 4, 7)
     assert (item.channels, item.bit_width, item.sample_rate, item.frame_size) == (2, 16, 16000, 320)
     assert item.avcodec_id == 86018
+    assert item.codec_name == "aac"
 
 
 @pytest.mark.parametrize("index,expected", [(0, 0), (1, 0), (255, 254)])
@@ -40,6 +42,8 @@ def test_consumer_index_mapping(index, expected):
 
 def test_unknown_codec_and_zero_values_preserved():
     assert parse_rtc_format(video(codec=255)).avcodec_id is None
+    assert parse_rtc_format(video(codec=255)).codec_name is None
+    assert parse_rtc_format(bytes([0, 2]) + bytes(18)).codec_name is None
     assert parse_rtc_format(bytes([0, 1]) + bytes(18)).frame_rate == 0
     assert parse_rtc_format(bytes([0, 2]) + bytes(18)).sample_rate == 0
 

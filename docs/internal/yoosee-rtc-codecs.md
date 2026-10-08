@@ -132,6 +132,87 @@ driver. Static inspection peaked at 33.6 MiB with no swap under the same
 | 7 | `opus` | `0x27e860` |
 
 Codes 1/2 leave the string empty on this path. Video uses a relative string
-table at `0x1030ec`, not yet decoded here. These are **input-format selectors**,
+table at `0x1030ec`, decoded below. These are **input-format selectors**,
 not a substitute for verifying decoder descriptors, bitstream framing or actual
 camera support. Keep unknown codec names unknown in production.
+
+### Concrete receive-interface binding confirmed
+
+`IStreamingIO::create(bool)` at `0x27afac` allocates a shared object and calls
+`StreamingIO::StreamingIO(bool)` at `0x27aff0`. It returns the concrete object
+pointer (allocation +0x18) at `0x27affc`, without a secondary-base adjustment.
+The constructor at `0x27bbac` loads the vtable symbol through GOT `0x3578b0`
+and writes the primary vptr as vtable +0x10 at `0x27bc38`.
+
+Dynamic relocations resolve that GOT entry to `_ZTVN8gwplayer11StreamingIOE`
+at `0x3529b8` (272 bytes). The primary slots are:
+
+| Slot relative to primary vptr | Relocation address | Concrete target |
+| --- | --- | --- |
+| +0 | `0x3529c8` | `on_rcv_avhdr`, `0x27be88` |
+| +8 | `0x3529d0` | `on_rcv_apkt`, `0x27c450` |
+| +0x10 | `0x3529d8` | `on_rcv_vpkt`, `0x27c72c` |
+
+This closes the concrete binding gap for BasePlayer's previously traced audio
+and video virtual calls: the packet-storage evidence above belongs to the actual
+receive implementation, not the capture-input family. It still does not prove
+the downstream decoder time base or a wall-clock epoch. Keep PTS raw until that
+consumer contract is verified. Bounded static reads used at most 41.1 MiB/no swap
+under a 128 MiB cap; no proprietary binary execution or camera traffic.
+
+### Pinned codec descriptor names — 2026-10-08
+
+`libgwplayer.so` explicitly depends on `libavcodec_gw.so` (DT_NEEDED). The latter
+ARM64 member in the same 6.45 archive is 3,415,296 bytes, SHA-256
+`061277ef3e31b149489971a837f29c7393eb1d021e4ddfedce4e61bbb02cef51`.
+This is the inspected dependency, not the separately bundled `libavcodec.so`
+or the host's FFmpeg version.
+
+`avcodec_descriptor_get` (`0x13f6d4`, 88 bytes) searches 517 entries at
+`0x32ee38`, stride 48. Its comparator (`0x13f72c`) reads the 32-bit ID at
+offset zero from both arguments. `avcodec_descriptor_get_by_name` (`0x13f768`)
+loads each name pointer at +8 before `strcmp`. Resolving AArch64 RELATIVE
+relocations for those pointers gives the following metadata:
+
+| Kind | SDK enum | AVCodecID | Descriptor name | Descriptor address |
+| --- | --- | --- | --- | --- |
+| Video | 1 | 27 | `h264` | `0x32f318` |
+| Video | 2 | 12 | `mpeg4` | `0x32f048` |
+| Video | 3 | 88 | `jpeg2000` | `0x32fe88` |
+| Video | 4 | 7 | `mjpeg` | `0x32ef58` |
+| Video | 5 | 173 | `hevc` | `0x330e78` |
+| Audio | 1 | 65543 | `pcm_alaw` | `0x3321f8` |
+| Audio | 2 | 65542 | `pcm_mulaw` | `0x3321c8` |
+| Audio | 3 | 69643 | `adpcm_g726` | `0x332978` |
+| Audio | 4 | 86018 | `aac` | `0x3333f8` |
+| Audio | 5 | 73728 | `amr_nb` | `0x333128` |
+| Audio | 6 | 69641 | `adpcm_adx` | `0x332918` |
+| Audio | 7 | 86076 | `opus` | `0x333ed8` |
+
+The video input-format table at `0x1030ec` instead resolves SDK enums 1..5
+to `h264`, `mpeg4`, `mjpeg`, `mjpeg`, `hevc` (string addresses `0xf45b4`,
+`0xf3a46`, `0xeb7cf`, `0xeb7cf`, `0xf3067`). In particular, enum 3 has a
+**descriptor/selector discrepancy**. Preserve the numeric mapping and record
+the discrepancy; do not guess an MJPEG decoder or silently rewrite the enum.
+
+The offline `rtc_codec_name` helper and format properties expose descriptor
+metadata only. Unknowns remain None; invalid kinds/bytes are rejected as before.
+A descriptor does not prove decoder availability, playable packet framing or
+per-camera capability. No runtime decoder selection is enabled. Table inspection
+peaked at 20.2 MiB and comparator inspection at 26.6 MiB, no swap, under 128 MiB.
+Remaining gates include downstream PTS units/epoch and real-record interoperability.
+
+Validation: 359 focused RTC tests passed (105.8 MiB peak, no swap, 256 MiB
+cap), Ruff passed, and full-app Mypy passed for 245 files under a separate
+384 MiB cap. No runtime wiring or decoder allocation was introduced.
+
+### Receive queue wrappers
+
+`read_au_packet` (`0x27e034`, 636 bytes) and `read_vi_packet` (`0x27e2b0`,
+636 bytes) resolve the requested buffer under a mutex, then pass the original
+caller-owned `ResPkt` to `get_packet` at `0x27e184` / `0x27e400`. Their successful
+return paths release the temporary buffer reference but do not rescale or replace
+the packet. Missing buffers return -11. These wrappers therefore do not supply
+the missing receive time base; the next target is their decoder-side caller,
+not capture-input time-base initialization. Inspections peaked at 35.9 MiB/no
+swap under 128 MiB, without executing SDK code or contacting cameras.

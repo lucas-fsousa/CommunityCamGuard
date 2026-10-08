@@ -2,7 +2,18 @@
 
 import pytest
 
-from backend.app.drivers.yoosee.p2p.push_rtc_codecs import rtc_avcodec_id
+from backend.app.drivers.yoosee.p2p.push_rtc_codecs import rtc_avcodec_id, rtc_codec_name
+
+
+@pytest.mark.parametrize("media,code,expected", [
+    ("audio", 1, "pcm_alaw"), ("audio", 2, "pcm_mulaw"),
+    ("audio", 3, "adpcm_g726"), ("audio", 4, "aac"), ("audio", 5, "amr_nb"),
+    ("audio", 6, "adpcm_adx"), ("audio", 7, "opus"),
+    ("video", 1, "h264"), ("video", 2, "mpeg4"), ("video", 3, "jpeg2000"),
+    ("video", 4, "mjpeg"), ("video", 5, "hevc"),
+])
+def test_pinned_avcodec_descriptors_not_demuxer_names(media, code, expected):
+    assert rtc_codec_name(media, code) == expected
 
 
 @pytest.mark.parametrize("media,code,expected", [
@@ -18,14 +29,19 @@ def test_sdk_initializer_pairs(media, code, expected):
                                         ("video", 0), ("video", 6), ("video", 255)])
 def test_unknown_never_defaults(media, code):
     assert rtc_avcodec_id(media, code) is None
+    assert rtc_codec_name(media, code) is None
 
 
 @pytest.mark.parametrize("code", [-1, 256, True, 1.0, "1", None])
 def test_no_lossy_byte_conversion(code):
     with pytest.raises(ValueError):
         rtc_avcodec_id("video", code)
+    with pytest.raises(ValueError):
+        rtc_codec_name("video", code)
 
 
 def test_media_kind_required():
     with pytest.raises(ValueError):
         rtc_avcodec_id("unknown", 1)
+    with pytest.raises(ValueError):
+        rtc_codec_name("unknown", 1)
