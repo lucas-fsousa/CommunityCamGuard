@@ -95,14 +95,66 @@ current dashboard stall (its live pipeline is RTSP/go2rtc), and copying those
 heuristics without actual malformed/discontinuous fixtures would hide errors.
 Keep the offline parser lossless and its PTS raw.
 
+## Final wrapper and cache repair
+
+`PacketPtrMake` (`0x19f3d4`, 1596 bytes) adopts the RawPacket's existing packet
+pointer into the output wrapper at `0x19f494`. It copies representation +0x78
+to AVExtInfo +0x160 at `0x19f59c`; it does not itself rescale AVPacket PTS/DTS.
+The video metadata path prefers positive RawPacket +0x20 (the UTC association
+above). Otherwise, if a nonzero demuxer clock offset and a packet exist, it
+computes `(PTS + offset) * time_base * 1000` at `0x19f960–0x19f998`, storing
+the integer result in AVExtInfo +0x28 at `0x19f7f4`. Without either source this
+metadata value remains zero. These are wrapper metadata, not AVPacket PTS stores.
+
+`correct_cache_pkts_time` (`0x19510c`, 1776 bytes) iterates representations,
+drains cached packets via `cache_front(true)` at `0x195288`, calls
+`correct_pkt_time` at `0x1952bc`, then invokes video duration repair at
+`0x1954ec` before replacing the cache at `0x195654`. Its `av_rescale_q` at
+`0x195548` converts the first cached packet's PTS to microseconds to set the
+format context's start time, not to rewrite each packet's time base.
+
+`repairVideoPacketDurations` (`0x195ff0`, 1796 bytes) requires video, valid stream
+codec parameters, codec-parameter +0x60 equal to zero, and a nonempty queue.
+For neighboring non-null packets it compares **both generation fields** at
+RawPacket +0x18/+0x1c (`0x19611c–0x196138`). Only a same-generation positive
+next-PTS minus previous-PTS difference replaces the previous packet's duration
+at `0x196150`. Otherwise, an existing positive duration survives; a missing
+duration falls back to tracked duration or one tick (`0x1961b8–0x196220`).
+The final packet uses the same fallback (`0x196424–0x196490`). No PTS/DTS store
+occurs in this duration-only helper. This is evidence for preserving generation
+boundaries, not permission to synthesize durations across a reconnect.
+
+## Decoder submission boundary
+
+`AVDecoder::sendPacket` (`0x1636dc`, 1196 bytes) carries the same packet pointer
+and copies AVExtInfo before virtual submission at `0x163948`. A concrete
+`VideoDecoder::sendPacket` path (`0x17adf8`, 2008 bytes) submits at `0x17b290`
+via `avcodec_send_packet`. It may first clone the packet and trim payload
+data/size (`0x17b0ec–0x17b0f8`), and may reject continuity before submission.
+Those are not timestamp rescaling operations.
+
+`check_poc_continuity` (`0x17ab28`, 720 bytes) parses NAL slice information,
+tracks a learned picture-order gap, resets that history for a keyframe, and can
+return a negative error on a discontinuity. The caller checks this at
+`0x17b284`. This concerns compressed-picture continuity, not the RTC eight-bit
+sequence field or a wall-clock timestamp. The log saying `skip duplicate pkt`
+branches to submission, so its wording alone must not be used as proof of a
+dropped packet. Other decoder implementations and the queue/run path are not
+covered by this bounded check; no universal decoder behavior is claimed.
+
 ## Validation and remaining work
 
 All inspection was static and sequential, capped at 128 MiB/50% CPU/no swap;
-the new targeted reads peaked at 38.5 MiB. No proprietary library was executed.
+the new targeted reads peaked at 42.6 MiB. No proprietary library was executed.
 The descriptor/helper commit `de786b0` passed exact-SHA CI run `37724951642`.
 
-Next: inspect `PacketPtrMake` (`0x19f3d4`, 1596 bytes), cached-packet repair and
-downstream decoder submission for further timeline rewriting, then validate framing, codec and timing
-against a provenance-checked real record. A microsecond contract alone does not
+The timing checkpoint `e138118` also passed exact-SHA CI run `37725249416`.
+The existing capture was already audited in [capture evidence](yoosee-push-capture-evidence.md);
+it has not supplied an authenticated RTC fixture. Do not rerun that same negative
+prefix inspection and present it as new interoperability evidence.
+
+Next: validate framing, codec and timing against a provenance-checked real record,
+and trace the decoder queue/run path if its scheduling semantics are needed.
+A microsecond contract alone does not
 authorize live native streaming. Authenticated relay ownership, platform/mode
 verification, teardown and per-device capabilities remain independent gates.

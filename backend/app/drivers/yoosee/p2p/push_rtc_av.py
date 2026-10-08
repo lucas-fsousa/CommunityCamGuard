@@ -8,7 +8,7 @@ from typing import Literal
 @dataclass(frozen=True)
 class RTCAVUnit:
     discriminator: int
-    clock_raw: int  # Units are not yet established.
+    clock_raw: int  # Raw u64; pinned receive path uses microseconds, not proven UTC.
     flag_raw: int
     index_raw: int  # SDK byte +10 minus one; may be -1.
     tag_raw: int
@@ -25,7 +25,11 @@ class RTCAVUnit:
 
     @property
     def pts_raw(self) -> int:
-        """Presentation timestamp; its time base is not established yet."""
+        """Unmodified PTS; see yoosee-rtc-timing.md for the pinned SDK time base.
+
+        No epoch, signed-sentinel conversion, wrap repair or session continuity
+        is inferred here. Media timestamps must not name recording directories.
+        """
         return self.clock_raw
 
     @property

@@ -34,9 +34,11 @@ and real-record interoperability. See [codec evidence](docs/internal/yoosee-rtc-
 RTC timing follow-up: secondary vtable slots link queued media to the demuxer;
 both receive representations explicitly set 1/1000000 time bases. UTC comes
 from separate `frame_time` side data, not from treating PTS as Unix time.
-Conditional PTS/DTS/duration repair is now traced after queue receive; it is not
-copied into our lossless parser. Next: final packet construction, cached timeline
-repair and provenance-checked real-record interoperability; no runtime conversion
+Conditional PTS/DTS/duration repair, final packet wrapping and cached timeline
+repair are traced; they are not copied into our lossless parser. Duration repair
+respects both generation counters. A concrete decoder path has a NAL continuity
+gate independent of RTC sequence metadata. Next: provenance-checked real-record
+interoperability and queue/scheduling semantics as needed; no runtime conversion
 or native-HD capability enabled.
 See [timing evidence](docs/internal/yoosee-rtc-timing.md).
 

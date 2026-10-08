@@ -287,5 +287,7 @@ by the video map size (`0x11a9d8–0x11a9ec`, `0x11aad8–0x11aaf0`).
 309 focused tests passed at 93.9 MiB/no swap under 256 MiB/50%-CPU limits;
 Ruff passed. Symbol-sized audits peaked at 40.6 MiB under a 128 MiB cap.
 No media capture, device command, production wiring or deployment occurred.
-Next: format consumers for codec enums and PTS time base, then real-media
-fixtures. Driver capabilities remain unchanged by this static SDK evidence.
+Follow-up: codec consumers and the receive microsecond time base are now mapped;
+see [codec descriptors](yoosee-rtc-codecs.md) and [receive timing](yoosee-rtc-timing.md).
+Real-media interoperability remains pending. Driver capabilities remain unchanged
+by this static SDK evidence.
