@@ -72,6 +72,13 @@ callers found for the separate decision/commit helpers. Next: concrete audio
 output timing, hold-limit provenance and queue consumption; no scheduler copied
 into production. See [sync evidence](docs/internal/yoosee-rtc-sync.md).
 
+Queue/output follow-up: frame `front(false)` avoids waiting on an empty queue
+but still locks; it retains the head without removing it. A renderer branch
+explicitly consumes after an accepted scheduling decision. Audio vtable slot
++0x58 resolves in all three inspected renderer tables to a simple position
+scale, not a hardware-latency query. Next: upstream audio PTS production and
+caller hold-limit provenance. No physical camera action needed for this work.
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

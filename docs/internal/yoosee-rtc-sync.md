@@ -79,7 +79,50 @@ It clamps the supplied extent to nonnegative, bounds the supplied rate with
 `fmaxnm(rate, 0.001)` (constant at `0xf7710`), stores a valid identity pair and
 refreshes the local monotonic anchor. Both observed audio renderer call sites
 obtain the PTS argument through a virtual method at slot +0x58 first; the
-concrete output-device implementation and latency correction are not yet proven.
+the pinned vtable follow-up below resolves this particular method. It does not
+establish how the renderer originally obtains the PTS argument.
+
+## Queue ownership and the meaning of the boolean
+
+`SafeQueue<Frame>::front(bool)` (`0x1ec12c`, 352 bytes) locks the queue. With
+false and an empty queue (+0x28 == 0), it returns an empty frame reference;
+otherwise it calls `front_locked`. That helper (`0x1779c0`, 1208 bytes) waits on
+a condition variable while empty (`0x177a34–0x177a50`), checking a queue-state
+counter after wakeup. The nonempty branch copies the head's retained frame
+reference and metadata (`0x177b6c–0x177c58`) without consuming it.
+Thus false means no empty-queue wait here, not “do not remove the frame”. It
+still takes a mutex and must not be described as lock-free/nonblocking.
+
+The distinction is explicit in `popFront(bool)` (`0x176d9c`, 388 bytes): after
+the same lookup, it calls `pop_locked` only if the returned frame pointer is
+non-null (`0x176e90–0x176ea0`). The earlier decoder's packet specialization is
+not automatically proven by this frame-specialization inspection.
+
+`request_render_frame` uses `front(false)` at `0x1efb9c`. In the first observed
+`obtainFrame` caller, a zero decision exits at `0x245d20`; a nonzero decision
+advances a frame timestamp by its duration, then explicitly calls queue `pop`
+at `0x2458a8`. The other caller has further validation/filtering paths and a
+separate pop at `0x245cd8`, so do not generalize immediate consumption to every
+successful decision. A scheduling decision is not proof of display completion.
+
+## Audio virtual slot: no hidden hardware-latency adjustment here
+
+ELF ABS64 relocations at the following primary vtable +0x10+0x58 slots all
+resolve to `AbstractAudioRenderer::computeRenderPosition` (`0x182c78`):
+
+| Vtable | Slot relocation |
+| --- | --- |
+| `AbstractAudioRenderer`, `0x34c9a8` | `0x34ca10` |
+| `EmptyAudioRenderer`, `0x34f6d0` | `0x34f738` |
+| `GWAudioRendererJni`, `0x355a00` | `0x355a68` |
+
+The complete 16-byte implementation converts integer argument x1 to double,
+multiplies it by d0, converts back to integer and returns. It does not read the
+float argument, query an Android playback position or subtract a latency.
+Both already-inspected renderer call sites pass d0 = 1.0 before updating the
+audio clock. This is an identity scale subject to floating-point precision,
+not evidence of a hardware playback timestamp. The original x1 producer and
+which renderer instance a real session selects remain separate questions.
 
 ## Validation and remaining gates
 
@@ -88,7 +131,7 @@ No SDK binary was executed, no camera was contacted, and no production settings
 were changed. These are evidence/docs changes, not an implementation of the SDK
 scheduler or a diagnosis of the browser's stalls.
 
-Next: establish the concrete audio-output +0x58 method, caller-provided hold
-limit and frame-queue consumption after a successful request. Real authenticated
+Next: establish the audio PTS producer before +0x58, caller-provided hold
+limit and the remaining successful-request consumption branches. Real authenticated
 RTC fixtures, ownership, platform verification and teardown remain independent
 requirements before enabling native streaming.
