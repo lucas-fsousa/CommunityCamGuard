@@ -136,6 +136,23 @@ def test_warm_failure_clears_reservation_and_does_not_fallback(prepared, monkeyp
     assert prepared.runs == prepared.fallback == 0
 
 
+@pytest.mark.parametrize("message,label", [
+    ("P2P list service did not answer", "list_timeout"),
+    ("private-token-value", "transport_or_auth"),
+])
+def test_warm_logs_stage_without_exception_content(prepared, monkeypatch, caplog, message, label):
+    def fail(*args, **kwargs):
+        raise P2PProbeError(message) from RuntimeError("private-chain-value")
+    monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(warm=fail))
+    with pytest.raises(P2PProbeError):
+        native_ptz.warm(CAMERA, PROFILE)
+    assert f"reason={label}" in caplog.text
+    assert "private-token-value" not in caplog.text
+    assert "private-chain-value" not in caplog.text
+    assert not native_ptz._warming
+    assert prepared.runs == prepared.fallback == 0
+
+
 def test_enrolled_camera_selects_driver_preflight_without_rollout_row(prepared):
     profile = native_ptz_policy.selected(CAMERA.camera_id)
     assert profile.identity is None

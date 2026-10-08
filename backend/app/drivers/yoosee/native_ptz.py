@@ -14,6 +14,7 @@ from .native_ptz_policy import PtzProfile
 from .p2p.contracts import P2PProbeError
 from .p2p.control_ownership import ControlChannelBusy, own_control_channel
 from .p2p.ptz_cache import CachedPtzRoute, PtzRouteCache
+from .p2p.ptz_diagnostics import preparation_failure_reason
 from .p2p.ptz_motion import PtzBusy, PtzMotion
 from .p2p.ptz_prepare import prepare_ptz_route
 from .p2p.ptz_target import select_target
@@ -60,14 +61,7 @@ def warm(camera: Camera, profile: PtzProfile) -> bool:
         return run_with_fresh_access(entry, prepare)
     except Exception as exc:
         # Fixed labels only: never emit vendor replies, tokens or arbitrary errors.
-        reason = {
-            "native PTZ model profile is not supported": "unsupported_model",
-            "native PTZ direction lacks current axis evidence": "unsupported_axis",
-            "native PTZ identity does not match reviewed evidence": "identity_mismatch",
-            "native PTZ correlated preflight read failed": "identity_read_failed",
-            "selected P2P camera is not online": "offline",
-            "PTZ broker liveness check failed": "broker_keepalive",
-        }.get(str(exc), "transport_or_auth")
+        reason = preparation_failure_reason(exc)
         log.warning("native_ptz warm_failed camera=%s reason=%s", camera.camera_id, reason)
         raise
     finally:

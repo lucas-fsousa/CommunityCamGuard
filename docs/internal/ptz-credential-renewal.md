@@ -148,3 +148,28 @@ Extended check through 03:56:33 UTC: the same three preparation transitions
 remain, with no `warm_failed` or preparation-failure logs observed since startup
 (approximately nine minutes). The health endpoint remains OK. This still does
 not substitute for physical latency or long-duration/credential-expiry validation.
+
+## Later transient failures and diagnostic follow-up
+
+The 2026-10-08 09:15 UTC audit found an episode **after** those initial clean
+windows: at 04:34:48 UTC one broker keepalive failed, followed by ten failures
+classified only as `transport_or_auth` through 04:38:46. The service used its
+30/60/120/240-second backoff. One camera recovered at 04:38:48 and the other two
+at 04:42:36 / 04:42:50. No app/go2rtc restart was needed; no later failure appears
+in the inspected logs through 09:15. This is evidence of automatic recovery, not
+proof that token expiry, WAN loss or vendor-session invalidation caused the episode.
+No retroactive stage diagnosis is possible from the old coarse labels.
+
+Added a small driver-local `ptz_diagnostics` module to distinguish future list-DNS,
+list timeout, certification availability, inventory availability, explicit access
+rejection, renewal failure, ownership contention and socket failures. Labels come
+from a fixed whitelist/typed exceptions; unknown exception text, causes, vendor
+replies, tokens and endpoints never enter these labels. A certification failure
+does **not** imply an expired token; only typed 0x216B is `stale_access`.
+This changes diagnostics only, not renewal, retry timing, camera capabilities or
+movement policy. No new traffic or diagnostic probing was added.
+
+Validation: 205 focused control/session tests passed (117.4 MiB peak, no swap,
+256 MiB/50%-CPU cap), including integration tests proving redaction, reservation
+cleanup and no motion/fallback on preparation failure. Existing deprecation warning
+from Starlette/httpx remains unrelated.

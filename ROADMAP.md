@@ -23,6 +23,13 @@ PTZ cameras prepared successfully with no failures in the initial two-minute
 observation. Longer production stability/physical latency remain to verify;
 other control transports' full pooling remains pending.
 
+Longer PTZ observation (2026-10-08): a transient failure episode at 04:34–04:38
+UTC recovered for all three cameras by 04:42 without restarting services. The
+old coarse labels do not establish its cause. Added driver-local fixed-label
+stage diagnostics (DNS/list/certification/inventory/explicit rejection/renewal)
+with redaction tests; no new retry policy or traffic. Pending: classify a future
+episode using those labels, physical first-click and actual credential-expiry checks.
+
 2026-10-08 offline RTC checkpoint: factory/vtable relocations establish the
 concrete receive callbacks, and the pinned codec dependency resolves all twelve
 mapped AVCodecIDs to descriptor names. Video enum 3's descriptor is jpeg2000
