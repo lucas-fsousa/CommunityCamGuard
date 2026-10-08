@@ -198,8 +198,9 @@ This validates synthetic parser contracts, not proprietary-library execution or
 real-camera interoperability.
 
 Next: validate framing, codec and timing against a provenance-checked real record.
-Further scheduling evidence would require frame-output/render consumers; this
-checkpoint does not prove real-time presentation or audio/video synchronization.
+The [render-boundary follow-up](yoosee-rtc-render.md) traces stale-output gates,
+queue registration and a local clock helper. Actual presentation scheduling and
+audio/video synchronization still require consumer/caller evidence.
 A microsecond contract alone does not
 authorize live native streaming. Authenticated relay ownership, platform/mode
 verification, teardown and per-device capabilities remain independent gates.

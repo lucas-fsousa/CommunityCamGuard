@@ -56,6 +56,14 @@ retransmission, a 41-frame buffer or a universal live-frame-dropping policy.
 Added raw-timestamp preservation regressions; 366 focused RTC tests pass.
 Real authenticated media fixtures and render/synchronization behavior remain open.
 
+Render-boundary follow-up: pinned decoder-identity/playback-sequence rejection,
+conditional renderer setup and synchronization queue registration. The SDK's
+`resetQueues` clears reference maps, not a proven producer-buffer flush. A clock
+helper interpolates locally within a stored extent; it does not establish UTC,
+network latency or the browser's catch-up policy. Next: renderer decision/commit
+callers and audio-clock field provenance. Documentation only, no runtime changes;
+see [render evidence](docs/internal/yoosee-rtc-render.md).
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement
