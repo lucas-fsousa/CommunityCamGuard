@@ -62,6 +62,28 @@ network-buffer duration. The time conversion's unit and the producers of the
 extent/rate fields still require tracing. It does not prove the clock is always
 the audio master or that the browser's catch-up behavior uses this algorithm.
 
+## Presentation commit helper: caller still unproven
+
+`commitPresentedFrame` (`0x1f0ef0`, 308 bytes) was inspected separately. Under
+the strategy mutex it requires decision +0 to be zero, decision +0x28 to equal
+strategy +0x1e8, and decision +0x70 to be nonzero. It compares six identity
+fields: decision +0x48/+0x4c/+0x50/+0x58/+0x60/+0x68 against identity
++0/+4/+8/+0x10/+0x18/+0x20, then requires the last field also to equal the
+strategy value. Failure returns false before the clock update. Success updates
+the per-stream clock and a boolean map, returning true.
+
+The bounded direct B/BL caller scan found no call sites for this helper in the
+inspected library. This does not rule out indirect/external callers, but means
+these checks **cannot yet be attributed to the active presentation path**.
+Do not infer that the existing renderer necessarily uses this helper.
+
+The separate `request_render_frame` call-site index does reference
+`Clock::computePts`, `AVSyncTiming::isAudioClockFresh`, `decideVideoJoin`,
+`shouldHoldVideoForAudio`, `nextVideoDeadline`, and
+`CadenceController::reconcileVideoDuration` / `durationBounds`.
+This is a useful next path for bounded branch inspection; catch-up/hold log
+strings alone do not prove the conditions, thresholds or policy in use.
+
 ## Next bounded inspection targets
 
 - `request_render_frame`: `0x1efb48`, 2844 bytes.
