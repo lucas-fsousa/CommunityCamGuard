@@ -11,6 +11,7 @@ from ....db.p2p import P2PEnrollment
 from .. import account_store
 from .account import VendorAccountError, refresh_account_session
 from .contracts import InitInfoRejectedError, P2PProbeError
+from .control_ownership import own_control_channel
 
 ResultT = TypeVar("ResultT")
 SESSION_LOCK_TIMEOUT_SECONDS = 15.0
@@ -78,10 +79,13 @@ def run_with_fresh_access(
     The mutex remains: it prevents concurrent read/modify/write cycles from racing on one camera.
     """
 
-    lock = _session_lock(enrollment.device_id)
-    if not lock.acquire(timeout=SESSION_LOCK_TIMEOUT_SECONDS):
-        raise P2PProbeError("another P2P session did not release this camera in time")
-    try:
-        return _run_with_renewal(enrollment, operation)
-    finally:
-        lock.release()
+    # Fixed lock order: shared broker before device. PTZ holds the reentrant
+    # broker lock through release, outside the retry closure.
+    with own_control_channel():
+        lock = _session_lock(enrollment.device_id)
+        if not lock.acquire(timeout=SESSION_LOCK_TIMEOUT_SECONDS):
+            raise P2PProbeError("another P2P session did not release this camera in time")
+        try:
+            return _run_with_renewal(enrollment, operation)
+        finally:
+            lock.release()

@@ -23,4 +23,7 @@ def access_log_config() -> dict:
     config = deepcopy(LOGGING_CONFIG)
     config.setdefault("filters", {})["without_query"] = {"()": WithoutQuery}
     config["loggers"]["uvicorn.access"]["filters"] = ["without_query"]
+    config["loggers"]["backend.app.services.control_sessions"] = {
+        "handlers": ["default"], "level": "INFO", "propagate": False,
+    }
     return config

@@ -13,7 +13,7 @@ from dataclasses import replace
 from typing import TypedDict
 
 from .access_session import heartbeat_node
-from .contracts import CertifiedNode
+from .contracts import CertifiedNode, OnlineDevice
 from .ptz_protocol import build_ptz_receipt, build_ptz_request, parse_ptz_reply
 from .session_io import acknowledge_reliable_node_frame, decrypt_node_frame
 
@@ -34,6 +34,8 @@ class NativePtzRoute:
         self._sock = sock
         self._node = node
         self._access_id = access_id
+        self._inventory: dict[int, OnlineDevice] = {}
+        self._verified: dict[tuple[object, ...], frozenset[str]] = {}
         self._device_id = device_id
         self._direction = direction
         self._allowed_directions = allowed_directions or frozenset({direction})
@@ -134,6 +136,7 @@ class NativePtzRoute:
                                device_id=self._device_id, direction=direction,
                                sequence=self._receipt_sequence,
                                allowed_directions=self._allowed_directions)
+        route._inventory, route._verified = self._inventory, self._verified
         self._closed = True  # socket ownership transferred, not duplicated
         return route
 

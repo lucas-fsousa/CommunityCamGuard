@@ -194,3 +194,38 @@ def test_failed_heartbeat_closes_instead_of_claiming_readiness(pool, monkeypatch
     with pytest.raises(ptz_cache.PtzKeepaliveError):
         cache.warm(("camera",), state.prepare)
     assert not cache._idle and route.closed == 1
+
+
+def test_shared_account_keeps_one_socket_but_requires_explicit_target_selection(pool):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    first = ("cam_one", None, frozenset({"right"}), 123, b"secret", "device-one")
+    second = ("cam_two", None, frozenset({"up"}), 123, b"secret", "device-two")
+    selected = []
+    def select(route):
+        selected.append(route)
+        return route
+    with pytest.raises(ValueError):
+        cache.warm(first, state.prepare)
+    assert cache.warm(first, state.prepare, select=select)
+    assert cache.warm(second, state.prepare, select=select)
+    assert state.prepares == 1 and len(cache._idle) == 1 and len(selected) == 1
+    with pytest.raises(ValueError):
+        cache.acquire(second, state.prepare)
+    lease = cache.acquire(second, state.prepare, select=select)
+    assert lease.reused and len(selected) == 2
+    lease.close()
+
+
+def test_shared_account_failed_liveness_prepares_before_any_movement(pool, monkeypatch):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    key = ("cam_one", None, frozenset({"right"}), 123, b"secret", None)
+    cache.warm(key, state.prepare, select=lambda route: route)
+    old = next(iter(cache._idle.values())).route
+    def fail():
+        raise ptz_cache.P2PProbeError("gone")
+    monkeypatch.setattr(old, "keepalive", fail)
+    lease = cache.acquire(key, state.prepare, select=lambda route: route)
+    assert not lease.reused and state.prepares == 2 and old.closed == 1
+    lease.close()

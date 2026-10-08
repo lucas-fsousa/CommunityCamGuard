@@ -13,6 +13,13 @@ adopts another camera's refreshed token before issuing another cloud refresh.
 keepalive 38 ms, cached handoff 1 ms; no movement sent. Pending: physical first-click latency verification,
 authoritative credential TTL/longer route lifetime and session pooling for other
 control transports. See [lifecycle](docs/internal/ptz-credential-renewal.md).
+2026-10-08 follow-up: independent per-camera broker certifications showed competing
+heartbeat failures. PTZ now shares one account channel with independently verified,
+native-ID-bound target profiles; cached foreground use verifies liveness before
+movement. A reentrant driver control lock protects the entire START/release boundary
+from other helper users' authentication. No movement retries or shared capability
+grants. Production stability/physical latency remain to verify; other control
+transports' full pooling remains pending.
 
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an

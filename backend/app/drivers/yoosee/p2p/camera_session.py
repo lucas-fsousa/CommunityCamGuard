@@ -19,6 +19,8 @@ def open_camera_session(
     enrollment: P2PEnrollment,
     timeout: float,
     deadline: float,
+    *,
+    inventory: list[OnlineDevice] | None = None,
 ) -> tuple[CertifiedNode, OnlineDevice, int]:
     """Open the access-node control route for exactly the enrolled camera.
 
@@ -48,4 +50,6 @@ def open_camera_session(
     )
     if target is None or not target.status:
         raise P2PProbeError("selected P2P camera is not online")
+    if inventory is not None:
+        inventory.extend(devices)
     return node, target, node.next_sequence

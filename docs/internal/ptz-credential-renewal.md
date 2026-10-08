@@ -89,3 +89,49 @@ cold preparation **2762 ms**, broker keepalive **38 ms**, cached route handoff
 **1 ms**. The handoff selected another previously verified direction but sent
 **no START or STOP**; the unused lease and all idle sockets were closed. These
 numbers establish setup savings, not physical movement latency or a latency SLA.
+
+## Shared-account correction — 2026-10-08
+
+The initial multi-camera deployment exposed intermittent broker-heartbeat failures:
+the first two independently prepared routes failed while the last route remained
+usable. A camera-3-only six-pass check succeeded (cold 2049 ms, heartbeats 19–32 ms,
+fresh preparation 1995 ms). This pattern is consistent with competing account
+certifications; it is not proof of a universal vendor session-count limit.
+
+The PTZ pool now retains **one owned socket per access ID/token pair**, not one
+independently certified socket per camera. It retains at most four idle account
+routes. Within that channel, `ptz_target` selects only devices present and online
+in the authenticated inventory. A new target still requires its own three
+correlated identity/model/axis reads. Up to sixteen target profiles are retained
+within the route's original twenty-second lifetime. They are keyed by public
+camera ID **and native device ID**, reviewed identity/directions and credentials;
+identical model names or a changed enrollment never inherit another unit's authority.
+
+Camera switching transfers the single socket owner and advances request sequences;
+it does not send movement. Shared-cache callers must explicitly select a target.
+Every cached foreground acquisition now checks broker liveness before START; a
+failed check closes that stale route and permits fresh preparation, still entirely
+before the movement boundary. The earlier 1 ms handoff excluded this extra check
+and is **not** a current end-to-end PTZ latency claim.
+
+Native gestures are not queued concurrently, even across cameras. The driver's
+reentrant control-channel lock is also used by `run_with_fresh_access`, with a
+fixed broker-before-device lock order. PTZ keeps ownership until its motion/release
+finishes, but keeps motion **outside** the credential-renewal retry closure. Other
+helper users cannot authenticate a competing channel between START and STOP.
+This conservative driver-wide exclusion includes refreshed access IDs; long audio
+or control operations can delay PTZ or return busy after fifteen seconds. Other
+brands are unaffected. Separate app processes/vendor apps are not coordinated by
+this in-process lock, so external invalidation remains possible.
+
+The service records prepared-state transitions without tokens or vendor replies;
+failures retain fixed reason labels/backoff. No control is enabled merely because
+preparation succeeds. Other control transports still have on-demand sessions; their
+full pooling and longer authenticated lifetimes remain follow-up work. Single-process
+deployment is assumed. Production observation and physical first-click validation
+must be recorded separately from synthetic ownership/target-isolation tests.
+
+Shared-channel validation: **177 focused tests passed**, including native binding
+changes, independent target validation, stale broker recovery before motion,
+cross-thread ownership through motion, lifecycle and logging. Peak 107.4 MiB/no
+swap under the 256 MiB/50%-CPU test cap. Ruff and full-app Mypy passed separately.

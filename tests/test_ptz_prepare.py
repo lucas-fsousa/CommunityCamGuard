@@ -23,8 +23,10 @@ def prepared(monkeypatch):
                     dict(t=1, stVal=dict(ptzInfo=dict(id0_status=7)))]
     monkeypatch.setattr(module, "socket", SimpleNamespace(socket=lambda *args: sock, AF_INET=2, SOCK_DGRAM=2))
     monkeypatch.setattr(module.time, "monotonic", lambda: state.now)
-    def session(*args):
-        return object(), SimpleNamespace(device_id=state.target, status=state.status), 0xFFFFFFFE
+    def session(*args, **kwargs):
+        target = SimpleNamespace(device_id=state.target, status=state.status)
+        kwargs["inventory"].append(target)
+        return object(), target, 0xFFFFFFFE
     monkeypatch.setattr(module, "open_camera_session", session)
     def read(sock, node, target, path, sequence, timeout, **kwargs):
         assert kwargs == dict(retries=1, deadline=30.0, require_correlated_response=True)
@@ -128,7 +130,7 @@ def test_failed_evidence_closes_socket_without_constructing_motion(prepared, fai
 
 
 def test_expired_handshake_does_not_read_or_construct(prepared, monkeypatch):
-    def expired(*args):
+    def expired(*args, **kwargs):
         prepared.now = 31
         return object(), SimpleNamespace(device_id=123456, status=1), 1
     monkeypatch.setattr(module, "open_camera_session", expired)
@@ -160,7 +162,7 @@ def test_final_read_cannot_return_an_expired_route(prepared, monkeypatch):
 
 
 def test_handshake_exception_closes_socket(prepared, monkeypatch):
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise P2PProbeError("synthetic handshake failure")
     monkeypatch.setattr(module, "open_camera_session", fail)
     with pytest.raises(P2PProbeError):

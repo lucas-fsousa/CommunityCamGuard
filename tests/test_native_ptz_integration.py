@@ -57,7 +57,7 @@ def test_success_does_not_fallback(prepared):
 
 def test_warm_prepares_without_motion_and_cleans_reservation(prepared, monkeypatch):
     keys = []
-    def warm(key, prepare):
+    def warm(key, prepare, **kwargs):
         keys.append(key)
         prepare()
         return True
@@ -77,6 +77,41 @@ def test_warm_skips_active_gesture(prepared):
         native_ptz._active.clear()
 
 
+def test_other_camera_cannot_queue_a_gesture_on_the_shared_channel(prepared):
+    native_ptz._active["another_camera"] = SimpleNamespace()
+    try:
+        with pytest.raises(ControlNotReady):
+            native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+        assert not native_ptz.warm(CAMERA, PROFILE)
+        assert prepared.runs == prepared.prepared == 0
+    finally:
+        native_ptz._active.clear()
+
+
+def test_broker_ownership_is_held_through_motion_not_just_preparation(prepared, monkeypatch):
+    import threading
+
+    from backend.app.drivers.yoosee.p2p import control_ownership
+
+    monkeypatch.setattr(control_ownership, "WAIT_SECONDS", 0.01)
+    observed = []
+    def competing_control():
+        try:
+            with control_ownership.own_control_channel():
+                observed.append("entered")
+        except control_ownership.ControlChannelBusy:
+            observed.append("busy")
+    def run(self, route):
+        worker = threading.Thread(target=competing_control)
+        worker.start()
+        worker.join(timeout=1)
+        assert not worker.is_alive()
+        return prepared.outcome
+    monkeypatch.setattr(native_ptz.PtzMotion, "run", run)
+    assert native_ptz.step(CAMERA, "right", PROFILE, prepared.fallback_fn)
+    assert observed == ["busy"]
+
+
 def test_click_joins_background_preparation_without_moving_early(prepared):
     waited = []
     def wait(timeout):
@@ -92,7 +127,7 @@ def test_click_joins_background_preparation_without_moving_early(prepared):
 
 
 def test_warm_failure_clears_reservation_and_does_not_fallback(prepared, monkeypatch):
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise P2PProbeError("test")
     monkeypatch.setattr(native_ptz, "_routes", SimpleNamespace(warm=fail))
     with pytest.raises(P2PProbeError):

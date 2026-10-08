@@ -18,6 +18,7 @@ class ControlSessions:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._failures: dict[str, tuple[int, float]] = {}
+        self._prepared: set[str] = set()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -53,6 +54,7 @@ class ControlSessions:
         cameras = registry.list_cameras()
         ids = {camera.camera_id for camera in cameras}
         self._failures = {key: value for key, value in self._failures.items() if key in ids}
+        self._prepared.intersection_update(ids)
         for camera in cameras:
             if self._stop.is_set():
                 break
@@ -60,12 +62,19 @@ class ControlSessions:
             if time.monotonic() < retry_at:
                 continue
             try:
-                drivers.for_camera(camera).maintain_control_session(camera)
+                prepared = drivers.for_camera(camera).maintain_control_session(camera)
             except Exception as exc:
                 failures = min(5, failures + 1)
                 delay = min(300, 15 * 2 ** failures)
                 self._failures[camera.camera_id] = (failures, time.monotonic() + delay)
+                self._prepared.discard(camera.camera_id)
                 log.warning("control_session prepare_failed error_type=%s retry_s=%d",
                             type(exc).__name__, delay)
             else:
                 self._failures.pop(camera.camera_id, None)
+                if prepared:
+                    if camera.camera_id not in self._prepared:
+                        log.info("control_session prepared camera=%s", camera.camera_id)
+                    self._prepared.add(camera.camera_id)
+                else:
+                    self._prepared.discard(camera.camera_id)

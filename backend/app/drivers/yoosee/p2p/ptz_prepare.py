@@ -14,7 +14,7 @@ from ....db.p2p import P2PEnrollment
 from ..capability_identity import CapabilityIdentity, normalize_identity
 from ..ptz_models import directions_for
 from .camera_session import open_camera_session
-from .contracts import P2PProbeError, P2PPropertyRead
+from .contracts import CertifiedNode, OnlineDevice, P2PProbeError, P2PPropertyRead
 from .model_session import exchange_model_read
 from .ptz_protocol import DIRECTIONS, direction_supported
 from .ptz_route import NativePtzRoute
@@ -41,37 +41,53 @@ def prepare_ptz_route(enrollment: P2PEnrollment, expected: CapabilityIdentity | 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.bind(("", 0))
-        node, target, sequence = open_camera_session(sock, enrollment, min(1.5, budget), deadline)
+        inventory: list[OnlineDevice] = []
+        node, target, sequence = open_camera_session(
+            sock, enrollment, min(1.5, budget), deadline, inventory=inventory)
         if str(target.device_id) != enrollment.device_id or not target.status:
             raise P2PProbeError("native PTZ target is not the reviewed online camera")
-        reads = []
-        for offset, path in enumerate(("ProConst._productInfo", "ProConst._versionInfo", "ProReadonly.devInfo")):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise P2PProbeError("native PTZ preparation exhausted its time budget")
-            result = exchange_model_read(sock, node, target, path, (sequence + offset) & 0xFFFFFFFF,
-                                         min(2, remaining), retries=1, deadline=deadline,
-                                         require_correlated_response=True)
-            if type(result.error_code) is not int or result.error_code != 0:
-                raise P2PProbeError("native PTZ correlated preflight read failed")
-            reads.append(P2PPropertyRead(enrollment.device_id, path, True, False,
-                                         result.transport_acknowledged, 0, result.value))
-            if offset == 1:
-                identity = normalize_identity(reads[0], reads[1], device_id=enrollment.device_id)
-                if identity is None or (expected is not None and identity != expected):
-                    raise P2PProbeError("native PTZ identity does not match reviewed evidence")
-                if expected is None:
-                    reviewed = reviewed & directions_for(identity)
-                    if direction not in reviewed:
-                        raise P2PProbeError("native PTZ model profile is not supported")
-        if time.monotonic() >= deadline:
-            raise P2PProbeError("native PTZ preparation exhausted its time budget")
-        if not direction_supported(reads[2].value, direction):
-            raise P2PProbeError("native PTZ direction lacks current axis evidence")
-        return NativePtzRoute(sock, node, access_id=enrollment.access_id, device_id=target.device_id,
+        allowed = verify_ptz_target(sock, node, target, enrollment, expected, direction,
+                                    reviewed, sequence, deadline)
+        route = NativePtzRoute(sock, node, access_id=enrollment.access_id, device_id=target.device_id,
                               direction=direction, sequence=(sequence + 3) & 0xFFFFFFFF,
-                              allowed_directions=frozenset(
-                                  d for d in reviewed if direction_supported(reads[2].value, d)))
+                              allowed_directions=allowed)
+        route._inventory = {device.device_id: device for device in inventory}
+        key = ((camera_id, enrollment.device_id), expected, reviewed, enrollment.access_id,
+               enrollment.access_token, enrollment.dev_token)
+        route._verified = {key: allowed}
+        return route
     except BaseException:
         sock.close()
         raise
+
+
+def verify_ptz_target(sock: socket.socket, node: CertifiedNode, target: OnlineDevice,
+                      enrollment: P2PEnrollment, expected: CapabilityIdentity | None,
+                      direction: str, reviewed: frozenset[str], sequence: int,
+                      deadline: float) -> frozenset[str]:
+    """Three fresh correlated reads on the owned account socket, never motion."""
+    reads = []
+    for offset, path in enumerate(("ProConst._productInfo", "ProConst._versionInfo", "ProReadonly.devInfo")):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise P2PProbeError("native PTZ preparation exhausted its time budget")
+        result = exchange_model_read(sock, node, target, path, (sequence + offset) & 0xFFFFFFFF,
+                                     min(2, remaining), retries=1, deadline=deadline,
+                                     require_correlated_response=True)
+        if type(result.error_code) is not int or result.error_code != 0:
+            raise P2PProbeError("native PTZ correlated preflight read failed")
+        reads.append(P2PPropertyRead(enrollment.device_id, path, True, False,
+                                     result.transport_acknowledged, 0, result.value))
+        if offset == 1:
+            identity = normalize_identity(reads[0], reads[1], device_id=enrollment.device_id)
+            if identity is None or (expected is not None and identity != expected):
+                raise P2PProbeError("native PTZ identity does not match reviewed evidence")
+            if expected is None:
+                reviewed = reviewed & directions_for(identity)
+                if direction not in reviewed:
+                    raise P2PProbeError("native PTZ model profile is not supported")
+    if time.monotonic() >= deadline:
+        raise P2PProbeError("native PTZ preparation exhausted its time budget")
+    if not direction_supported(reads[2].value, direction):
+        raise P2PProbeError("native PTZ direction lacks current axis evidence")
+    return frozenset(d for d in reviewed if direction_supported(reads[2].value, d))

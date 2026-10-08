@@ -66,3 +66,22 @@ def test_worker_cleanup_runs_even_on_stop(monkeypatch):
     worker.stop()
     worker._run()
     assert calls == ["closed"]
+
+
+def test_success_transition_is_logged_once_without_vendor_material(monkeypatch, caplog):
+    camera = SimpleNamespace(camera_id="cam_test")
+    state = SimpleNamespace(prepared=True)
+    monkeypatch.setattr(control_sessions.registry, "list_cameras", lambda: [camera])
+    monkeypatch.setattr(control_sessions.drivers, "for_camera", lambda _: SimpleNamespace(
+        maintain_control_session=lambda _: state.prepared))
+    worker = control_sessions.ControlSessions()
+    with caplog.at_level("INFO", logger=control_sessions.__name__):
+        worker.tick()
+        worker.tick()
+        assert caplog.text.count("control_session prepared") == 1
+        state.prepared = False
+        worker.tick()
+        assert not worker._prepared
+        state.prepared = True
+        worker.tick()
+        assert caplog.text.count("control_session prepared") == 2

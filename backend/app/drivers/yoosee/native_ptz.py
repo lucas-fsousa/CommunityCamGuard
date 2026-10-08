@@ -12,15 +12,17 @@ from ...db.registry import Camera
 from ..contracts import ControlNotReady, ControlOperationError
 from .native_ptz_policy import PtzProfile
 from .p2p.contracts import P2PProbeError
+from .p2p.control_ownership import ControlChannelBusy, own_control_channel
 from .p2p.ptz_cache import CachedPtzRoute, PtzRouteCache
 from .p2p.ptz_motion import PtzBusy, PtzMotion
 from .p2p.ptz_prepare import prepare_ptz_route
+from .p2p.ptz_target import select_target
 from .p2p.renewal import run_with_fresh_access
 
 log = logging.getLogger(__name__)
 _guard = threading.Lock()
 _active: dict[str, PtzMotion] = {}
-_routes = PtzRouteCache()
+_routes = PtzRouteCache(shared_account=True)
 _warming: dict[str, threading.Event] = {}
 
 
@@ -32,7 +34,7 @@ def close_idle() -> None:
 def warm(camera: Camera, profile: PtzProfile) -> bool:
     """Prepare authenticated control state with correlated reads only; no motion."""
     with _guard:
-        if camera.camera_id in _active or camera.camera_id in _warming:
+        if _active or _warming:
             return False
         done = threading.Event()
         _warming[camera.camera_id] = done
@@ -47,11 +49,13 @@ def warm(camera: Camera, profile: PtzProfile) -> bool:
             if (current.camera_id != camera.camera_id or current.device_id != entry.device_id
                     or (profile.identity is not None and current.device_id != profile.identity.device_id)):
                 raise ControlNotReady("native PTZ renewed enrollment requires review")
-            key = (camera.camera_id, profile.identity, profile.directions,
+            key = ((camera.camera_id, current.device_id), profile.identity, profile.directions,
                    current.access_id, current.access_token, current.dev_token)
             return _routes.warm(key, lambda: prepare_ptz_route(
                 current, profile.identity, camera_id=camera.camera_id, direction=direction,
-                budget=12, reviewed_directions=profile.directions))
+                budget=12, reviewed_directions=profile.directions),
+                select=lambda route: select_target(route, current, profile.identity,
+                    camera_id=camera.camera_id, direction=direction, reviewed=profile.directions))
 
         return run_with_fresh_access(entry, prepare)
     except Exception as exc:
@@ -88,54 +92,62 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
     started = time.monotonic()
     motion = PtzMotion(0.2)
     with _guard:
-        if camera.camera_id in _active or len(_active) >= 4:
+        if _active:
             raise ControlNotReady("another PTZ operation is running; do not queue movements")
         _active[camera.camera_id] = motion
-        warming = _warming.get(camera.camera_id)
+        warming = next(iter(_warming.values()), None)
     try:
         # Join an already running read-only preparation, never open a duplicate
         # session or reject the user's first click just because warming is active.
         if warming is not None and not warming.wait(15):
             raise ControlNotReady("native PTZ preparation is still running")
-        entry = p2p.get_enrollment_for_camera(camera.camera_id)
-        if entry is None or (profile.identity is not None and entry.device_id != profile.identity.device_id):
-            raise ControlNotReady("native PTZ enrollment requires review")
-        try:
-            def acquire(current: P2PEnrollment) -> CachedPtzRoute:
-                # Renewal wraps preparation only: never put motion.run inside it.
-                if (current.camera_id != camera.camera_id or current.device_id != entry.device_id
-                        or (profile.identity is not None and current.device_id != profile.identity.device_id)):
-                    raise ControlNotReady("native PTZ renewed enrollment requires review")
-                if motion.cancelled:
-                    raise P2PProbeError("native PTZ preparation was cancelled")
-                key = (camera.camera_id, profile.identity, profile.directions,
-                       current.access_id, current.access_token, current.dev_token)
-                return _routes.acquire(key, lambda: prepare_ptz_route(
-                    current, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12,
-                    reviewed_directions=profile.directions), direction=direction)
-
-            route = run_with_fresh_access(entry, acquire)
-        except P2PProbeError:
-            # No START has been constructed/sent by preparation. Only this failure
-            # boundary may consider a standard finite-step fallback.
-            with _guard:
-                if motion.cancelled:
-                    return False
-            log.info("native_ptz preflight_failed camera=%s fallback=onvif", camera.camera_id)
-            return fallback()
-        ready = time.monotonic()
-        result = motion.run(route)
-        log.warning("native_ptz camera=%s direction=%s start_attempted=%s release_confirmed=%s errors=%s reused=%s prepare_ms=%d total_ms=%d",
-                 camera.camera_id, direction, result.start_attempted, result.release_delivery_confirmed,
-                 ",".join(result.error_types) or "none", route.reused,
-                 int((ready-started)*1000), int((time.monotonic()-started)*1000))
-        if result.cancelled and not result.start_attempted:
-            return False
-        if not result.release_delivery_confirmed or result.error_types:
-            raise ControlOperationError("native PTZ outcome is uncertain; movement was not repeated")
-        return True
+        with own_control_channel():
+            return _step_owned(camera, direction, profile, fallback, motion, started)
+    except ControlChannelBusy as exc:
+        raise ControlNotReady("another camera control operation is running") from exc
     except (OSError, ValueError, PtzBusy) as exc:
         raise ControlOperationError("native PTZ operation failed; movement was not repeated") from exc
     finally:
         with _guard:
             _active.pop(camera.camera_id, None)
+
+
+def _step_owned(camera: Camera, direction: str, profile: PtzProfile,
+                 fallback: Callable[[], bool], motion: PtzMotion, started: float) -> bool:
+    entry = p2p.get_enrollment_for_camera(camera.camera_id)
+    if entry is None or (profile.identity is not None and entry.device_id != profile.identity.device_id):
+        raise ControlNotReady("native PTZ enrollment requires review")
+    try:
+        def acquire(current: P2PEnrollment) -> CachedPtzRoute:
+            # Renewal wraps preparation only: never put motion.run inside it.
+            if (current.camera_id != camera.camera_id or current.device_id != entry.device_id
+                    or (profile.identity is not None and current.device_id != profile.identity.device_id)):
+                raise ControlNotReady("native PTZ renewed enrollment requires review")
+            if motion.cancelled:
+                raise P2PProbeError("native PTZ preparation was cancelled")
+            key = ((camera.camera_id, current.device_id), profile.identity, profile.directions,
+                   current.access_id, current.access_token, current.dev_token)
+            return _routes.acquire(key, lambda: prepare_ptz_route(
+                current, profile.identity, camera_id=camera.camera_id, direction=direction, budget=12,
+                reviewed_directions=profile.directions), direction=direction,
+                select=lambda route: select_target(route, current, profile.identity,
+                    camera_id=camera.camera_id, direction=direction, reviewed=profile.directions))
+
+        route = run_with_fresh_access(entry, acquire)
+    except P2PProbeError:
+        # No START has been sent. Only this boundary may use finite-step fallback.
+        if motion.cancelled:
+            return False
+        log.info("native_ptz preflight_failed camera=%s fallback=onvif", camera.camera_id)
+        return fallback()
+    ready = time.monotonic()
+    result = motion.run(route)
+    log.warning("native_ptz camera=%s direction=%s start_attempted=%s release_confirmed=%s errors=%s reused=%s prepare_ms=%d total_ms=%d",
+             camera.camera_id, direction, result.start_attempted, result.release_delivery_confirmed,
+             ",".join(result.error_types) or "none", route.reused,
+             int((ready-started)*1000), int((time.monotonic()-started)*1000))
+    if result.cancelled and not result.start_attempted:
+        return False
+    if not result.release_delivery_confirmed or result.error_types:
+        raise ControlOperationError("native PTZ outcome is uncertain; movement was not repeated")
+    return True

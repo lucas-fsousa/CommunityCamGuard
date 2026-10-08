@@ -71,15 +71,16 @@ class YooseeDriver(CameraDriver):
         # Both native PTZ and the ONVIF fallback implement server-stopped steps.
         return "step"
 
-    def maintain_control_session(self, camera: Camera) -> None:
+    def maintain_control_session(self, camera: Camera) -> bool:
         from . import native_ptz
         from .native_ptz_policy import selected
 
         if camera.capabilities.get("ptz") is not True:
-            return
+            return False
         profile = selected(camera.camera_id)
         if profile is not None:
-            native_ptz.warm(camera, profile)
+            return native_ptz.warm(camera, profile)
+        return False
 
     def close_control_sessions(self) -> None:
         from . import native_ptz

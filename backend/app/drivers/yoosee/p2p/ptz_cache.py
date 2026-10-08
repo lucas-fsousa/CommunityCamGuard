@@ -29,31 +29,49 @@ class PtzRouteCache:
     are permitted only within the axes verified when the route was prepared.
     Caller retains per-camera ownership throughout acquire/use/return.
     """
-    def __init__(self) -> None:
+    def __init__(self, *, shared_account: bool = False) -> None:
         self._lock = threading.Lock()
         self._idle: dict[tuple[object, ...], _Idle] = {}
+        self._shared_account = shared_account
 
-    def warm(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute]) -> bool:
+    def _storage_key(self, key: tuple[object, ...]) -> tuple[object, ...]:
+        if not self._shared_account:
+            return key
+        if len(key) != 6:
+            raise ValueError("complete PTZ credential/profile key required")
+        return ("account", key[3], key[4])
+
+    def warm(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute], *,
+             select: Callable[[NativePtzRoute], NativePtzRoute] | None = None) -> bool:
         """Retain a never-started/stopped route; replace before its absolute deadline.
 
         Caller owns this camera exclusively. Broker heartbeats validate liveness
         without extending the 20s absolute lifetime. At most four idle sockets.
         """
+        if self._shared_account and select is None:
+            raise ValueError("shared PTZ session requires explicit target selection")
         now = time.monotonic()
         with self._lock:
-            idle = self._idle.pop(key, None)
+            idle = self._idle.pop(self._storage_key(key), None)
             full = len(self._idle) >= 4
         if idle is not None:
             idle.timer.cancel()
             if now < idle.expires and now - idle.created < 15:
+                route = idle.route
                 try:
-                    idle.route.keepalive()
+                    route.keepalive()
                 except BaseException as exc:
-                    idle.route.close()
+                    route.close()
                     if isinstance(exc, Exception):
                         raise PtzKeepaliveError("PTZ broker liveness check failed") from exc
                     raise
-                lease = CachedPtzRoute(self, key, idle.route, idle.created, True)
+                try:
+                    if select is not None:
+                        route = select(route)
+                except BaseException:
+                    route.close()
+                    raise
+                lease = CachedPtzRoute(self, key, route, idle.created, True)
                 return self._return(lease, prepared=True)
             idle.route.close()
         if full:
@@ -69,15 +87,26 @@ class PtzRouteCache:
             item.route.close()
 
     def acquire(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute],
-                *, direction: str | None = None) -> CachedPtzRoute:
+                *, direction: str | None = None,
+                select: Callable[[NativePtzRoute], NativePtzRoute] | None = None) -> CachedPtzRoute:
+        if self._shared_account and select is None:
+            raise ValueError("shared PTZ session requires explicit target selection")
         with self._lock:
-            idle = self._idle.pop(key, None)
+            idle = self._idle.pop(self._storage_key(key), None)
         now = time.monotonic()
         if idle is not None:
             idle.timer.cancel()
             if now - idle.created < 20 and now < idle.expires:
+                if self._shared_account:
+                    try:
+                        idle.route.keepalive()
+                    except (OSError, P2PProbeError):
+                        idle.route.close()
+                        created = time.monotonic()
+                        return CachedPtzRoute(self, key, prepare(), created, False)
                 try:
-                    renewed = idle.route.renew() if direction is None else idle.route.renew(direction)
+                    renewed = (select(idle.route) if select is not None else
+                               idle.route.renew() if direction is None else idle.route.renew(direction))
                     return CachedPtzRoute(self, key, renewed, idle.created, True)
                 except BaseException as exc:
                     idle.route.close()
@@ -92,17 +121,18 @@ class PtzRouteCache:
         if remaining <= 0 or (not prepared and not lease.confirmed) or lease.failed:
             lease.route.close()
             return False
-        timer = threading.Timer(min(8, remaining), self._expire, args=(lease.key, lease.route))
+        key = self._storage_key(lease.key)
+        timer = threading.Timer(min(8, remaining), self._expire, args=(key, lease.route))
         timer.daemon = True
         with self._lock:
-            if len(self._idle) >= 4 or lease.key in self._idle:
+            if len(self._idle) >= 4 or key in self._idle:
                 lease.route.close()
                 return False
-            self._idle[lease.key] = _Idle(lease.route, lease.created, timer, time.monotonic()+min(8, remaining))
+            self._idle[key] = _Idle(lease.route, lease.created, timer, time.monotonic()+min(8, remaining))
             try:
                 timer.start()
             except BaseException:
-                self._idle.pop(lease.key)
+                self._idle.pop(key)
                 lease.route.close()
                 raise
         return True
