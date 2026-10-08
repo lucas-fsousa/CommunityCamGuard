@@ -31,6 +31,15 @@ bitstream validation. Small metadata helpers/tests added, no camera traffic or
 runtime media capability enabled. Next: downstream receive PTS time-base proof
 and real-record interoperability. See [codec evidence](docs/internal/yoosee-rtc-codecs.md).
 
+RTC timing follow-up: secondary vtable slots link queued media to the demuxer;
+both receive representations explicitly set 1/1000000 time bases. UTC comes
+from separate `frame_time` side data, not from treating PTS as Unix time.
+Conditional PTS/DTS/duration repair is now traced after queue receive; it is not
+copied into our lossless parser. Next: final packet construction, cached timeline
+repair and provenance-checked real-record interoperability; no runtime conversion
+or native-HD capability enabled.
+See [timing evidence](docs/internal/yoosee-rtc-timing.md).
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

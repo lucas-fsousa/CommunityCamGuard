@@ -216,3 +216,9 @@ the packet. Missing buffers return -11. These wrappers therefore do not supply
 the missing receive time base; the next target is their decoder-side caller,
 not capture-input time-base initialization. Inspections peaked at 35.9 MiB/no
 swap under 128 MiB, without executing SDK code or contacting cameras.
+
+Follow-up: the secondary-vtable/demuxer link and receive representation setup
+now establish a microsecond media time base; UTC remains separate metadata.
+See [receive timing evidence](yoosee-rtc-timing.md) for exact branches, limits
+and remaining timeline-rewrite/real-record validation. Earlier sections describe
+the narrower evidence available at their checkpoint; no runtime conversion is enabled.

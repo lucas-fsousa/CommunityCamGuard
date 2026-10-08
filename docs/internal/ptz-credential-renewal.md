@@ -143,3 +143,8 @@ Through 03:49:22 UTC (multiple renewal cycles), no preparation/heartbeat failure
 was observed. This is a short observation window, not a long-running reliability
 claim or physical first-click validation. Both containers reported OOMKilled=false;
 app/go2rtc memory was approximately 119/334 MiB. No motion command was sent.
+
+Extended check through 03:56:33 UTC: the same three preparation transitions
+remain, with no `warm_failed` or preparation-failure logs observed since startup
+(approximately nine minutes). The health endpoint remains OK. This still does
+not substitute for physical latency or long-duration/credential-expiry validation.
