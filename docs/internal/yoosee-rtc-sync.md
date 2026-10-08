@@ -131,7 +131,11 @@ No SDK binary was executed, no camera was contacted, and no production settings
 were changed. These are evidence/docs changes, not an implementation of the SDK
 scheduler or a diagnosis of the browser's stalls.
 
-Next: establish the audio PTS producer before +0x58, caller-provided hold
+The [audio-output follow-up](yoosee-rtc-audio-output.md) traces the software
+position accumulator and byte-array JNI callback, and records a signature
+mismatch that prevents reusing the existing Java decompilation as proof.
+
+Next: finish audio field/scale provenance, caller-provided hold
 limit and the remaining successful-request consumption branches. Real authenticated
 RTC fixtures, ownership, platform verification and teardown remain independent
 requirements before enabling native streaming.

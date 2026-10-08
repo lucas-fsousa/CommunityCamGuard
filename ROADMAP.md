@@ -79,6 +79,13 @@ explicitly consumes after an accepted scheduling decision. Audio vtable slot
 scale, not a hardware-latency query. Next: upstream audio PTS production and
 caller hold-limit provenance. No physical camera action needed for this work.
 
+Receive-audio follow-up: traced a software position accumulator and the JNI
+`onFrameUpdate(byte[])` void callback; neither is a hardware playback receipt.
+Existing decompiled Java uses `AVData` instead, so it is not matching evidence
+for this SDK. Next: provenance-pinned, bounded extraction of the matching 6.45
+Java callback and remaining timing-field producers. No two-way-audio changes;
+see [audio-output evidence](docs/internal/yoosee-rtc-audio-output.md).
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement
