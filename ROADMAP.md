@@ -93,6 +93,12 @@ receive-side vendor behavior, not our two-way-audio path or proof of audibility.
 Inspection peaked at 284 MiB under a 384 MiB hard cap, no swap. No physical
 command sent. Next: remaining timing inputs and real authenticated RTC fixture.
 
+Video hold-limit checkpoint: both renderer call sites pass converted frame
+duration, not a fixed network timeout. One path replaces only zero duration with
+an FPS-derived value capped at 100 ms; the separate 500 ms rule concerns audio
+clock freshness. Configuration/time-base source and existing-renderer update
+are traced. No SDK fallback is copied into the lossless wire parser.
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

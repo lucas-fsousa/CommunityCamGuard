@@ -59,12 +59,34 @@ the audio clock and calls `shouldHoldVideoForAudio` at `0x1f0290`.
 That helper (`0x1f45a8`, 20 bytes) requires a positive limit and
 `video_pts - audio_pts > limit`. The hold branch records per-stream state,
 logs and returns zero (`0x1f04a4–0x1f04d0`), which the video caller checks.
-The source/configuration of the caller-provided limit remains to trace.
+The caller-provided limit is derived from frame duration, as traced below.
 
 The initial-join helper (`0x1f45bc`, 28 bytes) similarly checks its freshness
 boolean, positive limit and video-ahead delta. Although its caller computes a
 queue-size boolean in `w4`, this helper body does not read `w4`. Do not infer a
 queue-size-dependent decision from its signature alone.
+
+### Caller-provided limit is frame-derived, not a fixed network timeout
+
+Both inspected `VideoRenderer::obtainFrame` call sites initialize the reference
+argument from `trunc(renderer[+0x128] * 1,000,000 * AVFrame[+0x1d8])`:
+`0x245818–0x24584c` stores it at stack +0x118, and `0x245a4c–0x245a7c` at +0xf8.
+Those exact addresses are passed by reference to `request_render_frame`.
+
+The second path applies a fallback **only when that integer is zero and the
+configured positive frame rate exists**: `min(trunc(1,000,000 / fps), 100,000)`
+at `0x245a80–0x245ac0`. It does not replace an arbitrary negative duration or
+cap every nonzero duration at 100 ms. Do not interpret this fallback cap as a
+universal buffer size or live latency target.
+
+The renderer constructor copies configuration +0x10 to renderer +0x128 and
+configuration +0x0c to renderer +0x124 (`0x241304–0x241310`). In
+`start_render_nolock`, frame metadata +0x160 supplies configuration +0x10
+(`0x1e7378–0x1e737c`), connecting it to the previously traced time-base scalar.
+The frame-rate ratio is computed at `0x1e735c–0x1e7394`. The existing-renderer
+branch copies this updated configuration back at `0x1e7454–0x1e745c`.
+Thus the inspected hold input is a media-duration conversion, not a hardcoded
+500 ms wait; 500 ms belongs to the separate audio-clock freshness check.
 
 ## Audio update boundary
 
@@ -135,7 +157,7 @@ The [audio-output follow-up](yoosee-rtc-audio-output.md) traces the software
 position accumulator and byte-array JNI callback, and records a signature
 mismatch that prevents reusing the existing Java decompilation as proof.
 
-Next: finish audio field/scale provenance, caller-provided hold
-limit and the remaining successful-request consumption branches. Real authenticated
+Next: finish audio field/scale provenance and the remaining successful-request
+consumption branches. Real authenticated
 RTC fixtures, ownership, platform verification and teardown remain independent
 requirements before enabling native streaming.
