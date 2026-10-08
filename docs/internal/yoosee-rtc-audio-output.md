@@ -64,14 +64,44 @@ that signature. It cannot establish the implementation of this SDK's `([B)V`
 callback. Its method also carries a decompiler correctness warning. No behavior
 from that Java file was used to claim Android write/latency semantics here.
 
-Next Android-side inspection must locate the matching class in the corresponding
-6.45 base APK and pin its provenance before tracing the callback. Do not launch
-a whole-APK decompilation to resolve this small boundary: use a bounded,
-single-class extraction with an enforced memory limit when available.
+### Matching 6.45 bytecode follow-up
+
+The matching class was subsequently located and inspected directly in
+`re/apk/yoosee-6.45-xapk/com.yoosee.apk`, member `classes7.dex` (8,495,612 bytes;
+SHA-256 `25a9cc6bc3ea6037bd2aea123ce7599ef896cb075230700157f7fe0d2b17eb0a`).
+Only that DEX was parsed with Androguard; no whole-APK decompilation or native
+execution. The exact class is `Lcom/gw/player/render/DefaultAudioRenderer;`.
+
+Its `onFrameUpdate([B)V` has code-item offset `0x508cb0`. Offsets below are
+**byte offsets within the method's instruction stream**, not native addresses:
+
+- +0x0e: locks `mLockForAudioTrack`; null track or empty input skips the write.
+- +0x46/+0x54: grows a temporary byte array as needed and copies the input.
+- +0x62: optionally calls `IAudiFilter.filter([B)[B`; a non-null result replaces
+  the buffer selected for output, otherwise the original input remains selected.
+- +0x74: calls `AudioTrack.write(byte[], 0, selected_array.length)`.
+- +0x7a: immediately loads the lock reference, **without `move-result`**;
+  the integer write return value is discarded. No retry/partial-write accounting
+  appears in this method. +0x7e unlocks, +0x84 returns void.
+
+The code item has zero try blocks. Thus this method has no local exception
+handler/finally around the locked filter/write path. That is a property of the
+vendor callback, not a bug in our dashboard and not proof that an exception
+actually occurred in any observed session.
+
+`initAudioTrack` (code-item `0x508af0`) has one try block and references
+`getMinBufferSize`, the six-integer `AudioTrack` constructor, `setVolume`,
+`play` and `flush`. This confirms an Android audio-output implementation exists;
+the call index does not prove runtime initialization success, selected device,
+speaker audibility or actual latency. The selected renderer binding in a real
+session remains separate from this default implementation's existence.
 
 ## Scope and validation
 
-Static reads were sequential with 128 MiB cap, no swap, 50% of one CPU. No
+Native static reads were sequential with 128 MiB cap, no swap, 50% of one CPU.
+Matching-Dex parsing was separately capped at 384 MiB/45 seconds/50% CPU/no swap;
+two targeted passes completed in about six seconds, peaks 283.8/264.7 MiB.
+No
 proprietary code execution, camera command, network capture or production
 change. The queue/vtable checkpoint `5afa3b9` passed CI `37834577611`.
 
@@ -80,3 +110,6 @@ receive path cannot be validated by sending a siren/light/PTZ command. The
 remaining native-media gate still needs authenticated media/session provenance,
 platform verification and safe teardown; physical confirmation alone does not
 replace those requirements.
+
+Next: finish hold-limit/scale provenance and authenticated fixture acquisition,
+not repeated Android decompilation or a camera-speaker test of this receive path.

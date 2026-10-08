@@ -86,6 +86,13 @@ for this SDK. Next: provenance-pinned, bounded extraction of the matching 6.45
 Java callback and remaining timing-field producers. No two-way-audio changes;
 see [audio-output evidence](docs/internal/yoosee-rtc-audio-output.md).
 
+Matching Java checkpoint: bounded parsing of the pinned 6.45 `classes7.dex`
+confirms `onFrameUpdate(byte[])` calls Android `AudioTrack.write`; its return
+value is discarded and the callback has no local exception handler. This is
+receive-side vendor behavior, not our two-way-audio path or proof of audibility.
+Inspection peaked at 284 MiB under a 384 MiB hard cap, no swap. No physical
+command sent. Next: remaining timing inputs and real authenticated RTC fixture.
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement
