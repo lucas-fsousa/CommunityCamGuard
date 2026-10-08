@@ -64,6 +64,14 @@ network latency or the browser's catch-up policy. Next: renderer decision/commit
 callers and audio-clock field provenance. Documentation only, no runtime changes;
 see [render evidence](docs/internal/yoosee-rtc-render.md).
 
+Synchronization follow-up: actual video/audio renderer call sites reach frame
+requests and audio-clock updates. Pinned dependencies prove monotonic microsecond
+anchors; audio freshness is at most 500 ms and stale audio bypasses the inspected
+audio-ahead hold check. Default strategy enum 1 resolves to `SYNC`. No direct
+callers found for the separate decision/commit helpers. Next: concrete audio
+output timing, hold-limit provenance and queue consumption; no scheduler copied
+into production. See [sync evidence](docs/internal/yoosee-rtc-sync.md).
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

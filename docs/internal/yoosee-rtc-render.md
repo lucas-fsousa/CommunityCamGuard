@@ -58,8 +58,9 @@ elapsed value to nonnegative, multiplies by the double at +0x28, converts to an
 integer, caps it at the extent, and adds the stored base.
 
 This proves bounded local clock interpolation, not UTC conversion or a fixed
-network-buffer duration. The time conversion's unit and the producers of the
-extent/rate fields still require tracing. It does not prove the clock is always
+network-buffer duration. The [synchronization follow-up](yoosee-rtc-sync.md)
+establishes monotonic microseconds and audio update semantics; the concrete
+audio-output producer remains to trace. It does not prove the clock is always
 the audio master or that the browser's catch-up behavior uses this algorithm.
 
 ## Presentation commit helper: caller still unproven
@@ -91,9 +92,10 @@ strings alone do not prove the conditions, thresholds or policy in use.
 - `commitPresentedFrame`: `0x1f0ef0`, 308 bytes.
 - `updateAudioClock`: `0x1f1274`, 292 bytes.
 
-These symbol-resolved targets are not yet proof of their callers, scheduling
-thresholds, presentation policy or hardware output. Next establish those edges
-and generation checks before considering any reusable scheduling contract.
+The [synchronization follow-up](yoosee-rtc-sync.md) establishes callers of
+`request_render_frame` and `updateAudioClock`, the 500 ms freshness check and
+conditional audio-ahead holding. Direct callers of the decision/commit helpers
+and concrete hardware-output behavior remain unproven.
 
 Sequential static reads used a 128 MiB memory cap, no swap and 50% of one CPU;
 peak observed memory was 31.9 MiB. This checkpoint changes documentation only.
