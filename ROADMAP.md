@@ -49,6 +49,13 @@ interoperability and queue/scheduling semantics as needed; no runtime conversion
 or native-HD capability enabled.
 See [timing evidence](docs/internal/yoosee-rtc-timing.md).
 
+Decoder-loop follow-up: identified a later duplicate-PTS rewrite used by the
+vendor's metadata association, a bounded 41-key per-stream metadata history,
+local -11 decoder retry, and seek-generation output gates. None imply camera
+retransmission, a 41-frame buffer or a universal live-frame-dropping policy.
+Added raw-timestamp preservation regressions; 366 focused RTC tests pass.
+Real authenticated media fixtures and render/synchronization behavior remain open.
+
 Native relay follow-up: mapped the actual ready-path quality timer to bounded
 telemetry, not resolution selection or the disconnected score helper. Added an
 offline generation recheck for already-parsed queued work; retirement/replacement

@@ -142,10 +142,50 @@ branches to submission, so its wording alone must not be used as proof of a
 dropped packet. Other decoder implementations and the queue/run path are not
 covered by this bounded check; no universal decoder behavior is claimed.
 
+## Decoder run-loop checkpoint
+
+`AVDecoder::run` (`0x164a74`, 9324 bytes) was inspected through targeted windows
+after a streamed call-site listing, not whole-section decompilation. The loop
+snapshots packet queues under a mutex (`0x164bd8–0x164cf8`). Empty-queue paths
+at `0x164ec8` / `0x164ee4` construct 10,000,000 nanoseconds and call
+`sleep_for`: a **10 ms local wait**, not camera packet pacing or network RTT.
+The packet path calls `popFront(false)` at `0x164e98`; the null-packet/flush
+case separately invokes `pop_locked` at `0x164f54`.
+
+The loop's metadata association is keyed by PTS (`unordered_map<unsigned long,
+AVExtInfo>` at stack +0x200). Lookup at `0x1651d0–0x1652c8` detects an existing
+key; after the `avoid duplicate pts` log, it increments a local counter and
+**writes PTS + counter back to AVPacket +8** at `0x165330`. It then continues
+to submission. This is a genuine later PTS rewrite, unlike the previously
+inspected wrapper. This window does not update DTS and does not prove globally
+unique timestamps, monotonicity or absence of cross-stream collisions.
+
+After `sendPacket` at `0x165418`, success and -11 continue to receive processing;
+other negative returns take the cleanup branch. Metadata is associated with the
+submitted PTS at `0x165490–0x1654a0`. A per-stream list of association keys is
+trimmed when its length reaches 42, repeating until it is at most 41
+(`0x1654ec–0x165534`). **41 is a metadata-history limit**, not a proven frame
+queue capacity, latency limit or camera-buffer size. After frame reception, the
+-11 path logs `resend` at `0x1668ec` and returns to submission via `0x165338`.
+This is local decoder backpressure handling, not retransmission to a camera.
+
+`checkSkipFrames` (`0x167990`, 596 bytes) rejects an older seek generation at
+`0x1679d4–0x167a38`. With a configured seek threshold, streams not already marked
+ready reject earlier PTS until crossing that threshold, then enter the ready set.
+Return zero takes the skip branch after the frame-side call at `0x1666dc`;
+return one permits further state/listener/output checks. These are seek-generation
+and timeline gates, not evidence of a generic live “drop to latest frame” policy.
+
+Parser regression tests deliberately preserve duplicate video PTS, repeated and
+backward grouped-audio PTS in wire order, zero/restarted timelines and all u64
+boundary values (including the bit pattern the decoder uses as a signed sentinel).
+No deduplication, epoch conversion or vendor PTS increment is copied into the
+lossless RTC parser. Session ownership and generation validation remain caller-owned.
+
 ## Validation and remaining work
 
 All inspection was static and sequential, capped at 128 MiB/50% CPU/no swap;
-the new targeted reads peaked at 42.6 MiB. No proprietary library was executed.
+the new targeted reads peaked at 46.1 MiB. No proprietary library was executed.
 The descriptor/helper commit `de786b0` passed exact-SHA CI run `37724951642`.
 
 The timing checkpoint `e138118` also passed exact-SHA CI run `37725249416`.
@@ -153,8 +193,13 @@ The existing capture was already audited in [capture evidence](yoosee-push-captu
 it has not supplied an authenticated RTC fixture. Do not rerun that same negative
 prefix inspection and present it as new interoperability evidence.
 
-Next: validate framing, codec and timing against a provenance-checked real record,
-and trace the decoder queue/run path if its scheduling semantics are needed.
+366 focused RTC tests passed (115.8 MiB peak/no swap under a 256 MiB/50%-CPU cap).
+This validates synthetic parser contracts, not proprietary-library execution or
+real-camera interoperability.
+
+Next: validate framing, codec and timing against a provenance-checked real record.
+Further scheduling evidence would require frame-output/render consumers; this
+checkpoint does not prove real-time presentation or audio/video synchronization.
 A microsecond contract alone does not
 authorize live native streaming. Authenticated relay ownership, platform/mode
 verification, teardown and per-device capabilities remain independent gates.

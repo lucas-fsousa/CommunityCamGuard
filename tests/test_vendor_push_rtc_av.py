@@ -48,6 +48,33 @@ def test_non_key_video_and_unmapped_discriminator():
     assert unknown.is_key_frame is None
 
 
+def test_repeated_video_pts_does_not_deduplicate_or_rewrite_payloads():
+    first, = parse_rtc_av_units(record(clock=100, payload=b"first"))
+    second, = parse_rtc_av_units(record(clock=100, payload=b"second"))
+    assert first.pts_raw == second.pts_raw == 100
+    assert (first.payload, second.payload) == (b"first", b"second")
+
+
+def test_grouped_audio_preserves_duplicate_and_backward_pts_in_wire_order():
+    units = parse_rtc_av_units(record(flags=1, count=3, clock=100,
+                                     payload=part(b"a", 7) + part(b"b", 7) + part(b"c", 2)))
+    assert [unit.pts_raw for unit in units] == [107, 107, 102]
+    assert [unit.payload for unit in units] == [b"a", b"b", b"c"]
+
+
+@pytest.mark.parametrize("clock", [0, (1 << 63) - 1, 1 << 63, (1 << 64) - 1])
+def test_wire_pts_is_not_signed_sentinel_or_wall_clock_conversion(clock):
+    unit, = parse_rtc_av_units(record(clock=clock))
+    assert unit.clock_raw == unit.pts_raw == clock
+
+
+def test_new_record_can_restart_timeline_without_inheriting_parser_history():
+    first, = parse_rtc_av_units(record(clock=9000000))
+    restarted, = parse_rtc_av_units(record(clock=0))
+    assert first.pts_raw == 9000000
+    assert restarted.pts_raw == 0  # Session/generation validation is caller-owned.
+
+
 @pytest.mark.parametrize("count", [1, 15])
 def test_count_bound_and_zero_length_structural_units(count):
     assert len(parse_rtc_av_units(record(flags=1, count=count, payload=part(b"") * count))) == count
