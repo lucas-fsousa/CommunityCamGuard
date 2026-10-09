@@ -13,7 +13,12 @@ class MTPRelayDescriptor:
     index: int
     flags: int
     address: str = field(repr=False)
-    port: int = field(repr=False)
+    udp_port: int = field(repr=False)
+
+    @property
+    def tcp_port(self) -> int:
+        """TCP helper swaps the advertised word; UDP helper copies it as-is."""
+        return ((self.udp_port & 0xFF) << 8) | (self.udp_port >> 8)
 
 
 @dataclass(frozen=True, slots=True)

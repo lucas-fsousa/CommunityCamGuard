@@ -10,8 +10,9 @@ def build_mtp_tcp_pair_request(
 ) -> bytes:
     """Encode the 74-byte request from SDK 6.45 iv_on_tcp_connect_finished.
 
-    relay_link_id comes from native MTP session +0x5e8, not automatically the
-    calling link at +0x20. Its assignment must be established before live use.
+    relay_link_id comes from native MTP session +0x5e8. A newly allocated SDK
+    session copies it to the calling link at +0x20; reused sessions need their
+    own provenance rather than assuming those fields stay equal indefinitely.
     The timestamp is supplied by the caller, in monotonic milliseconds. No AV
     command, token, userdata, retry, session lookup or network I/O is added.
     """

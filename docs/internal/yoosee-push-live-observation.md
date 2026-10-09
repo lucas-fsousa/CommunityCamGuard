@@ -76,8 +76,8 @@ descriptor flags. The SDK handler takes the receive frame at argument `x1+0x1b0`
 (`0x247708–0x247710`), resolves the MTP session using frame `+0x1c`, and reads
 v4/v6 counts at `+0x78/+0x79` (`0x247f3c–0x247f88`). Tables start at `+0x7a`,
 with strides 16/28. The SDK clamps counts to 32/16; our parser rejects overflow.
-Descriptor flags are little-endian at entry `+8`. Ports at `+10` are network-order:
-the UDP helper copies them into `sockaddr` and converts them for logging
+Descriptor flags are little-endian at entry `+8`. The **UDP view** of ports at
+`+10` is network-order: the UDP helper copies them into `sockaddr` and converts them for logging
 (`0x25b350–0x25b35c`, `0x25b398–0x25b3a4`). Addresses begin at `+12`.
 
 The selection loop tests bit 2 of **either paired family descriptor** before
@@ -140,8 +140,50 @@ In SDK 6.45, `iv_mtp_session_add_tcp_relay` schedules TCP via
 integer widths. It does not reuse the direct `c0/90` meter's extra fields or the
 E4 relay certification token. **Session `+0x5e8` assignment is still unproven**;
 do not substitute the calling link at `+0x20`. The response/readiness transition
-and callback registration chain still need verification before live pairing.
-No pairing packet was sent. Targeted disassembly stayed below 128 MiB/no swap.
+and callback registration chain were still pending at that codec checkpoint.
+No pairing packet was sent at that checkpoint. Targeted disassembly stayed below
+128 MiB/no swap. The subsequent limited live experiment is recorded below.
+
+### Native MTP TCP transport reached; media still unproven
+
+Further SDK inspection closed the initial identifier assignment:
+`iv_mtp_session_new` seeds the low 24 bits at session `+0x5e8`, clears bits 24–29
+and copies the value to calling link `+0x20` at `0x25a908–0x25a914`.
+This establishes equality on creation, not on every reused-session transition.
+
+The first TCP attempt was refused before any application packet was sent.
+Review found a concrete parser/diagnostic error: we had generalized UDP port
+byte order to TCP. TCP's helper **reverses** the word before storing it in its
+sockaddr (`0x25c110–0x25c124`, IPv6 `0x25c164–0x25c178`).
+`ivtcp_comm_add_connect` copies that sockaddr unchanged at `0x1edf80–0x1edfb4`,
+and `ivtcp_start_connect` passes it to `bufferevent_socket_connect`.
+The TCP view is therefore little-endian on the advertised bytes, unlike the UDP
+view. Descriptors now expose explicit `udp_port` and `tcp_port`, not one ambiguous
+port. Both family views have regression coverage. This corrects the earlier
+generic-port statement without changing the unrelated E4 codec.
+
+After that correction, one fresh camera-3 route's first advertised global IPv4
+TCP candidate accepted the connection, received the exact 74-byte pairing request
+and returned **82 bytes starting `c0/d0`, with a valid MTP checksum**. A second
+instrumented observation reproduced the result. Each attempt used one advertised
+candidate, one send, a three-second TCP budget, at most 4096 received bytes, no
+address/port scanning and no AV INIT/START or camera-control command. TCP sockets
+were closed in `finally`. Both runs peaked at 38.4 MiB with no swap.
+
+This is real native TCP relay transport, not a successful media session:
+the response does not match the existing plain `c0/90` meter layout. Applying
+that layout's offsets yields no link/device/timestamp correlation. Do not relabel
+it a meter ACK or successful certification merely because its checksum is valid.
+The TCP receive callback at `0x25bd00` accepts MTP prefix bit 4, handles partial
+records and dispatches to `iv_on_mtp_tcp_frm`; that dispatch/decode path is next.
+No E4 or confirmed B9 receipt was observed. Production remains unchanged.
+
+The experimental connector lives only in ignored `re/mtp_tcp_probe_once.py` and
+is opt-in through `CCG_PROBE_MTP_TCP=1`. It accepts current broker-session/link
+correlation plus checksum, permits only advertised global IPv4 TCP candidates,
+and does not reinterpret the opaque A3 suffix. The first refused attempt's
+top-level `relay_contacted` flag was incorrectly left false; its nested
+`tcp_probe.attempted` was true. The diagnostic bookkeeping is corrected.
 
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),

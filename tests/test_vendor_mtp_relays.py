@@ -35,12 +35,14 @@ def parse(frame):
 def test_tables_preserve_independent_family_indices_and_private_repr():
     result = parse(packet(2, 1))
     assert result is not None
-    assert [(d.family, d.index, d.flags, d.port) for d in result] == [
+    assert [(d.family, d.index, d.flags, d.udp_port) for d in result] == [
         (4, 0, 4, 19800), (4, 1, 4, 19800), (6, 0, 4, 19800),
     ]
     assert result[0].address == "192.0.2.1"
     assert result[2].address == "2001:db8::1"
     assert "192.0.2.1" not in repr(result) and "19800" not in repr(result)
+    assert result[0].tcp_port == 0x584D
+    assert result[2].tcp_port == 0x584D
 
 
 def test_empty_and_maximum_tables():

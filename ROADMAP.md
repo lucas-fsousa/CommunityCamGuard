@@ -487,6 +487,13 @@ admission remains unchanged. Saved-sample checksum and four IPv4/nonzero-port
 entries verified offline. SDK TCP `c0/80` pairing encoder is now socket-free and
 tested; next trace session `+0x5e8` assignment and response/readiness before use.
 
+Native MTP TCP follow-up: creation-time link assignment traced; corrected the
+TCP-specific advertised-port byte order (distinct from UDP). Two controlled
+camera-3 experiments established a TCP connection, sent the 74-byte native
+pairing request and received an 82-byte `c0/d0` response with valid checksum.
+**Transport reached, media/authenticated pairing not proven**: next decode the
+TCP receive dispatch; plain-meter offsets do not correlate. No runtime activation.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
