@@ -494,6 +494,12 @@ pairing request and received an 82-byte `c0/d0` response with valid checksum.
 **Transport reached, media/authenticated pairing not proven**: next decode the
 TCP receive dispatch; plain-meter offsets do not correlate. No runtime activation.
 
+Follow-up milestone: SDK dispatch revealed an eight-byte extended prefix. A
+fresh TCP observation then correlated kind-1/68-byte MTP request with the current
+link, camera-3 source and our destination ID. Native camera-correlated MTP traffic
+through relay is proven; it is not an ACK or media-ready session. Extended meter
+parser/tests added separately; next map/respond to that request, still without AV.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

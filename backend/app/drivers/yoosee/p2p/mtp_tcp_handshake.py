@@ -1,8 +1,38 @@
 """Offline SDK-shaped TCP pairing request; no connector or readiness inference."""
 
 import struct
+from dataclasses import dataclass
 
-from .media_protocol import build_mtp_frame
+from .media_protocol import build_mtp_frame, verify_mtp_frame
+
+
+@dataclass(frozen=True, slots=True)
+class MTPTCPMeter:
+    kind: int
+    timestamp_ms: int
+
+
+def parse_mtp_tcp_meter(
+    frame: bytes, *, expected_link_id: int, expected_source_id: int,
+    expected_destination_id: int,
+) -> MTPTCPMeter | None:
+    """Correlate the observed extended TCP meter; never implies media readiness.
+
+    SDK dispatch skips eight bytes when prefix bits 5–6 are nonzero. Accept only
+    the observed c0/d0, 68-byte body here. The extension remains uninterpreted.
+    Checksum/correlation are not cryptographic authentication: the caller owns
+    broker provenance and the connected endpoint. Kind 1 is a request, not ACK.
+    """
+    if len(frame) != 82 or frame[:2] != b"\xc0\xd0" or not verify_mtp_frame(frame):
+        return None
+    body = frame[14:]
+    if body[0] != 0 or body[1] not in (1, 2) or struct.unpack_from("<H", body, 2)[0] != 68:
+        return None
+    if (struct.unpack_from("<I", body, 4)[0] != expected_link_id
+            or struct.unpack_from("<Q", body, 12)[0] != expected_source_id
+            or struct.unpack_from("<Q", body, 20)[0] != expected_destination_id):
+        return None
+    return MTPTCPMeter(body[1], struct.unpack_from("<Q", body, 32)[0])
 
 
 def build_mtp_tcp_pair_request(

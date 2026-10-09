@@ -185,6 +185,33 @@ and does not reinterpret the opaque A3 suffix. The first refused attempt's
 top-level `relay_contacted` flag was incorrectly left false; its nested
 `tcp_probe.attempted` was true. The diagnostic bookkeeping is corrected.
 
+### Camera-correlated MTP request received through TCP relay
+
+`iv_on_mtp_tcp_frm` routes prefix bit 7 to `iv_on_rcv_mtpCtrl_pkt` at
+`0x25b554`. That dispatcher (`0x253884`) checks prefix bits 5–6 and selects a
+body offset of 6 when zero, or **14** otherwise (`0x2538a8–0x2538dc`). It
+looks up the link at body `+4`, then dispatches kind 1 to `iv_rcv_meter_req`
+and kind 2 to `iv_rcv_meter_ack`. The observed `c0/d0` has the extended layout;
+the earlier plain-offset comparisons were inapplicable, not an authentication
+failure or evidence of an unrelated camera.
+
+One instrumented repeat received the same 82-byte/checksum-valid frame. At the
+SDK-defined offset its body has **kind 1, length 68, the current attempt's link,
+camera 3 as source and our access ID as destination**. Its timestamp does not
+echo our request, consistent with a new request rather than an ACK. This proves
+a camera-correlated MTP control request reached our native client through the
+advertised TCP relay. It does not prove cryptographic peer authentication, AV
+readiness, HD support, E4 delivery or remote B9 teardown. No ACK or AV packet was
+sent in response; the TCP socket closed after observation. Peak 38.4 MiB/no swap.
+
+`parse_mtp_tcp_meter` now separately models the observed extended layout with
+exact length, checksum and three-way link/source/destination correlation; kind
+1 remains distinct from kind 2. Socket-free tests cover truncation, corruption,
+wrong identities and the full 64-bit timestamp. It does not widen the direct
+`c0/90` parser or strip extension bytes before verifying the original checksum.
+Next: trace the extended request ACK builder and ownership/lifetime, then test
+the bounded exchange. Keep AV START disabled until that exchange is confirmed.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
