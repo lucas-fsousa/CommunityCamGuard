@@ -3,7 +3,10 @@ import struct
 
 import pytest
 
-from backend.app.drivers.yoosee.p2p.mtp_relays import parse_mtp_relays
+from backend.app.drivers.yoosee.p2p.mtp_relays import (
+    inspect_mtp_relay_advertisement,
+    parse_mtp_relays,
+)
 
 
 def packet(v4=1, v6=1):
@@ -66,3 +69,26 @@ def test_trailing_extension_rejected_even_with_correct_declared_length():
     frame = bytearray(packet() + b"\0")
     struct.pack_into("<H", frame, 2, len(frame))
     assert parse(bytes(frame)) is None
+
+
+@pytest.mark.parametrize("size", [1, 8, 10, 28, 64])
+def test_inspection_preserves_bounded_unknown_tail_without_strict_acceptance(size):
+    suffix = b"x" * size
+    frame = bytearray(packet() + suffix)
+    struct.pack_into("<H", frame, 2, len(frame))
+    result = inspect_mtp_relay_advertisement(
+        bytes(frame), expected_session_id=17, expected_link_id=31,
+    )
+    assert result is not None
+    assert result.entries == parse(packet())
+    assert result.extension == suffix
+    assert "extension=" not in repr(result)
+    assert parse(bytes(frame)) is None
+
+
+def test_inspection_rejects_excess_tail_and_missing_table():
+    for frame in (bytearray(packet() + bytes(65)), bytearray(packet()[:-1])):
+        struct.pack_into("<H", frame, 2, len(frame))
+        assert inspect_mtp_relay_advertisement(
+            bytes(frame), expected_session_id=17, expected_link_id=31,
+        ) is None

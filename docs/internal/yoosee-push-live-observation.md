@@ -99,6 +99,50 @@ Next: identify those ten bytes (padding, extension or alternate layout) from the
 SDK/capture before relaxing validation. Do not repeat the unchanged probe merely
 to confirm the same counts, and do not treat failure as camera incompatibility.
 
+### Variable suffix and explicit diagnostic inspection
+
+Follow-up observations produced 214- and 194-byte A3 envelopes: their suffixes
+were 28 and 8 bytes, respectively. The prior ten bytes are therefore not a fixed
+padding rule. A single 194-byte decrypted sample was saved with mode `0600` in
+ignored RE storage for offline reuse. Its GAT XOR checksum verifies. Offline
+inspection found four IPv4 entries, four nonzero ports and flags `0x7` for each;
+the suffix remains opaque. No endpoints or payloads were printed or committed.
+The two observation processes peaked at 57.9/38.3 MiB, without swap.
+
+`inspect_mtp_relay_advertisement` now returns the bounded known table **and an
+explicit, repr-hidden opaque extension**. Its 64-byte suffix budget is local
+diagnostic policy, not an inferred firmware limit. The existing strict
+`parse_mtp_relays` still rejects extensions. Neither API opens sockets or enables
+capabilities. This separates useful table evidence from an unsupported claim of
+complete envelope interpretation; the extension cannot supply extra endpoints.
+
+The SDK suffix branch at `0x24830c–0x2483c4` reads `unlock_utc` only when
+frame option bit 2 is set, after an optional four-byte field selected by bit 1.
+The saved frame's option word is `0x6500`, so those branches do not explain its
+suffix. Do not label it padding, an authentication token or a timestamp.
+
+### TCP pairing request, separate from E4 certification
+
+In SDK 6.45, `iv_mtp_session_add_tcp_relay` schedules TCP via
+`ivtcp_comm_add_connect` at `0x25c6c0` (IPv4 path). Independently inspected
+`iv_on_tcp_connect_finished` constructs a 74-byte frame at `0x25b900–0x25ba98`:
+
+| Offset | Content |
+| --- | --- |
+| 0..5 | `c0/80` MTP prefix, encoded total length 74, existing rotating-XOR checksum |
+| 6..9 | zero, request kind 1, little-endian record length 68 |
+| 10..13 | u32 from MTP session `+0x5e8` |
+| 18..25 / 26..33 | u64 source / destination from session `+0x30/+0x38` |
+| 38..45 | full u64 monotonic millisecond tick |
+| remaining body | zero-initialized |
+
+`mtp_tcp_handshake.py` encodes this socket-free request with strict unsigned
+integer widths. It does not reuse the direct `c0/90` meter's extra fields or the
+E4 relay certification token. **Session `+0x5e8` assignment is still unproven**;
+do not substitute the calling link at `+0x20`. The response/readiness transition
+and callback registration chain still need verification before live pairing.
+No pairing packet was sent. Targeted disassembly stayed below 128 MiB/no swap.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).

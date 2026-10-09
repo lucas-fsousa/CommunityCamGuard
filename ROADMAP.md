@@ -481,6 +481,12 @@ implemented without a connector. Camera 3 advertises counts 4 IPv4 / 0 IPv6, but
 its 196-byte envelope has ten bytes beyond the mapped table; validation remains
 closed until that extension/layout is understood. This does not enable relay/HD.
 
+Follow-up: suffix length varies (8/10/28 observed). A separate diagnostic inspector
+preserves the opaque suffix while decoding the bounded known table; strict
+admission remains unchanged. Saved-sample checksum and four IPv4/nonzero-port
+entries verified offline. SDK TCP `c0/80` pairing encoder is now socket-free and
+tested; next trace session `+0x5e8` assignment and response/readiness before use.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
