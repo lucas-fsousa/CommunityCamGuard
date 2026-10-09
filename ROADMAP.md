@@ -476,6 +476,11 @@ previously discarded broker fragments produced AA reports, not E4; relay/HD
 remain unproven and B9 remote receipt remains unconfirmed. No production change
 or camera action. See [live evidence and next step](docs/internal/yoosee-push-live-observation.md).
 
+MTP alternative follow-up: passive, separately typed A3 candidate-table codec is
+implemented without a connector. Camera 3 advertises counts 4 IPv4 / 0 IPv6, but
+its 196-byte envelope has ten bytes beyond the mapped table; validation remains
+closed until that extension/layout is understood. This does not enable relay/HD.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

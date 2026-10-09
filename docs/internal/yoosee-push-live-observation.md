@@ -69,6 +69,36 @@ Next inspect the handler's decode call and bounds before implementing candidate
 parsing; intermediate SDK structure offsets must not be copied as wire offsets.
 No alternate endpoint was contacted. These inspections peaked below 29 MiB.
 
+### Passive MTP table codec and live envelope
+
+`mtp_relays.py` is a separate, socket-free parser; it does not reuse the E4
+descriptor flags. The SDK handler takes the receive frame at argument `x1+0x1b0`
+(`0x247708–0x247710`), resolves the MTP session using frame `+0x1c`, and reads
+v4/v6 counts at `+0x78/+0x79` (`0x247f3c–0x247f88`). Tables start at `+0x7a`,
+with strides 16/28. The SDK clamps counts to 32/16; our parser rejects overflow.
+Descriptor flags are little-endian at entry `+8`. Ports at `+10` are network-order:
+the UDP helper copies them into `sockaddr` and converts them for logging
+(`0x25b350–0x25b35c`, `0x25b398–0x25b3a4`). Addresses begin at `+12`.
+
+The selection loop tests bit 2 of **either paired family descriptor** before
+choosing the TCP branch (`0x2480a4–0x2480d4`). The parser therefore retains raw
+flags and independent family indices, without pretending a single entry proves
+UDP/TCP readiness. Zero ports and special addresses remain data, not permission
+to connect. It requires mode-2, matching session/link, no ACK/compression and exact
+known-layout length. Production callers and capabilities are unchanged.
+
+Two bounded camera-3 observations rejected the table layout. The second recorded
+a correlated uncompressed A3 with counts **4 IPv4 / 0 IPv6** and 196 bytes, while the mapped
+table ends at 186. The extra ten bytes are **not mapped yet**: the strict parser
+correctly rejected this layout rather than silently accepting an extension.
+This is a concrete live compatibility gap, not evidence of four usable relays.
+No candidate address was printed or contacted. The runs peaked at 39.1/38.3 MiB,
+no swap; neither started AV nor obtained E4 or confirmed B9 receipt.
+
+Next: identify those ten bytes (padding, extension or alternate layout) from the
+SDK/capture before relaxing validation. Do not repeat the unchanged probe merely
+to confirm the same counts, and do not treat failure as camera incompatibility.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
