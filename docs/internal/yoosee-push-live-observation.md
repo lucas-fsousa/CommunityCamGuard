@@ -50,6 +50,25 @@ Next: compare SDK calling/channel transitions and relay selection with our direc
 route, including teardown correlation. Do not repeat unchanged A4 probes, force
 undocumented flags, or require vendor-app capture instead of native investigation.
 
+### Separate MTP relay path found
+
+A bounded reverse-reference scan found a separate relay path:
+`gat_on_rcvpkt_MTP_RES_RESPONSE` calls `iv_mtp_session_add_tcp_relay`
+at `0x24816c` and `iv_mtp_session_add_udp_relay` at `0x2482cc`.
+The UDP branch checks the supplied address and avoids an existing UDP node before
+adding one (`0x248278–0x2482cc`). The UDP helper at `0x25b2ac` copies an
+endpoint into a new channel and links it into the MTP session; it is not the
+E4 push-session certification path. A preceding branch adds a LAN candidate
+through `iv_mtp_session_add_lan_or_nat` at `0x247ec0`.
+
+Our current `parse_mtp_peer_endpoint` returns only one public IPv4 endpoint from
+A3 and does not enumerate such alternatives. This gives a concrete independent
+branch to investigate rather than assuming all proprietary relay traffic needs
+E4. **It does not yet prove the received camera-3 reply contains usable relays.**
+Next inspect the handler's decode call and bounds before implementing candidate
+parsing; intermediate SDK structure offsets must not be copied as wire offsets.
+No alternate endpoint was contacted. These inspections peaked below 29 MiB.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
