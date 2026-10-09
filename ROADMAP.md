@@ -11,6 +11,9 @@ and clear/retire state, while cancellation stays idempotent. Nine new regression
 not relay authentication or remote teardown. Next: remaining relay trust/lifetime
 evidence before a camera-3-only bounded diagnostic. See
 [fragment lifecycle](docs/internal/yoosee-push-fragments.md).
+Layered follow-up: exhaustive two-chunk splits of a synthetic fragmented relay
+stream prove the three distinct completeness boundaries (TCP, fragments, inner
+records). 502 combined tests pass; no authenticated fixture or live sender added.
 
 2026-10-04 PTZ latency priority: implemented optional driver-owned background
 preparation (one worker, four idle routes, broker-only heartbeats, fresh preparation

@@ -117,3 +117,12 @@ begins and continuations, one completed interleaved ID with another pending,
 terminal cleanup, cancellation versus EOF and independent sessions. The 71
 fragment/framing/reception tests passed under a 256 MiB/no-swap/50%-CPU cap,
 with 108.1 MiB peak. No camera traffic or runtime media capability was enabled.
+
+Layered synthetic regressions now also exercise every two-chunk TCP split of
+a pair of relay envelopes carrying a begin/end fragmented inner record. They
+separately demonstrate that clean TCP EOF can still leave unfinished fragments,
+and complete fragments can still contain an invalid inner-record tail. No valid
+prefix is published from the latter. These tests deliberately do not certify
+the synthetic outer envelopes or infer a session from their placeholder fields.
+502 combined RTC/framing/reception tests passed at 97.6 MiB peak/no swap under
+the same cap. EOF implementation `098d25b` passed CI `37880201692`.
