@@ -18,7 +18,7 @@ def parse_mtp_tcp_meter(
 ) -> MTPTCPMeter | None:
     """Correlate the observed extended TCP meter; never implies media readiness.
 
-    SDK dispatch skips eight bytes when prefix bits 5–6 are nonzero. Accept only
+    SDK dispatch skips eight bytes when prefix bits 5-6 are nonzero. Accept only
     the observed c0/d0, 68-byte body here. The extension remains uninterpreted.
     Checksum/correlation are not cryptographic authentication: the caller owns
     broker provenance and the connected endpoint. Kind 1 is a request, not ACK.
