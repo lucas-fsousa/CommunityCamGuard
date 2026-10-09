@@ -470,6 +470,12 @@ its provenance before enabling operator profile selection. Do not repeat the
 same media probe or select both platform fields speculatively. The 2026-10-01
 SDK comparison above refines the E4-only assumption; recordings polish is deferred.
 
+2026-10-09 controlled camera-3 observation: explicit live A4 advertisement and
+correlated direct handshake succeeded without the vendor app. Reassembly of
+previously discarded broker fragments produced AA reports, not E4; relay/HD
+remain unproven and B9 remote receipt remains unconfirmed. No production change
+or camera action. See [live evidence and next step](docs/internal/yoosee-push-live-observation.md).
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
