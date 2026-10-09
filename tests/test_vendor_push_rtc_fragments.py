@@ -102,3 +102,56 @@ def test_owner_close_and_independent_sources():
     with pytest.raises(ValueError, match="closed"):
         old.feed(frame(0xF2))
     assert new.feed(frame(0xF2)) == b"new"
+
+
+@pytest.mark.parametrize("ending", [None, 0xF2, 0xF3])
+def test_clean_finish_is_terminal(ending):
+    assembly = RTCFragmentAssembly()
+    if ending is not None:
+        assembly.feed(frame(0xF0, payload=b"content"))
+        assembly.feed(frame(ending))
+    assembly.finish()
+    assert not assembly._pending
+    assert assembly._size == 0
+    with pytest.raises(ValueError, match="closed"):
+        assembly.finish()
+    with pytest.raises(ValueError, match="closed"):
+        assembly.feed(frame(0xF0))
+    assembly.close()
+
+
+@pytest.mark.parametrize("payload", [b"", b"private content"])
+@pytest.mark.parametrize("continuation", [False, True])
+def test_incomplete_finish_clears_all_ids_and_cannot_resume(payload, continuation):
+    assembly = RTCFragmentAssembly()
+    assembly.feed(frame(0xF0, 1, payload))
+    assembly.feed(frame(0xF0, 2, b"second"))
+    if continuation:
+        assembly.feed(frame(0xF1, 1, payload))
+    assembly.feed(frame(0xF2, 2))
+    with pytest.raises(ValueError, match=r"^truncated RTC fragment stream$"):
+        assembly.finish()
+    assert assembly._size == 0
+    assert not assembly._pending
+    with pytest.raises(ValueError, match="closed"):
+        assembly.feed(frame(0xF2, 1))
+    with pytest.raises(ValueError, match="closed"):
+        assembly.finish()
+
+
+def test_finish_after_cancellation_is_not_a_clean_eof():
+    assembly = RTCFragmentAssembly()
+    assembly.feed(frame(0xF0, payload=b"discarded"))
+    assembly.close()
+    with pytest.raises(ValueError, match="closed"):
+        assembly.finish()
+
+
+def test_failed_finish_does_not_affect_another_session():
+    old, new = RTCFragmentAssembly(), RTCFragmentAssembly()
+    old.feed(frame(0xF0, payload=b"old"))
+    new.feed(frame(0xF0, payload=b"new"))
+    with pytest.raises(ValueError, match="truncated"):
+        old.finish()
+    assert new.feed(frame(0xF2)) == b"new"
+    new.finish()

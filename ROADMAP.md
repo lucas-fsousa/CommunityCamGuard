@@ -4,6 +4,14 @@ User priority override (2026-10-03): camera-card/SD work is the **last priority*
 Do not resume its enum/listing investigation while native live-streaming work is
 available. Current focus: native relay/platform provenance and safe HD preparation.
 
+2026-10-09 lifecycle hardening: the offline RTC fragment assembler now separates
+validated EOF from cancellation. Incomplete IDs (even empty begins) reject EOF
+and clear/retire state, while cancellation stays idempotent. Nine new regressions;
+71 focused fragment/framing/reception tests passed. This is local completeness,
+not relay authentication or remote teardown. Next: remaining relay trust/lifetime
+evidence before a camera-3-only bounded diagnostic. See
+[fragment lifecycle](docs/internal/yoosee-push-fragments.md).
+
 2026-10-04 PTZ latency priority: implemented optional driver-owned background
 preparation (one worker, four idle routes, broker-only heartbeats, fresh preparation
 at 15s without extending the 20s absolute limit). First clicks join in-progress

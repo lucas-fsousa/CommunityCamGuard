@@ -96,3 +96,24 @@ lengths, nested fragments, partial tails, and fragment assembly split inside
 inner headers/payloads. This remains offline, without production callers.
 The inner-boundary checkpoint passed 292 focused tests with 77 MiB peak/no swap
 under a 256 MiB/50%-CPU cap; Ruff and GitHub CI passed.
+
+## Explicit EOF versus cancellation — 2026-10-09
+
+`RTCFragmentAssembly.finish()` now distinguishes an observed end of input from
+an intentional `close()`. EOF fails if any fragment ID remains unfinished,
+including a begin with an empty payload; it clears all retained fragments and
+permanently closes the instance even when raising. Finishing an already closed
+instance fails rather than reporting cancelled/truncated input as complete.
+Completed or explicitly discarded fragment IDs do not count as pending.
+
+`close()` remains idempotent and intentionally discards pending input for local
+cancellation/session replacement. Neither operation sends a hangup, authenticates
+a session, validates the assembled media or proves remote resource release.
+Future capture/replay owners must call `finish()` on EOF and `close()` on abort;
+there is still no production transport caller.
+
+Nine added regression cases cover clean/empty EOF, end/discard, unfinished empty
+begins and continuations, one completed interleaved ID with another pending,
+terminal cleanup, cancellation versus EOF and independent sessions. The 71
+fragment/framing/reception tests passed under a 256 MiB/no-swap/50%-CPU cap,
+with 108.1 MiB peak. No camera traffic or runtime media capability was enabled.

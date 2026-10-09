@@ -8,8 +8,9 @@ class RTCFragmentAssembly:
 
     Local policy: four pending IDs, 256 KiB aggregate payload, 256 records per
     ID. Malformed input/ordering/limit violations close the instance permanently.
-    No timeout or scheduler: the owner must close it on cancellation/EOF/session
-    replacement. Input must already be ordered; no sequence number is inferred.
+    No timeout or scheduler: the owner must close it on cancellation/session
+    replacement, or finish it on EOF to detect incomplete assemblies.
+    Input must already be ordered; no sequence number is inferred.
     Returned bytes are opaque, NOT validated media or a recursively parsed RTC
     stream. SDK recursion is deliberately not reproduced here.
     """
@@ -20,9 +21,23 @@ class RTCFragmentAssembly:
         self._closed = False
 
     def close(self) -> None:
+        """Discard local fragments on cancellation; idempotent, not remote teardown."""
         self._pending.clear()
         self._size = 0
         self._closed = True
+
+    def finish(self) -> None:
+        """Validate EOF and retire this instance, even when fragments are missing.
+
+        Success only means no unfinished fragment IDs remain. It proves neither
+        valid media nor a remote hangup acknowledgement.
+        """
+        if self._closed:
+            raise ValueError("RTC fragment assembly is closed")
+        incomplete = bool(self._pending)
+        self.close()
+        if incomplete:
+            raise ValueError("truncated RTC fragment stream")
 
     def feed(self, frame: bytes) -> bytes | None:
         if self._closed:
