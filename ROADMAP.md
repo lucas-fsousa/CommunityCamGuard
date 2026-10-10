@@ -501,7 +501,7 @@ through relay is proven; it is not an ACK or media-ready session. Extended meter
 parser/tests added separately; next map/respond to that request, still without AV.
 
 2026-10-10: SDK-derived extended/plain TCP ACK builders implemented and tested.
-Camera 3 received at most one ACK per format on a bounded experimental socket;
+The client sent at most one ACK per format on a bounded camera-3 experimental socket;
 six correlated requests arrived, but no timestamp-correlated kind-2 roundtrip
 was observed. No AV started or runtime capability enabled. Next map the SDK's
 post-pairing meter sender and ACK-driven readiness, not another identical probe.

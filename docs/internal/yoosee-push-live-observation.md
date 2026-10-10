@@ -256,6 +256,15 @@ ACK-driven channel readiness transition. The initial relay pairing request is
 not necessarily the camera-directed measurement whose timestamp can be echoed.
 Do not repeat the same pairing/ACK test hoping to obtain a different result.
 
+The subsequent static inspection found a distinct periodic measurement builder:
+`iv_mtp_chnnel_send_meter_frm` (`0x258758`, 1452 bytes) writes a sequence from
+channel `+0x130`, flags `0x08`, a 72-byte record (68 plus four-byte call data),
+full timestamp, session source/destination, role and channel-dependent type before
+calling `iv_mtp_chnnel_send_mtp_frm` at `0x258cc0`. The latter is a separate
+2860-byte transport wrapper at `0x257c2c`, not the initial 74-byte pairing packet.
+This distinguishes the next measurement to trace from the already-tested pairing
+request. Its relay envelope/selection must be verified before sending it.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
