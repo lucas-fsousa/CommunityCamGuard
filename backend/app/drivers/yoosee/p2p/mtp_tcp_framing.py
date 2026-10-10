@@ -39,7 +39,7 @@ class MtpTcpFramer:
         records: list[bytes] = []
         offset = 0
         while len(self._buffer) - offset >= 4:
-            prefix = self._buffer[offset:offset + 4]
+            prefix = bytes(self._buffer[offset:offset + 4])
             if prefix[0] != 0xC0 or prefix[1] not in (0x10, 0x50, 0x90, 0xD0):
                 self._fail("unmapped inbound MTP TCP prefix")
             size = mtp_frame_length(prefix)
