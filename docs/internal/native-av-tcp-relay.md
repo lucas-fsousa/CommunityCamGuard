@@ -58,11 +58,43 @@ complete lifecycle, fragmented/coalesced input, maintenance responses, stale/
 unsent/duplicate receipts, wrong peer/conversation, premature CLOSE, traffic/time
 budgets, partial-send cancellation and EOF. Ruff and targeted Mypy passed.
 
+## TCP video decode follow-up
+
+The next acquisition failed during access-session establishment, before A4 or
+any AV START. It allocated no camera media route and cleared the empty sample.
+A separate read-only camera-3 access check then succeeded without sending A4;
+there is no evidence from these results that the enrollment token had expired.
+
+One subsequent acquisition after that check completed the lifecycle and the
+existing sequential `decode_sample` validation **after TCP/UDP local closure and
+the B9 cleanup attempt**:
+
+- HEVC, **640×360**, nine frames decoded by ffprobe and strict ffmpeg null-output
+  decode, agreeing with the parsed encoding header and retained frame count.
+- 7,144 video bytes retained temporarily in RAM; zero pre-IDR discards; raw
+  timestamp span 800,000 ticks. No frame rate or time scale inferred here.
+- One encoding header, nine video and thirteen audio records parsed. Audio was
+  counted only, not retained, decoded or played.
+- 22,472 TCP bytes/53 records received; 3,136 bytes emitted. Two attempts each
+  for INIT, START and CLOSE, preserving each control's sequence/timestamp.
+- CLOSE transport receipt confirmed, owner and sockets closed, sample cleared.
+  Broker B9 remote receipt still unconfirmed. No media file/image was produced.
+- Combined parent/decoder cgroup peak **114.8 MiB**, zero swap, 10.072 seconds;
+  cap 256 MiB/no swap/50% CPU/60 seconds. Sequential decoders use one thread and
+  the existing per-child address-space/CPU/wall-time limits.
+
+This upgrades TCP evidence from parsed records to actual decodability. It still
+does not prove maximum resolution, sustained playback, visual correctness or
+LAN-only operation. Production and the dashboard remain unchanged.
+
+CI follow-up: the full import-aware type check required an explicit `V1Record`
+list annotation in the new owner; corrected it and verified locally with normal
+Mypy imports (77 MiB/no swap). A skip-import targeted check had missed that issue.
+
 ## Next steps
 
-1. Reuse the existing bounded video sample/decoder diagnostic to prove that these
-   TCP-delivered video records decode. Do not infer resolution or codecs from
-   record counts; report encoding metadata explicitly in that next observation.
+1. Map and validate the maximum-resolution profile. The proven TCP sample is
+   640×360 and must not silently become the dashboard's preferred quality.
 2. Resolve remaining broker teardown uncertainty and validate sustained reception,
    backpressure and reconnect ownership before production use.
 3. Preserve maximum-resolution preference and the generic single-producer driver

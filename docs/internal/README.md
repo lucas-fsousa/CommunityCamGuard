@@ -13,8 +13,8 @@ Native relay RE (experimental, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).
 See also [pinned SDK codec enum translation](yoosee-rtc-codecs.md).
 Camera-3 live milestone: [native AV over TCP relay](native-av-tcp-relay.md)
-completed negotiation and parsed video/audio records with a CLOSE transport
-receipt. TCP video decode, sustained reception and production integration remain
+completed negotiation and decoded nine 640×360 HEVC frames with a CLOSE transport
+receipt. Maximum-resolution validation, sustained reception and production integration remain
 pending; this is not LAN-only operation.
 
 | ADR | Decision |

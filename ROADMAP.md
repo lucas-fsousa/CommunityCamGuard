@@ -544,6 +544,14 @@ Next: bounded TCP video decode/encoding metadata, broker teardown uncertainty an
 sustained reception; then generic single-producer integration. Not yet decoded
 video, maximum-resolution validation, LAN-only or a dashboard capability.
 
+TCP decode follow-up: after one access-session failure before A4/START and a
+successful read-only access check, a bounded acquisition decoded **9 HEVC frames
+at 640×360**. Sample 7,144 bytes in RAM, cleared after strict null-output decode;
+CLOSE transport ACK confirmed, local sockets closed, broker B9 still unconfirmed.
+Peak combined process/decoder 114.8 MiB/no swap. Next: maximum-resolution profile,
+sustained reception/cleanup and generic source integration, not another basic
+decode proof. No dashboard quality/default or native-video capability changed.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

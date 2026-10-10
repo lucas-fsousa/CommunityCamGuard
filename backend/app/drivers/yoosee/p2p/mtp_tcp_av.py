@@ -17,6 +17,7 @@ from .mtp_tcp_ack import build_mtp_tcp_meter_ack, build_mtp_tcp_plain_meter_ack
 from .mtp_tcp_framing import MtpTcpFramer
 from .mtp_tcp_kcp import unwrap_tcp_relay_kcp, wrap_tcp_relay_kcp
 from .mtp_tcp_measurement import build_mtp_tcp_measurement, matches_mtp_tcp_measurement_ack
+from .v1_receive import V1Record
 
 MAX_RX_BYTES = 2 * 1024 * 1024
 MAX_TX_BYTES = 256 * 1024
@@ -148,8 +149,8 @@ class TcpAvSession:
             self.received_bytes += len(data)
             if self.received_bytes > MAX_RX_BYTES:
                 self._fail("TCP AV receive budget exceeded")
-            acknowledgements = []
-            records = []
+            acknowledgements: list[bytes] = []
+            records: list[V1Record] = []
             unhandled = 0
             for wire in self._framer.feed(data):
                 self.received_records += 1
