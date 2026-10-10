@@ -265,6 +265,43 @@ calling `iv_mtp_chnnel_send_mtp_frm` at `0x258cc0`. The latter is a separate
 This distinguishes the next measurement to trace from the already-tested pairing
 request. Its relay envelope/selection must be verified before sending it.
 
+## Correlated periodic TCP roundtrip — 2026-10-10
+
+The distinct measurement is now mapped and **one live camera-3 roundtrip was
+observed**, without the vendor app, AV startup or any physical camera command.
+
+`iv_mtp_session_add_tcp_relay` creates native channels 0x86/0x85 at
+`0x25c4bc`/`0x25c59c`. For these channels the periodic builder leaves body channel
+zero, writes base length 68 but record length 72, flags 8, sequence, full 64-bit
+timestamp, session role and the four-byte call ID. `iv_mtp_chnnel_send_mtp_frm`
+at `0x258470–0x2585d0` wraps channel 0x86 as `c0/e0` with the destination ID
+as its eight-byte route prefix (86 bytes total); 0x85 uses `c0/80` (78 bytes).
+The UDP MTU padding branch does not apply to these TCP channels.
+
+`mtp_tcp_measurement.py` encodes these socket-free requests separately from
+pairing and ACK builders. Its narrow response matcher requires the observed
+86-byte `c0/d0`, kind 2, base length 68, record length 72, flags zero and exact
+link/source/destination/sequence/full-timestamp correlation. Important: the
+legacy MTP checksum covers only the first 24 payload bytes, **not the whole
+record**. Neither checksum nor correlation constitutes cryptographic peer
+authentication or proof of SDK channel readiness.
+
+The bounded ignored diagnostic sent one extended ACK, one plain ACK and one
+periodic measurement on the same socket. Among six received records (472 bytes),
+the fourth was the 86-byte kind-2 response: matching current route, sequence and
+full timestamp, flags zero and record length 72. The other records were the
+previously observed kind-1 requests. This proves a response to our camera-directed
+measurement, rather than merely observing unsolicited requests. No repeated
+probe was needed. Process peak: 42.7 MiB, no swap, 8.893 seconds. TCP closed in
+`finally`; broker B9 remote receipt is still unconfirmed. Production unchanged.
+
+266 focused tests passed in 1.41 seconds (81.1 MiB/no swap); Ruff passed. Tests
+cover exact SDK layouts, both transport types, unsigned-width rejection, ACK
+correlation, truncation, partial checksum coverage and unsupported envelopes.
+Next: map the ACK-driven SDK channel selection/readiness and teardown ownership
+before enabling AV INIT/START. Do not equate this roundtrip with working media,
+LAN-only operation, E4 reception or confirmed broker release.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).

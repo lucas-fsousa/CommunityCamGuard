@@ -506,6 +506,15 @@ six correlated requests arrived, but no timestamp-correlated kind-2 roundtrip
 was observed. No AV started or runtime capability enabled. Next map the SDK's
 post-pairing meter sender and ACK-driven readiness, not another identical probe.
 
+2026-10-10 subsequent milestone: periodic TCP relay measurement mapped and tested.
+One camera-3 experiment returned a kind-2 `c0/d0` ACK with matching current
+link/source/destination, sequence and full timestamp: **native relay roundtrip
+confirmed without the vendor app**. Socket-free encoder/narrow matcher and
+266 focused passing tests; 42.7 MiB live peak/no swap. No AV startup or runtime
+capability enabled. Next: ACK-driven channel selection/readiness and teardown
+ownership, then gated AV startup. Broker B9 receipt remains unconfirmed;
+roundtrip is not proof of media readiness, LAN-only or cryptographic auth.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
