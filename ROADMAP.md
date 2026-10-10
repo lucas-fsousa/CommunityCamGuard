@@ -529,6 +529,12 @@ SDK local teardown and meter-ring aliasing documented. Still no live AV or new
 dashboard capability: next compose a bounded connection owner/framer and lifecycle,
 then validate only camera 3. Do not infer remote cleanup from local socket closure.
 
+Bounded TCP framer implemented separately: split/coalesced records, 1500-byte
+record ceiling, 4096-byte read/64-record batch policy, terminal EOF/error/abort,
+no resynchronization or reuse across connections. 368 combined focused tests
+pass (87.2 MiB/no swap). Next is composition with exclusive connection/AV lifecycle
+ownership, not another codec or a new dashboard capability. No live AV sent.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

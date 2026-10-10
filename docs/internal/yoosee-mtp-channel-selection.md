@@ -95,12 +95,33 @@ their pointers, frees buffers/timers and delegates channel cleanup.
 `ivtcp_close_notify` for its TCP resources, then frees channel storage. This is
 local resource ownership, not evidence of AV CLOSE or broker B9 remote receipt.
 
+## Bounded TCP record assembly
+
+`mtp_tcp_framing.py` now assembles complete records independently of session/AV
+logic. One framer belongs to one connection. It accepts only the mapped inbound
+meter/KCP prefixes, validates original length/checksum, retains only an incomplete
+suffix and never scans forward for a new magic byte after an error. Clean EOF,
+truncated EOF, admission failure and cancellation all prevent instance reuse.
+This prevents a reconnection from inheriting partial bytes; it is not camera
+authentication or a substitute for per-record conversation validation.
+
+The SDK-derived record limit is 1500 bytes. Additional local policies bound each
+read at 4096 bytes and each returned batch at 64 records. A malformed complete
+record discards the entire batch rather than returning its valid prefix. Callers
+still need connection-wide byte/record/time budgets and must close their socket
+on terminal errors. Empty `feed` is not EOF: the owner explicitly calls `finish`.
+
+Every split point, one-byte reads, coalescing, partial tails, maximum records,
+oversized declarations/reads, batch overflow, checksum failure and terminal reuse
+are tested. Combined TCP and existing AV suites: 368 tests passed in 2.51 seconds,
+87.2 MiB/no swap. No camera contacted, socket opened or production behavior changed.
+
 ## Next bounded work
 
 1. Trace channel lookup and meter-ring sequence ownership so late or unrelated
    ACKs cannot revive a closed/currently replaced connection.
-2. Compose one measured TCP connection with bounded record framing and the AV
-   lifecycle; the selected-route consumer and TCP envelope are now mapped above.
+2. Compose one measured TCP connection with the now-tested record framer and AV
+   lifecycle; the selected-route consumer and TCP envelope are mapped above.
 3. Establish explicit socket/session teardown and one outstanding diagnostic
    request before a bounded camera-3 AV test. Broker B9 receipt remains unknown.
 
