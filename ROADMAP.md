@@ -515,6 +515,12 @@ capability enabled. Next: ACK-driven channel selection/readiness and teardown
 ownership, then gated AV startup. Broker B9 receipt remains unconfirmed;
 roundtrip is not proof of media readiness, LAN-only or cryptographic auth.
 
+Static follow-up: ACK accounting and quality/route selection are now traced in
+[the SDK channel-selection note](docs/internal/yoosee-mtp-channel-selection.md).
+ACK updates RTT/meter status and triggers route optimization, not AV startup.
+Remaining: sequence/channel ownership, selected-route consumer/TCP AV envelope,
+and explicit teardown before a bounded AV test. No extra camera probe performed.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

@@ -303,5 +303,6 @@ before enabling AV INIT/START. Do not equate this roundtrip with working media,
 LAN-only operation, E4 reception or confirmed broker release.
 
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
+[ACK accounting and channel selection](yoosee-mtp-channel-selection.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
