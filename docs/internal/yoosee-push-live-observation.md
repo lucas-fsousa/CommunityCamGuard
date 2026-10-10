@@ -212,6 +212,50 @@ wrong identities and the full 64-bit timestamp. It does not widen the direct
 Next: trace the extended request ACK builder and ownership/lifetime, then test
 the bounded exchange. Keep AV START disabled until that exchange is confirmed.
 
+## TCP request ACKs — 2026-10-10
+
+Targeted inspection of `iv_rcv_meter_req` (`0x25cc7c`, 2508 bytes) recovered the
+actual reply, rather than assuming an echoed request or reusing the UDP builder:
+
+- Extended body selection at `0x25cd38–0x25cd60` initializes the outgoing eight-byte
+  route prefix with the request **source ID**, not the received opaque prefix.
+- `0x25cfbc–0x25d06c` builds kind 2, body length 68, preserves the link, swaps
+  source/destination, copies sequence and the complete 64-bit timestamp, copies
+  channel/record length (minimum 68), and sets body byte 64 to 2. Other body
+  fields are zero-initialized, not blindly echoed.
+- TCP input mode 2 selects outgoing `c0/e0`, total body length plus 14 and a fresh
+  checksum at `0x25d554–0x25d604`.
+- Plain TCP input selects `c0/80`, or `c0/90` only for channel types 1/2, and
+  length plus 6 at `0x25d424–0x25d548`. It is not the generic UDP ACK branch.
+
+`mtp_tcp_ack.py` implements these two fixed-layout builders, separately from
+the pairing/parser module. Both require checksum-valid, current link/source/
+destination and request kind 1. Oversized records, the unimplemented body
+extension flag, wrong routes, incoming ACKs and truncation fail before sending.
+The pure functions open no sockets. Neither a valid ACK nor a successful local
+send proves remote acceptance or session readiness.
+
+The opt-in ignored diagnostic now receives bounded split/coalesced TCP records
+and sends at most **one extended ACK and one plain ACK**, on the same connected
+socket. Limits remain one advertised global IPv4 candidate, three seconds,
+4096 received bytes and six records, under 192 MiB/no-swap/50%-CPU/30-second
+process caps. No AV INIT/START, KCP payload or camera action was sent.
+
+The final camera-3 test sent both ACKs and received six checksum-valid,
+link/source/destination-correlated **kind-1 requests**: three `c0/d0` records
+of 82 bytes and three `c0/90` records of 74 bytes (468 bytes total). No kind-2
+reply echoing our initial pairing timestamp was observed. Earlier intermediate
+observations with only the extended ACK likewise must not be described as a
+roundtrip. TCP closed locally; broker B9 remote receipt remains unconfirmed.
+Peak live process memory was 38.6 MiB/no swap in 8.861 s; the first ACK probe
+peaked at 43 MiB. Production containers were not rebuilt or restarted.
+
+216 focused codec/parser tests passed in 1.08 s at 80.1 MiB/no swap; Ruff passed.
+Next: trace the SDK's post-pairing outgoing meter scheduler/builder and the
+ACK-driven channel readiness transition. The initial relay pairing request is
+not necessarily the camera-directed measurement whose timestamp can be echoed.
+Do not repeat the same pairing/ACK test hoping to obtain a different result.
+
 Related: [SDK provenance](yoosee-platform-sdk-versions.md),
 [push lifecycle](yoosee-push-teardown.md),
 [existing native decode](native-av-first-live-decode.md).
