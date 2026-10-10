@@ -521,6 +521,14 @@ ACK updates RTT/meter status and triggers route optimization, not AV startup.
 Remaining: sequence/channel ownership, selected-route consumer/TCP AV envelope,
 and explicit teardown before a bounded AV test. No extra camera probe performed.
 
+TCP AV preparation: selected-route KCP output now traced; socket-free TCP adapter
+added (outbound c0/60 or c0/00, narrowly admitted inbound c0/50 or c0/10), preserving
+existing AV control bytes and exact conversation ownership. 346 focused tests
+passed, including INIT/START/CLOSE sender composition and stale/closed receipts.
+SDK local teardown and meter-ring aliasing documented. Still no live AV or new
+dashboard capability: next compose a bounded connection owner/framer and lifecycle,
+then validate only camera 3. Do not infer remote cleanup from local socket closure.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

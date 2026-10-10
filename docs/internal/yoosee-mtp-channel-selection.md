@@ -45,12 +45,62 @@ one candidate remains, all 128 route slots at session `+0x1b0` receive its point
 most two candidates fill those slots. This is route selection, not AV startup:
 neither the ACK handler nor the optimizer calls an AV INIT/START builder.
 
+## KCP route consumer and TCP envelope
+
+Follow-up on 2026-10-10 identifies `iv_kcp_output` at `0x258e04` (428 bytes),
+installed by `iv_create_kcb` at `0x258da4`. It reads a selected route slot from
+session `+0x1b0` using index `+0x84c`, advances that index modulo 128, and calls
+`iv_mtp_chnnel_send_mtp_frm` with control flag **zero** (`0x258f64–f68`). If no
+selected route exists it searches for native channel 0x87, not any arbitrary TCP
+candidate. Our experiment must explicitly own a measured TCP route; it must not
+pretend that this UDP fallback established TCP readiness.
+
+Consequently the same wrapper already traced for periodic meters produces
+outbound **c0/60** for channel 0x86 (destination-ID prefix plus KCP bytes) and
+**c0/00** for channel 0x85. Sending the existing canonical c0/10 datagram unchanged
+would not reproduce this SDK TCP output. `iv_mtp_kcp_create` (`0x25df68`) uses
+session `+0x5e8` for the base conversation and its high-bit counterpart for the
+command conversation, matching the existing INIT versus START/CLOSE separation.
+
+On input, `iv_on_mtp_tcp_frm` dispatches bit-7-clear records to
+`iv_on_rcv_kcpdata_from_tcp` (`0x25b578`, 444 bytes). That function removes six
+bytes in mode 0 and fourteen in nonzero mode, resolves the session by conversation
+and selects the command/data KCP instance using the conversation high bit.
+
+New socket-free `mtp_tcp_kcp.py` keeps this envelope adaptation separate from
+the canonical parser and AV lifecycle. It validates original wire checksum and
+length **before** constructing canonical c0/10 bytes, checks every coalesced
+segment's exact expected conversation, rejects meter/outbound/unmapped input
+envelopes, and caps complete TCP records at 1500 bytes, including the route prefix.
+Inbound admission is deliberately limited to modes 0/2 (c0/10 and c0/50).
+The c0/50 AV envelope is statically mapped and synthetically tested, **not yet
+observed in a live AV exchange**. The eight-byte inbound prefix remains opaque;
+conversation matching does not replace endpoint ownership or authentication.
+
+Tests compose the adapter with `ReliableAvControl` for INIT/START/CLOSE, preserving
+byte-identical retries and rejecting wrong-peer/stale-timestamp receipts and
+receipts after closure. The adapter adds no socket, queue, retry loop or capability.
+346 focused tests passed in 2.32 s, peak 86.4 MiB/no swap. No live AV was sent.
+
+## Ownership and teardown follow-up
+
+`iv_get_meter_item` (`0x257bfc`, 48 bytes) indexes a 16-item ring using sequence
+low four bits. That lookup alone is not a stale-ACK guard; the diagnostic must
+retain exact outstanding sequence/timestamp and connection ownership rather than
+copying the SDK ring indexing as an admission policy.
+
+`iv_mtp_session_free` (`0x25ade8`, 792 bytes) releases both KCP instances, clears
+their pointers, frees buffers/timers and delegates channel cleanup.
+`iv_mtp_chnnel_free` (`0x256d44`, 888 bytes) calls `ivtcp_close_socket` and
+`ivtcp_close_notify` for its TCP resources, then frees channel storage. This is
+local resource ownership, not evidence of AV CLOSE or broker B9 remote receipt.
+
 ## Next bounded work
 
 1. Trace channel lookup and meter-ring sequence ownership so late or unrelated
    ACKs cannot revive a closed/currently replaced connection.
-2. Trace the consumer of the selected route slots and the AV control envelope
-   for TCP relay. Reuse existing AV codecs only after confirming that envelope.
+2. Compose one measured TCP connection with bounded record framing and the AV
+   lifecycle; the selected-route consumer and TCP envelope are now mapped above.
 3. Establish explicit socket/session teardown and one outstanding diagnostic
    request before a bounded camera-3 AV test. Broker B9 receipt remains unknown.
 

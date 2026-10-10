@@ -42,6 +42,12 @@ actions, timestamp wrap and coalesced ACK segments. No packet was sent to a came
 
 ## Remaining integration
 
+2026-10-10 TCP relay follow-up: the socket-free adapter in `mtp_tcp_kcp.py` now
+wraps existing canonical KCP output using the SDK TCP route envelope, without
+changing retries, conversation IDs or receipt ownership. Synthetic composition
+covers INIT/START/CLOSE. This is not live relay AV acceptance; see
+[TCP channel/envelope evidence](yoosee-mtp-channel-selection.md).
+
 Update: the socket-free composition is now implemented and synthetically tested in
 [native-av-handshake.md](native-av-handshake.md). The bounded socket probe and CLOSE
 are simulated in [native-av-probe.md](native-av-probe.md) and
