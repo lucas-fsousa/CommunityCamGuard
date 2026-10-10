@@ -273,9 +273,11 @@ Still open: WAN-independent camera bootstrap/control, long-session intercom hard
 camera-family coverage for proprietary controls, native HEVC playback validation across desktop/mobile,
 broader settings, delegated-access mobile/proxy acceptance, security hardening, and S3 tiering.
 Scoped temporary keys are implemented; S3 is not implemented.
-Proprietary Yoosee live-stream reception is still experimental/offline: codec
-descriptors and the SDK's receive time base are mapped, but real-record
-interoperability and authenticated transport validation remain open. Current
+Proprietary Yoosee live-stream reception is still experimental. A bounded camera-3
+[native TCP relay test](docs/internal/native-av-tcp-relay.md) completed AV negotiation
+and parsed video/audio records without the vendor app. TCP video decode,
+maximum-resolution validation, sustained reception and production integration
+remain open; vendor relay access does not provide LAN-only operation. Current
 live view continues through go2rtc/RTSP; these findings do not enable controls
 or streaming capabilities for an unverified camera. See the
 [receive timing checkpoint](docs/internal/yoosee-rtc-timing.md).

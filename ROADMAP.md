@@ -535,6 +535,15 @@ no resynchronization or reuse across connections. 368 combined focused tests
 pass (87.2 MiB/no swap). Next is composition with exclusive connection/AV lifecycle
 ownership, not another codec or a new dashboard capability. No live AV sent.
 
+2026-10-10 TCP AV milestone: composed the exclusive measurement/framer/AV owner,
+then one camera-3 test negotiated AV over native relay TCP without the vendor app.
+Parsed 1 encoding header, 4 video records and 5 audio records; exact CLOSE transport
+receipt confirmed. 21,605 bytes received, 45.8 MiB/no swap; production unchanged.
+386 focused tests pass. [Evidence and limits](docs/internal/native-av-tcp-relay.md).
+Next: bounded TCP video decode/encoding metadata, broker teardown uncertainty and
+sustained reception; then generic single-producer integration. Not yet decoded
+video, maximum-resolution validation, LAN-only or a dashboard capability.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

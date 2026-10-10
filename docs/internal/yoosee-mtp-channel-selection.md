@@ -118,6 +118,11 @@ are tested. Combined TCP and existing AV suites: 368 tests passed in 2.51 second
 
 ## Next bounded work
 
+Update: the exclusive owner and one live AV exchange are now implemented and
+documented in [native AV over TCP relay](native-av-tcp-relay.md). The following
+original integration checklist led to that milestone; decode and sustained
+reception remain separate, and broker teardown receipt is still unconfirmed.
+
 1. Trace channel lookup and meter-ring sequence ownership so late or unrelated
    ACKs cannot revive a closed/currently replaced connection.
 2. Compose one measured TCP connection with the now-tested record framer and AV
