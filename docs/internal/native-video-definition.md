@@ -1,5 +1,39 @@
 # Native video-definition encoding — offline SDK evidence, 2026-09-22
 
+## SDK 6.45 preconnection path — 2026-10-10
+
+New targeted evidence separates **local preparation before connecting** from
+the platform-dependent mid-stream command. It supersedes the blanket prohibition
+on preparing both startup fields, not the requirement for platform provenance
+when dispatching command 5 or 0x33.
+
+Pinned 6.45 ARM64 `LivePlayer::set_definitions` at `0x12b2c0` (976 bytes):
+
+- `0x12b314–328` packs five three-bit slots; `0x12b3ec–3fc` distinguishes
+  platform 1, platform 2 and unknown/other values.
+- Platform 1 sends command 5 at `0x12b560–568`; platform 2 sends 0x33 at
+  `0x12b514–51c`. Existing strict platform-gated encoders remain unchanged.
+- The unknown branch instead logs a platform exception and stores **both**
+  packed halfword at player `+0x67` (`0x12b498`) and legacy value-minus-one at
+  `+0x50` (`0x12b49c`). It invokes the local callback without sending either
+  BuiltIn command. This callback is not a camera response or capability proof.
+- The uniform setter at `0x12b690` fills indices 0–4 with the same requested
+  enum (`0x12b770–784`). No sparse/unspecified-slot semantics are needed.
+- `set_opt_conn_params` at `0x130224` passes player `+0x50`, length 32, to
+  `Connection::set_req_userdata` (`0x1302d0–2d8`), carrying both cached fields.
+
+`video_startup_645.with_preconnect_definition` reproduces only this explicit
+uniform preconnection preparation on a supplied immutable template. It assigns
+no platform, changes only userdata[0] and userdata[23:25], exposes no live control
+and does not change defaults or the existing known-platform APIs. Fresh A4 and
+INIT must receive the same prepared bytes. An HD enum still does not prove
+maximum sensor resolution or support on another camera.
+
+100 focused tests passed (84.7 MiB/no swap); Ruff passed. Disassembly ran
+sequentially with 128 MiB/no-swap limits, measured peaks below 38 MiB. Next is
+one camera-3-only startup/encoding/decode observation using this exact SDK path,
+not a guessed platform or two speculative mid-stream commands.
+
 2026-10-03: one bounded, platform-only camera-3 diagnostic confirmed the MTP
 roundtrip and B9 receipt but returned an unknown platform. No AV INIT/START or
 quality change was sent. HD remains gated; see the

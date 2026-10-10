@@ -552,6 +552,14 @@ Peak combined process/decoder 114.8 MiB/no swap. Next: maximum-resolution profil
 sustained reception/cleanup and generic source integration, not another basic
 decode proof. No dashboard quality/default or native-video capability changed.
 
+2026-10-10 SDK 6.45 quality follow-up: unknown-platform `set_definitions` has a
+local-only preconnection branch that caches both legacy/packed quality fields;
+`set_opt_conn_params` copies that 32-byte template. Added a separate uniform
+startup preparer, without guessing platform or relaxing mid-stream command gates.
+100 focused tests pass. Next controlled camera-3 HD startup/actual encoding/decode
+validation; defaults and capabilities remain unchanged. See
+[version-specific evidence](docs/internal/native-video-definition.md).
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
