@@ -17,6 +17,8 @@ completed negotiation and decoded HEVC at 640×360, then **1920×1080** with the
 SDK-mapped HD startup profile and CLOSE transport receipt. Sensor-maximum
 verification, sustained reception and production integration remain
 pending; this is not LAN-only operation.
+The [continuity/cleanup checkpoint](native-tcp-cleanup-checkpoint.md) records a
+three-second HD follow-up, offline buffering regressions and unresolved broker release.
 
 | ADR | Decision |
 |---|---|

@@ -144,9 +144,11 @@ def build_route_hangup(
 ) -> bytes:
     """Build the native brokered P2P-inner teardown for one exact direct link.
 
-    This is not an AV STOP/CLOSE record.  It mirrors ``giot_eif_send_hungup_msg`` and releases the
-    A4-created MTP route after media has stopped, so closing the host UDP socket does not leave a
-    camera link slot occupied until timeout.
+    This is not an AV STOP/CLOSE record. It mirrors the brokered
+    ``giot_eif_send_hungup_msg`` layout to request release after media has stopped.
+    Sending it, or receiving a transport ACK, does not prove remote resource release.
+    The caller supplies a fresh route whose two link identifiers are still equal;
+    remapped routes must not silently reuse that assumption.
     """
 
     if not 0 < link_id <= 0xFFFFFF:

@@ -114,6 +114,11 @@ The earlier 640×360 observation above remains the baseline, not the desired def
 
 ## Next steps
 
+Follow-up: [bounded continuity and cleanup](native-tcp-cleanup-checkpoint.md)
+decoded 38 more 1080p HEVC frames over a three-second post-readiness observation,
+peak 77.1 MiB/no swap. This is not a long-duration soak test. Offline duplicate,
+fragmentation and missing-sequence cleanup regressions now cover the composed owner.
+
 1. Preserve the proven 1920×1080 HD startup path; verify sensor maximum separately
    rather than assuming the enum name guarantees it on every model.
 2. Resolve remaining broker teardown uncertainty and validate sustained reception,

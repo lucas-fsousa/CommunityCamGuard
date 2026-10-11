@@ -569,6 +569,14 @@ Next: bounded continuity/backpressure and teardown verification, then generic
 single-producer integration. HD is proven on this unit, not maximum resolution
 for every model, sustained reliability or a new dashboard capability.
 
+2026-10-11 continuity follow-up: after an access failure before A4 and a successful
+access-only check, one camera-3 run decoded 38 HEVC 1080p frames with a three-second
+post-readiness target, CLOSE receipt and cleared sample (77.1 MiB/no swap).
+109 local tests pass, including duplicate/split TCP and missing-sequence expiry.
+This short check does not close sustained/backpressure acceptance. SDK teardown
+mapping confirmed two separately sourced link fields; trace their assignment
+before modifying broker cleanup. [Checkpoint](docs/internal/native-tcp-cleanup-checkpoint.md).
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
