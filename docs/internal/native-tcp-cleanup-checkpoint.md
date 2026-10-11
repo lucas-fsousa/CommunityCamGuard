@@ -65,3 +65,22 @@ The static checks used 128 MiB/no-swap/50%-CPU/40-second cgroups, peak below
 38 MiB. Next trace the channel +0x1f0 assignment and actual send-time header
 preparation before changing teardown. AV CLOSE receipt, B9 transport receipt,
 physical socket closure and remote resource reclamation remain separate facts.
+
+### Assignment traced: fresh route versus reused route
+
+The next two bounded reads narrow this issue without changing the wire:
+
+- `iv_process_calling`, `0x250284` (1604 bytes), allocates a fresh MTP session
+  at `0x2502b8`, then copies MTP +0x20 to channel +0x1f0 at `0x250364–370`.
+  Together with the previously mapped session constructor (initial +0x20 equals
+  +0x5e8), this supports our two equal fields on a **fresh** diagnostic route.
+- `iv_start_process_calling`, `0x24f74c` (1572 bytes), has a reuse branch that
+  can increment bits 24–29 of +0x5e8 (`0x24fb98–bb0`) before requesting a new KCP
+  session. It still copies +0x20 to channel +0x1f0 at `0x24fcc0–ccc`.
+
+Thus distinct field origins are not evidence that the current fresh-route B9
+payload is wrong. They matter when future reconnects reuse an SDK-style route.
+Do not "fix" missing acknowledgements by changing these IDs without new evidence.
+Next unresolved boundary is queued broker send-time header/session preparation
+and acknowledgement handling, not the now-traced fresh-route assignment. Both
+additional inspections peaked below 29 MiB/no swap; no camera traffic was sent.

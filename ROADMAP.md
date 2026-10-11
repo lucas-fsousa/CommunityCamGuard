@@ -577,6 +577,12 @@ This short check does not close sustained/backpressure acceptance. SDK teardown
 mapping confirmed two separately sourced link fields; trace their assignment
 before modifying broker cleanup. [Checkpoint](docs/internal/native-tcp-cleanup-checkpoint.md).
 
+Teardown assignment follow-up: fresh-route creation copies MTP +0x20 to channel
++0x1f0, supporting equal hangup fields for our fresh diagnostic. SDK route reuse
+can increment the other field's generation bits, so reuse needs distinct IDs.
+This is not the cause of the missing B9 ACK; next trace send-time broker headers
+and reply handling. No speculative teardown packet change or extra live test.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
