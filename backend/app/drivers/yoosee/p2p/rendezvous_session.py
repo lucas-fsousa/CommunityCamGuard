@@ -156,10 +156,11 @@ def close_device_route(
     *,
     require_correlated_ack: bool = False,
 ) -> bool:
-    """Send one idempotent native hangup and report its transport acknowledgement.
+    """Send one idempotent native hangup and report a positive transport receipt.
 
     The teardown itself is always emitted once. Waiting is bounded and no application action is
-    replayed if its acknowledgement is lost.
+    replayed if its acknowledgement is lost. A nonzero native ACK result is not
+    positive receipt; even result zero does not prove remote resource reclamation.
     """
 
     request = build_route_hangup(
@@ -174,10 +175,12 @@ def close_device_route(
         if peer != node.address:
             continue
         plain = decrypt_node_frame(wire, node)
-        if plain is None or len(plain) < 24:
+        if plain is None or len(plain) < 32:
             continue
         flags = struct.unpack_from("<I", plain, 0x14)[0]
         if flags & (1 << 20):
+            if struct.unpack_from("<H", plain, 0x1A)[0] != 0:
+                continue
             if plain[1] == 0xB9 and (not require_correlated_ack or (
                     struct.unpack_from("<Q", plain, 4)[0] == node.session_id
                     and struct.unpack_from("<I", plain, 0x0C)[0] == (sequence & 0xFFFFFFFF)

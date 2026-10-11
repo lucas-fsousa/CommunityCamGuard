@@ -125,3 +125,18 @@ Next: instrument broker servicing during the TCP receive interval (currently a
 synchronous diagnostic), and separate correlated ACK status from positive release
 reporting. Preserve no-retry cleanup and fresh-route ownership; do not refresh
 credentials or relax peer/session checks on speculation. Production was not rebuilt.
+
+### Negative receipt hardening
+
+The next offline correction makes `close_device_route` require the full 32-byte
+ACK and a zero result at +0x1a before reporting positive transport receipt.
+Previously an otherwise correlated negative ACK, including `NEED_CERTIFY` (1)
+or `SIGNATURE_ERROR` (4), could be reported as success. Unknown nonzero values
+also fail closed. Both legacy and strict modes reject negative results; strict
+mode continues to require the same peer/session/sequence/mode. Missing/invalid
+receipts never trigger another teardown send or automatic credential refresh.
+
+80 focused tests passed in 2.411 seconds, peak 83.6 MiB/no swap; Ruff passed.
+New encrypted negative-result and header-only regressions cover the change.
+This corrects a false-positive path; it does **not** explain the real experiment,
+where no B9 response was observed. No second live test was needed for this guard.

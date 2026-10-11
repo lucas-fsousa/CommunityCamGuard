@@ -590,6 +590,12 @@ open. No production rebuild, credential refresh or broader camera test. Next:
 broker servicing during TCP reception and distinct ACK-status diagnostics. See
 [cleanup evidence](docs/internal/native-tcp-cleanup-checkpoint.md).
 
+ACK hardening follow-up: route cleanup now rejects truncated and negative native
+receipts instead of counting them as positive delivery, in strict and legacy
+modes. 80 focused tests passed (83.6 MiB/no swap); no extra camera traffic. Broker
+release remains unconfirmed in live tests; next instrument concurrent broker
+servicing without introducing an unbounded queue or a second media producer.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

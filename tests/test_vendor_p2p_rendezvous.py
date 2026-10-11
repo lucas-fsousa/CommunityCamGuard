@@ -197,7 +197,7 @@ def test_route_close_sends_once_and_accepts_transport_ack(monkeypatch):
     assert sent == [(b"hangup", node.address)]
 
 
-@pytest.mark.parametrize("fault", [None, "session", "sequence", "mode", "short"])
+@pytest.mark.parametrize("fault", [None, "session", "sequence", "mode", "short", "header_only"])
 def test_strict_route_release_requires_matching_receipt(monkeypatch, fault):
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
     device = OnlineDevice(7000000002, 1, False, 1, bytes(16))
@@ -213,7 +213,8 @@ def test_strict_route_release_requires_matching_receipt(monkeypatch, fault):
     monkeypatch.setattr(rendezvous_session, "receive_datagrams",
                         lambda *args: iter([(b"ack", node.address)]))
     monkeypatch.setattr(rendezvous_session, "decrypt_node_frame",
-                        lambda *args: bytes(ack[:10] if fault == "short" else ack))
+                        lambda *args: bytes(ack[:10] if fault == "short" else
+                                           ack[:24] if fault == "header_only" else ack))
     assert rendezvous_session.close_device_route(
         Socket(), node, 123, device, 42, 18, 0.1, require_correlated_ack=True
     ) is (fault is None)
