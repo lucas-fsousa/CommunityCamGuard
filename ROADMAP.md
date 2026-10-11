@@ -596,6 +596,12 @@ modes. 80 focused tests passed (83.6 MiB/no swap); no extra camera traffic. Brok
 release remains unconfirmed in live tests; next instrument concurrent broker
 servicing without introducing an unbounded queue or a second media producer.
 
+Broker servicing implemented for the opt-in diagnostic: bounded ACK-only owner,
+four UDP datagrams per TCP iteration, existing socket, no threads or new producer.
+Camera 3 handled 3 broker messages/10 ACKs while decoding 7 HD frames; AV CLOSE
+confirmed but B9 still absent (118.5 MiB/no swap). 34 focused tests and Mypy pass.
+Next SDK hangup caller/reason mapping; no production activation. See cleanup checkpoint.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

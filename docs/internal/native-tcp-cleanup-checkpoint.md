@@ -140,3 +140,31 @@ receipts never trigger another teardown send or automatic credential refresh.
 New encrypted negative-result and header-only regressions cover the change.
 This corrects a false-positive path; it does **not** explain the real experiment,
 where no B9 response was observed. No second live test was needed for this guard.
+
+## Concurrent broker servicing
+
+`broker_maintenance.py` now offers a socket-free, ACK-only owner for this
+experiment. It pins the broker address, requires the decrypted inner mode-2
+session, reassembles at most two fragment groups and never dispatches an action,
+refreshes credentials, opens a connection or retains complete messages. Outer
+fragment group identity is deliberately not treated as broker session identity.
+Limits: 15 seconds, 512 datagrams, 1 MiB cumulative input, 4096-byte datagrams.
+Close clears fragment storage and its node/key reference.
+
+The ignored runner opts in with `CCG_SERVICE_BROKER=1` and services at most four
+ready UDP datagrams per TCP iteration on the existing socket. No extra thread,
+socket or persistent media producer is created. Deadline/byte budgets still apply.
+
+One camera-3 HD acquisition with this servicing handled **7 UDP datagrams,
+3 valid complete broker messages and 10 ACKs** (including fragment receipts),
+3,271 maintenance bytes. It decoded **7 HEVC 1920×1080 frames**, 29,534 temporary
+video bytes; AV CLOSE receipt confirmed and all local owners/sockets/sample
+cleared. **B9 remained unconfirmed**, with no observed cleanup response. This
+does not support treating synchronous UDP starvation as the sole explanation.
+Peak combined memory 118.5 MiB/no swap, 9.895 seconds; production unchanged.
+
+34 focused maintenance/catalogue/correlation tests passed, peak 102.6 MiB/no swap;
+Ruff and normal-import Mypy passed (105.5 MiB/no swap). These tests include wrong
+peer/session, damaged/plaintext traffic, ACK-loop prevention, fragmented inner
+correlation, expiry, count and size limits. Next inspect SDK hangup reason/callers;
+do not repeat the same serviced acquisition without additional evidence.
