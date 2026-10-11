@@ -111,3 +111,8 @@ short; de-identify examples (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`) — never real 
 - [Delegated access activation (2026-09-27)](delegated-access-activation.md): optional
   expiration, explicit feature grants, owner-only modal, login and guarded transports.
   Source-tested and locally deployed as `b-a84862f46bfb`; real-browser acceptance remains pending.
+Latest in-server camera-3 validation: 55 HEVC frames decoded at 1920×1080,
+AV CLOSE and correlated positive broker-release receipts. Diagnostic restored
+disabled; all three recorders grew afterward. Sustained/browser validation remains
+open; the historical standalone missing receipts were not silently reclassified.
+

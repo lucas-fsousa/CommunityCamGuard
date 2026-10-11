@@ -273,3 +273,38 @@ the diagnostic. Do not clear the one-shot guard, stop other cameras, run concurr
 account probes or treat absent B9 receipt as successful broker cleanup. If the
 receipt is still missing, preserve evidence and inspect broker traffic/sequence
 handling before another live attempt. Sustained streaming remains a later task.
+## Latest live checkpoint — 2026-10-11: in-server HD and broker receipt
+
+After operator approval, rebuilt with the legacy builder constrained to 512 MiB,
+no additional swap and one CPU. Recreated only `ccg-app`; go2rtc and unrelated
+containers were not restarted. A preliminary HTTP call was rejected with 403
+before the diagnostic: urllib's default form Content-Type without Origin hit the
+existing CSRF guard. Corrected the local client to send application/json and the
+explicit direct-loopback Origin; no server guard was weakened.
+
+One actual camera-3 attempt in the updated server returned HTTP 200:
+
+- TCP ready and AV CLOSE transport receipt: true.
+- 55 video records, 57 audio records counted (not played), one encoding header.
+- 380,520 received TCP bytes, 17,808 sent TCP bytes; five broker messages serviced.
+- Strict HEVC decode: **55 frames, 1920×1080**, 310,808 input bytes,
+  3,549,000 relative timestamp ticks, zero pre-IDR discards.
+- **Correlated positive B9 broker receipt: true.**
+
+This closes the missing-receipt observation for this one bounded, isolated attempt.
+It supports the shared-account concurrency hypothesis but does not prove the
+exclusive cause of previous failures, physical reclamation of all remote resources,
+sustained reliability, maximum sensor resolution, LAN-only access or browser playback.
+
+Finally restored all four diagnostic flags false and target IDs empty; health 200.
+Three current-hour recorder directories grew over ten seconds by 524,288, 786,432
+and 786,432 bytes. Four app recreations occurred across rejected-client and actual
+attempt/restoration; recordings were briefly interrupted, not gap-free. Client
+cgroup peak was 56.6 MiB without swap for the successful cycle (server not included).
+After restoration app used 112.6 MiB, go2rtc 46.23 MiB; both retain 1 GiB limits.
+
+Next: bounded timing/stall measurements and sustained-reception preparation,
+followed by generic single-producer/fan-out integration. Do not expose native TCP
+as a production capability based only on this short test. Historical unresolved
+receipt notes below remain evidence of earlier, confounded standalone attempts.
+

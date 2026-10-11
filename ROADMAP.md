@@ -629,6 +629,14 @@ shared-account runner or claim remote cleanup without a correlated receipt.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
+2026-10-11 native TCP live checkpoint: updated same-process diagnostic decoded
+55 HEVC 1920×1080 frames, confirmed AV CLOSE and **positive correlated B9 receipt**.
+All flags/targets restored disabled/empty; three recorders grew afterward.
+Only app was recreated with operator approval; brief recording interruptions.
+Shared-session isolation is supported as an explanation, not proven exclusive
+causality. Next native-stream work: bounded timing/stall measurements, sustained
+reception, then generic single-producer integration; no production capability yet.
+
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
 key and before/after encoding checks. Growing/replaced originals cannot reuse or
 publish stale conversions. Old derived entries need on-demand preparation again;

@@ -8,6 +8,13 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 
 ### TCP relay mode (2026-10-11; not live-validated in-server)
 
+**Follow-up:** now validated once inside the server: 55 HD frames decoded and both
+CLOSE/B9 receipts positive. Restored disabled/empty afterward. The implementation
+notes below describe the original offline stage; see the latest
+[live checkpoint](native-tcp-cleanup-checkpoint.md). The local HTTP client must
+send an explicit same-loopback Origin and a non-form Content-Type (application/json)
+for its empty POST; do not weaken CSRF protections for diagnostic scripts.
+
 `NATIVE_AV_DIAGNOSTIC_TCP_RELAY=true` selects the bounded native TCP route.
 Default is false. It cannot combine with platform-only mode; optional post-route
 decoding is supported. Both camera and shared-account broker reservations cover
