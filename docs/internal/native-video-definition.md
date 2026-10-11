@@ -34,6 +34,15 @@ sequentially with 128 MiB/no-swap limits, measured peaks below 38 MiB. Next is
 one camera-3-only startup/encoding/decode observation using this exact SDK path,
 not a guessed platform or two speculative mid-stream commands.
 
+**2026-10-11 live outcome:** that observation succeeded: encoding codec 5,
+1920×1080, eight HEVC frames independently decoded after local socket closure.
+Both A4 and INIT used the same prepared template; four additional offline
+regressions cover their equality for every supported enum (104 focused tests).
+CLOSE transport receipt confirmed; broker B9 receipt remains unconfirmed.
+Combined process/decoder peak 140.6 MiB, zero swap, 9.752 seconds. This proves
+this unit's HD startup path, not sensor maximum, other models, sustained playback
+or a mid-stream quality command. See [full observation](native-av-tcp-relay.md).
+
 2026-10-03: one bounded, platform-only camera-3 diagnostic confirmed the MTP
 roundtrip and B9 receipt but returned an unknown platform. No AV INIT/START or
 quality change was sent. HD remains gated; see the

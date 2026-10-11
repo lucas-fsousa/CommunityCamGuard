@@ -1,8 +1,11 @@
 import pytest
 
+from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.media_protocol import build_av_init
+from backend.app.drivers.yoosee.p2p.rendezvous_protocol import build_calling_request
 from backend.app.drivers.yoosee.p2p.video_definition import encode_definitions
 from backend.app.drivers.yoosee.p2p.video_startup_645 import with_preconnect_definition
+from tests.test_live_startup_quality import route
 
 
 @pytest.mark.parametrize("definition,legacy,packed", [
@@ -37,3 +40,14 @@ def test_preparation_never_relaxes_midstream_platform_gate_or_default():
     assert build_av_init(42) == original
     with pytest.raises(ValueError):
         encode_definitions(0, {0: 3})
+
+
+@pytest.mark.parametrize("definition", [1, 2, 3, 7])
+def test_preconnect_cache_reaches_a4_and_init_identically(definition):
+    node, args = route()
+    metadata = with_preconnect_definition(build_av_init(1)[24:56], definition)
+    kwargs = dict(request_user_data=metadata, connection_type=1)
+    broker = gute_mode2_decrypt(build_calling_request(*args, **kwargs), node.session_key)
+    init = build_av_init(args[5].call_id, **kwargs)
+    assert broker[0x90:0xB0] == init[24:56] == metadata
+    assert broker[0xB0] == metadata[0]

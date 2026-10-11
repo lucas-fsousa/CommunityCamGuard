@@ -560,6 +560,15 @@ startup preparer, without guessing platform or relaxing mid-stream command gates
 validation; defaults and capabilities remain unchanged. See
 [version-specific evidence](docs/internal/native-video-definition.md).
 
+2026-10-11 HD milestone: one camera-3 native TCP acquisition using that SDK path
+decoded **8 HEVC frames at 1920×1080**, matching its encoding header. CLOSE
+transport receipt confirmed, local sockets closed and RAM sample cleared; broker
+B9 receipt still unconfirmed. Combined peak 140.6 MiB/no swap, 9.752 seconds.
+104 focused tests cover startup and transport, including A4/INIT metadata equality.
+Next: bounded continuity/backpressure and teardown verification, then generic
+single-producer integration. HD is proven on this unit, not maximum resolution
+for every model, sustained reliability or a new dashboard capability.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

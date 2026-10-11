@@ -91,10 +91,31 @@ CI follow-up: the full import-aware type check required an explicit `V1Record`
 list annotation in the new owner; corrected it and verified locally with normal
 Mypy imports (77 MiB/no swap). A skip-import targeted check had missed that issue.
 
+## HD startup follow-up — 2026-10-11
+
+One camera-3 acquisition used the [SDK 6.45 preconnection preparation](native-video-definition.md)
+with uniform HD enum 3 in both A4 and INIT. No platform was guessed and no
+mid-stream quality command was sent. The camera advertised codec 5 at
+**1920×1080**; strict sequential ffprobe/ffmpeg validation decoded eight HEVC
+frames at those dimensions after local socket closure and the B9 cleanup attempt.
+
+- 28,460 video bytes temporarily in RAM; zero pre-IDR discards; raw timestamp
+  span 700,000 ticks. Twelve audio records counted only, never played or retained.
+- 64,729 TCP bytes/91 records received, 4,474 bytes emitted by the AV owner.
+- INIT, START and CLOSE each needed two byte-identical transmission attempts.
+  Readiness and CLOSE transport receipt confirmed; owner/socket closed and sample
+  cleared. Broker B9 receipt remains unconfirmed, not silently treated as success.
+- Combined parent/decoder peak **140.6 MiB**, zero swap, **9.752 seconds**;
+  256 MiB/no-swap/50%-CPU/60-second cap, no production restart or other camera use.
+
+HD is now decoded evidence for this unit. It is not sensor-maximum verification,
+visual inspection, sustained reception, LAN-only access or a production feature.
+The earlier 640×360 observation above remains the baseline, not the desired default.
+
 ## Next steps
 
-1. Map and validate the maximum-resolution profile. The proven TCP sample is
-   640×360 and must not silently become the dashboard's preferred quality.
+1. Preserve the proven 1920×1080 HD startup path; verify sensor maximum separately
+   rather than assuming the enum name guarantees it on every model.
 2. Resolve remaining broker teardown uncertainty and validate sustained reception,
    backpressure and reconnect ownership before production use.
 3. Preserve maximum-resolution preference and the generic single-producer driver

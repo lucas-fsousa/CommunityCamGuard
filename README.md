@@ -275,8 +275,9 @@ broader settings, delegated-access mobile/proxy acceptance, security hardening, 
 Scoped temporary keys are implemented; S3 is not implemented.
 Proprietary Yoosee live-stream reception is still experimental. A bounded camera-3
 [native TCP relay test](docs/internal/native-av-tcp-relay.md) completed AV negotiation
-and decoded nine HEVC frames at 640×360 without the vendor app. Maximum-resolution
-validation, sustained reception and production integration
+decoded HEVC at 640×360, then eight frames at **1920×1080** using the SDK-mapped
+HD startup profile, without the vendor app. Sensor-maximum verification,
+sustained reception and production integration
 remain open; vendor relay access does not provide LAN-only operation. Current
 live view continues through go2rtc/RTSP; these findings do not enable controls
 or streaming capabilities for an unverified camera. See the
