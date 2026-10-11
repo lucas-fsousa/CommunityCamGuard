@@ -583,6 +583,13 @@ can increment the other field's generation bits, so reuse needs distinct IDs.
 This is not the cause of the missing B9 ACK; next trace send-time broker headers
 and reply handling. No speculative teardown packet change or extra live test.
 
+2026-10-11 send-time mapping: corrected B9 delivery kind from 3 to SDK-proven 1;
+73 focused tests pass, including real encrypted receipt/correlation regressions.
+One camera-3 HD decode/CLOSE test still had no B9 receipt, so broker cleanup stays
+open. No production rebuild, credential refresh or broader camera test. Next:
+broker servicing during TCP reception and distinct ACK-status diagnostics. See
+[cleanup evidence](docs/internal/native-tcp-cleanup-checkpoint.md).
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

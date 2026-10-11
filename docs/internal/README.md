@@ -19,6 +19,8 @@ verification, sustained reception and production integration remain
 pending; this is not LAN-only operation.
 The [continuity/cleanup checkpoint](native-tcp-cleanup-checkpoint.md) records a
 three-second HD follow-up, offline buffering regressions and unresolved broker release.
+It also records the SDK-backed B9 delivery-kind correction and encrypted receipt
+tests; a subsequent live check still did not confirm broker release.
 
 | ADR | Decision |
 |---|---|

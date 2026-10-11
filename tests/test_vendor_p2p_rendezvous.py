@@ -147,7 +147,10 @@ def test_route_hangup_matches_the_native_p2p_inner_layout():
     assert struct.unpack_from("<Q", plain, 4)[0] == node.session_id
     assert struct.unpack_from("<I", plain, 0x0C)[0] == 18
     assert (struct.unpack_from("<I", plain, 0x14)[0] >> 16) & 3 == 2
-    assert (struct.unpack_from("<I", plain, 0x14)[0] >> 18) & 3 == 3
+    # Native hangup takes delivery kind 1 from the first queue-policy word.
+    flags = struct.unpack_from("<I", plain, 0x14)[0]
+    assert (flags >> 18) & 3 == 1
+    assert not flags & (1 << 20)  # Outgoing request, never an ACK.
     assert struct.unpack_from("<I", plain, 0x18)[0] == 1
     assert struct.unpack_from("<Q", plain, 0x1C)[0] == 7000000002
     assert struct.unpack_from("<Q", plain, 0x24)[0] == 123

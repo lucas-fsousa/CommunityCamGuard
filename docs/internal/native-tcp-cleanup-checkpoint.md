@@ -84,3 +84,44 @@ Do not "fix" missing acknowledgements by changing these IDs without new evidence
 Next unresolved boundary is queued broker send-time header/session preparation
 and acknowledgement handling, not the now-traced fresh-route assignment. Both
 additional inspections peaked below 29 MiB/no swap; no camera traffic was sent.
+
+## Send-time mapping and delivery-kind correction
+
+Further SDK 6.45 evidence:
+
+- The relocation at GOT `0x2a8528` resolves to `gat_on_ackfrm_msg`, not a packet
+  builder. That callback (`0x23da38`, 140 bytes) logs delivery timeout for its
+  status argument 2; it does not implement semantic camera-release confirmation.
+- `giot_eif_send_hungup_msg` supplies queue-policy words `[1, 40, 0, 3]` at
+  `0x255624–640`. In `iv_gutes_add_send_pkt` (`0x1e7c50`, 2184 bytes), the **first**
+  policy word becomes header bits 18–19 at `0x1e7db8–dcc`. Our builder incorrectly
+  used delivery kind 3. It now uses **1**; session, reason and link fields remain
+  unchanged. This is a source-backed format correction, not proof of the timeout's cause.
+- The queue fills sequence at `0x1e7d8c–db0`, clears ACK at `0x1e7dd0–ddc`,
+  and can replace prefix/identity with 7e/current broker session at
+  `0x1e7fc0–8004` before checksum/encryption. That supports our existing broker
+  session header; no change to identity or encryption was justified.
+- `iv_gutes_pkt_send_ack` (`0x1e8654`, 984 bytes) builds a 32-byte ACK,
+  echoes type/sequence, sets bit 20 and writes the result at +0x1a. Our minimum
+  response length is consistent; do not relax it to accept truncated receipts.
+- `iv_gutes_on_rcvfrm_ack` (`0x1e9ec4`, 3088 bytes) handles nonzero result codes
+  (including certification/signature errors) separately, then correlates queued
+  sequence at `0x1ea738–74c`. Kind 1 releases its queued sender; kinds 2/3 retain
+  response-wait state. A transport ACK must not be reported as semantic release.
+
+One camera-3 validation after the kind correction decoded seven HEVC 1920×1080
+frames (28,356 RAM bytes), confirmed AV CLOSE transport receipt and cleared local
+owners/sockets/sample. **B9 receipt was still absent.** No cleanup response was
+observed, so no nonzero ACK status was diagnosed. Peak 74.7 MiB/no swap, 9.432s
+under the unchanged 256 MiB/no-swap/50%-CPU cap. No repeated live attempt followed.
+
+73 focused tests passed (84.2 MiB/no swap), including nine new end-to-end encrypted
+receipt cases using real encryption/decryption with wrong peer/session/sequence/
+type/mode/key/checksum/truncation. A valid receipt passes and invalid ones cannot
+trigger a resend or claim success. This rules out those synthetic parser paths,
+not packet loss, broker session lifetime or unexamined ACK result semantics.
+
+Next: instrument broker servicing during the TCP receive interval (currently a
+synchronous diagnostic), and separate correlated ACK status from positive release
+reporting. Preserve no-retry cleanup and fresh-route ownership; do not refresh
+credentials or relax peer/session checks on speculation. Production was not rebuilt.

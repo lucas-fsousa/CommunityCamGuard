@@ -160,7 +160,9 @@ def build_route_hangup(
         0x4C,
         node.session_id,
         sequence,
-        randomized_flags(mode=2, proc=3),
+        # SDK 6.45 giot_eif_send_hungup_msg queues delivery kind 1;
+        # iv_gutes_add_send_pkt writes that kind into header bits 18-19.
+        randomized_flags(mode=2, proc=1),
     )
     frame[0] = 0x7E
     struct.pack_into("<I", frame, 0x18, 1)
