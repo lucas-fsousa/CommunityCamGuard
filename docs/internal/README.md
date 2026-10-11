@@ -27,6 +27,8 @@ broker; further TCP cleanup tests must continue using this in-server reservation
 The finite paired-socket receiver, rendezvous/socket owner and guarded internal
 trigger are integrated. One isolated live check decoded 55 HD frames and confirmed
 both CLOSE and B9 receipts; production streaming is unchanged.
+The [duration budget review](native-tcp-duration-budgets.md) lists the layered
+limits that must be reconciled before sustained reception; none were relaxed.
 
 | ADR | Decision |
 |---|---|

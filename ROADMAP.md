@@ -639,6 +639,10 @@ Arrival timing instrumentation implemented/offline-tested: startup, first-video,
 interarrival gap and trailing silence frozen before CLOSE, constant storage.
 Not deployed or live-measured. Next review all layered lifetime/byte/record limits
 before extending reception; do not merely increase a socket timeout or buffer.
+Layered review completed in [duration budgets](docs/internal/native-tcp-duration-budgets.md):
+an extended profile still needs consistent total/traffic budgets while preserving
+startup/idle/reassembly and retained-memory limits. Longer shared broker ownership
+also affects control latency; production requires a separate ownership design.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
