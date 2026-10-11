@@ -23,10 +23,10 @@ It also records the SDK-backed B9 delivery-kind correction and encrypted receipt
 tests; a subsequent live check still did not confirm broker release.
 Later investigation identified a shared-account isolation gap: standalone probes
 do not share server locks. The internal diagnostic now reserves both camera and
-broker; further TCP cleanup tests require its in-server integration/deployment.
+broker; further TCP cleanup tests must continue using this in-server reservation.
 The finite paired-socket receiver, rendezvous/socket owner and guarded internal
-trigger are now integrated and offline-tested. Deployment and isolated live
-cleanup validation remain pending; production streaming is unchanged.
+trigger are integrated. One isolated live check decoded 55 HD frames and confirmed
+both CLOSE and B9 receipts; production streaming is unchanged.
 
 | ADR | Decision |
 |---|---|
@@ -111,8 +111,6 @@ short; de-identify examples (`aa:bb:cc:dd:ee:ff`, `192.168.1.x`) — never real 
 - [Delegated access activation (2026-09-27)](delegated-access-activation.md): optional
   expiration, explicit feature grants, owner-only modal, login and guarded transports.
   Source-tested and locally deployed as `b-a84862f46bfb`; real-browser acceptance remains pending.
-Latest in-server camera-3 validation: 55 HEVC frames decoded at 1920×1080,
-AV CLOSE and correlated positive broker-release receipts. Diagnostic restored
-disabled; all three recorders grew afterward. Sustained/browser validation remains
-open; the historical standalone missing receipts were not silently reclassified.
-
+- [Native TCP cleanup](native-tcp-cleanup-checkpoint.md): in-server camera-3 validation
+  decoded 55 HD frames with positive CLOSE/B9 receipts. Restored disabled; all three
+  recorders grew afterward. Sustained/browser validation remains open.

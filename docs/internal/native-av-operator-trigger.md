@@ -6,7 +6,7 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 
 ## Gates and limits
 
-### TCP relay mode (2026-10-11; not live-validated in-server)
+### TCP relay mode (2026-10-11; bounded in-server validation completed)
 
 **Follow-up:** now validated once inside the server: 55 HD frames decoded and both
 CLOSE/B9 receipts positive. Restored disabled/empty afterward. The implementation

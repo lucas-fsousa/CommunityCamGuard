@@ -627,8 +627,6 @@ no swap), including encrypted discovery and cleanup failures. Next: coordinated
 deployment, then one in-server camera-3 validation; do not race a standalone
 shared-account runner or claim remote cleanup without a correlated receipt.
 
-## Dashboard reliability, settings and access security — requested 2026-09-21
-
 2026-10-11 native TCP live checkpoint: updated same-process diagnostic decoded
 55 HEVC 1920×1080 frames, confirmed AV CLOSE and **positive correlated B9 receipt**.
 All flags/targets restored disabled/empty; three recorders grew afterward.
@@ -636,6 +634,13 @@ Only app was recreated with operator approval; brief recording interruptions.
 Shared-session isolation is supported as an explanation, not proven exclusive
 causality. Next native-stream work: bounded timing/stall measurements, sustained
 reception, then generic single-producer integration; no production capability yet.
+
+Arrival timing instrumentation implemented/offline-tested: startup, first-video,
+interarrival gap and trailing silence frozen before CLOSE, constant storage.
+Not deployed or live-measured. Next review all layered lifetime/byte/record limits
+before extending reception; do not merely increase a socket timeout or buffer.
+
+## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
 key and before/after encoding checks. Growing/replaced originals cannot reuse or

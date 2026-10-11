@@ -11,6 +11,7 @@ from typing import Protocol
 from .av_sample import AvVideoSample
 from .kcp_receive import ReceiveError
 from .mtp_tcp_av import TcpAvSession
+from .reception_timing import ArrivalTiming, ReceptionTiming
 
 
 class PairedSocket(Protocol):
@@ -29,6 +30,7 @@ class TcpReception:
     encoding_headers: int
     received_bytes: int
     sent_bytes: int
+    timing: ReceptionTiming | None = None
 
 
 def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSession,
@@ -42,7 +44,9 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
     owner and clears the supplied sample; never retry an ambiguous socket write.
     Caller must still close the actual TCP socket and request broker release.
     """
-    deadline = clock() + 8
+    started = clock()
+    deadline = started + 8
+    timing = ArrivalTiming(started)
     ready_at = None
     closing = False
     video = audio = headers = 0
@@ -65,6 +69,7 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
             owner.poll()
             if (not closing and owner.ready and ready_at is not None
                     and clock() - ready_at >= 3 and video):
+                timing.finish(clock())
                 owner.begin_finish()
                 closing = True
                 deadline = min(deadline, clock() + 2)
@@ -82,17 +87,20 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
             batch = owner.receive(data, peer)
             if owner.ready and ready_at is None:
                 ready_at = clock()
+                timing.ready(ready_at)
             for wire in batch.acknowledgements:
                 send(wire)
             for record in batch.records:
                 if sample is not None:
                     sample.consume(record)
                 video += bool(record.video)
+                if record.video:
+                    timing.video(clock())
                 audio += len(record.audio)
                 headers += record.encoding is not None
             if owner.close_acknowledged:
                 return TcpReception(ready_at is not None, True, video, audio, headers,
-                                    owner.received_bytes, owner.sent_bytes)
+                                    owner.received_bytes, owner.sent_bytes, timing.finish(clock()))
         raise ReceiveError("TCP reception deadline exceeded")
     except BaseException:
         if sample is not None:

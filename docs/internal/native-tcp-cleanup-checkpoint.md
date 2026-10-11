@@ -1,5 +1,9 @@
 # Native TCP continuity and cleanup checkpoint — 2026-10-11
 
+**Latest:** the in-server live check at the end of this document decoded 55 HD
+frames and confirmed both CLOSE and B9 receipts. Earlier missing-receipt findings
+below are historical; sustained/browser validation is still open.
+
 ## Offline continuity
 
 `test_vendor_mtp_tcp_continuity.py` exercises the complete measured/negotiated TCP
@@ -306,5 +310,19 @@ After restoration app used 112.6 MiB, go2rtc 46.23 MiB; both retain 1 GiB limits
 Next: bounded timing/stall measurements and sustained-reception preparation,
 followed by generic single-producer/fan-out integration. Do not expose native TCP
 as a production capability based only on this short test. Historical unresolved
-receipt notes below remain evidence of earlier, confounded standalone attempts.
+receipt notes above remain evidence of earlier, confounded standalone attempts.
 
+## Arrival timing instrumentation — offline follow-up
+
+The finite TCP receiver now reports local-monotonic timing with constant memory:
+time to ready, time to first video, maximum between-video arrival gap, trailing
+silence, and observation duration (milliseconds). The measurement starts at the
+paired-socket receiver, not at HTTP authentication or camera capture. It freezes
+before sending CLOSE: teardown and late media cannot inflate the measured silence.
+Multiple video records in one receive batch can legitimately have zero spacing;
+these are not FPS, decoder throughput, glass-to-glass latency or camera timestamps.
+
+51 focused offline tests passed (107.8 MiB peak, no swap), including real protocol
+socket tests, startup/silence separation, frozen close boundary and 10,000 synthetic
+arrivals without history retention. This instrumentation has not been deployed or
+live-measured; the 55-frame result predates it. No new camera connection was made.

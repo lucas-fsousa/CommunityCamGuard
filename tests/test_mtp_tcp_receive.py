@@ -74,6 +74,11 @@ def test_fixed_window_services_broker_and_closes_without_owning_socket():
     assert result.ready and result.close_acknowledged
     assert result.video_frames == 1 and result.audio_frames == 2
     assert result.encoding_headers == 1
+    assert result.timing is not None
+    assert result.timing.ready_ms is not None and result.timing.first_video_ms is not None
+    assert result.timing.max_video_gap_ms == 0  # Single video fixture, then silence.
+    assert result.timing.trailing_video_gap_ms > 1000
+    assert result.timing.observation_ms < round((now[0] - 1) * 1000)  # CLOSE excluded.
     assert sock.actions == [1, 6, 7]
     assert now[0] >= 4 and len(ticks) > 50
     assert owner.closed and owner.buffered_bytes == 0
