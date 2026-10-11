@@ -21,6 +21,7 @@ def setup(monkeypatch):
                                native_av_diagnostic_decode_video=False,
                                native_av_diagnostic_platform_only=False,
                                native_av_diagnostic_tcp_relay=False,
+                               native_av_diagnostic_tcp_profile="short",
                                native_av_diagnostic_camera_id=CAMERA,
                                native_av_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
@@ -43,7 +44,7 @@ def test_single_use_fixed_target_and_safe_counts(setup):
     assert result.json()["route_release_acknowledged"] is True
     assert "123" not in result.text and "token" not in result.text
     assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA, reviewed_device_id="123",
-                         decode_video=False, platform_only=False, tcp_relay=False)]
+                         decode_video=False, platform_only=False, tcp_relay=False, tcp_profile="short")]
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
@@ -82,8 +83,10 @@ def test_tcp_mode_selected_only_by_server(setup):
     assert client.post(PATH + "?tcp_relay=true").status_code == 400
     assert not calls
     settings.native_av_diagnostic_tcp_relay = True
+    settings.native_av_diagnostic_tcp_profile = "extended"
     assert client.post(PATH).status_code == 200
     assert calls[0]["tcp_relay"] is True
+    assert calls[0]["tcp_profile"] == "extended"
     assert client.post(PATH).status_code == 409
 
 

@@ -17,6 +17,7 @@ from .mtp_tcp_ack import build_mtp_tcp_meter_ack, build_mtp_tcp_plain_meter_ack
 from .mtp_tcp_framing import MtpTcpFramer
 from .mtp_tcp_kcp import unwrap_tcp_relay_kcp, wrap_tcp_relay_kcp
 from .mtp_tcp_measurement import build_mtp_tcp_measurement, matches_mtp_tcp_measurement_ack
+from .tcp_budget import TcpProfile, validate_profile
 from .v1_receive import V1Record
 
 MAX_RX_BYTES = 2 * 1024 * 1024
@@ -35,7 +36,10 @@ class TcpAvSession:
     def __init__(self, peer: tuple[str, int], link_id: int, call_id: int, cookie: bytes,
                  *, source_id: int, destination_id: int,
                  request_user_data: bytes | None = None,
+                 profile: TcpProfile = TcpProfile.SHORT,
                  clock: Callable[[], float] = time.monotonic) -> None:
+        validate_profile(profile)
+        self._profile = profile
         if type(link_id) is not int or not 0 < link_id <= 0xFFFFFF:
             raise ValueError("invalid fresh TCP AV link")
         if not isinstance(cookie, bytes) or len(cookie) != 8:
@@ -57,6 +61,10 @@ class TcpAvSession:
         self._measurement_sent = False
         self.closed = False
         self.received_bytes = self.sent_bytes = self.received_records = 0
+
+    @property
+    def profile(self) -> TcpProfile:
+        return self._profile
 
     @property
     def metered(self) -> bool:
@@ -89,7 +97,7 @@ class TcpAvSession:
     def poll(self) -> None:
         if self.closed:
             raise ReceiveError("TCP AV session is closed")
-        if self._clock() - self._created >= (15 if self.metered else 3):
+        if self._clock() - self._created >= (self.profile.budget.session_seconds if self.metered else 3):
             self._fail("TCP AV session deadline exceeded")
         try:
             if self._av is not None:
@@ -100,7 +108,7 @@ class TcpAvSession:
 
     def _account(self, wires: tuple[bytes, ...]) -> tuple[bytes, ...]:
         self.sent_bytes += sum(map(len, wires))
-        if self.sent_bytes > MAX_TX_BYTES:
+        if self.sent_bytes > MAX_TX_BYTES * self.profile.budget.traffic_multiplier:
             self._fail("TCP AV transmit budget exceeded")
         return wires
 
@@ -147,14 +155,14 @@ class TcpAvSession:
             self._fail("TCP AV input must be bytes")
         try:
             self.received_bytes += len(data)
-            if self.received_bytes > MAX_RX_BYTES:
+            if self.received_bytes > MAX_RX_BYTES * self.profile.budget.traffic_multiplier:
                 self._fail("TCP AV receive budget exceeded")
             acknowledgements: list[bytes] = []
             records: list[V1Record] = []
             unhandled = 0
             for wire in self._framer.feed(data):
                 self.received_records += 1
-                if self.received_records > MAX_RECORDS:
+                if self.received_records > MAX_RECORDS * self.profile.budget.traffic_multiplier:
                     self._fail("TCP AV record budget exceeded")
                 if wire[1] & 0x80:
                     reply = self._meter(wire)

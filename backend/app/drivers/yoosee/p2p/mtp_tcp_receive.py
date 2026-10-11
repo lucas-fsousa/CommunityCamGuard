@@ -12,6 +12,7 @@ from .av_sample import AvVideoSample
 from .kcp_receive import ReceiveError
 from .mtp_tcp_av import TcpAvSession
 from .reception_timing import ArrivalTiming, ReceptionTiming
+from .tcp_budget import TcpProfile
 
 
 class PairedSocket(Protocol):
@@ -37,7 +38,7 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
                       *, clock: Callable[[], float], sample: AvVideoSample | None = None,
                       service_broker: Callable[[], None] = lambda: None,
                       cancelled: Callable[[], bool] = lambda: False) -> TcpReception:
-    """Observe three seconds after readiness, within eight seconds including CLOSE.
+    """Observe the owner's reviewed window (default 3s within 8s including CLOSE).
 
     Consume records immediately; never buffer complete messages outside the optional
     bounded sample. Return only after CLOSE receipt. Any failure terminates the
@@ -45,12 +46,15 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
     Caller must still close the actual TCP socket and request broker release.
     """
     started = clock()
-    deadline = started + 8
+    budget = owner.profile.budget
+    deadline = started + budget.receive_seconds
     timing = ArrivalTiming(started)
     ready_at = None
     closing = False
     video = audio = headers = 0
     try:
+        if owner.profile is TcpProfile.EXTENDED and sample is not None:
+            raise ReceiveError("extended TCP experiment cannot retain a decode sample")
         if sock.getpeername() != peer:
             raise ReceiveError("TCP receive peer differs from paired route")
 
@@ -68,7 +72,7 @@ def receive_paired_av(sock: PairedSocket, peer: tuple[str, int], owner: TcpAvSes
                 raise ReceiveError("TCP reception cancelled or expired during broker service")
             owner.poll()
             if (not closing and owner.ready and ready_at is not None
-                    and clock() - ready_at >= 3 and video):
+                    and clock() - ready_at >= budget.observation_seconds and video):
                 timing.finish(clock())
                 owner.begin_finish()
                 closing = True

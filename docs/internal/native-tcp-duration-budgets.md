@@ -25,9 +25,8 @@ continuous ACK-only traffic, backpressure and cancellation with a fake clock fir
 An extended test should count/discard completed media immediately; keep any decode
 sample independently capped. Do not remove traffic limits or add an unbounded queue.
 
-The initial staged target can be ten seconds of observation, but this is a proposed
-acceptance step, not an enabled mode or promised success under today's cumulative
-limits. Measure gaps and bounded buffer occupancy, confirm CLOSE/B9, then restore
+The initial staged target is ten seconds of observation. Measure gaps and bounded
+buffer occupancy, confirm CLOSE/B9, then restore
 diagnostics disabled. A shared-account lock currently covers the entire experiment;
 longer ownership also delays controls on other cameras and needs explicit limits.
 Minutes-long production streaming cannot simply reuse this exclusive diagnostic.
@@ -36,3 +35,27 @@ Production design still requires one driver-owned source per camera, bounded
 fan-out/backpressure, a defined broker-session ownership model, RTSP fallback and
 browser codec validation. Camera capabilities must remain unknown/disabled until
 the driver has evidence for that model/device; this review enables none.
+
+## Implemented finite extended profile — offline validation
+
+`TcpProfile` is an enum of immutable reviewed budgets, not arbitrary numeric input.
+SHORT preserves the original limits above. EXTENDED observes ten seconds with
+20 seconds for TCP reception including CLOSE, 22 seconds for its protocol owner,
+28 seconds for broker servicing and 48 seconds for the whole route before the
+independent 1.5-second cleanup phase. Authentication still receives its original
+20-second deadline, measurement three seconds, readiness/idle five seconds and
+assembly two seconds. Broker packet/byte and all retained-buffer limits stay fixed.
+TCP cumulative traffic is capped at 8 MiB RX, 1 MiB TX and 16,384 records; these
+are counters, not buffers. No indefinite session, retry or renewal is added.
+
+EXTENDED rejects a decoder sample before socket allocation; the receiver also
+rejects and clears one if invoked directly. Completed media is counted/discarded.
+The guarded server option `NATIVE_AV_DIAGNOSTIC_TCP_PROFILE=extended` requires
+TCP enabled and decode/platform-only disabled. Default remains `short`; no HTTP
+parameters can select a profile. All original authentication, camera/broker locks,
+reviewed server target and one-shot gates remain in force.
+
+Offline tests exercise ten seconds of continuous real-protocol messages with a
+fake clock, CLOSE, drained buffers, unchanged startup/idle failures, immutable
+profiles, rejection before sockets, broker limits, cancellation and profile
+propagation through both route owners. This is not yet a new live result.

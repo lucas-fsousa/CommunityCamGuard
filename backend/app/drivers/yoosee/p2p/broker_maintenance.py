@@ -16,14 +16,17 @@ from .resource_service_protocol import (
     decode_fragment_packet,
 )
 from .session_io import decrypt_node_frame
+from .tcp_budget import TcpProfile, validate_profile
 
 
 class BrokerMaintenance:
-    """One broker/session, 15 seconds, 512 datagrams, 1 MiB; no retained messages."""
+    """One broker/session, default 15 seconds, 512 datagrams, 1 MiB; no history."""
 
-    def __init__(self, node: CertifiedNode, *, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, node: CertifiedNode, *, clock: Callable[[], float] = time.monotonic,
+                 profile: TcpProfile = TcpProfile.SHORT):
+        validate_profile(profile)
         self._node: CertifiedNode | None = node
-        self._clock, self._deadline = clock, clock() + 15
+        self._clock, self._deadline = clock, clock() + profile.budget.broker_seconds
         self._fragments = FragmentReassembler(max_groups=2)
         self.closed = False
         self.datagrams = self.received_bytes = self.messages = self.acknowledgements = 0

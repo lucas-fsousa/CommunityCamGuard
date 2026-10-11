@@ -8,6 +8,7 @@ from backend.app.drivers.yoosee.p2p.av_sample import AvVideoSample
 from backend.app.drivers.yoosee.p2p.contracts import CertifiedNode, OnlineDevice
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_xor_checksum
 from backend.app.drivers.yoosee.p2p.mtp_tcp_receive import TcpReception
+from backend.app.drivers.yoosee.p2p.tcp_budget import TcpProfile
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2
 from tests.test_av_route import ENROLLMENT
 from tests.test_vendor_mtp_relays import packet
@@ -41,12 +42,14 @@ def test_identity_mismatch_never_allocates_socket(monkeypatch):
 
 @pytest.mark.parametrize("fault", [None, "connect", "pair", "receive", "release", "a4", "close", "advert"])
 @pytest.mark.parametrize("fragmented", [False, True])
-def test_one_socket_attempt_and_cleanup_order(monkeypatch, fault, fragmented):
+@pytest.mark.parametrize("profile", list(TcpProfile))
+def test_one_socket_attempt_and_cleanup_order(monkeypatch, fault, fragmented, profile):
     node = CertifiedNode(("192.0.2.5", 19800), 17, bytes(range(32)), 40)
     target = OnlineDevice(123, 1, False, 1, bytes(16))
     events, owners, sockets = [], [], []
     sample = AvVideoSample()
     sample.data.extend(b"private")
+    selected_sample = sample if profile is TcpProfile.SHORT else None
 
     class Socket:
         def __init__(self, *args):
@@ -71,6 +74,8 @@ def test_one_socket_attempt_and_cleanup_order(monkeypatch, fault, fragmented):
             if fault == "close": raise OSError("close failure")
 
     def capture(sock, peer, owner, **kwargs):
+        assert owner.profile is profile
+        assert kwargs["sample"] is selected_sample
         owners.append(owner)
         events.append("receive")
         if fault == "receive": raise ValueError("bad media")
@@ -84,7 +89,17 @@ def test_one_socket_attempt_and_cleanup_order(monkeypatch, fault, fragmented):
         return True
 
     monkeypatch.setattr(route.socket, "socket", Socket)
-    monkeypatch.setattr(route, "open_camera_session", lambda *args: (node, target, 40))
+    def open_session(sock, enrollment, timeout, deadline):
+        assert 0 < deadline - route.time.monotonic() <= 20
+        if profile is TcpProfile.EXTENDED:
+            assert sock.deadline > deadline + 20
+        return node, target, 40
+    original_maintenance = route.BrokerMaintenance
+    def maintenance(*args, **kwargs):
+        assert kwargs["profile"] is profile
+        return original_maintenance(*args, **kwargs)
+    monkeypatch.setattr(route, "BrokerMaintenance", maintenance)
+    monkeypatch.setattr(route, "open_camera_session", open_session)
     monkeypatch.setattr(route, "local_route_ip", lambda _: "192.0.2.6")
     monkeypatch.setattr(route.secrets, "randbelow", lambda _: 30)
     wire = finish_mode2(bytearray(advertisement(link=32 if fault == "advert" else 31)), node.session_key)
@@ -94,12 +109,26 @@ def test_one_socket_attempt_and_cleanup_order(monkeypatch, fault, fragmented):
     monkeypatch.setattr(route, "close_device_route", release)
     if fault not in (None, "release"):
         with pytest.raises((OSError, ValueError, route.P2PProbeError)):
-            route.probe_tcp_route(ENROLLMENT, camera_id="cam_test", device_id="123", sample=sample)
-        assert sample.closed and not sample.data
+            route.probe_tcp_route(ENROLLMENT, camera_id="cam_test", device_id="123",
+                                  sample=selected_sample, profile=profile)
+        if selected_sample is not None:
+            assert sample.closed and not sample.data
     else:
-        result = route.probe_tcp_route(ENROLLMENT, camera_id="cam_test", device_id="123", sample=sample)
+        result = route.probe_tcp_route(ENROLLMENT, camera_id="cam_test", device_id="123",
+                                      sample=selected_sample, profile=profile)
         assert result.broker_release is (fault is None)
         sample.close()
     assert events.count("release") == 1
     assert all(sock.closed for sock in sockets)
     assert all(owner.closed for owner in owners)
+    sample.close()
+
+
+@pytest.mark.parametrize("profile,sample", [("extended", None), (TcpProfile.EXTENDED, AvVideoSample())])
+def test_invalid_profile_or_extended_sample_never_opens_socket(monkeypatch, profile, sample):
+    def forbidden(*args):
+        pytest.fail("invalid experiment allocated socket")
+    monkeypatch.setattr(route.socket, "socket", forbidden)
+    with pytest.raises(ValueError):
+        route.probe_tcp_route(ENROLLMENT, camera_id="cam_test", device_id="123",
+                              profile=profile, sample=sample)

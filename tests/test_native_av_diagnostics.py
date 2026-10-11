@@ -94,6 +94,31 @@ def test_platform_and_tcp_conflict_before_route(env):
     assert not env
 
 
+@pytest.mark.parametrize("kwargs", [dict(tcp_profile="unknown"), dict(tcp_profile="extended"),
+    dict(tcp_profile="extended", tcp_relay=True, decode_video=True),
+    dict(tcp_profile="extended", tcp_relay=True, platform_only=True)])
+def test_extended_conflicts_fail_before_acquiring_route(env, kwargs):
+    with pytest.raises(ValueError):
+        run(**kwargs)
+    assert not env
+
+
+def test_extended_dispatch_never_allocates_sample_or_decoder(env, monkeypatch):
+    from backend.app.drivers.yoosee.p2p.tcp_budget import TcpProfile
+    def forbidden(*args, **kwargs):
+        pytest.fail("extended diagnostics must not retain samples or launch decoder")
+    def probe(*args, **kwargs):
+        assert kwargs["profile"] is TcpProfile.EXTENDED
+        assert "sample" not in kwargs
+        with pytest.raises(camera_controls.ControlBusy):
+            camera_controls.read_control("cam_test", "orientation")
+        return "extended"
+    monkeypatch.setattr(diagnostics, "require_decoder_tools", forbidden)
+    monkeypatch.setattr(diagnostics, "AvVideoSample", forbidden)
+    monkeypatch.setattr(diagnostics, "probe_tcp_route", probe)
+    assert run(tcp_relay=True, tcp_profile="extended") == "extended"
+
+
 @pytest.mark.parametrize("fault", [None, "route", "decoder", "tools"])
 @pytest.mark.parametrize("tcp", [False, True])
 def test_decode_opt_in_orders_route_before_decoder_and_always_clears(env, monkeypatch, fault, tcp):

@@ -8,6 +8,12 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 
 ### TCP relay mode (2026-10-11; bounded in-server validation completed)
 
+Extended mode is separately selected by server-only
+`NATIVE_AV_DIAGNOSTIC_TCP_PROFILE=extended` (default `short`). It requires TCP true,
+decode-video false and platform-only false, counts/discards media for ten seconds
+and reports arrival timing. It does not collect a decode sample. The profile is
+offline-tested, not live-validated yet. See [budget limits](native-tcp-duration-budgets.md).
+
 **Follow-up:** now validated once inside the server: 55 HD frames decoded and both
 CLOSE/B9 receipts positive. Restored disabled/empty afterward. The implementation
 notes below describe the original offline stage; see the latest

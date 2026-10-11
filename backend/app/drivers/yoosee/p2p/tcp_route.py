@@ -25,6 +25,7 @@ from .mtp_tcp_receive import TcpReception, receive_paired_av
 from .rendezvous_protocol import build_calling_request
 from .rendezvous_session import close_device_route
 from .session_io import local_route_ip, receive_datagrams
+from .tcp_budget import TcpProfile, validate_profile
 from .video_startup_645 import with_preconnect_definition
 
 
@@ -52,12 +53,16 @@ def select_relay(frame: bytes, session_id: int, link_id: int) -> tuple[str, int]
 
 def probe_tcp_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                     sample: AvVideoSample | None = None,
+                    profile: TcpProfile = TcpProfile.SHORT,
                     cancelled: Callable[[], bool] = lambda: False) -> TcpRouteResult:
     """Fresh HD attempt only; no endpoint sweep, credential renewal or retry.
 
     Not a production source. Return separate media/CLOSE and broker-receipt facts.
     A false broker receipt remains unresolved, never promoted to remote cleanup.
     """
+    validate_profile(profile)
+    if profile is TcpProfile.EXTENDED and sample is not None:
+        raise ValueError("extended TCP experiment counts media without retaining a decode sample")
     if enrollment.camera_id != camera_id or enrollment.device_id != device_id:
         raise ValueError("TCP diagnostic enrollment mismatch")
     udp = BudgetSocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM), cancelled)
@@ -68,8 +73,11 @@ def probe_tcp_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
     release = False
     reception = None
     try:
+        startup_deadline = udp.deadline
+        if profile is TcpProfile.EXTENDED:
+            udp.deadline = time.monotonic() + profile.budget.route_seconds
         udp.bind(("", 0))
-        node, target, _ = open_camera_session(datagrams, enrollment, 1.0, udp.deadline)
+        node, target, _ = open_camera_session(datagrams, enrollment, 1.0, startup_deadline)
         if str(target.device_id) != device_id:
             raise ValueError("TCP diagnostic target mismatch")
         attempt = CallingAttempt(secrets.randbelow(0xFFFFFF) + 1,
@@ -78,7 +86,7 @@ def probe_tcp_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
         request = build_calling_request(node, enrollment.access_id, target,
             local_route_ip(node.address), udp.getsockname()[1], attempt, node.next_sequence,
             request_user_data=metadata, connection_type=1)
-        maintenance = BrokerMaintenance(node)
+        maintenance = BrokerMaintenance(node, profile=profile)
         calling_attempted = True  # Includes ambiguous sends.
         udp.sendto(request, node.address)
         endpoint: tuple[str, int] | None = None
@@ -120,7 +128,7 @@ def probe_tcp_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str
             timestamp_ms=int(time.monotonic() * 1000)))
         owner = TcpAvSession(endpoint, attempt.link_id, attempt.call_id, attempt.cookie,
                             source_id=enrollment.access_id, destination_id=target.device_id,
-                            request_user_data=metadata)
+                            request_user_data=metadata, profile=profile)
         reception = receive_paired_av(tcp, endpoint, owner, clock=time.monotonic,
             sample=sample, service_broker=service, cancelled=cancelled)
     except BaseException:

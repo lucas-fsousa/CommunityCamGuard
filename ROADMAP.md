@@ -643,6 +643,10 @@ Layered review completed in [duration budgets](docs/internal/native-tcp-duration
 an extended profile still needs consistent total/traffic budgets while preserving
 startup/idle/reassembly and retained-memory limits. Longer shared broker ownership
 also affects control latency; production requires a separate ownership design.
+Extended ten-second profile implemented with immutable reviewed budgets and
+server-only selection (default short). Preserves startup/idle/reassembly/storage
+bounds; counts/discards media, no decoder sample. Offline fake-clock continuity,
+cleanup, cancellation and propagation tests pass; live validation remains next.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

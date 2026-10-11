@@ -17,6 +17,7 @@ from ..drivers.yoosee.p2p.av_route import (
 )
 from ..drivers.yoosee.p2p.av_sample import AvVideoSample
 from ..drivers.yoosee.p2p.control_ownership import own_control_channel
+from ..drivers.yoosee.p2p.tcp_budget import TcpProfile
 from ..drivers.yoosee.p2p.tcp_route import TcpRouteResult, probe_tcp_route
 from ..services.camera_controls import CameraNotFound, _exclusive
 from .native_video_decode import DecodedVideo, decode_sample, require_decoder_tools
@@ -33,9 +34,10 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
                            decode_video: bool = False,
                            platform_only: bool = False,
                            tcp_relay: bool = False,
+                           tcp_profile: str = "short",
                            cancelled: Callable[[], bool] = lambda: False
                            ) -> AvRouteResult | DecodedAvResult | PlatformRouteResult | TcpRouteResult:
-    """One fixed three-second sample under the existing PTZ/audio/control lock.
+    """One reviewed finite experiment under the existing PTZ/audio/control lock.
 
     The two reviewed IDs must come from trusted internal configuration, not HTTP.
     Also reserves the driver's shared broker against in-process warmup/logins.
@@ -47,6 +49,11 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
         raise ValueError("platform-only diagnostic cannot decode video")
     if platform_only and tcp_relay:
         raise ValueError("platform-only diagnostic cannot open TCP media")
+    if tcp_profile not in {"short", "extended"}:
+        raise ValueError("unreviewed TCP experiment profile")
+    profile = TcpProfile.SHORT if tcp_profile == "short" else TcpProfile.EXTENDED
+    if profile is TcpProfile.EXTENDED and (not tcp_relay or decode_video or platform_only):
+        raise ValueError("extended diagnostic requires TCP without decoding/platform-only")
     with _exclusive(camera_id), own_control_channel():
         camera = registry.get_camera_by_id(camera_id)
         if camera is None:
@@ -61,7 +68,7 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
         if not decode_video:
             if tcp_relay:
                 return probe_tcp_route(enrollment, camera_id=camera_id,
-                                       device_id=reviewed_device_id, cancelled=cancelled)
+                                       device_id=reviewed_device_id, cancelled=cancelled, profile=profile)
             return probe_av_route(enrollment, camera_id=camera_id, device_id=reviewed_device_id,
                                   duration=3.0, cancelled=cancelled)
         require_decoder_tools()  # Fail before touching a camera if tools are unavailable.
@@ -70,7 +77,8 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
             route: AvRouteResult | TcpRouteResult
             if tcp_relay:
                 route = probe_tcp_route(enrollment, camera_id=camera_id,
-                                        device_id=reviewed_device_id, cancelled=cancelled, sample=sample)
+                                        device_id=reviewed_device_id, cancelled=cancelled, sample=sample,
+                                        profile=profile)
             else:
                 route = probe_av_route(enrollment, camera_id=camera_id, device_id=reviewed_device_id,
                                        duration=3.0, cancelled=cancelled, sample=sample)
