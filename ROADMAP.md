@@ -611,6 +611,12 @@ Standalone runner now requires independently verified isolation; no more paralle
 account probes. Next integrate the TCP adapter into the locked in-server diagnostic
 before deployment/another cleanup validation. Do not disable other cameras to test.
 
+TCP integration preparation: extracted `mtp_tcp_receive` as a bounded, typed
+paired-socket receiver with immediate consumption, fixed deadline, cancellation,
+CLOSE receipt and failure cleanup. Real protocol state machine exercised through
+synthetic socket tests; no live traffic or production activation. Next compose
+the in-server rendezvous/TCP socket owner and guarded diagnostic entry point.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

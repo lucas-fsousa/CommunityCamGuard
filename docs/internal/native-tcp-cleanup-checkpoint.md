@@ -213,3 +213,26 @@ disable their warmup to manufacture isolation. Production has not been rebuilt.
 Note: after moving cleanup earlier, the ignored runner's top-level UDP counts
 reflect the reset cleanup phase (sometimes zero), not whole-run input. Nested
 TCP/maintenance counts remain valid. Preserve phase labels in future summaries.
+
+## Extracted finite TCP receiver — offline integration preparation
+
+`mtp_tcp_receive.receive_paired_av` replaces the reusable part of the ignored
+runner with a typed socket-boundary primitive: supplied paired socket, existing
+`TcpAvSession`, optional bounded sample, cancellation and broker-service callbacks.
+It does not discover, authenticate, select a camera or expose an endpoint. The
+caller must hold both reservations and retain physical socket/broker cleanup.
+
+The receiver consumes records immediately, observes three seconds after readiness
+within eight seconds total, and returns only after a CLOSE transport receipt.
+It closes the protocol owner on every exit and clears a supplied sample on any
+failure. It never recreates the owner or retries an ambiguous socket write.
+Silence still polls protocol deadlines; broker service cannot extend the overall
+deadline or hide cancellation. Existing byte/record limits remain in the owner.
+
+Synthetic socket tests use the real measurement/AV/framing state machine with
+partial reads, not a replacement protocol parser. They cover success, peer
+mismatch, failed writes, EOF, missing CLOSE receipt, cancellation, broker failure
+and expiry during broker servicing. Ruff and normal-import Mypy passed (40.7 MiB
+type-check peak). This is offline preparation, not a new live validation or
+production capability. Still needed: in-server rendezvous/TCP route owner, guarded
+operator trigger, deployment, isolated cleanup validation and longer reception.
