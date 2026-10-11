@@ -40,7 +40,9 @@ def test_uncorrelated_input_cannot_trigger_message_ack(fault):
         wire = wire[:8] + bytes((wire[8] ^ 1,)) + wire[9:]
     if fault == "plain":
         wire = bytes(32)
-    assert not owner.receive(wire, peer)
+    inspected = []
+    assert not owner.receive(wire, peer, inspect_message=inspected.append)
+    assert not inspected
     assert owner.messages == owner.acknowledgements == 0
 
 
@@ -49,8 +51,13 @@ def test_fragment_group_identity_is_not_session_identity(identity, expected):
     owner = BrokerMaintenance(NODE)
     wire = message(identity)
     # Helper uses a different outer identity; only the inner session matters.
-    assert len(owner.receive(_fragment(1, 2, wire, 16), NODE.address)) == 1
-    assert len(owner.receive(_fragment(0, 2, wire, 16), NODE.address)) == 1 + expected
+    inspected = []
+    assert len(owner.receive(_fragment(1, 2, wire, 16), NODE.address,
+                             inspect_message=inspected.append)) == 1
+    assert not inspected
+    assert len(owner.receive(_fragment(0, 2, wire, 16), NODE.address,
+                             inspect_message=inspected.append)) == 1 + expected
+    assert len(inspected) == expected
     assert owner.messages == expected
     assert owner.acknowledgements == 2 + expected
     owner.close()

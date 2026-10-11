@@ -57,12 +57,13 @@ def native_av(request: Request) -> dict:
         result = run_reviewed_native_av(camera_id=camera_id, reviewed_camera_id=camera_id,
                                         reviewed_device_id=device_id,
                                         platform_only=settings.native_av_diagnostic_platform_only,
+                                        tcp_relay=settings.native_av_diagnostic_tcp_relay,
                                         decode_video=settings.native_av_diagnostic_decode_video)
     except (ControlBusy, ControlChannelBusy, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
     except AvBootstrapError as exc:
         raise HTTPException(502, dict(message="native AV bootstrap failed; attempt consumed",
                                      **exc.observations)) from None
-    except P2PProbeError:
+    except (P2PProbeError, OSError):
         raise HTTPException(502, "native AV diagnostic failed; attempt consumed") from None
     return asdict(result)

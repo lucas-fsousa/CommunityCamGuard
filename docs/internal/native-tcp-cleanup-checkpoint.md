@@ -236,3 +236,40 @@ and expiry during broker servicing. Ruff and normal-import Mypy passed (40.7 MiB
 type-check peak). This is offline preparation, not a new live validation or
 production capability. Still needed: in-server rendezvous/TCP route owner, guarded
 operator trigger, deployment, isolated cleanup validation and longer reception.
+
+## In-server TCP route integration — 2026-10-11, offline only
+
+`tcp_route.probe_tcp_route` now owns fresh rendezvous, one reviewed advertised
+global IPv4 TCP endpoint, pairing, bounded reception, B9 cleanup and both sockets.
+It uses the recovered HD startup metadata, never retries ambiguous writes and
+does not renew credentials. Broker inspection receives complete decrypted frames
+only after current-session validation, including out-of-order fragment assembly.
+No payload is retained by the inspection hook.
+
+`run_reviewed_native_av(tcp_relay=True)` executes under the same camera and shared
+broker reservations as UDP diagnostics. Optional decode checks tools before
+network activity and wipes the sample on all exits. TCP media/CLOSE success and
+`broker_release` are separate facts; false release is not hidden by decode success.
+Socket errors are sanitized to HTTP 502 and consume the single-use attempt.
+
+Operator configuration, all server-side: existing `NATIVE_AV_DIAGNOSTIC_ENABLED`,
+reviewed camera/device IDs and optional `NATIVE_AV_DIAGNOSTIC_DECODE_VIDEO`, plus
+`NATIVE_AV_DIAGNOSTIC_TCP_RELAY=true`. Leave `NATIVE_AV_DIAGNOSTIC_PLATFORM_ONLY`
+false. The endpoint remains direct-loopback-only, authenticated, absent from
+OpenAPI, accepts no body/query fields, and is single-use per process. TCP defaults
+false; no production capabilities, frontend source or automatic worker changed.
+
+81 focused tests passed under MemoryMax=256M, MemorySwapMax=0 and CPUQuota=50%
+(104.1 MiB peak). They cover real encrypted and fragmented discovery, negative
+correlation, ambiguous A4, connect/pair/receive/physical-close failures, one cleanup
+attempt, both locks, decode cleanup and HTTP mode/error restrictions. Ruff and
+normal-import Mypy passed. No live traffic, rebuild or container restart occurred.
+
+Next validation requires deploying this code inside the actual server process;
+a second worker/CLI would defeat the process-local reservation. Coordinate the
+shared-server restart before enabling it. Review only camera 3; trigger once,
+record sanitized reception/decoder counts and B9 receipt separately, then disable
+the diagnostic. Do not clear the one-shot guard, stop other cameras, run concurrent
+account probes or treat absent B9 receipt as successful broker cleanup. If the
+receipt is still missing, preserve evidence and inspect broker traffic/sequence
+handling before another live attempt. Sustained streaming remains a later task.

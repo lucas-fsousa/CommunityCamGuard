@@ -617,6 +617,16 @@ CLOSE receipt and failure cleanup. Real protocol state machine exercised through
 synthetic socket tests; no live traffic or production activation. Next compose
 the in-server rendezvous/TCP socket owner and guarded diagnostic entry point.
 
+2026-10-11 follow-up: composed `tcp_route` with the locked internal diagnostic.
+Server-only `native_av_diagnostic_tcp_relay` defaults false, accepts no HTTP
+protocol/target overrides and cannot combine with platform-only mode. One relay,
+one pairing attempt, bounded media and one B9 cleanup attempt; receipt remains
+separate from decoding success. Fragmented broker advertisements are inspected
+only after session validation. 81 focused offline tests passed (104.1 MiB peak,
+no swap), including encrypted discovery and cleanup failures. Next: coordinated
+deployment, then one in-server camera-3 validation; do not race a standalone
+shared-account runner or claim remote cleanup without a correlated receipt.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version

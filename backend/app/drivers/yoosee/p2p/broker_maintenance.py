@@ -33,7 +33,8 @@ class BrokerMaintenance:
         self._node = None
         self._fragments = FragmentReassembler(max_groups=2)
 
-    def receive(self, wire: bytes, peer: tuple[str, int]) -> tuple[bytes, ...]:
+    def receive(self, wire: bytes, peer: tuple[str, int], *,
+                inspect_message: Callable[[bytes], None] | None = None) -> tuple[bytes, ...]:
         if self.closed:
             raise ValueError("broker maintenance is closed")
         try:
@@ -63,6 +64,8 @@ class BrokerMaintenance:
             if plain is None or struct.unpack_from("<Q", plain, 4)[0] != node.session_id:
                 return tuple(replies)
             self.messages += 1
+            if inspect_message is not None:
+                inspect_message(plain)
             flags = struct.unpack_from("<I", plain, 20)[0]
             if not flags & (1 << 20) and (flags >> 18) & 3:
                 replies.append(build_mode2_response_ack(node, plain))

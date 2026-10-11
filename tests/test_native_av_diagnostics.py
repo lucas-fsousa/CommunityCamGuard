@@ -88,8 +88,15 @@ def test_platform_and_decode_conflict_before_route(env):
     assert not env
 
 
+def test_platform_and_tcp_conflict_before_route(env):
+    with pytest.raises(ValueError, match="cannot open TCP"):
+        run(platform_only=True, tcp_relay=True)
+    assert not env
+
+
 @pytest.mark.parametrize("fault", [None, "route", "decoder", "tools"])
-def test_decode_opt_in_orders_route_before_decoder_and_always_clears(env, monkeypatch, fault):
+@pytest.mark.parametrize("tcp", [False, True])
+def test_decode_opt_in_orders_route_before_decoder_and_always_clears(env, monkeypatch, fault, tcp):
     events, retained = [], []
 
     def tools():
@@ -116,13 +123,13 @@ def test_decode_opt_in_orders_route_before_decoder_and_always_clears(env, monkey
         return "decoded"
 
     monkeypatch.setattr(diagnostics, "require_decoder_tools", tools)
-    monkeypatch.setattr(diagnostics, "probe_av_route", route)
+    monkeypatch.setattr(diagnostics, "probe_tcp_route" if tcp else "probe_av_route", route)
     monkeypatch.setattr(diagnostics, "decode_sample", decode)
     if fault:
         with pytest.raises(RuntimeError):
-            run(decode_video=True)
+            run(decode_video=True, tcp_relay=tcp)
     else:
-        result = run(decode_video=True)
+        result = run(decode_video=True, tcp_relay=tcp)
         assert result.route == "route closed" and result.video == "decoded"
     assert all(value.closed and not value.data for value in retained)
     assert events == (["tools"] if fault == "tools" else ["tools", "route"] if fault == "route"

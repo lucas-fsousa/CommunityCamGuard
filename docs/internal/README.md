@@ -24,8 +24,9 @@ tests; a subsequent live check still did not confirm broker release.
 Later investigation identified a shared-account isolation gap: standalone probes
 do not share server locks. The internal diagnostic now reserves both camera and
 broker; further TCP cleanup tests require its in-server integration/deployment.
-The finite paired-socket receiver is now extracted and offline-tested; discovery,
-socket ownership and operator-trigger integration remain pending.
+The finite paired-socket receiver, rendezvous/socket owner and guarded internal
+trigger are now integrated and offline-tested. Deployment and isolated live
+cleanup validation remain pending; production streaming is unchanged.
 
 | ADR | Decision |
 |---|---|

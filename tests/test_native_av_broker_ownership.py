@@ -37,21 +37,23 @@ def available_from_other_thread():
     return result == [True]
 
 
-@pytest.mark.parametrize("platform", [False, True])
+@pytest.mark.parametrize("mode", ["udp", "platform", "tcp"])
 @pytest.mark.parametrize("failure", [False, True])
-def test_broker_owned_through_probe_and_released_on_failure(env, monkeypatch, platform, failure):
+def test_broker_owned_through_probe_and_released_on_failure(env, monkeypatch, mode, failure):
     def probe(*args, **kwargs):
         assert not available_from_other_thread()
         if failure:
             raise RuntimeError("probe failure")
         return "complete"
 
-    monkeypatch.setattr(diagnostics, "probe_platform_route" if platform else "probe_av_route", probe)
+    monkeypatch.setattr(diagnostics, {"platform": "probe_platform_route", "udp": "probe_av_route",
+                                     "tcp": "probe_tcp_route"}[mode], probe)
+    kwargs = dict(platform_only=mode == "platform", tcp_relay=mode == "tcp")
     if failure:
         with pytest.raises(RuntimeError):
-            run(platform_only=platform)
+            run(**kwargs)
     else:
-        assert run(platform_only=platform) == "complete"
+        assert run(**kwargs) == "complete"
     assert available_from_other_thread()
 
 
