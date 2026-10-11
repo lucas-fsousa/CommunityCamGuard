@@ -6,6 +6,33 @@ actual server process. Generic camera APIs and driver capabilities are unchanged
 
 ## Gates and limits
 
+### TCP relay mode (2026-10-11; not live-validated in-server)
+
+`NATIVE_AV_DIAGNOSTIC_TCP_RELAY=true` selects the bounded native TCP route.
+Default is false. It cannot combine with platform-only mode; optional post-route
+decoding is supported. Both camera and shared-account broker reservations cover
+authentication, discovery, media and cleanup. This prevents in-process warmup
+from replacing the broker session, not interference from external vendor apps,
+CLI probes or another server instance using the same account.
+
+Discovery accepts a correlated encrypted broker advertisement, including bounded
+fragment reassembly, then attempts only one global IPv4 TCP endpoint. No address
+sweep, auto-renewal or fallback is enabled. TCP pairing, media and cleanup are
+finite; one B9 attempt happens before physical socket closure even after an
+ambiguous A4 send. Decoder input is bounded and wiped after use.
+
+Without decoding the response has `reception` (ready/CLOSE confirmation and safe
+frame/byte counts), `broker_release`, and `broker_messages`. With decoding these
+are under `route`, alongside `video`. **HTTP 200 and decoded frames do not mean
+broker release succeeded**: inspect `broker_release` separately. A false value
+remains an unresolved cleanup result. Do not auto-retry it.
+
+81 focused offline tests passed, including encrypted fragmented discovery and
+shared-lock failure paths. No TCP activation or container recreation accompanied
+this integration. Follow the procedure below only after coordinating the shared
+app restart; standalone execution is not an alternative to that deployment.
+See the [cleanup checkpoint](native-tcp-cleanup-checkpoint.md).
+
 ### Platform-only mode (2026-10-03)
 
 `NATIVE_AV_DIAGNOSTIC_PLATFORM_ONLY=true` selects a bootstrap-only attempt through
@@ -66,6 +93,7 @@ two app restarts briefly interrupted recording; no zero-gap claim is made.
   consume it too. No automatic retry. No target, duration or credential override.
 - Fixed three-second reception under the shared PTZ/audio/control lock, including
   preparation, AV CLOSE and B9 cleanup. Existing resource bounds remain active.
+- Shared-account broker reservation is held throughout, including optional decode.
 - Only aggregate results returned; expected failures are sanitized.
 
 Single-use state and camera locks are process-local: use the existing single-worker
