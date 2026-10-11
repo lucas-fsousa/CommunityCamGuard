@@ -168,3 +168,48 @@ Ruff and normal-import Mypy passed (105.5 MiB/no swap). These tests include wron
 peer/session, damaged/plaintext traffic, ACK-loop prevention, fragmented inner
 correlation, expiry, count and size limits. Next inspect SDK hangup reason/callers;
 do not repeat the same serviced acquisition without additional evidence.
+
+## Teardown order and shared-session isolation finding
+
+SDK `iv_stop_av_link` (`0x1d7120`, 1020 bytes) calls hangup at `0x1d7408`
+with **0x4e22** (`0x1d7404`), then sets channel close intent at `0x1d7414`
+and waits at most 50 × 10 ms for local channel state. Our reason is therefore
+supported; do not substitute another reason experimentally.
+
+Two distinct, bounded camera-3 observations followed (no repeated action):
+
+- Release before physical TCP closure, after AV CLOSE receipt: 10 decoded HEVC
+  1080p frames, 30,237 RAM bytes, broker maintenance 3 messages/10 ACKs; B9 absent.
+  73.4 MiB/no swap, 6.212 seconds. Release attempted once before sending, so an
+  ambiguous failure cannot trigger a second release in outer cleanup.
+- Same ordering plus one read-only heartbeat before B9, using separate reserved
+  sequence numbers: 11 decoded 1080p frames, 30,069 RAM bytes; **heartbeat also
+  timed out** and B9 remained absent. 73.5 MiB/no swap, 7.536 seconds. No token
+  renewal. All samples and local sockets were cleared/closed in both observations.
+
+The last result shifts attention from B9 alone to broker-session availability.
+Code review found that the standalone runner does not share the server's
+`own_control_channel` RLock. `ControlSessions` prepares/maintains shared-account
+PTZ sessions in the server, while `run_with_fresh_access` intentionally holds
+that lock because another login can invalidate an existing route. Bounded logs
+also contained `PtzKeepaliveError` events, but do not prove causality or exact
+temporal attribution. The known shared-account race makes standalone results
+unsuitable to establish reliable cleanup behavior, even though video decode was real.
+
+The existing **in-server** native AV diagnostic also held only its camera lock,
+not the shared broker lock. It now holds both through preparation, capture,
+cleanup and optional decode; broker contention returns sanitized HTTP 409 and
+consumes the diagnostic attempt without retry. Threaded offline regressions
+verify exclusion, release on failure and no route allocation when busy.
+
+The ignored runner now refuses execution unless session isolation is explicitly
+attested (`CCG_ISOLATED_BROKER_SESSION=1`). This flag is not isolation itself and
+must not be enabled while the existing server uses the same account. No further
+standalone camera tests are authorized by this checkpoint. Use an in-server TCP
+diagnostic under the existing lock after its adapter is integrated/deployed, or
+a genuinely separate reviewed account; do not stop other cameras/containers or
+disable their warmup to manufacture isolation. Production has not been rebuilt.
+
+Note: after moving cleanup earlier, the ignored runner's top-level UDP counts
+reflect the reset cleanup phase (sometimes zero), not whole-run input. Nested
+TCP/maintenance counts remain valid. Preserve phase labels in future summaries.

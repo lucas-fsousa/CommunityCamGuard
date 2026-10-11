@@ -14,6 +14,7 @@ from ..auth import require_auth
 from ..config import get_settings
 from ..drivers.yoosee.p2p.av_route import AvBootstrapError
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
+from ..drivers.yoosee.p2p.control_ownership import ControlChannelBusy
 from ..services.camera_controls import CameraNotFound, ControlBusy
 from .yoosee_av import run_reviewed_native_av
 
@@ -57,7 +58,7 @@ def native_av(request: Request) -> dict:
                                         reviewed_device_id=device_id,
                                         platform_only=settings.native_av_diagnostic_platform_only,
                                         decode_video=settings.native_av_diagnostic_decode_video)
-    except (ControlBusy, CameraNotFound, ValueError):
+    except (ControlBusy, ControlChannelBusy, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
     except AvBootstrapError as exc:
         raise HTTPException(502, dict(message="native AV bootstrap failed; attempt consumed",

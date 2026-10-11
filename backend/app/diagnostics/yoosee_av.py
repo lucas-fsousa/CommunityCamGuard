@@ -16,6 +16,7 @@ from ..drivers.yoosee.p2p.av_route import (
     probe_platform_route,
 )
 from ..drivers.yoosee.p2p.av_sample import AvVideoSample
+from ..drivers.yoosee.p2p.control_ownership import own_control_channel
 from ..services.camera_controls import CameraNotFound, _exclusive
 from .native_video_decode import DecodedVideo, decode_sample, require_decoder_tools
 
@@ -35,13 +36,14 @@ def run_reviewed_native_av(*, camera_id: str, reviewed_camera_id: str,
     """One fixed three-second sample under the existing PTZ/audio/control lock.
 
     The two reviewed IDs must come from trusted internal configuration, not HTTP.
-    This does not lock RTSP, other processes or background capability probes.
+    Also reserves the driver's shared broker against in-process warmup/logins.
+    This does not lock RTSP or other processes.
     """
     if not reviewed_camera_id or camera_id != reviewed_camera_id or not reviewed_device_id:
         raise ValueError("native AV diagnostic target is not the reviewed test camera")
     if platform_only and decode_video:
         raise ValueError("platform-only diagnostic cannot decode video")
-    with _exclusive(camera_id):
+    with _exclusive(camera_id), own_control_channel():
         camera = registry.get_camera_by_id(camera_id)
         if camera is None:
             raise CameraNotFound("camera not found")

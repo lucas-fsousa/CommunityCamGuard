@@ -129,11 +129,12 @@ def test_failed_operation_is_sanitized_and_consumes_attempt(setup, monkeypatch):
     assert client.post(PATH).status_code == 409 and len(calls) == 1
 
 
-def test_busy_camera_consumes_attempt_without_retry(setup, monkeypatch):
+@pytest.mark.parametrize("error", [ControlBusy, api.ControlChannelBusy])
+def test_busy_camera_consumes_attempt_without_retry(setup, monkeypatch, error):
     client, _, calls = setup
     def busy(**kwargs):
         calls.append(kwargs)
-        raise ControlBusy("busy")
+        raise error("busy")
     monkeypatch.setattr(api, "run_reviewed_native_av", busy)
     assert client.post(PATH).status_code == 409
     assert client.post(PATH).status_code == 409 and len(calls) == 1

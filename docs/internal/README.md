@@ -21,6 +21,9 @@ The [continuity/cleanup checkpoint](native-tcp-cleanup-checkpoint.md) records a
 three-second HD follow-up, offline buffering regressions and unresolved broker release.
 It also records the SDK-backed B9 delivery-kind correction and encrypted receipt
 tests; a subsequent live check still did not confirm broker release.
+Later investigation identified a shared-account isolation gap: standalone probes
+do not share server locks. The internal diagnostic now reserves both camera and
+broker; further TCP cleanup tests require its in-server integration/deployment.
 
 | ADR | Decision |
 |---|---|

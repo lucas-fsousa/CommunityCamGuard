@@ -602,6 +602,15 @@ Camera 3 handled 3 broker messages/10 ACKs while decoding 7 HD frames; AV CLOSE
 confirmed but B9 still absent (118.5 MiB/no swap). 34 focused tests and Mypy pass.
 Next SDK hangup caller/reason mapping; no production activation. See cleanup checkpoint.
 
+Isolation follow-up: SDK confirms existing hangup reason 0x4e22. Moving B9 before
+TCP closure did not restore receipt; a separate heartbeat-before-release test
+also timed out. Identified that standalone probes cannot share server broker
+ownership and may race shared-account warmup. Fixed the in-server diagnostic to
+hold camera + broker locks, with threaded busy/failure tests and sanitized 409.
+Standalone runner now requires independently verified isolation; no more parallel
+account probes. Next integrate the TCP adapter into the locked in-server diagnostic
+before deployment/another cleanup validation. Do not disable other cameras to test.
+
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
 2026-09-30 playback cache: replaced path-only cache identity with a source-version
