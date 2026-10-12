@@ -99,7 +99,7 @@ class BrokerTransactions:
                 or struct.unpack_from("<I", plain, 16)[0] != gute_mode1_xor_checksum(plain)):
             return None
         flags = struct.unpack_from("<I", plain, 20)[0]
-        if ((flags >> 16) & 3) != 2 or not flags & (1 << 20):
+        if ((flags >> 16) & 3) != 2 or not flags & (1 << 20) or flags & (1 << 21):
             return None
         sequence = struct.unpack_from("<I", plain, 12)[0]
         pending = self._pending.get(sequence)

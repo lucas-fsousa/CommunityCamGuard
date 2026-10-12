@@ -36,6 +36,7 @@ def test_interleaved_receipts_never_steal_another_transaction():
     (ack(kind=0xB7), 1), (ack(sequence=41), 1), (ack(session=18), 1),
     (ack(), 2), (ack(), True), (ack(flags=2 << 16), 1),
     (ack(flags=(1 << 16) | (1 << 20)), 1), (ack()[:-1], 1),
+    (ack(flags=(2 << 16) | (1 << 20) | (1 << 21)), 1),
     (ack() + b"x", 1), (bytes(32), 1),
 ])
 def test_mismatches_leave_waiter_pending(wire, generation):

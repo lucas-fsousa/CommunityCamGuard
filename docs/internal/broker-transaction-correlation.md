@@ -38,3 +38,24 @@ or embedded request identity), a single bounded account socket dispatcher, then
 read-only preparation integration. Do not replace existing application parsers or
 interpret this transport-only component as readiness to enable a native source.
 Production entry points do not import it yet; no container rebuild is required.
+
+## Read-only application response boundary
+
+`broker_model_reply.match_model_reply` now separately correlates the reviewed B7/B8
+read exchange using `model_protocol.parse_model_read_response`. It requires the
+current generation/session/device, B7 request ticket and mode 2. Bit 21 identifies
+the original request sequence at offset 0x10; this field is **not a checksum** for
+B8. The outer response sequence does not select the request. ACK/report frames
+cannot satisfy the read, and the ACK correlator rejects the application-response
+flag instead of mixing the two layouts.
+
+This is a stateless matcher, not an application waiter registry: the future
+dispatcher must additionally check that the ticket is outstanding and unexpired.
+A positive transport receipt must not retire that application waiter. Negative
+application error codes remain distinct from transport receipt status. Decrypted
+input is capped at 4 KiB; JSON values at 16 levels and 256 visited nodes. Parse or
+recursion failures reject the result, and response payloads are excluded from repr.
+
+Tests cover real mode-2 encryption, original versus outer sequence, wrong device,
+session/generation, report/ACK confusion, malformed JSON/length, negative camera
+results and oversized/deep values. No new camera traffic or production imports.

@@ -663,6 +663,10 @@ generation/session/type checks). Encrypted fragmented-input tests pass. Next:
 application-response identity correlation and the bounded account socket dispatcher;
 existing controls/streaming remain untouched. See
 [correlation contract](docs/internal/broker-transaction-correlation.md).
+Read-response matcher added separately: B8 original request identity, session,
+device and generation checks, bounded JSON, no report/ACK confusion. Still offline
+and not production-wired. Next dispatcher must retain an application waiter after
+a positive transport receipt; ticket lifetime and payload completion are distinct.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

@@ -8,6 +8,9 @@ First implementation: [bounded transport-receipt correlator](broker-transaction-
 is now socket-free and offline-tested, including encrypted fragmented input.
 It is not wired into production. Application responses need separate correlation
 before building/migrating the single account dispatcher.
+The stateless B7/B8 read-response matcher is now separately implemented/tested;
+the remaining dispatcher must own outstanding application tickets and deadlines,
+not discard them when transport ACKs arrive.
 
 ## Existing ownership to preserve
 
