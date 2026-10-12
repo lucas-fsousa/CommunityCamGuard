@@ -38,6 +38,8 @@ Its first code unit, [broker receipt correlation](broker-transaction-correlation
 is bounded/offline-tested and not yet used by production controls.
 The [finite read dispatcher](broker-read-dispatch.md) now composes fragmented input,
 transport receipts and application waiters without creating sockets or workers.
+The [exclusive read socket adapter](broker-read-socket.md) adds bounded I/O and
+guaranteed physical socket cleanup; production entry points remain unchanged.
 
 | ADR | Decision |
 |---|---|

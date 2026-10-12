@@ -672,6 +672,12 @@ positive ACK does not free capacity/reset deadlines; response, rejection, timeou
 and cancellation are distinct. Real encrypted fragmented-input and failure tests.
 No sockets/workers or production wiring. Next bounded socket adapter and read-only
 integration; see [dispatcher contract](docs/internal/broker-read-dispatch.md).
+2026-10-12: exclusive finite read socket adapter implemented/offline-tested.
+One supplied authenticated socket, bounded batch, no retries, timeout/cancellation
+and physical-close handling; response evidence is separate from ACK-write failure.
+Next reviewed in-server read-only diagnostic under camera/account ownership, then
+one camera-3 comparison. No production PTZ/cache migration yet. See
+[socket adapter](docs/internal/broker-read-socket.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

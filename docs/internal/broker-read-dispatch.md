@@ -45,3 +45,8 @@ Next: a bounded socket adapter with a single reader/writer, explicit send-failur
 and shutdown semantics, followed by read-only integration behind a controlled
 diagnostic. This finite component is not yet a long-lived account manager; no
 automatic login/renewal, indefinite lease or native streaming activation is implied.
+
+Follow-up: the [exclusive socket adapter](broker-read-socket.md) is implemented and
+offline-tested. It owns a supplied authenticated socket through one bounded batch,
+reports I/O/protocol failure separately from camera results and closes every exit.
+Reviewed server-side authentication/reservation integration remains pending.
