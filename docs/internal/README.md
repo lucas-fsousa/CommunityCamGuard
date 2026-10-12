@@ -36,6 +36,8 @@ The [ownership migration plan](native-stream-ownership-plan.md) maps the current
 PTZ cache and certification paths before introducing a long-lived native source.
 Its first code unit, [broker receipt correlation](broker-transaction-correlation.md),
 is bounded/offline-tested and not yet used by production controls.
+The [finite read dispatcher](broker-read-dispatch.md) now composes fragmented input,
+transport receipts and application waiters without creating sockets or workers.
 
 | ADR | Decision |
 |---|---|

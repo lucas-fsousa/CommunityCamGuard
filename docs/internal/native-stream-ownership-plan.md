@@ -11,6 +11,9 @@ before building/migrating the single account dispatcher.
 The stateless B7/B8 read-response matcher is now separately implemented/tested;
 the remaining dispatcher must own outstanding application tickets and deadlines,
 not discard them when transport ACKs arrive.
+That bounded waiter registry and its finite datagram composition are now implemented
+and offline-tested: [read dispatch](broker-read-dispatch.md). Physical socket ownership
+and read-only integration remain next; existing production controls are unchanged.
 
 ## Existing ownership to preserve
 

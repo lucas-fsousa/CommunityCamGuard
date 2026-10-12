@@ -667,6 +667,11 @@ Read-response matcher added separately: B8 original request identity, session,
 device and generation checks, bounded JSON, no report/ACK confusion. Still offline
 and not production-wired. Next dispatcher must retain an application waiter after
 a positive transport receipt; ticket lifetime and payload completion are distinct.
+Application waiter lifecycle and finite datagram dispatcher implemented/tested:
+positive ACK does not free capacity/reset deadlines; response, rejection, timeout
+and cancellation are distinct. Real encrypted fragmented-input and failure tests.
+No sockets/workers or production wiring. Next bounded socket adapter and read-only
+integration; see [dispatcher contract](docs/internal/broker-read-dispatch.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
