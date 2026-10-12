@@ -296,6 +296,8 @@ simultaneous native media/control integration remain pending.
 Follow-up session check also passed: the same authenticated connection completed
 three identity reads, a correlated heartbeat after50 seconds, then three more reads.
 This remains a disabled internal experiment, not persistent dashboard streaming.
+Bounded [concurrent read admission](docs/internal/broker-mailbox.md) is now tested
+offline; production account-worker and native media integration remain pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

@@ -60,6 +60,8 @@ That [socket check](broker-account-check.md) is now implemented and offline-test
 with a disabled server-only opt-in. One camera-3 run passed all six identity reads
 around a correlated heartbeat(interval50), with no recertification. Restored disabled;
 production concurrency/native media integration remain pending.
+The [bounded mailbox](broker-mailbox.md) adds offline-tested concurrent read
+admission with exact wire binding and acknowledged cancellation; no runtime worker yet.
 
 | ADR | Decision |
 |---|---|

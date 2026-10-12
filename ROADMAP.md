@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-12 account concurrency: a driver-local mailbox now bounds all queued reads,
+active reads, retained results and unacknowledged cancellations to eight slots.
+Exact wire binding prevents cross-delivery between identical reads. Nineteen tests,
+Ruff and mypy passed under memory limits; no production integration or camera I/O.
+Next: account adapter and exclusive worker scheduling before PTZ/media migration.
+See [admission contract](docs/internal/broker-mailbox.md).
+
 User priority override (2026-10-03): camera-card/SD work is the **last priority**.
 Do not resume its enum/listing investigation while native live-streaming work is
 available. Current focus: native relay/platform provenance and safe HD preparation.

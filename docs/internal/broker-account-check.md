@@ -64,6 +64,12 @@ swap/halfCPU with a4.862-MB context. These are bounded-client/build figures, not
 measurement of the server's peak. During the observation app/go2rtc used about
 142/37 MiB. No audio/light/movement/media-start command was part of this check.
 
+After restoration, all three recording totals grew over ten seconds (sorted byte
+deltas:524288,1048576,1310720). App health was200, running, OOM=false, restart count0;
+app/go2rtc used118.1/36.84MiB. App-only recreation briefly interrupted recording;
+this evidence does not claim gap-free deployment. CI passed for source `7ec875a`
+and documentation `bda29f3` (runs38296833402 and38297281077).
+
 The finally path restored both read/heartbeat enables false, target fields empty,
 and app health200. Only app was recreated for arming/disarming; recording was
 briefly interrupted at those boundaries, not claimed gap-free. Unrelated containers
