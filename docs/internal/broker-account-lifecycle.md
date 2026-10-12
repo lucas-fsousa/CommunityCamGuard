@@ -50,3 +50,6 @@ and after a correlated heartbeat in the same camera-3 account generation. Do not
 extend `BrokerMaintenance`'s existing media defaults or wire this to PTZ by simply
 removing time limits. Continuous operation, credential refresh, media draining and
 concurrent dashboard consumers remain separate pending work.
+Follow-up: [exclusive socket composition](broker-account-check.md) is implemented
+and offline-tested with a fixed60-second check and server-only opt-in. It preserves
+default media budgets and all existing operator gates. Live comparison remains next.

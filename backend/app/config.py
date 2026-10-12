@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     native_av_diagnostic_device_id: str = ""
     # Separate opt-in for three fixed broker identity reads; never a dashboard control.
     broker_read_diagnostic_enabled: bool = False
+    broker_read_diagnostic_heartbeat: bool = False
     broker_read_diagnostic_camera_id: str = ""
     broker_read_diagnostic_device_id: str = ""
     # Whether this process spawns/owns the go2rtc binary. True on host; set False when

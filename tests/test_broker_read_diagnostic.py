@@ -12,12 +12,14 @@ from tests.test_native_av_broker_ownership import available_from_other_thread
 
 
 @pytest.mark.parametrize("fault", [None, "missing", "enrollment", "auth", "target", "exchange"])
-def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault):
+@pytest.mark.parametrize("heartbeat", [False, True])
+def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, heartbeat):
     sockets, events = [], []
     class Socket:
         closed = 0
         def __init__(self, *args): sockets.append(self)
         def bind(self, address): pass
+        def getsockname(self): return ("0.0.0.0", 1234)
         def close(self):
             assert not available_from_other_thread()
             self.closed += 1
@@ -29,7 +31,7 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault):
                 pass
         if fault == "auth": raise OSError("auth failure")
         return NODE, SimpleNamespace(device_id=999 if fault == "target" else 123, status=1), 17
-    def exchange(sock, node, generation, specs, **kwargs):
+    def exchange(sock, node, generation, specs, *local, **kwargs):
         events.append("exchange")
         assert tuple(s.path for s in specs) == diagnostic.IDENTITY_PATHS
         assert all(s.device_id == 123 for s in specs)
@@ -39,13 +41,21 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault):
         completion = SimpleNamespace(request=SimpleNamespace(path=specs[0].path),
             status="response", transport_result=0, error_code=0,
             value={"private_identity": "must-not-escape"})
+        if heartbeat:
+            assert local == ("192.0.2.1", 1234)
+            return SimpleNamespace(before=(completion,), after=(completion,),
+                heartbeats=(SimpleNamespace(status="response", interval_hint=35),),
+                failure=None, sent_datagrams=3, received_datagrams=3)
         return ReadExchange((completion,), None, 3, 3)
     monkeypatch.setattr(diagnostic.registry, "get_camera_by_id", lambda _: None if fault == "missing" else object())
     monkeypatch.setattr(diagnostic.p2p, "get_enrollment_for_camera", lambda _: None if fault == "enrollment" else ENROLLMENT)
     monkeypatch.setattr(diagnostic.socket, "socket", Socket)
     monkeypatch.setattr(diagnostic, "open_camera_session", authenticate)
     monkeypatch.setattr(diagnostic, "run_owned_reads", exchange)
-    kwargs = dict(camera_id="cam_test", reviewed_camera_id="cam_test", reviewed_device_id="123")
+    monkeypatch.setattr(diagnostic, "run_owned_account_check", exchange)
+    monkeypatch.setattr(diagnostic, "local_route_ip", lambda _: "192.0.2.1")
+    kwargs = dict(camera_id="cam_test", reviewed_camera_id="cam_test", reviewed_device_id="123",
+                  with_heartbeat=heartbeat)
     if fault:
         with pytest.raises((ValueError, OSError, RuntimeError, camera_controls.CameraNotFound)):
             diagnostic.run_reviewed_broker_reads(**kwargs)
@@ -55,6 +65,9 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault):
         assert asdict(result)["observations"] == ({"path": diagnostic.IDENTITY_PATHS[0],
             "status": "response", "transport_result": 0, "error_code": 0},)
         assert "must-not-escape" not in repr(result)
+        if heartbeat:
+            assert len(result.after_observations) == 1 and result.heartbeats[0].interval_hint == 35
+        assert events == ["auth", "exchange"]
     assert all(sock.closed == 1 for sock in sockets)
     assert available_from_other_thread()
     if fault in {"missing", "enrollment"}: assert not sockets

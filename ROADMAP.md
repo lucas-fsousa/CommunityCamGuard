@@ -719,6 +719,12 @@ Account lifecycle implemented offline: eight reads plus one reserved heartbeat,
 explicit retirement and exactly-once terminal events. No sockets, workers, production
 PTZ migration or credential renewal. Next bounded encrypted socket composition and
 camera-3 reads before/after heartbeat; see [lifecycle](docs/internal/broker-account-lifecycle.md).
+Exclusive socket check added with60-second ceiling: three identity reads, one
+correlated heartbeat, then the same reads without recertification. Keeps bounded
+crypto/fragment/ACK handling and closes on every exit. Server-only opt-in false by
+default; safe summary contains no raw values.128focused tests passed,112.6MiB/swap0.
+Next one in-server camera3 validation, disarm and verify recordings. See
+[check contract](docs/internal/broker-account-check.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

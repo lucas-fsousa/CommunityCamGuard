@@ -56,6 +56,8 @@ The [finite account lifecycle](broker-account-lifecycle.md) now composes shared
 reads/heartbeat, reserved maintenance capacity and bounded draining/retirement.
 It has no socket or production wiring; the next integration is an exclusive
 encrypted socket owner and camera-3 before/after-heartbeat validation.
+That [socket check](broker-account-check.md) is now implemented and offline-tested,
+with a disabled server-only opt-in; real camera-3 validation is the next step.
 
 | ADR | Decision |
 |---|---|

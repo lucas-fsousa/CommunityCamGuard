@@ -4,6 +4,8 @@ No socket, command dispatch, heartbeat, credential refresh or media producer.
 The caller must poll fairly with its existing UDP socket and close this owner.
 """
 
+from __future__ import annotations
+
 import struct
 import time
 from collections.abc import Callable
@@ -30,6 +32,18 @@ class BrokerMaintenance:
         self._fragments = FragmentReassembler(max_groups=2)
         self.closed = False
         self.datagrams = self.received_bytes = self.messages = self.acknowledgements = 0
+
+    @classmethod
+    def account_check(cls, node: CertifiedNode, *,
+                      clock: Callable[[], float] = time.monotonic) -> BrokerMaintenance:
+        """Fixed 60-second read/heartbeat experiment; all traffic caps unchanged.
+
+        Not a streaming profile or general lifetime override. Existing native AV
+        users retain their original 15/28-second ceilings.
+        """
+        owner = cls(node, clock=clock)
+        owner._deadline = clock() + 60
+        return owner
 
     def close(self) -> None:
         self.closed = True

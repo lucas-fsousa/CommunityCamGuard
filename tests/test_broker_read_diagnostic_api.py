@@ -15,6 +15,7 @@ CAMERA = "cam_" + "a" * 24
 @pytest.fixture
 def setup(monkeypatch):
     settings = SimpleNamespace(broker_read_diagnostic_enabled=True,
+        broker_read_diagnostic_heartbeat=False,
         broker_read_diagnostic_camera_id=CAMERA, broker_read_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
     calls = []
@@ -33,8 +34,10 @@ def test_fixed_target_single_use_hidden_schema(setup):
     client, _, calls = setup
     response = client.post(PATH)
     assert response.status_code == 200
-    assert response.json() == dict(observations=[], failure=None, sent_datagrams=3, received_datagrams=3)
-    assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA, reviewed_device_id="123")]
+    assert response.json() == dict(observations=[], failure=None, sent_datagrams=3,
+                                  received_datagrams=3, after_observations=[], heartbeats=[])
+    assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA,
+                         reviewed_device_id="123", with_heartbeat=False)]
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
@@ -48,6 +51,16 @@ def test_disabled_and_missing_target(setup):
     settings.broker_read_diagnostic_device_id = ""
     assert client.post(PATH).status_code == 409
     assert not calls
+
+
+def test_heartbeat_profile_is_server_only(setup):
+    client, settings, calls = setup
+    assert client.post(PATH, params={"with_heartbeat": "true"}).status_code == 400
+    assert not calls
+    settings.broker_read_diagnostic_heartbeat = True
+    assert client.post(PATH).status_code == 200
+    assert calls[0]["with_heartbeat"] is True
+    assert client.post(PATH).status_code == 409
 
 
 @pytest.mark.parametrize("kind", ["missing", "temporary", "legacy"])

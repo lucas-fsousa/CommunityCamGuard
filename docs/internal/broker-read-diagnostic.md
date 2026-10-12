@@ -48,6 +48,11 @@ response, capability support or persistent session ownership.
 
 ## Guarded server trigger
 
+Optional [same-generation heartbeat check](broker-account-check.md) is selected
+only by server setting `BROKER_READ_DIAGNOSTIC_HEARTBEAT` (default false). It reads
+the same identity paths before and after one correlated heartbeat, with a separate
+60-second socket ceiling; the original short mode and defaults are unchanged.
+
 `POST /api/internal/diagnostics/broker-reads` is hidden from OpenAPI and requires:
 
 - `BROKER_READ_DIAGNOSTIC_ENABLED=true` (default false).

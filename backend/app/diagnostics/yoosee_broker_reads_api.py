@@ -36,7 +36,8 @@ def broker_reads(request: Request) -> dict:
         request.app.state.broker_read_diagnostic_used = True
     try:
         result = run_reviewed_broker_reads(camera_id=camera_id, reviewed_camera_id=camera_id,
-                                          reviewed_device_id=device_id)
+                                          reviewed_device_id=device_id,
+                                          with_heartbeat=settings.broker_read_diagnostic_heartbeat)
     except (ControlBusy, ControlChannelBusy, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
     except (P2PProbeError, OSError):
