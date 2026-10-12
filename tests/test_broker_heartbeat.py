@@ -106,7 +106,7 @@ def test_builder_failure_burns_sequence_without_leaving_waiter(monkeypatch):
 def test_shared_encrypted_fragmented_dispatch_does_not_steal_read_reply():
     from backend.app.drivers.yoosee.p2p.broker_maintenance import BrokerMaintenance
     from backend.app.drivers.yoosee.p2p.broker_reads import BrokerReads
-    from backend.app.drivers.yoosee.p2p.wire import finish_mode2
+    from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_encrypt
     from tests.test_broker_reads import DEVICE, PATH, response
     from tests.test_vendor_resource_service_protocol import _fragment
 
@@ -119,12 +119,13 @@ def test_shared_encrypted_fragmented_dispatch_does_not_steal_read_reply():
     def inspect(plain):
         for value in (reads.accept(plain, generation=1), heartbeat.accept(plain, generation=1)):
             if value is not None: completed.append(value)
-    wire = finish_mode2(bytearray(reply(sequence=beat.ticket.sequence)), NODE.session_key)
+    wire = gute_mode2_encrypt(reply(sequence=beat.ticket.sequence), NODE.session_key)
     for index in (1, 0):
-        maintenance.receive(_fragment(index, 2, wire, 16), NODE.address, inspect_message=inspect)
+        maintenance.receive(_fragment(index, 2, wire, (len(wire) + 1) // 2),
+                            NODE.address, inspect_message=inspect)
     assert len(completed) == 1 and completed[0].ticket == beat.ticket
     assert reads.pending_count == 1
-    maintenance.receive(finish_mode2(bytearray(response(request)), NODE.session_key),
+    maintenance.receive(gute_mode2_encrypt(response(request), NODE.session_key),
                         NODE.address, inspect_message=inspect)
     assert len(completed) == 2 and completed[1].request == request
     assert reads.pending_count == 0
