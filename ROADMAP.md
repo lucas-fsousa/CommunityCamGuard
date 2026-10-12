@@ -704,6 +704,10 @@ Heartbeat RE follow-up: pinned SDK handler accepts frame byte0x21 only within
 10–60-second scheduling. Next inspect timer/request registration and upstream A1
 callback correlation; no guessed parser or production heartbeat change. See
 [SDK evidence](docs/internal/broker-heartbeat-sdk.md).
+Timer registration now pinned separately: default50, three interval arguments
+50000/40000/35000 and relocation-verified callbacks. Accepted values other than
+35/40 use the50 wrapper, not an arbitrary server-selected interval. Next common
+sender and upstream callback correlation; production timing unchanged.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
