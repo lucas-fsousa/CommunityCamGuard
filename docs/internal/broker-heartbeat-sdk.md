@@ -46,17 +46,45 @@ three timers in Python: a future single-owner loop can represent the scheduling
 policy without extra workers. Precise deadline/retry behavior and callback
 correlation remain separate evidence requirements.
 
-## Outstanding correlation boundary
+## Verified response correlation
+
+The sender registers through PLT `0x230e90`, resolved by relocation `0x243838`
+to `iv_gutes_add_send_pkt` (`0x1a2100`). For non-B7 requests, its instructions
+`0x1a222c`–`0x1a2250` increment the session counter and store the same value in
+request frame `0x0c` and request metadata `(object+0x18)+0x16c`.
+
+`iv_gutes_on_rcvfrm_resp` (`0x1a3edc`, size `0x3b8`) compares that metadata to
+incoming frame **`0x10`** at `0x1a3f38`–`0x1a3f4c`, then requires incoming kind
+minus one to equal the request kind (`0x1a3f50`–`0x1a3f68`). Request processing
+mode must be 2 or 3. This establishes A0→A1 request identity without requiring the
+independent response sequence `0x0c` to equal the request sequence.
+
+The upstream `iv_gutes_on_rcvpkt` (`0x1a00cc`, size `0x3c0`) checks the broker
+session and routes bit21 responses separately from bit20 transport ACKs. The
+heartbeat sender supplies `gat_on_rcvfrm_HeartResp` and `gat_on_ackfrm_msg` in
+separate callback slots (GOT `0x2407f8`/`0x2407e0`). A transport ACK is therefore
+not the application's heartbeat response.
+
+Implementation: `broker_heartbeat_reply` checks current generation/session, A1,
+bit21, no ACK bit, mode2, exact declared length, original request sequence and a
+40–4096-byte bound. It returns only the accepted interval hint, without interpreting
+optional fields. Peer/decryption/reassembly and waiter deadline are caller duties.
+`BrokerHeartbeat` adds one pending A0, shared sequence allocation, a <=10-second
+deadline, explicit timeout/cancellation and exactly-once completion. Unknown interval
+hints preserve prior selection; accepted hints select35/40/fallback50. It creates
+no socket or timer, does not retry, and does not change production heartbeat.
+
+## Remaining integration boundary
 
 The inspected response handler receives an already-selected SDK callback/context.
-It does not, by itself, establish which incoming frame/header field selected the
-pending A0 request. Before implementing a shared heartbeat waiter, inspect that
-dispatcher/request registration and confirm peer, session, sequence, flags and
-length rules. Preserve unknown fields rather than inventing capability meanings.
+The upstream mapping above now establishes the pending A0 request identity. A
+single account owner must still schedule, serialize and deliver timeouts, retire
+credential generations, and enforce aggregate resource bounds. Preserve unknown
+optional fields rather than inventing capability meanings.
 
 Bounded inspection used at most 31.1 MiB without swap, under a 128-MiB cgroup cap
 and half a CPU. Only named handler/registration functions and a 248-byte wrapper
 range were decoded.
 No new persistent worker, timer interval, credential refresh or camera action was
-enabled. The next RE targets are the common sender and the callback
-dispatcher; the existing finite read pilot remains the live-validated baseline.
+enabled. The existing finite read pilot remains the live-validated baseline;
+the new correlated heartbeat has only offline validation so far.

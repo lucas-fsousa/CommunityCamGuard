@@ -50,7 +50,8 @@ allocation across future account consumers and rejects late replies after retire
 This is offline-tested plumbing, not persistent heartbeat or PTZ integration.
 Targeted [heartbeat SDK evidence](broker-heartbeat-sdk.md) identifies interval-field
 bounds and 35/40/50-second timer selection, with default50. Response correlation
-and deadline/retry behavior still require verification before persistent scheduling.
+is now pinned to A1 field0x10 and separate ACK callbacks. A bounded single-pending
+heartbeat waiter is offline-tested; account scheduling and live validation remain.
 
 | ADR | Decision |
 |---|---|

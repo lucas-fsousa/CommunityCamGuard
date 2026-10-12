@@ -708,6 +708,12 @@ Timer registration now pinned separately: default50, three interval arguments
 50000/40000/35000 and relocation-verified callbacks. Accepted values other than
 35/40 use the50 wrapper, not an arbitrary server-selected interval. Next common
 sender and upstream callback correlation; production timing unchanged.
+Heartbeat correlation now verified in SDK send-registration/response dispatcher:
+A1 field0x10 matches the stored A0 request sequence, independent outer sequence,
+type+1 and separate response/transport-ACK callbacks. Added bounded matcher and
+one-pending heartbeat waiter using shared sequence allocation, explicit timeouts,
+retirement rejection and SDK interval selection. Offline only, no production wiring.
+Next account scheduling/draining and aggregate bounds, then reviewed live validation.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
