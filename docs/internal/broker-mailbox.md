@@ -28,3 +28,23 @@ shutdown, timeout, exact response binding and sequence exhaustion. Local pytest
 peak80.1MiB/no swap, mypy69.8MiB/no swap; Ruff passed. No camera I/O or deployment.
 Next: a single-owner adapter applying this contract to `BrokerAccount`, then
 exclusive socket scheduling and account-cache migration. Actions/media are excluded.
+
+## Account adapter
+
+`broker_read_dispatcher.BrokerReadDispatcher` now owns one finite account, one
+mailbox and two bounded exact-ticket maps. Only its mailbox is thread-safe;
+step/receive/close belong to one worker. It publishes decoded results exclusively
+to the mailbox and removes mapping entries on every terminal result/cancellation.
+Queue wait consumes the original deadline, not an additional ten-second window.
+
+Preparation failure retires the entire generation and discards the unsent batch;
+shutdown preserves completed results and cancels queued/active work. A cancelled
+bind releases the prepared reservation without sending. The future socket owner
+must check `mailbox.ready` immediately before each write, service maintenance
+frames and call step during silence. Cancellation after that final check is
+best-effort: a read already entering the socket cannot be recalled. No actions
+are admitted. Heartbeat still has its independent reserved slot/shared counter.
+
+The adapter is tested locally with synthetic out-of-order replies, eight active
+reads across heartbeat, cancellation/preparation races, queue deadlines, wrong
+peer/generation and retirement. No worker/socket/cache integration is enabled yet.

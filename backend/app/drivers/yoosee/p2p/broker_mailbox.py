@@ -151,6 +151,16 @@ class BrokerMailbox:
             self._stop(slot, "cancelled")
             return True
 
+    def ready(self, ticket: MailboxTicket) -> bool:
+        """Worker's final pre-send check; cancellation is best-effort once sent."""
+        with self._lock:
+            slot = self._slots.get(ticket)
+            if slot is None:
+                return False
+            if self._clock() >= slot.submission.deadline:
+                self._stop(slot, "timeout")
+            return slot.request is not None and slot.outcome is None and not slot.consumed
+
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
         with self._lock:
             slot = self._slots.get(ticket)

@@ -10,6 +10,7 @@ from typing import Literal
 from .broker_heartbeat import BrokerHeartbeat, HeartbeatCompletion
 from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
+from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
 from .model_protocol import build_model_read
 
@@ -85,6 +86,10 @@ class BrokerAccount:
         heartbeat = self._heartbeat.close()
         self._node = None
         return AccountEvents(reads, (heartbeat,) if heartbeat else (), retired=reason)
+
+    def cancel_read(self, ticket: ReceiptTicket) -> ReadCompletion | None:
+        """Release one exact reservation; never replay a wire request."""
+        return self._reads.cancel(ticket)
 
     def _expire(self) -> AccountEvents:
         if self._reason is not None:

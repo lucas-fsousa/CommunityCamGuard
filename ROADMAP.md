@@ -6,6 +6,10 @@ Exact wire binding prevents cross-delivery between identical reads. Nineteen tes
 Ruff and mypy passed under memory limits; no production integration or camera I/O.
 Next: account adapter and exclusive worker scheduling before PTZ/media migration.
 See [admission contract](docs/internal/broker-mailbox.md).
+Follow-up: socket-free account adapter implemented with exact response routing,
+preparation-failure retirement and original-deadline preservation. Concurrent
+callers use only the mailbox; a single future socket worker owns the dispatcher.
+Next remains exclusive encrypted socket scheduling, not production activation.
 
 User priority override (2026-10-03): camera-card/SD work is the **last priority**.
 Do not resume its enum/listing investigation while native live-streaming work is
