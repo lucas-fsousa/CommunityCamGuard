@@ -44,6 +44,10 @@ class BrokerHeartbeat:
         self.closed = False
 
     @property
+    def pending_count(self) -> int:
+        return int(self._pending is not None)
+
+    @property
     def cadence_seconds(self) -> int:
         """SDK wrapper selection, not arbitrary interval or timer phase emulation."""
         return self._interval_hint if self._interval_hint in (35, 40) else 50

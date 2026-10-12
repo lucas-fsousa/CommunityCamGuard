@@ -52,6 +52,10 @@ Targeted [heartbeat SDK evidence](broker-heartbeat-sdk.md) identifies interval-f
 bounds and 35/40/50-second timer selection, with default50. Response correlation
 is now pinned to A1 field0x10 and separate ACK callbacks. A bounded single-pending
 heartbeat waiter is offline-tested; account scheduling and live validation remain.
+The [finite account lifecycle](broker-account-lifecycle.md) now composes shared
+reads/heartbeat, reserved maintenance capacity and bounded draining/retirement.
+It has no socket or production wiring; the next integration is an exclusive
+encrypted socket owner and camera-3 before/after-heartbeat validation.
 
 | ADR | Decision |
 |---|---|

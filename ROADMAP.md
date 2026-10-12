@@ -714,6 +714,11 @@ type+1 and separate response/transport-ACK callbacks. Added bounded matcher and
 one-pending heartbeat waiter using shared sequence allocation, explicit timeouts,
 retirement rejection and SDK interval selection. Offline only, no production wiring.
 Next account scheduling/draining and aggregate bounds, then reviewed live validation.
+Account lifecycle implemented offline: eight reads plus one reserved heartbeat,
+120-second research lifetime,512-message/1-MiB input budgets, two-second draining,
+explicit retirement and exactly-once terminal events. No sockets, workers, production
+PTZ migration or credential renewal. Next bounded encrypted socket composition and
+camera-3 reads before/after heartbeat; see [lifecycle](docs/internal/broker-account-lifecycle.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
