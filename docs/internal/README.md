@@ -40,6 +40,9 @@ The [finite read dispatcher](broker-read-dispatch.md) now composes fragmented in
 transport receipts and application waiters without creating sockets or workers.
 The [exclusive read socket adapter](broker-read-socket.md) adds bounded I/O and
 guaranteed physical socket cleanup; production entry points remain unchanged.
+The [same-process read pilot](broker-read-diagnostic.md) composes reviewed enrollment,
+authentication and both reservations; it has no live trigger yet and returns no
+raw identity values.
 
 | ADR | Decision |
 |---|---|

@@ -40,8 +40,9 @@ failed writes, read failure, malformed fragments, ACK-send failure, close failur
 cancellation before write/after read, skipped expired unsent reads, batch bounds
 and BaseException cleanup. No actual network or sleeps are used by these tests.
 
-Next: compose a reviewed read-only server diagnostic with authentication and both
-existing reservations, transfer its socket into this adapter, then make a single
-camera-3 comparison against existing correlated identity reads. Do not call it
+The [internal pilot](broker-read-diagnostic.md) now composes authentication and
+both reservations, without an HTTP route or activation. Next add a guarded server
+trigger, then make a single camera-3 comparison against existing correlated
+identity reads. Do not call it
 from a standalone shared-account CLI. This is finite read-only plumbing, not yet
 a long-lived session manager or a native streaming capability.

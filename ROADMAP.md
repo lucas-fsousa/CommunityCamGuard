@@ -678,6 +678,11 @@ and physical-close handling; response evidence is separate from ACK-write failur
 Next reviewed in-server read-only diagnostic under camera/account ownership, then
 one camera-3 comparison. No production PTZ/cache migration yet. See
 [socket adapter](docs/internal/broker-read-socket.md).
+2026-10-12: [same-process read pilot](docs/internal/broker-read-diagnostic.md)
+composes reviewed camera/enrollment checks, authentication, three fixed identity
+reads and socket cleanup under both reservations. Offline-tested only; no HTTP
+trigger or production activation. Summary strips raw identity values. Next guarded
+single-use server trigger, then camera-3 comparison; PTZ migration remains pending.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
