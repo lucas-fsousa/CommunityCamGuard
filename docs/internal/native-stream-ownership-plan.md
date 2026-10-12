@@ -4,6 +4,11 @@ Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in
 [duration budgets](native-tcp-duration-budgets.md).
 
+First implementation: [bounded transport-receipt correlator](broker-transaction-correlation.md)
+is now socket-free and offline-tested, including encrypted fragmented input.
+It is not wired into production. Application responses need separate correlation
+before building/migrating the single account dispatcher.
+
 ## Existing ownership to preserve
 
 | Existing component | Verified responsibility | Integration constraint |

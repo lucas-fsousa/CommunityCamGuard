@@ -657,6 +657,12 @@ and shared-lock paths. [Migration plan](docs/internal/native-stream-ownership-pl
 first a bounded socket-free transaction correlator, then a single account socket
 owner, read-only/control migration and finally native source/fan-out integration.
 No new source skeleton, token-lifetime assumption or production activation added.
+First unit implemented: bounded socket-free transport-receipt correlation (eight
+waiters, ten-second deadlines, no sequence recycling, explicit expiry/cancellation,
+generation/session/type checks). Encrypted fragmented-input tests pass. Next:
+application-response identity correlation and the bounded account socket dispatcher;
+existing controls/streaming remain untouched. See
+[correlation contract](docs/internal/broker-transaction-correlation.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

@@ -34,6 +34,8 @@ Follow-up: the reviewed extended profile passed one ten-second camera-3 run
 document for profile-specific bounds, restored state and production ownership limits.
 The [ownership migration plan](native-stream-ownership-plan.md) maps the current
 PTZ cache and certification paths before introducing a long-lived native source.
+Its first code unit, [broker receipt correlation](broker-transaction-correlation.md),
+is bounded/offline-tested and not yet used by production controls.
 
 | ADR | Decision |
 |---|---|
