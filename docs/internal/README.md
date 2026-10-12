@@ -51,11 +51,11 @@ This is offline-tested plumbing, not persistent heartbeat or PTZ integration.
 Targeted [heartbeat SDK evidence](broker-heartbeat-sdk.md) identifies interval-field
 bounds and 35/40/50-second timer selection, with default50. Response correlation
 is now pinned to A1 field0x10 and separate ACK callbacks. A bounded single-pending
-heartbeat waiter is offline-tested; account scheduling and live validation remain.
+heartbeat waiter is implemented; the subsequent live check is described below.
 The [finite account lifecycle](broker-account-lifecycle.md) now composes shared
 reads/heartbeat, reserved maintenance capacity and bounded draining/retirement.
-It has no socket or production wiring; the next integration is an exclusive
-encrypted socket owner and camera-3 before/after-heartbeat validation.
+It has no socket or production wiring; the exclusive encrypted socket check below
+provides the camera3 before/after-heartbeat validation.
 That [socket check](broker-account-check.md) is now implemented and offline-tested,
 with a disabled server-only opt-in. One camera-3 run passed all six identity reads
 around a correlated heartbeat(interval50), with no recertification. Restored disabled;

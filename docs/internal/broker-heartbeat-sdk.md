@@ -85,6 +85,8 @@ optional fields rather than inventing capability meanings.
 Bounded inspection used at most 31.1 MiB without swap, under a 128-MiB cgroup cap
 and half a CPU. Only named handler/registration functions and a 248-byte wrapper
 range were decoded.
-No new persistent worker, timer interval, credential refresh or camera action was
-enabled. The existing finite read pilot remains the live-validated baseline;
-the new correlated heartbeat has only offline validation so far.
+No persistent production worker, timer interval, credential refresh or camera action
+was enabled. Follow-up [camera3 validation](broker-account-check.md) has now proven
+six identity reads around one correlated heartbeat, interval hint50, on the same
+authenticated socket. The later [concurrent worker](account-read-worker.md) remains
+offline-tested only; do not conflate those two validation levels.

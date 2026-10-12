@@ -80,4 +80,38 @@ Its migration must keep the current deployed PTZ path unchanged initially.
 The [sequence namespace](broker-sequence-ownership.md) is now extracted and tested:
 read/receipt consumers can share account allocation without duplicate numbers;
 retirement blocks new work and late completions. Heartbeat A0/A1 correlation,
-global queue bounds and account draining remain to be implemented.
+global mailbox bounds and account draining are now implemented. The same-socket
+camera3 read/heartbeat/read check passed; the later concurrent
+[single-reader worker](account-read-worker.md) is offline-tested, not deployed.
+
+## Migration audit after the finite worker
+
+Rechecked production `native_ptz`, `ptz_cache`, `ptz_route`, `renewal` and
+`control_ownership` against the new worker:
+
+1. `NativePtzRoute.confirm_release` and `heartbeat_node` still read their socket
+   synchronously. Neither can run alongside the new reader. The PTZ adapter must
+   use correlated owner requests/results before sharing any physical socket.
+2. `PtzRouteCache` owns idle-close timers, lease return and target-switch handoff.
+   Warmup's15-second replacement and20-second lifetime are not credential TTLs.
+   A migration must remove both timer ownership and direct reads for migrated
+   accounts; simply retaining the current cached socket longer is insufficient.
+3. `own_control_channel` protects the START/release boundary; renewal nests the
+   reentrant broker lock before its per-device session lock. A persistent worker
+   must not hold that operation lock indefinitely or release it on another thread.
+   The future account-owner reservation must coordinate all login paths, including
+   warmup and diagnostics, before replacing this protection.
+4. Credential replacement must first reject admission, drain old work, finish any
+   required PTZ/media release, and confirm old physical socket closure. The new
+   worker already reports close failure independently; do not authenticate a
+   replacement account while cleanup is uncertain. Never replay a START whose
+   send outcome is unknown, even when a token was successfully renewed.
+5. The worker mailbox only permits identity-read paths. Extending this to other
+   reads requires explicit allowlist/schema tests. PTZ is a separate typed command
+   contract with reserved release capacity, not an arbitrary command queue.
+
+Next implementation should validate the finite worker under the existing guarded
+in-server enrollment/account reservation, then introduce explicit generation
+handoff with failure tests. Read-only warmup migrates before motion/media. No
+additional setting, capability flag, cache lifetime extension or production reader
+was enabled by this audit. The current dashboard/recording path is unchanged.

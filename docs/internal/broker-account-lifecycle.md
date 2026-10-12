@@ -44,12 +44,10 @@ completion/expiry, late/wrong-peer/generation replies, hard lifetime, input floo
 prepare failure preserving earlier timeout results, and idempotent transport cleanup.
 No real camera, worker or runtime setting was changed by this implementation.
 
-Next compose one exclusive socket reader/writer with bounded encrypted input and
-ACK servicing for this longer finite window. Then validate identity reads before
-and after a correlated heartbeat in the same camera-3 account generation. Do not
-extend `BrokerMaintenance`'s existing media defaults or wire this to PTZ by simply
-removing time limits. Continuous operation, credential refresh, media draining and
-concurrent dashboard consumers remain separate pending work.
-Follow-up: [exclusive socket composition](broker-account-check.md) is implemented
-and offline-tested with a fixed60-second check and server-only opt-in. It preserves
-default media budgets and all existing operator gates. Live comparison remains next.
+The [exclusive socket check](broker-account-check.md) subsequently passed on camera3:
+three identity reads, correlated heartbeat at50 seconds, then three more reads,
+all on one authenticated socket. It preserves default media budgets/operator gates.
+The [mailbox](broker-mailbox.md) and [finite worker](account-read-worker.md) now
+add offline-tested concurrent admission, sole-reader ownership and bounded draining.
+Do not wire these to PTZ by simply removing time limits. Continuous operation,
+credential handoff, media draining and production dashboard consumers remain pending.

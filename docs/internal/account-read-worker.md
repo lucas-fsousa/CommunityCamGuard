@@ -41,6 +41,9 @@ No real camera traffic, credentials, runtime thread or production import was add
 The combined mailbox/account/worker and legacy-pilot regression run passed131 tests
 in3.625 seconds, peaking at86.4MiB with zero swap (192MiB/halfCPU cgroup). Ruff and
 targeted mypy passed; no local full-suite run, browser, build or container restart.
+The subsequent narrow-allowlist/diagnostic regression run passed149 tests, peaking
+at106.3MiB with zero swap. Admission shares exactly three identity paths with the
+server diagnostic; the existing broader property-reader catalogue is unchanged.
 
 The older `broker_read_dispatch.BrokerReadDispatcher` remains the15-second
 single-batch diagnostic; `account_read_dispatcher.AccountReadDispatcher` is the

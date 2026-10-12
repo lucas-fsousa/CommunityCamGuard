@@ -5,6 +5,7 @@ import pytest
 from backend.app.drivers.yoosee.p2p.broker_mailbox import BrokerMailbox, MailboxTicket
 from backend.app.drivers.yoosee.p2p.broker_reads import ReadCompletion, ReadRequest
 from backend.app.drivers.yoosee.p2p.broker_transactions import ReceiptTicket
+from backend.app.drivers.yoosee.p2p.contracts import ACCOUNT_IDENTITY_READ_PATHS, MODEL_READ_PATHS
 from tests.test_broker_reads import DEVICE, PATH
 
 
@@ -153,7 +154,7 @@ def test_cancellation_between_claim_and_bind_prevents_send():
     assert not box.poll().cancellations
 
 
-@pytest.mark.parametrize("timeout", [True, 0, -1, float("nan"), float("inf"), 11])
+@pytest.mark.parametrize("timeout", [True, 0, -1, float("nan"), float("inf"), 11, 10 ** 400])
 def test_invalid_deadline_rejected(timeout):
     with pytest.raises(ValueError): submit(BrokerMailbox(1), timeout)
 
@@ -163,3 +164,17 @@ def test_ticket_exhaustion_does_not_wrap():
     box._next = (1 << 64) - 1
     assert submit(box).sequence == (1 << 64) - 1
     with pytest.raises(ValueError, match="exhausted"): submit(box)
+
+
+@pytest.mark.parametrize("path", sorted(MODEL_READ_PATHS - set(ACCOUNT_IDENTITY_READ_PATHS)))
+def test_worker_does_not_inherit_the_full_property_reader_catalogue(path):
+    box = BrokerMailbox(1)
+    with pytest.raises(ValueError): box.submit(DEVICE.device_id, path)
+    assert not box.poll().submissions
+
+
+@pytest.mark.parametrize("path", ACCOUNT_IDENTITY_READ_PATHS)
+def test_only_reviewed_identity_paths_admitted(path):
+    box = BrokerMailbox(1)
+    ticket = box.submit(DEVICE.device_id, path)
+    assert box.poll().submissions[0].ticket == ticket

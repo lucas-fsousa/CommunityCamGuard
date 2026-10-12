@@ -15,6 +15,10 @@ independent input/output budgets, concurrent caller admission and two-second dra
 No runtime thread/authentication or camera command added. Next: guarded in-server
 worker validation and account-generation handoff before production PTZ/media migration.
 See [worker lifecycle](docs/internal/account-read-worker.md).
+Production ownership audit confirms PTZ still has its own reader, heartbeat and
+idle-close timer; all three must migrate together, without sharing that socket
+with the experimental worker. Worker admission is restricted to the diagnostic's
+three identity paths, with exhaustive rejection tests for the remaining catalogue.
 
 User priority override (2026-10-03): camera-card/SD work is the **last priority**.
 Do not resume its enum/listing investigation while native live-streaming work is

@@ -10,11 +10,12 @@ from ..drivers.yoosee.p2p.av_route_io import BudgetSocket
 from ..drivers.yoosee.p2p.broker_account_check import run_owned_account_check
 from ..drivers.yoosee.p2p.broker_read_socket import ReadSpec, run_owned_reads
 from ..drivers.yoosee.p2p.camera_session import open_camera_session
+from ..drivers.yoosee.p2p.contracts import ACCOUNT_IDENTITY_READ_PATHS
 from ..drivers.yoosee.p2p.control_ownership import own_control_channel
 from ..drivers.yoosee.p2p.session_io import local_route_ip
 from ..services.camera_controls import CameraNotFound, _exclusive
 
-IDENTITY_PATHS = ("ProConst._productInfo", "ProConst._versionInfo", "ProReadonly.devInfo")
+IDENTITY_PATHS = ACCOUNT_IDENTITY_READ_PATHS
 
 
 @dataclass(frozen=True, slots=True)

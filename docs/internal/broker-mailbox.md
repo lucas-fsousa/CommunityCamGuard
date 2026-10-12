@@ -51,3 +51,9 @@ peer/generation and retirement. No worker/socket/cache integration is enabled ye
 An [exclusive finite socket worker](account-read-worker.md) now composes it offline;
 production cache integration remains pending. Mailbox drain rejects queued/new
 work while allowing claimed reads to complete within the account's two-second grace.
+
+Scope audit: admission now uses `ACCOUNT_IDENTITY_READ_PATHS`, the exact same three
+identity paths as the guarded diagnostic, not the broader `MODEL_READ_PATHS`.
+The broader catalogue also contains B7 property/capability reads for Action roots
+(not action execution); it remains unchanged for existing consumers. Regression
+tests reject every catalogue entry outside the worker's three-path scope.

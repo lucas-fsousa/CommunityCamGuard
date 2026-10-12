@@ -9,7 +9,7 @@ from typing import Literal
 
 from .broker_reads import ReadCompletion, ReadRequest
 from .broker_transactions import MAX_PENDING, MAX_TIMEOUT
-from .contracts import MODEL_READ_PATHS
+from .contracts import ACCOUNT_IDENTITY_READ_PATHS
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +67,9 @@ class BrokerMailbox:
 
     def submit(self, device_id: int, path: str, timeout: float = 2.0) -> MailboxTicket:
         if (type(device_id) is not int or not 0 < device_id < 1 << 64
-                or not isinstance(path, str) or path not in MODEL_READ_PATHS
-                or type(timeout) not in (int, float) or not math.isfinite(timeout)
-                or not 0 < timeout <= MAX_TIMEOUT):
+                or not isinstance(path, str) or path not in ACCOUNT_IDENTITY_READ_PATHS
+                or type(timeout) not in (int, float) or not 0 < timeout <= MAX_TIMEOUT
+                or not math.isfinite(timeout)):
             raise ValueError("invalid bounded read submission")
         with self._lock:
             if self._closed or self._next >= 1 << 64:

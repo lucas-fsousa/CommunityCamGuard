@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# Narrow experimental account-worker scope; not the full model/property catalogue.
+ACCOUNT_IDENTITY_READ_PATHS = (
+    "ProConst._productInfo", "ProConst._versionInfo", "ProReadonly.devInfo",
+)
+
 # Every entry is queried with the read-only B7 family. Action roots describe capabilities here;
 # they are never invoked with the AC action family by the generic property reader.
 MODEL_READ_PATHS = frozenset(
