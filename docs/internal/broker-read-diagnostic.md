@@ -37,8 +37,8 @@ the adapter, including interruptions and failures.
 The returned summary contains only path, completion status, transport result,
 application error code, sanitized failure category and datagram counters. Raw
 identity values, keys, device identifiers and network exception messages are not
-included. Exceptions can still propagate internally; a future HTTP boundary must
-sanitize them rather than returning their text.
+included. Exceptions can still propagate internally; the HTTP boundary sanitizes
+expected failures rather than returning their text.
 
 Offline tests cover reservation ownership through cleanup, missing/mismatching
 targets, authentication and exchange failures, cancellation before authentication,
@@ -70,11 +70,38 @@ server. Restarting while enabled rearms the experiment. Proxy stripping of forwa
 metadata must not expose this path. Client disconnect does not cancel the bounded
 synchronous operation; never retry an uncertain HTTP outcome.
 
-The route is registered but remains disabled. It has not been deployed or run on
-a camera. Tests exercise authentication, proxy/LAN/CSRF rejection, invalid input,
+The route is registered and disabled by default. Tests exercise authentication,
+proxy/LAN/CSRF rejection, invalid input,
 single use including concurrent requests, failure sanitization and settings exposure.
 
-## Next live check
+## Camera-3 live validation — 2026-10-12
+
+One invocation inside the actual server returned HTTP 200 with **all three reads
+completed by correlated application responses**. Each had `transport_result=0`
+and `error_code=0`; `failure=null`, six sent and six received datagrams. Raw values
+were deliberately not returned or retained, so this confirms the read transaction
+path, not particular model/firmware values or capability support.
+
+Deployed source `5f6942b`, image `371a4315043d`. The legacy Docker build was limited
+to 384 MiB, no extra swap and half a CPU; its 4.786-MB context excluded secrets and
+runtime data. WSL had approximately 1.5 GiB available, but swap became full during
+the procedure; do not infer that the host has capacity for parallel heavy work.
+The operator process peaked at 111.4 MiB with no swap and ran for 20.5 seconds;
+this is not the server or Docker daemon's peak measurement.
+
+Only the app was recreated to arm and disarm the attempt; go2rtc and unrelated
+containers were not restarted. The two recreations briefly interrupted recording;
+this is not a zero-gap deployment. Finally restored all diagnostic enables to false,
+cleared both reviewed target fields and confirmed health HTTP 200. All three
+camera recording totals increased over a subsequent ten-second observation:
+262144, 1048576 and 1572864 bytes (sorted, no device identifiers). After restoration,
+app/go2rtc usage was approximately 116/25 MiB, each retaining its 1-GiB ceiling.
+
+No camera actions, PTZ, light, siren, microphone or media rendezvous were sent by
+this diagnostic. No automatic retry was performed. This is a finite session,
+not evidence of persistent heartbeat renewal or simultaneous media/control service.
+
+## Repeating a reviewed check (not an automatic next step)
 
 Review camera 3's current registry/enrollment pair privately, then deploy the tested
 app with temporary server-only settings. Account for recording interruption during
@@ -83,6 +110,7 @@ server through direct loopback, compare the three completion results to existing
 correlated identity-read evidence, then restore disabled/empty settings and verify
 health/recording progress. Do not use a standalone broker process as a shortcut.
 
-Do not migrate PTZ or introduce sustained native streaming on the basis of these
-offline tests. This pilot opens a finite authenticated session; it is not the
-planned single long-lived account reader/writer.
+Next work is the single-owner account lifecycle: bounded submission/completion
+delivery, sequence allocation shared with heartbeat, generation retirement and
+credential-change draining. Do not merely remove the finite dispatcher's deadline
+or wire PTZ to its socket. This pilot is not the planned long-lived reader/writer.

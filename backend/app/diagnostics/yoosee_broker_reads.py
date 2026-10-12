@@ -1,4 +1,4 @@
-"""Internal same-process read pilot; no HTTP route or automatic activation."""
+"""Internal same-process read pilot; separately gated trigger, no auto-activation."""
 
 import socket
 from collections.abc import Callable

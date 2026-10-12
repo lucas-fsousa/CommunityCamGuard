@@ -290,8 +290,9 @@ receipts; it counted/discarded media and did not decode or replace dashboard RTS
 See the [integration checkpoint](docs/internal/native-tcp-cleanup-checkpoint.md).
 A separate [internal identity-read diagnostic](docs/internal/broker-read-diagnostic.md)
 is prepared for the session-ownership work. It is disabled by default, requires a
-primary session over direct loopback and is not a dashboard feature; live validation
-of this new diagnostic remains pending.
+primary session over direct loopback and is not a dashboard feature. One camera-3
+validation completed all three identity reads; persistent account ownership and
+simultaneous native media/control integration remain pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

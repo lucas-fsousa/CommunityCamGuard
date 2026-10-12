@@ -687,6 +687,12 @@ Follow-up: server trigger implemented and offline-tested, primary-session/direct
 loopback only, fixed server target, no request fields, one attempt including failures.
 Disabled by default; no deployment or live run. Next camera-3 identity-read comparison
 using the actual server process, then review ownership migration from that evidence.
+Live follow-up 2026-10-12: camera-3 in-server identity reads all returned correlated
+responses, transport result zero and application error zero (6 TX/6 RX, no failure).
+Restored disabled/empty and health 200; all three recording totals grew over ten
+seconds. App-only arm/disarm recreation caused brief recording interruptions.
+Next persistent account lifecycle/heartbeat ownership, not repeated finite probes
+or PTZ migration before generation/draining guarantees are implemented.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

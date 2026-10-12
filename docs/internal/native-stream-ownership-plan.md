@@ -13,7 +13,9 @@ the remaining dispatcher must own outstanding application tickets and deadlines,
 not discard them when transport ACKs arrive.
 That bounded waiter registry and its finite datagram composition are now implemented
 and offline-tested: [read dispatch](broker-read-dispatch.md). Physical socket ownership
-and read-only integration remain next; existing production controls are unchanged.
+and the [read-only pilot](broker-read-diagnostic.md) are now implemented. One in-server
+camera-3 run completed all three identity reads with positive transport receipts,
+zero application errors and safe cleanup. Existing production controls are unchanged.
 
 ## Existing ownership to preserve
 
@@ -71,5 +73,7 @@ no dashboard checkbox that can bypass a missing driver capability.
   rollout requires evidence from the relevant driver, not camera number rules.
 
 This plan deliberately does not implement a placeholder driver/source or lengthen
-PTZ cache lifetimes. The next concrete code unit is the bounded transaction
-correlator; its migration must keep the current deployed path unchanged initially.
+PTZ cache lifetimes. The finite correlator/dispatcher/read pilot are completed;
+the next unit is the persistent account lifecycle with bounded submissions and
+completions, shared heartbeat sequence allocation and explicit generation retirement.
+Its migration must keep the current deployed PTZ path unchanged initially.
