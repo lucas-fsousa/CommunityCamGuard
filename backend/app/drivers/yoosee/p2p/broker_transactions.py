@@ -11,11 +11,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .broker_sequences import BrokerSequences
 from .crypto import gute_mode1_xor_checksum
 
 MAX_PENDING = 8
 MAX_TIMEOUT = 10.0
-_UINT32 = 0xFFFFFFFF
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,12 +45,14 @@ class BrokerTransactions:
     """
 
     def __init__(self, session_id: int, generation: int, next_sequence: int, *,
-                 clock: Callable[[], float] = time.monotonic):
-        if (type(session_id) is not int or not 0 < session_id < 1 << 64
-                or type(generation) is not int or generation <= 0
-                or type(next_sequence) is not int or not 0 <= next_sequence <= _UINT32):
-            raise ValueError("invalid broker transaction identity")
-        self._session, self._generation, self._next = session_id, generation, next_sequence
+                 clock: Callable[[], float] = time.monotonic,
+                 sequences: BrokerSequences | None = None):
+        seed = BrokerSequences(session_id, generation, next_sequence)
+        if sequences is not None and not sequences.matches(session_id, generation):
+            raise ValueError("broker sequence identity mismatch")
+        self._sequences = sequences if sequences is not None else seed
+        self._owns_sequences = sequences is None
+        self._session, self._generation = session_id, generation
         self._clock = clock
         self._pending: dict[int, tuple[ReceiptTicket, float]] = {}
         self.closed = False
@@ -59,8 +61,12 @@ class BrokerTransactions:
     def pending_count(self) -> int:
         return len(self._pending)
 
+    @property
+    def active(self) -> bool:
+        return not self.closed and self._sequences.matches(self._session, self._generation)
+
     def register(self, kind: int, timeout: float) -> ReceiptTicket:
-        if self.closed:
+        if not self.active:
             raise ValueError("broker transactions closed")
         if (type(kind) is not int or not 0 <= kind <= 255
                 or type(timeout) not in (int, float) or not math.isfinite(timeout)
@@ -68,11 +74,8 @@ class BrokerTransactions:
             raise ValueError("invalid broker transaction bounds")
         if len(self._pending) >= MAX_PENDING:
             raise ValueError("broker transaction capacity exhausted")
-        if self._next > _UINT32:
-            raise ValueError("broker sequence exhausted; new generation required")
-        ticket = ReceiptTicket(self._generation, self._next, kind)
-        self._pending[self._next] = ticket, self._clock() + timeout
-        self._next += 1
+        ticket = ReceiptTicket(self._generation, self._sequences.allocate(), kind)
+        self._pending[ticket.sequence] = ticket, self._clock() + timeout
         return ticket
 
     def poll(self) -> tuple[ReceiptTicket, ...]:
@@ -91,7 +94,7 @@ class BrokerTransactions:
         return True
 
     def accept(self, plain: bytes, *, generation: int) -> TransportReceipt | None:
-        if (self.closed or type(generation) is not int or generation != self._generation
+        if (not self.active or type(generation) is not int or generation != self._generation
                 or not isinstance(plain, bytes) or len(plain) != 32
                 or plain[0] not in (0x7E, 0x7F)
                 or struct.unpack_from("<H", plain, 2)[0] != 32
@@ -116,4 +119,6 @@ class BrokerTransactions:
         self._pending.clear()
         self._session = 0
         self.closed = True
+        if self._owns_sequences:
+            self._sequences.close()
         return cancelled

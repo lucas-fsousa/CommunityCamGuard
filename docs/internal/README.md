@@ -45,6 +45,9 @@ authentication and both reservations; its single-use, primary-session/loopback
 trigger stays disabled by default and returns no raw identity values. One in-server
 camera-3 invocation completed all three reads with positive transport receipts and
 zero application errors. Restored disabled/empty; all three recordings grew afterward.
+The [shared sequence namespace](broker-sequence-ownership.md) now prevents duplicate
+allocation across future account consumers and rejects late replies after retirement.
+This is offline-tested plumbing, not persistent heartbeat or PTZ integration.
 
 | ADR | Decision |
 |---|---|

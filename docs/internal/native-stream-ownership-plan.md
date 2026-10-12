@@ -77,3 +77,7 @@ PTZ cache lifetimes. The finite correlator/dispatcher/read pilot are completed;
 the next unit is the persistent account lifecycle with bounded submissions and
 completions, shared heartbeat sequence allocation and explicit generation retirement.
 Its migration must keep the current deployed PTZ path unchanged initially.
+The [sequence namespace](broker-sequence-ownership.md) is now extracted and tested:
+read/receipt consumers can share account allocation without duplicate numbers;
+retirement blocks new work and late completions. Heartbeat A0/A1 correlation,
+global queue bounds and account draining remain to be implemented.

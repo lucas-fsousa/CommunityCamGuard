@@ -693,6 +693,12 @@ Restored disabled/empty and health 200; all three recording totals grew over ten
 seconds. App-only arm/disarm recreation caused brief recording interruptions.
 Next persistent account lifecycle/heartbeat ownership, not repeated finite probes
 or PTZ migration before generation/draining guarantees are implemented.
+Shared sequence namespace extracted and offline-tested: optional common allocation
+for read/receipt registries, identity checks, no wrap/recycling, consumer-local
+cleanup and account retirement rejecting late responses. Existing finite callers
+retain private namespaces; no heartbeat/PTZ wiring or deployment. Next verified
+A0/A1 heartbeat correlation and bounded account lifecycle. See
+[sequence ownership](docs/internal/broker-sequence-ownership.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from .broker_model_reply import match_model_reply
+from .broker_sequences import BrokerSequences
 from .broker_transactions import MAX_PENDING, BrokerTransactions, ReceiptTicket
 from .contracts import MODEL_READ_PATHS
 
@@ -46,8 +47,10 @@ class BrokerReads:
     """
 
     def __init__(self, session_id: int, generation: int, next_sequence: int, *,
-                 clock: Callable[[], float] = time.monotonic):
-        self._receipts = BrokerTransactions(session_id, generation, next_sequence, clock=clock)
+                 clock: Callable[[], float] = time.monotonic,
+                 sequences: BrokerSequences | None = None):
+        self._receipts = BrokerTransactions(session_id, generation, next_sequence,
+                                             clock=clock, sequences=sequences)
         self._session, self._clock = session_id, clock
         self._pending: dict[int, _Pending] = {}
         self.closed = False
@@ -57,7 +60,7 @@ class BrokerReads:
         return len(self._pending)
 
     def register(self, device_id: int, path: str, timeout: float) -> ReadRequest:
-        if self.closed:
+        if self.closed or not self._receipts.active:
             raise ValueError("broker reads closed")
         if (type(device_id) is not int or not 0 < device_id < 1 << 64
                 or not isinstance(path, str) or path not in MODEL_READ_PATHS):
@@ -78,7 +81,7 @@ class BrokerReads:
         return ReadCompletion(pending.request, status, pending.transport_result, error_code, value)
 
     def accept(self, plain: bytes, *, generation: int) -> ReadCompletion | None:
-        if self.closed:
+        if self.closed or not self._receipts.active:
             return None
         receipt = self._receipts.accept(plain, generation=generation)
         if receipt is not None:
