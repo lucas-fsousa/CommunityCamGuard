@@ -2,42 +2,25 @@
 
 from __future__ import annotations
 
-import ipaddress
 import re
 import threading
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..api.local_only import require_local_request
-from ..auth import require_auth
 from ..config import get_settings
 from ..drivers.yoosee.p2p.av_route import AvBootstrapError
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
 from ..drivers.yoosee.p2p.control_ownership import ControlChannelBusy
 from ..services.camera_controls import CameraNotFound, ControlBusy
+from .local_operator import require_local_operator
 from .yoosee_av import run_reviewed_native_av
 
 router = APIRouter(prefix="/api/internal/diagnostics", include_in_schema=False)
 _guard = threading.Lock()
 
 
-def _local_operator(request: Request) -> None:
-    require_auth(request)
-    require_local_request(request)
-    try:
-        peer = ipaddress.ip_address(request.client.host if request.client else "")
-    except ValueError:
-        raise HTTPException(403, "diagnostic requires direct loopback") from None
-    if isinstance(peer, ipaddress.IPv6Address) and peer.ipv4_mapped:
-        peer = peer.ipv4_mapped
-    forwarded = ("forwarded", "x-forwarded-for", "x-real-ip", "cf-connecting-ip",
-                 "true-client-ip", "x-forwarded-host", "x-forwarded-proto")
-    if not peer.is_loopback or any(name in request.headers for name in forwarded):
-        raise HTTPException(403, "diagnostic requires direct loopback")
-
-
-@router.post("/native-av", dependencies=[Depends(_local_operator)])
+@router.post("/native-av", dependencies=[Depends(require_local_operator)])
 def native_av(request: Request) -> dict:
     settings = get_settings()
     if not settings.native_av_diagnostic_enabled:

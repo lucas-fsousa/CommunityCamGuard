@@ -683,6 +683,10 @@ composes reviewed camera/enrollment checks, authentication, three fixed identity
 reads and socket cleanup under both reservations. Offline-tested only; no HTTP
 trigger or production activation. Summary strips raw identity values. Next guarded
 single-use server trigger, then camera-3 comparison; PTZ migration remains pending.
+Follow-up: server trigger implemented and offline-tested, primary-session/direct
+loopback only, fixed server target, no request fields, one attempt including failures.
+Disabled by default; no deployment or live run. Next camera-3 identity-read comparison
+using the actual server process, then review ownership migration from that evidence.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

@@ -2,7 +2,8 @@
 
 `diagnostics.yoosee_broker_reads.run_reviewed_broker_reads` prepares a finite
 read-only comparison before migrating account ownership. It is an internal
-callable only: **no HTTP route, startup task, CLI or production activation**.
+callable with a separately gated internal HTTP trigger. There is **no startup
+task, standalone CLI or production activation**.
 
 ## Ownership and scope
 
@@ -45,11 +46,43 @@ exactly-once close and summary redaction. No live camera was contacted for this
 implementation. Successful transport receipts alone do not prove an application
 response, capability support or persistent session ownership.
 
-## Next
+## Guarded server trigger
 
-Add a disabled-by-default, primary-authenticated, local, single-use server trigger
-with a server-reviewed target, following the existing native AV diagnostic gates.
-Then compare one camera-3 run with existing correlated identity-read evidence.
+`POST /api/internal/diagnostics/broker-reads` is hidden from OpenAPI and requires:
+
+- `BROKER_READ_DIAGNOSTIC_ENABLED=true` (default false).
+- Reviewed server-only `BROKER_READ_DIAGNOSTIC_CAMERA_ID` and
+  `BROKER_READ_DIAGNOSTIC_DEVICE_ID`; both default empty.
+- A primary-key session, direct loopback peer and existing Host/Origin/CSRF checks.
+  Temporary/legacy sessions, LAN peers and forwarding headers are rejected.
+- An empty POST, no query parameters or transfer encoding. Operator clients must
+  send an explicit same-loopback Origin and non-form Content-Type, as with the
+  existing native AV diagnostic. Never print cookies or pass them in shell arguments.
+
+One attempt is claimed atomically per server process before work. Busy targets and
+expected failures consume it; no automatic retry. Expected exceptions return safe
+409/502 messages, while completed exchanges return the safe summary. **HTTP 200
+does not establish that any identity read succeeded**: examine every completion
+and the separate failure field. An empty/timeout response is not capability proof.
+
+Locks and single-use state are process-local; use only the existing single-worker
+server. Restarting while enabled rearms the experiment. Proxy stripping of forwarding
+metadata must not expose this path. Client disconnect does not cancel the bounded
+synchronous operation; never retry an uncertain HTTP outcome.
+
+The route is registered but remains disabled. It has not been deployed or run on
+a camera. Tests exercise authentication, proxy/LAN/CSRF rejection, invalid input,
+single use including concurrent requests, failure sanitization and settings exposure.
+
+## Next live check
+
+Review camera 3's current registry/enrollment pair privately, then deploy the tested
+app with temporary server-only settings. Account for recording interruption during
+app recreation; do not restart unrelated services. Invoke once inside the actual
+server through direct loopback, compare the three completion results to existing
+correlated identity-read evidence, then restore disabled/empty settings and verify
+health/recording progress. Do not use a standalone broker process as a shortcut.
+
 Do not migrate PTZ or introduce sustained native streaming on the basis of these
 offline tests. This pilot opens a finite authenticated session; it is not the
 planned single long-lived account reader/writer.

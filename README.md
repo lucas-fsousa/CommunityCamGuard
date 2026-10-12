@@ -288,6 +288,10 @@ AV CLOSE and broker-release receipts. Sustained/browser validation remains open.
 An additional bounded ten-second test received 160 video records with both cleanup
 receipts; it counted/discarded media and did not decode or replace dashboard RTSP.
 See the [integration checkpoint](docs/internal/native-tcp-cleanup-checkpoint.md).
+A separate [internal identity-read diagnostic](docs/internal/broker-read-diagnostic.md)
+is prepared for the session-ownership work. It is disabled by default, requires a
+primary session over direct loopback and is not a dashboard feature; live validation
+of this new diagnostic remains pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

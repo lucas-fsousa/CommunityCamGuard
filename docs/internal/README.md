@@ -41,8 +41,9 @@ transport receipts and application waiters without creating sockets or workers.
 The [exclusive read socket adapter](broker-read-socket.md) adds bounded I/O and
 guaranteed physical socket cleanup; production entry points remain unchanged.
 The [same-process read pilot](broker-read-diagnostic.md) composes reviewed enrollment,
-authentication and both reservations; it has no live trigger yet and returns no
-raw identity values.
+authentication and both reservations; its single-use, primary-session/loopback
+trigger stays disabled by default and returns no raw identity values. Offline
+validation is complete; a camera-3 live comparison is still pending.
 
 | ADR | Decision |
 |---|---|

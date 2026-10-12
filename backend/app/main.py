@@ -41,6 +41,7 @@ from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
 from .db import p2p, registry
 from .diagnostics.yoosee_av_api import router as native_av_diagnostic_router
+from .diagnostics.yoosee_broker_reads_api import router as broker_read_diagnostic_router
 from .frontend_build import build_version
 from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
@@ -151,6 +152,7 @@ app = FastAPI(
 )
 app.add_exception_handler(RequestValidationError, invalid_request)
 app.include_router(native_av_diagnostic_router)
+app.include_router(broker_read_diagnostic_router)
 app.include_router(auth_router)
 app.include_router(access_keys_router)
 app.include_router(provisioning_router)

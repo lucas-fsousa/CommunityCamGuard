@@ -20,6 +20,8 @@
         "dashboard_allow_local_origin", "host", "port",
         "autostart_services", "control_session_warmup", "manage_go2rtc", "db_path", "recordings_dir",
         "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
+        "broker_read_diagnostic_enabled", "broker_read_diagnostic_camera_id",
+        "broker_read_diagnostic_device_id",
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
         "native_av_diagnostic_platform_only",
         "native_av_diagnostic_tcp_relay",
