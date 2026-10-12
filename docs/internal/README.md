@@ -48,6 +48,9 @@ zero application errors. Restored disabled/empty; all three recordings grew afte
 The [shared sequence namespace](broker-sequence-ownership.md) now prevents duplicate
 allocation across future account consumers and rejects late replies after retirement.
 This is offline-tested plumbing, not persistent heartbeat or PTZ integration.
+Targeted [heartbeat SDK evidence](broker-heartbeat-sdk.md) identifies interval-field
+bounds and 35/40/fallback wrapper selection; response correlation and actual timer
+registration still require verification before persistent scheduling.
 
 | ADR | Decision |
 |---|---|

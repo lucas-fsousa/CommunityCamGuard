@@ -699,6 +699,11 @@ cleanup and account retirement rejecting late responses. Existing finite callers
 retain private namespaces; no heartbeat/PTZ wiring or deployment. Next verified
 A0/A1 heartbeat correlation and bounded account lifecycle. See
 [sequence ownership](docs/internal/broker-sequence-ownership.md).
+Heartbeat RE follow-up: pinned SDK handler accepts frame byte0x21 only within
+10–60; sender wrappers distinguish35/40/fallback. This does not prove arbitrary
+10–60-second scheduling. Next inspect timer/request registration and upstream A1
+callback correlation; no guessed parser or production heartbeat change. See
+[SDK evidence](docs/internal/broker-heartbeat-sdk.md).
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
