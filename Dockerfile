@@ -9,12 +9,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
+# Documentation/source edits must not invalidate the dependency installation.
+COPY pyproject.toml ./
 RUN python -c 'import tomllib; data=tomllib.load(open("pyproject.toml", "rb")); print("\n".join(data["project"]["dependencies"] + data["build-system"]["requires"]))' \
         > /tmp/requirements-runtime.txt \
     && pip install --no-cache-dir -r /tmp/requirements-runtime.txt \
     && rm /tmp/requirements-runtime.txt
 
+COPY README.md ./
 COPY backend ./backend
 COPY frontend ./frontend
 RUN pip install --no-cache-dir --no-deps --no-build-isolation .

@@ -86,6 +86,10 @@ Deployed source `5f6942b`, image `371a4315043d`. The legacy Docker build was lim
 to 384 MiB, no extra swap and half a CPU; its 4.786-MB context excluded secrets and
 runtime data. WSL had approximately 1.5 GiB available, but swap became full during
 the procedure; do not infer that the host has capacity for parallel heavy work.
+Follow-up build improvement: README copying now follows dependency installation,
+so documentation-only changes no longer invalidate that layer. Static Dockerfile
+and secret-boundary tests cover this order. No additional build was run to benchmark
+the change while host swap remained occupied.
 The operator process peaked at 111.4 MiB with no swap and ran for 20.5 seconds;
 this is not the server or Docker daemon's peak measurement.
 
