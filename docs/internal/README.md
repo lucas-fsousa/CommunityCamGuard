@@ -57,7 +57,9 @@ reads/heartbeat, reserved maintenance capacity and bounded draining/retirement.
 It has no socket or production wiring; the next integration is an exclusive
 encrypted socket owner and camera-3 before/after-heartbeat validation.
 That [socket check](broker-account-check.md) is now implemented and offline-tested,
-with a disabled server-only opt-in; real camera-3 validation is the next step.
+with a disabled server-only opt-in. One camera-3 run passed all six identity reads
+around a correlated heartbeat(interval50), with no recertification. Restored disabled;
+production concurrency/native media integration remain pending.
 
 | ADR | Decision |
 |---|---|

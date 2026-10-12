@@ -725,6 +725,11 @@ crypto/fragment/ACK handling and closes on every exit. Server-only opt-in false 
 default; safe summary contains no raw values.128focused tests passed,112.6MiB/swap0.
 Next one in-server camera3 validation, disarm and verify recordings. See
 [check contract](docs/internal/broker-account-check.md).
+Live same-account follow-up: six camera3 identity reads around one correlated
+heartbeat(interval50) all returned transport0/application0, failure null,30TX/27RX.
+No recertification or camera actions. App-only arming/restoration; disabled/empty
+and health200 afterward. Next bounded concurrent submission/result delivery and
+account handoff; sustained native media and production PTZ migration remain pending.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

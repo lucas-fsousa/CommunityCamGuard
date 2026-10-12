@@ -48,7 +48,28 @@ three application responses with zero errors and the heartbeat must have status
 that criterion. An absent transport ACK does not invalidate a correlated application
 response, but must remain distinguishable in the observations.
 
-At implementation time this mode is offline-tested, disabled and not yet deployed.
-Next: one reviewed camera3 attempt through the actual server, then disarm/clear the
-target, verify health and recording growth, and document the result without keys,
-identifiers or raw device values. Do not use a standalone shared-account probe.
+## Live camera-3 result
+
+One in-server run of source `7ec875a`, image `d97c56a48809`, passed: all three
+initial identity reads and all three post-heartbeat reads returned correlated
+application responses with `transport_result=0` and `error_code=0`. The heartbeat
+returned `status=response`, `interval_hint=50`; `failure=null`, 30 sent/27 received
+datagrams. Extra broker traffic/ACKs are included in those counts; they are not a
+count of camera commands. There was one initial authentication, no recertification,
+and the scheduled heartbeat crossed the 50-second initial delay on the same socket.
+
+The operator process ran for64.540 seconds including app recreation/restoration,
+peaked at117.2 MiB and used no swap. The Docker build was capped at384 MiB/no extra
+swap/halfCPU with a4.862-MB context. These are bounded-client/build figures, not a
+measurement of the server's peak. During the observation app/go2rtc used about
+142/37 MiB. No audio/light/movement/media-start command was part of this check.
+
+The finally path restored both read/heartbeat enables false, target fields empty,
+and app health200. Only app was recreated for arming/disarming; recording was
+briefly interrupted at those boundaries, not claimed gap-free. Unrelated containers
+and go2rtc were not restarted. The experiment remains disabled after validation.
+
+This validates finite read/heartbeat/read continuity, not simultaneous native media,
+unlimited token life, device-feature support or LAN-only access. Next bounded
+concurrent submission/completion delivery and explicit account handoff before any
+production control migration. Do not use a standalone shared-account probe.

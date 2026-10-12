@@ -293,6 +293,9 @@ is prepared for the session-ownership work. It is disabled by default, requires 
 primary session over direct loopback and is not a dashboard feature. One camera-3
 validation completed all three identity reads; persistent account ownership and
 simultaneous native media/control integration remain pending.
+Follow-up session check also passed: the same authenticated connection completed
+three identity reads, a correlated heartbeat after50 seconds, then three more reads.
+This remains a disabled internal experiment, not persistent dashboard streaming.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
