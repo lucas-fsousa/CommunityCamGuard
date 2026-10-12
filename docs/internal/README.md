@@ -32,6 +32,8 @@ limits that must be reconciled before sustained reception; none were relaxed.
 Follow-up: the reviewed extended profile passed one ten-second camera-3 run
 (160 video records, largest arrival gap 312 ms, both cleanup receipts). See that
 document for profile-specific bounds, restored state and production ownership limits.
+The [ownership migration plan](native-stream-ownership-plan.md) maps the current
+PTZ cache and certification paths before introducing a long-lived native source.
 
 | ADR | Decision |
 |---|---|

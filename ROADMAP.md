@@ -652,6 +652,11 @@ interarrival gap, CLOSE/B9 true). Restored disabled/short; all three recordings
 grew afterward. No decode/browser claim. Next: solve long-lived source versus
 shared-control broker ownership before production single-producer/fan-out wiring;
 do not simply retain the diagnostic lock or launch independent credential logins.
+Ownership audit mapped the existing PTZ account cache/socket transfer, certification
+and shared-lock paths. [Migration plan](docs/internal/native-stream-ownership-plan.md):
+first a bounded socket-free transaction correlator, then a single account socket
+owner, read-only/control migration and finally native source/fan-out integration.
+No new source skeleton, token-lifetime assumption or production activation added.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 
