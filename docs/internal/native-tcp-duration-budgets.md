@@ -59,3 +59,42 @@ Offline tests exercise ten seconds of continuous real-protocol messages with a
 fake clock, CLOSE, drained buffers, unchanged startup/idle failures, immutable
 profiles, rejection before sockets, broker limits, cancellation and profile
 propagation through both route owners. This is not yet a new live result.
+
+## Ten-second in-server live result — 2026-10-11
+
+After CI 38171577350 passed for `c9aba40`, built image `f8d6a35d51c7` with
+512 MiB/no-extra-swap/one-CPU build limits and recreated only the app. One camera-3
+EXTENDED attempt, with no decoder sample, returned HTTP 200:
+
+| Observation | Result |
+|---|---:|
+| Video records delivered | 160 |
+| Audio records counted, not played | 164 |
+| Encoding headers | 1 |
+| TCP received / sent bytes | 1,266,503 / 53,992 |
+| Ready / first video from receiver start | 1,259 / 1,442 ms |
+| Maximum video interarrival gap | 312 ms |
+| Trailing silence before CLOSE | 0 ms (rounded) |
+| Observation duration including startup | 11,264 ms |
+| AV CLOSE / correlated B9 receipt | both true |
+| Broker messages serviced | 5 |
+
+The observed ready-to-CLOSE window is 10,005 ms. These are local arrival timings,
+not camera capture latency, browser playback measurements or a strict frame-rate
+claim. The same HD startup profile was requested, but this counts-only attempt
+does **not** constitute another decoded-resolution validation. The previous
+55-frame strict decode remains the resolution evidence.
+
+Finally restored four flags false, both target IDs empty and profile `short`;
+health returned 200. All three current-hour recorder directories grew over ten
+seconds: 786,432, 1,500,980 and 1,875,831 bytes. Two app recreations briefly
+interrupted recording. go2rtc and unrelated containers were not restarted.
+Client cgroup peak was 86.5 MiB without swap (not total server memory); afterward
+app used 201.8 MiB and go2rtc 413.1 MiB, each retaining its 1 GiB ceiling.
+
+Ten seconds does not homologate minutes-long streaming or the dashboard. Next
+engineering boundary is source/session ownership: a production source cannot
+hold the driver's shared control lock indefinitely or be invalidated by another
+control login. Resolve that contract before wiring a generic single producer and
+bounded consumers. Do not promote this diagnostic, repeat it automatically or
+enable a native-stream capability on any model from this evidence alone.

@@ -285,6 +285,8 @@ or streaming capabilities for an unverified camera. See the
 An opt-in internal TCP diagnostic now shares the server's camera/broker locks;
 it is disabled by default and camera-3 validation decoded 55 HD frames with both
 AV CLOSE and broker-release receipts. Sustained/browser validation remains open.
+An additional bounded ten-second test received 160 video records with both cleanup
+receipts; it counted/discarded media and did not decode or replace dashboard RTSP.
 See the [integration checkpoint](docs/internal/native-tcp-cleanup-checkpoint.md).
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.

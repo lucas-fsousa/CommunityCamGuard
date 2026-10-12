@@ -647,6 +647,11 @@ Extended ten-second profile implemented with immutable reviewed budgets and
 server-only selection (default short). Preserves startup/idle/reassembly/storage
 bounds; counts/discards media, no decoder sample. Offline fake-clock continuity,
 cleanup, cancellation and propagation tests pass; live validation remains next.
+Live follow-up: ten-second camera-3 run passed (160 video records, 312 ms maximum
+interarrival gap, CLOSE/B9 true). Restored disabled/short; all three recordings
+grew afterward. No decode/browser claim. Next: solve long-lived source versus
+shared-control broker ownership before production single-producer/fan-out wiring;
+do not simply retain the diagnostic lock or launch independent credential logins.
 
 ## Dashboard reliability, settings and access security — requested 2026-09-21
 

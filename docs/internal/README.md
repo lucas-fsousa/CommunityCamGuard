@@ -29,6 +29,9 @@ trigger are integrated. One isolated live check decoded 55 HD frames and confirm
 both CLOSE and B9 receipts; production streaming is unchanged.
 The [duration budget review](native-tcp-duration-budgets.md) lists the layered
 limits that must be reconciled before sustained reception; none were relaxed.
+Follow-up: the reviewed extended profile passed one ten-second camera-3 run
+(160 video records, largest arrival gap 312 ms, both cleanup receipts). See that
+document for profile-specific bounds, restored state and production ownership limits.
 
 | ADR | Decision |
 |---|---|

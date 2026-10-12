@@ -12,7 +12,9 @@ Extended mode is separately selected by server-only
 `NATIVE_AV_DIAGNOSTIC_TCP_PROFILE=extended` (default `short`). It requires TCP true,
 decode-video false and platform-only false, counts/discards media for ten seconds
 and reports arrival timing. It does not collect a decode sample. The profile is
-offline-tested, not live-validated yet. See [budget limits](native-tcp-duration-budgets.md).
+validated once on camera 3: 160 video records, maximum arrival gap 312 ms, positive
+CLOSE/B9 receipts, then restored disabled/short. This is not browser or decoded
+resolution validation. See [budget limits and live result](native-tcp-duration-budgets.md).
 
 **Follow-up:** now validated once inside the server: 55 HD frames decoded and both
 CLOSE/B9 receipts positive. Restored disabled/empty afterward. The implementation
