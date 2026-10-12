@@ -298,6 +298,8 @@ three identity reads, a correlated heartbeat after50 seconds, then three more re
 This remains a disabled internal experiment, not persistent dashboard streaming.
 Bounded [concurrent read admission](docs/internal/broker-mailbox.md) is now tested
 offline; production account-worker and native media integration remain pending.
+An [experimental single-reader executor](docs/internal/account-read-worker.md)
+now passes synthetic socket tests with bounded shutdown; it is not enabled in the dashboard.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

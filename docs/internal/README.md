@@ -61,7 +61,9 @@ with a disabled server-only opt-in. One camera-3 run passed all six identity rea
 around a correlated heartbeat(interval50), with no recertification. Restored disabled;
 production concurrency/native media integration remain pending.
 The [bounded mailbox](broker-mailbox.md) adds offline-tested concurrent read
-admission with exact wire binding and acknowledged cancellation; no runtime worker yet.
+admission with exact wire binding and acknowledged cancellation. The
+[exclusive finite worker](account-read-worker.md) is now implemented/tested offline,
+including concurrent callers and two-second drain; it is not runtime-wired.
 
 | ADR | Decision |
 |---|---|

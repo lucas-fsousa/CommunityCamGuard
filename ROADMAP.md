@@ -10,6 +10,11 @@ Follow-up: socket-free account adapter implemented with exact response routing,
 preparation-failure retirement and original-deadline preservation. Concurrent
 callers use only the mailbox; a single future socket worker owns the dispatcher.
 Next remains exclusive encrypted socket scheduling, not production activation.
+That finite socket executor is now implemented and tested offline, with one reader,
+independent input/output budgets, concurrent caller admission and two-second drain.
+No runtime thread/authentication or camera command added. Next: guarded in-server
+worker validation and account-generation handoff before production PTZ/media migration.
+See [worker lifecycle](docs/internal/account-read-worker.md).
 
 User priority override (2026-10-03): camera-card/SD work is the **last priority**.
 Do not resume its enum/listing investigation while native live-streaming work is

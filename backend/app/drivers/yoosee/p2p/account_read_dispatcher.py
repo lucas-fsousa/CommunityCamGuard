@@ -23,7 +23,7 @@ class DispatchBatch:
     maintenance: AccountEvents = field(default_factory=AccountEvents, repr=False)
 
 
-class BrokerReadDispatcher:
+class AccountReadDispatcher:
     """One owner drives step/receive/close; callers only access the mailbox.
 
     The future socket worker must check mailbox.ready immediately before each
@@ -87,3 +87,7 @@ class BrokerReadDispatcher:
 
     def close(self, reason: Retirement = "closed") -> AccountEvents:
         return self._publish(self._account.retire(reason))
+
+    def drain(self) -> AccountEvents:
+        self.mailbox.drain()
+        return self._publish(self._account.drain())

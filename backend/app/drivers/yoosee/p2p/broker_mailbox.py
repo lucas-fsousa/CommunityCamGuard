@@ -182,3 +182,11 @@ class BrokerMailbox:
             self._closed = True
             for slot in self._slots.values():
                 self._stop(slot, "cancelled")
+
+    def drain(self) -> None:
+        """Reject new/queued work while allowing already claimed reads to finish."""
+        with self._lock:
+            self._closed = True
+            for slot in self._slots.values():
+                if not slot.claimed:
+                    self._stop(slot, "cancelled")

@@ -2,7 +2,7 @@ import struct
 
 import pytest
 
-from backend.app.drivers.yoosee.p2p.broker_read_dispatcher import BrokerReadDispatcher
+from backend.app.drivers.yoosee.p2p.account_read_dispatcher import AccountReadDispatcher
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from tests.test_broker_heartbeat_reply import reply
 from tests.test_broker_reads import DEVICE, NODE, PATH, response
@@ -10,7 +10,7 @@ from tests.test_broker_reads import DEVICE, NODE, PATH, response
 
 def dispatcher():
     now = [0.0]
-    owner = BrokerReadDispatcher(NODE, 1, "192.0.2.1", 1234, clock=lambda: now[0])
+    owner = AccountReadDispatcher(NODE, 1, "192.0.2.1", 1234, clock=lambda: now[0])
     return owner, owner.mailbox, now
 
 

@@ -31,7 +31,7 @@ exclusive socket scheduling and account-cache migration. Actions/media are exclu
 
 ## Account adapter
 
-`broker_read_dispatcher.BrokerReadDispatcher` now owns one finite account, one
+`account_read_dispatcher.AccountReadDispatcher` now owns one finite account, one
 mailbox and two bounded exact-ticket maps. Only its mailbox is thread-safe;
 step/receive/close belong to one worker. It publishes decoded results exclusively
 to the mailbox and removes mapping entries on every terminal result/cancellation.
@@ -48,3 +48,6 @@ are admitted. Heartbeat still has its independent reserved slot/shared counter.
 The adapter is tested locally with synthetic out-of-order replies, eight active
 reads across heartbeat, cancellation/preparation races, queue deadlines, wrong
 peer/generation and retirement. No worker/socket/cache integration is enabled yet.
+An [exclusive finite socket worker](account-read-worker.md) now composes it offline;
+production cache integration remains pending. Mailbox drain rejects queued/new
+work while allowing claimed reads to complete within the account's two-second grace.
