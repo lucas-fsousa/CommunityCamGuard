@@ -63,3 +63,17 @@ reviewed step, before any native media or motion adoption.
 
 This completes the offline generation-handoff unit, not persistent session pooling,
 credential-expiry homologation or WAN-independent authentication.
+
+### Authenticated-factory audit
+
+`camera_session.open_camera_session` calls `access_session.obtain_list`, which
+performs synchronous `socket.getaddrinfo` before its deadline-checked UDP loop.
+`BudgetSocket` limits UDP operations, but does not bound that resolver call. Thus
+wrapping the existing opener in a 20-second socket budget is **not** a hard
+20-second factory bound. A thread timeout that merely abandons a still-running
+authentication would also violate exclusive ownership and must not be used.
+
+Before background integration, define bounded resolver admission/cancellation,
+then ensure authentication has actually terminated and its socket is closed before
+another generation starts. Preserve DNS/proxy configuration; do not hardcode vendor
+IPs or confuse this issue with the separate LAN-only DNS-redirect investigation.

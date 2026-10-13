@@ -9,6 +9,9 @@ Ruff/targeted mypy. No production wiring, new thread, camera traffic or deployme
 Next: bounded authenticated-factory integration and server-owned read-only warmup,
 coordinated with all legacy account login paths before any PTZ/media migration.
 See [generation lifecycle](docs/internal/account-read-lifecycle.md).
+Factory audit: the current synchronous list-service DNS lookup is outside the UDP
+deadline. Resolve this boundedness/ownership boundary before background migration;
+abandoning a login thread on timeout is not safe session retirement.
 
 2026-10-12 finite-worker server integration: a disabled, server-only profile now
 runs three fixed identity reads and one heartbeat through the actual single-reader
