@@ -1,5 +1,15 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-13 generation handoff: an experimental read-account lifecycle now reserves
+before authentication, rejects competing runs and permits replacement only after
+the finite worker confirms physical close. Stop/drain latch during connection;
+old tickets cannot affect a replacement generation; uncertain cleanup blocks reuse.
+127 focused tests passed under192MiB/no-swap limits (85.2MiB observed peak), plus
+Ruff/targeted mypy. No production wiring, new thread, camera traffic or deployment.
+Next: bounded authenticated-factory integration and server-owned read-only warmup,
+coordinated with all legacy account login paths before any PTZ/media migration.
+See [generation lifecycle](docs/internal/account-read-lifecycle.md).
+
 2026-10-12 finite-worker server integration: a disabled, server-only profile now
 runs three fixed identity reads and one heartbeat through the actual single-reader
 worker under existing camera/account reservations. Same primary/local/single-use

@@ -99,3 +99,7 @@ explicit generation handoff, followed by read-only warmup migration.
 Two post-restoration filesystem samples showed positive recording growth for all
 three camera directories: sorted byte deltas1048576,3670016,5505024. This checks
 continued writes, not browser playback or absence of gaps during recreation.
+
+2026-10-13 follow-up: the [generation lifecycle](account-read-lifecycle.md) now
+wraps this worker with offline-tested exclusive handoff and fail-closed physical
+cleanup. No production ownership migration yet; read-only warmup integration is next.

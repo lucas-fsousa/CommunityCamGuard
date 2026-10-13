@@ -120,3 +120,9 @@ The guarded worker check subsequently passed on camera3; see
 [live evidence](account-read-worker.md). Generation handoff is now the next step,
 not another repeat of the same finite probe. Production migration constraints above
 remain unchanged; a successful heartbeat does not establish indefinite token TTL.
+
+2026-10-13: the offline [generation coordinator](account-read-lifecycle.md) now
+reserves before the authenticated factory, closes admission on drain and blocks
+replacement until physical close is confirmed. It creates no thread and is not a
+process-global account registry. Next is bounded factory/server-owned read-only
+warmup integration with legacy login exclusion, not another finite camera probe.
