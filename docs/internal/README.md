@@ -66,6 +66,8 @@ admission with exact wire binding and acknowledged cancellation. The
 including concurrent callers and two-second drain; it is not runtime-wired.
 It now has a disabled server-only validation profile under the existing local
 diagnostic guards; this is not production PTZ or streaming activation.
+The actual worker profile subsequently passed on camera3 (three reads, one
+heartbeat, clean close), and all diagnostic flags/targets were restored disabled.
 
 | ADR | Decision |
 |---|---|

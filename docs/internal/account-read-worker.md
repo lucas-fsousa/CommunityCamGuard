@@ -75,3 +75,27 @@ or extra login is created; the existing server request worker runs the finite pu
 
 84 focused adapter/worker/diagnostic/API/settings tests passed (126.4MiB peak,
 no swap,192MiB cgroup); targeted mypy/Ruff passed. Live check is pending.
+
+### Camera3 live result
+
+Source `119779b`, image `9851b75f5060`, passed the guarded in-server worker check.
+All three identity reads returned `status=response`, `transport_result=0`,
+`error_code=0`; `failure=null`. The worker completed its60-second window with
+`reason=deadline`, one heartbeat response,24 sent/21 received datagrams and
+`socket_close_failed=false`. The separate after-read/heartbeat-detail arrays are
+empty in this profile; no post-heartbeat read batch or interval hint is claimed.
+
+One authentication, one socket reader, no new thread or action/media command.
+The operator ran71.908 seconds including app-only recreation/restoration, peaked
+at108.5MiB with no swap. App usage observed during the check was140.8MiB; this is
+not a server peak measurement. Build used384MiB/no additional swap/halfCPU and a
+4.95MB context. CI38332460714 passed Python and Node checks before deployment.
+
+All read/heartbeat/worker/AV diagnostic flags were verified false afterward, with
+empty read targets, health200 and app running/OOM=false/restarts0. Recreating only
+the app briefly interrupts recordings; this does not establish gap-free deployment.
+The new worker is still not the production PTZ/cache or media owner. Next is
+explicit generation handoff, followed by read-only warmup migration.
+Two post-restoration filesystem samples showed positive recording growth for all
+three camera directories: sorted byte deltas1048576,3670016,5505024. This checks
+continued writes, not browser playback or absence of gaps during recreation.

@@ -115,3 +115,8 @@ in-server enrollment/account reservation, then introduce explicit generation
 handoff with failure tests. Read-only warmup migrates before motion/media. No
 additional setting, capability flag, cache lifetime extension or production reader
 was enabled by this audit. The current dashboard/recording path is unchanged.
+
+The guarded worker check subsequently passed on camera3; see
+[live evidence](account-read-worker.md). Generation handoff is now the next step,
+not another repeat of the same finite probe. Production migration constraints above
+remain unchanged; a successful heartbeat does not establish indefinite token TTL.

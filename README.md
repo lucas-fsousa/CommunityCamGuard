@@ -302,6 +302,8 @@ An [experimental single-reader executor](docs/internal/account-read-worker.md)
 now passes synthetic socket tests with bounded shutdown; it is not enabled in the dashboard.
 A disabled, loopback-only operator check can now exercise that executor inside the
 server's account reservations, without enabling production native streaming.
+That worker check passed on camera3 with three identity responses, one heartbeat
+and clean socket closure; production account-cache migration remains pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

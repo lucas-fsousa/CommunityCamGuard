@@ -6,6 +6,10 @@ worker under existing camera/account reservations. Same primary/local/single-use
 guards, explicit close-failure reporting, no raw values or production PTZ migration.
 84 focused tests passed under192MiB/no-swap limits. Camera3 live validation pending;
 see [worker check](docs/internal/account-read-worker.md).
+Live follow-up passed on camera3 with source119779b: three identity responses,
+transport/application errors0, one heartbeat through the actual worker, clean
+physical close,24TX/21RX. Restored disabled/targets empty. Next: generation handoff
+and read-only warmup migration; no production PTZ/native-stream capability enabled.
 
 2026-10-12 account concurrency: a driver-local mailbox now bounds all queued reads,
 active reads, retained results and unacknowledged cancellations to eight slots.
