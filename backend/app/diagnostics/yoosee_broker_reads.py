@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from ..db import p2p, registry
+from ..drivers.yoosee.p2p.account_read_worker import WorkerSummary
+from ..drivers.yoosee.p2p.account_worker_check import run_owned_worker_check
 from ..drivers.yoosee.p2p.av_route_io import BudgetSocket
 from ..drivers.yoosee.p2p.broker_account_check import run_owned_account_check
 from ..drivers.yoosee.p2p.broker_read_socket import ReadSpec, run_owned_reads
@@ -40,11 +42,13 @@ class BrokerReadSummary:
     received_datagrams: int
     after_observations: tuple[BrokerReadObservation, ...] = ()
     heartbeats: tuple[BrokerHeartbeatObservation, ...] = ()
+    worker: WorkerSummary | None = None
 
 
 def run_reviewed_broker_reads(*, camera_id: str, reviewed_camera_id: str,
                               reviewed_device_id: str,
                               with_heartbeat: bool = False,
+                              with_worker: bool = False,
                               cancelled: Callable[[], bool] = lambda: False) -> BrokerReadSummary:
     """Three fixed identity reads under camera+broker ownership through cleanup.
 
@@ -52,7 +56,8 @@ def run_reviewed_broker_reads(*, camera_id: str, reviewed_camera_id: str,
     actions, credential renewal or raw values in the returned summary. Running
     in a separate process would not share the server reservations; do not do so.
     """
-    if (type(with_heartbeat) is not bool or not reviewed_camera_id
+    if (type(with_heartbeat) is not bool or type(with_worker) is not bool
+            or (with_worker and with_heartbeat) or not reviewed_camera_id
             or camera_id != reviewed_camera_id or not reviewed_device_id):
         raise ValueError("broker read diagnostic requires reviewed target")
     with _exclusive(camera_id), own_control_channel():
@@ -71,6 +76,16 @@ def run_reviewed_broker_reads(*, camera_id: str, reviewed_camera_id: str,
             if str(target.device_id) != reviewed_device_id or not target.status:
                 raise ValueError("broker read online target mismatch")
             specs = tuple(ReadSpec(target.device_id, path, 2.0) for path in IDENTITY_PATHS)
+            if with_worker:
+                local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
+                transferred = True
+                worker_check = run_owned_worker_check(bounded.sock, node, 1, specs, local_ip,
+                                                     local_port, cancelled=cancelled)
+                return BrokerReadSummary(
+                    tuple(BrokerReadObservation(r.request.path, r.status, r.transport_result,
+                                               r.error_code) for r in worker_check.completions),
+                    worker_check.failure, worker_check.worker.sent_datagrams,
+                    worker_check.worker.received_datagrams, worker=worker_check.worker)
             if with_heartbeat:
                 local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
                 transferred = True

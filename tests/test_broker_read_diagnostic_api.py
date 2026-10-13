@@ -16,6 +16,7 @@ CAMERA = "cam_" + "a" * 24
 def setup(monkeypatch):
     settings = SimpleNamespace(broker_read_diagnostic_enabled=True,
         broker_read_diagnostic_heartbeat=False,
+        broker_read_diagnostic_worker=False,
         broker_read_diagnostic_camera_id=CAMERA, broker_read_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
     calls = []
@@ -35,9 +36,9 @@ def test_fixed_target_single_use_hidden_schema(setup):
     response = client.post(PATH)
     assert response.status_code == 200
     assert response.json() == dict(observations=[], failure=None, sent_datagrams=3,
-                                  received_datagrams=3, after_observations=[], heartbeats=[])
+                                  received_datagrams=3, after_observations=[], heartbeats=[], worker=None)
     assert calls == [dict(camera_id=CAMERA, reviewed_camera_id=CAMERA,
-                         reviewed_device_id="123", with_heartbeat=False)]
+                         reviewed_device_id="123", with_heartbeat=False, with_worker=False)]
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
@@ -60,6 +61,16 @@ def test_heartbeat_profile_is_server_only(setup):
     settings.broker_read_diagnostic_heartbeat = True
     assert client.post(PATH).status_code == 200
     assert calls[0]["with_heartbeat"] is True
+    assert client.post(PATH).status_code == 409
+
+
+def test_worker_profile_is_server_only(setup):
+    client, settings, calls = setup
+    assert client.post(PATH, params={"with_worker": "true"}).status_code == 400
+    assert not calls
+    settings.broker_read_diagnostic_worker = True
+    assert client.post(PATH).status_code == 200
+    assert calls[0]["with_worker"] is True
     assert client.post(PATH).status_code == 409
 
 

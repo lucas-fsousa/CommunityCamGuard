@@ -55,3 +55,23 @@ of the existing shared PTZ account owner. That migration must avoid a competing
 login/reader and retain start/release safety, per-camera enrollment binding and
 driver-reported capabilities. Passing these offline tests alone does not authorize
 enabling native media/PTZ capabilities or claim LAN-only operation.
+
+## Guarded server check
+
+`BROKER_READ_DIAGNOSTIC_WORKER=true` (default false) selects the real finite worker
+on the existing hidden `/api/internal/diagnostics/broker-reads` endpoint. It is
+mutually exclusive with `BROKER_READ_DIAGNOSTIC_HEARTBEAT`; neither can be selected
+by request body/query. Primary session, direct loopback, explicit server-reviewed
+camera/device, empty request and one-use-per-process guards remain unchanged.
+Camera and account reservations cover authentication, worker execution and close.
+
+The adapter queues exactly three identity reads for one device, runs the sole
+reader for at most60 seconds and verifies three successful application responses,
+one correlated heartbeat and no socket-close failure. `failure=null` requires all
+criteria; HTTP200 or `worker.reason=deadline` alone is insufficient. `worker` holds
+only fixed reason/counters/close status, never raw identities, keys or model values.
+It does not claim reads after the heartbeat or concurrent physical PTZ. No thread
+or extra login is created; the existing server request worker runs the finite pump.
+
+84 focused adapter/worker/diagnostic/API/settings tests passed (126.4MiB peak,
+no swap,192MiB cgroup); targeted mypy/Ruff passed. Live check is pending.

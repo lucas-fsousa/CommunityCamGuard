@@ -64,6 +64,8 @@ The [bounded mailbox](broker-mailbox.md) adds offline-tested concurrent read
 admission with exact wire binding and acknowledged cancellation. The
 [exclusive finite worker](account-read-worker.md) is now implemented/tested offline,
 including concurrent callers and two-second drain; it is not runtime-wired.
+It now has a disabled server-only validation profile under the existing local
+diagnostic guards; this is not production PTZ or streaming activation.
 
 | ADR | Decision |
 |---|---|

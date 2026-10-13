@@ -300,6 +300,8 @@ Bounded [concurrent read admission](docs/internal/broker-mailbox.md) is now test
 offline; production account-worker and native media integration remain pending.
 An [experimental single-reader executor](docs/internal/account-read-worker.md)
 now passes synthetic socket tests with bounded shutdown; it is not enabled in the dashboard.
+A disabled, loopback-only operator check can now exercise that executor inside the
+server's account reservations, without enabling production native streaming.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

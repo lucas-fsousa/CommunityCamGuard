@@ -53,7 +53,7 @@ class AccountReadWorker:
         """Request no new work, with <=2 seconds for already active replies."""
         self._drain.set()
 
-    def run(self, sock: ReadSocket) -> WorkerSummary:
+    def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False) -> WorkerSummary:
         # A rejected second invocation still owns/closes its supplied socket,
         # but must not tear down the first invocation's account or mailbox.
         with self._claim:
@@ -82,7 +82,7 @@ class AccountReadWorker:
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock)
 
             def check() -> None:
-                if self._stop.is_set():
+                if self._stop.is_set() or cancelled():
                     raise _Stop("stopped")
                 if self._clock() >= deadline:
                     raise _Stop("deadline")

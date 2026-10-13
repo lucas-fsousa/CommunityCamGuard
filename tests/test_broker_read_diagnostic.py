@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.diagnostics import yoosee_broker_reads as diagnostic
+from backend.app.drivers.yoosee.p2p.account_read_worker import WorkerSummary
 from backend.app.drivers.yoosee.p2p.broker_read_socket import ReadExchange
 from backend.app.services import camera_controls
 from tests.test_av_route import ENROLLMENT
@@ -12,8 +13,9 @@ from tests.test_native_av_broker_ownership import available_from_other_thread
 
 
 @pytest.mark.parametrize("fault", [None, "missing", "enrollment", "auth", "target", "exchange"])
-@pytest.mark.parametrize("heartbeat", [False, True])
-def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, heartbeat):
+@pytest.mark.parametrize("profile", ["short", "heartbeat", "worker"])
+def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, profile):
+    heartbeat, worker = profile == "heartbeat", profile == "worker"
     sockets, events = [], []
     class Socket:
         closed = 0
@@ -46,6 +48,10 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, heart
             return SimpleNamespace(before=(completion,), after=(completion,),
                 heartbeats=(SimpleNamespace(status="response", interval_hint=35),),
                 failure=None, sent_datagrams=3, received_datagrams=3)
+        if worker:
+            assert local == ("192.0.2.1", 1234)
+            return SimpleNamespace(completions=(completion,), failure=None,
+                                   worker=WorkerSummary("deadline", 3, 3, 1, False))
         return ReadExchange((completion,), None, 3, 3)
     monkeypatch.setattr(diagnostic.registry, "get_camera_by_id", lambda _: None if fault == "missing" else object())
     monkeypatch.setattr(diagnostic.p2p, "get_enrollment_for_camera", lambda _: None if fault == "enrollment" else ENROLLMENT)
@@ -53,9 +59,10 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, heart
     monkeypatch.setattr(diagnostic, "open_camera_session", authenticate)
     monkeypatch.setattr(diagnostic, "run_owned_reads", exchange)
     monkeypatch.setattr(diagnostic, "run_owned_account_check", exchange)
+    monkeypatch.setattr(diagnostic, "run_owned_worker_check", exchange)
     monkeypatch.setattr(diagnostic, "local_route_ip", lambda _: "192.0.2.1")
     kwargs = dict(camera_id="cam_test", reviewed_camera_id="cam_test", reviewed_device_id="123",
-                  with_heartbeat=heartbeat)
+                  with_heartbeat=heartbeat, with_worker=worker)
     if fault:
         with pytest.raises((ValueError, OSError, RuntimeError, camera_controls.CameraNotFound)):
             diagnostic.run_reviewed_broker_reads(**kwargs)
@@ -67,6 +74,8 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, heart
         assert "must-not-escape" not in repr(result)
         if heartbeat:
             assert len(result.after_observations) == 1 and result.heartbeats[0].interval_hint == 35
+        if worker:
+            assert result.worker.heartbeat_responses == 1
         assert events == ["auth", "exchange"]
     assert all(sock.closed == 1 for sock in sockets)
     assert available_from_other_thread()
@@ -103,3 +112,10 @@ def test_cancelled_before_auth_closes_socket_and_releases_locks(monkeypatch):
     assert available_from_other_thread()
     with camera_controls._exclusive("cam_test"):
         pass
+
+
+def test_conflicting_profiles_do_not_authenticate(monkeypatch):
+    monkeypatch.setattr(diagnostic.registry, "get_camera_by_id", lambda _: pytest.fail("unexpected lookup"))
+    with pytest.raises(ValueError):
+        diagnostic.run_reviewed_broker_reads(camera_id="cam_test", reviewed_camera_id="cam_test",
+            reviewed_device_id="123", with_heartbeat=True, with_worker=True)

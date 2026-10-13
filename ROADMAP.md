@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-12 finite-worker server integration: a disabled, server-only profile now
+runs three fixed identity reads and one heartbeat through the actual single-reader
+worker under existing camera/account reservations. Same primary/local/single-use
+guards, explicit close-failure reporting, no raw values or production PTZ migration.
+84 focused tests passed under192MiB/no-swap limits. Camera3 live validation pending;
+see [worker check](docs/internal/account-read-worker.md).
+
 2026-10-12 account concurrency: a driver-local mailbox now bounds all queued reads,
 active reads, retained results and unacknowledged cancellations to eight slots.
 Exact wire binding prevents cross-delivery between identical reads. Nineteen tests,
