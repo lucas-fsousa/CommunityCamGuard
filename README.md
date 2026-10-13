@@ -18,6 +18,11 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 
 ## Documentation
 
+ARM64 status: an experimental Android/Termux + Ubuntu/PRoot test recorded three
+cameras and delivered three 640×360 views, or one 1080p view. Three simultaneous
+1080p views did not pass the bounded test. Native Linux ARM64 Docker validation
+remains pending; see the [hardware checkpoint](docs/internal/arm64-termux-check.md).
+
 | | |
 |---|---|
 | **[Setup](#setup)** | Run it — Docker on Linux/macOS/Windows, or Python directly. |

@@ -112,6 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
+| [ARM64 Termux checkpoint](arm64-termux-check.md) | Real Android/PRoot API, three recordings, one HD and three reduced views; three-HD probe failed, native Linux/Compose and sustained validation pending |
 | [Native archive playback](recordings-native-playback.md) | HEVC capability hints, one-shot fallback, original delivery, HTTP measurements and capped Chromium smoke test; native HEVC/mobile validation pending |
 | [Recording player lifecycle](recordings-playback-lifecycle.md) | Selection ownership, cancellation, native controls, removed duplicate button and shared encoder budget |
 | [Playback measurements](recordings-playback-measurements.md) | Cold/cached conversion, codec cache, Range/auth checks, deployment and scoped preparation logs |
