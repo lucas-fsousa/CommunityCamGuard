@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-13 PTZ/read ownership boundary: idle timer/shutdown retirement now tracks
+physical close completion, not just cache removal. Experimental handoff retains
+the broker reservation, rejects pending PTZ/warmup, pauses admission and waits
+for removed-but-closing routes. Uncertain transfer blocks subsequent legacy login.
+71 focused tests passed (99.8MiB/no swap), Ruff/targeted mypy passed. No production
+activation or camera I/O. Next: compose the boundary/factory/worker in a server-owned
+read-only adapter; do not replace PTZ warmup with a60s exclusive diagnostic.
+See [PTZ retirement boundary](docs/internal/ptz-read-handoff.md).
+
 2026-10-13 bounded DNS/factory follow-up: isolated stdlib resolver with one
 process-wide slot, five-second lookup budget, cancellation and confirmed child
 reaping; uncertain cleanup blocks replacement. Experimental read factory now

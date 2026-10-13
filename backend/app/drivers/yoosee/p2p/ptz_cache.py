@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .contracts import P2PProbeError
@@ -33,6 +34,51 @@ class PtzRouteCache:
         self._lock = threading.Lock()
         self._idle: dict[tuple[object, ...], _Idle] = {}
         self._shared_account = shared_account
+        self._retired = threading.Condition(self._lock)
+        self._closing = 0
+        self._close_failed = False
+        self._paused = False
+
+    def _check_admission(self) -> None:
+        # Caller holds _lock. Does not replace the external broker reservation.
+        if self._paused or self._close_failed:
+            raise P2PProbeError("PTZ cache paused or cleanup unconfirmed")
+
+    def _close_tracked(self, route: NativePtzRoute) -> None:
+        """Caller registers _closing before removing the route from the cache."""
+        failed = True
+        try:
+            route.close()
+            failed = False
+        finally:
+            with self._retired:
+                self._close_failed |= failed
+                self._closing -= 1
+                self._retired.notify_all()
+
+    @contextmanager
+    def quiesce(self) -> Iterator[None]:
+        """Experimental handoff: caller holds broker ownership through the yield.
+
+        No active leases may exist; the native owner checks motion/warmup first.
+        Pauses cache admission, retires idle routes and waits <=1s for any timer
+        already closing a removed route. Uncertain close permanently blocks reuse.
+        Does not authenticate or close a borrowed/active socket.
+        """
+        with self._lock:
+            self._check_admission()
+            self._paused = True
+        try:
+            self.close_idle()
+            with self._retired:
+                if not self._retired.wait_for(lambda: self._closing == 0, timeout=1.0):
+                    self._close_failed = True
+                if self._close_failed:
+                    raise P2PProbeError("PTZ cache cleanup unconfirmed")
+            yield
+        finally:
+            with self._lock:
+                self._paused = False
 
     def _storage_key(self, key: tuple[object, ...]) -> tuple[object, ...]:
         if not self._shared_account:
@@ -52,6 +98,7 @@ class PtzRouteCache:
             raise ValueError("shared PTZ session requires explicit target selection")
         now = time.monotonic()
         with self._lock:
+            self._check_admission()
             idle = self._idle.pop(self._storage_key(key), None)
             full = len(self._idle) >= 4
         if idle is not None:
@@ -82,9 +129,19 @@ class PtzRouteCache:
     def close_idle(self) -> None:
         with self._lock:
             idle, self._idle = self._idle, {}
+            self._closing += len(idle)
+        failure: BaseException | None = None
         for item in idle.values():
-            item.timer.cancel()
-            item.route.close()
+            try:
+                try:
+                    item.timer.cancel()
+                finally:
+                    self._close_tracked(item.route)
+            except BaseException as exc:
+                if failure is None:
+                    failure = exc
+        if failure is not None:
+            raise failure
 
     def acquire(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute],
                 *, direction: str | None = None,
@@ -92,6 +149,7 @@ class PtzRouteCache:
         if self._shared_account and select is None:
             raise ValueError("shared PTZ session requires explicit target selection")
         with self._lock:
+            self._check_admission()
             idle = self._idle.pop(self._storage_key(key), None)
         now = time.monotonic()
         if idle is not None:
@@ -125,7 +183,7 @@ class PtzRouteCache:
         timer = threading.Timer(min(8, remaining), self._expire, args=(key, lease.route))
         timer.daemon = True
         with self._lock:
-            if len(self._idle) >= 4 or key in self._idle:
+            if self._paused or self._close_failed or len(self._idle) >= 4 or key in self._idle:
                 lease.route.close()
                 return False
             self._idle[key] = _Idle(lease.route, lease.created, timer, time.monotonic()+min(8, remaining))
@@ -143,7 +201,8 @@ class PtzRouteCache:
             if current is None or current.route is not route or time.monotonic() < current.expires:
                 return
             self._idle.pop(key)
-        route.close()
+            self._closing += 1
+        self._close_tracked(route)
 
 
 class CachedPtzRoute:

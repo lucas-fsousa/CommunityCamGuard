@@ -4,7 +4,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 from ...db import p2p
 from ...db.p2p import P2PEnrollment
@@ -12,7 +13,11 @@ from ...db.registry import Camera
 from ..contracts import ControlNotReady, ControlOperationError
 from .native_ptz_policy import PtzProfile
 from .p2p.contracts import P2PProbeError
-from .p2p.control_ownership import ControlChannelBusy, own_control_channel
+from .p2p.control_ownership import (
+    ControlChannelBusy,
+    block_uncertain_channel,
+    own_control_channel,
+)
 from .p2p.ptz_cache import CachedPtzRoute, PtzRouteCache
 from .p2p.ptz_diagnostics import preparation_failure_reason
 from .p2p.ptz_motion import PtzBusy, PtzMotion
@@ -30,6 +35,28 @@ _warming: dict[str, threading.Event] = {}
 def close_idle() -> None:
     """Called after the maintenance worker stops; active gestures retain ownership."""
     _routes.close_idle()
+
+
+@contextmanager
+def reserve_read_handoff() -> Iterator[None]:
+    """Experimental owner boundary; not called by production maintenance yet.
+
+    No competing legacy login during read-worker startup/run/physical close.
+    Reject pending gestures/preparation instead of waiting for them under _guard.
+    New gestures/warmups retain their existing broker reservation before any I/O.
+    """
+    with own_control_channel():
+        with _guard:
+            if _active or _warming:
+                raise ControlNotReady("PTZ must be idle before account handoff")
+        try:
+            with _routes.quiesce():
+                yield
+        except BaseException:
+            # Cache failure or an interrupted new owner must not release the
+            # legacy login paths into an account with unconfirmed cleanup.
+            block_uncertain_channel()
+            raise
 
 
 def warm(camera: Camera, profile: PtzProfile) -> bool:

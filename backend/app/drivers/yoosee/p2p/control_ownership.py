@@ -8,11 +8,23 @@ from contextlib import contextmanager
 from .contracts import P2PProbeError
 
 _channel = threading.RLock()
+_cleanup_uncertain = False
 WAIT_SECONDS = 15.0
 
 
 class ControlChannelBusy(P2PProbeError):
     """No channel ownership was obtained; no operation was started."""
+
+
+def block_uncertain_channel() -> None:
+    """Trusted owner only: no further broker login until process replacement.
+
+    Experimental handoff uses this when cleanup cannot be proven. There is no
+    reset API, automatic retry or attempt to reclaim an uncertain socket.
+    """
+    global _cleanup_uncertain
+    with _channel:
+        _cleanup_uncertain = True
 
 
 @contextmanager
@@ -26,6 +38,8 @@ def own_control_channel() -> Iterator[None]:
     if not _channel.acquire(timeout=WAIT_SECONDS):
         raise ControlChannelBusy("another broker control operation is still running")
     try:
+        if _cleanup_uncertain:
+            raise ControlChannelBusy("broker cleanup unconfirmed; authentication blocked")
         yield
     finally:
         _channel.release()

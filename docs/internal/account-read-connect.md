@@ -60,3 +60,8 @@ Next: connect the factory and coordinator to a server-owned read-only warmup
 lifecycle with explicit legacy-login exclusion and shutdown ownership. Keep
 production PTZ/RTSP unchanged until that integration and CI are validated; do not
 reuse a PTZ socket or treat resolver completion as camera authentication success.
+
+Follow-up: the [native PTZ retirement boundary](ptz-read-handoff.md) now provides
+experimental exclusion through physical idle-close completion, including timer
+races. Composing it with this factory and the worker remains separate from
+activating replacement background preparation.
