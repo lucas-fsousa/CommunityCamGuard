@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-13 bounded DNS/factory follow-up: isolated stdlib resolver with one
+process-wide slot, five-second lookup budget, cancellation and confirmed child
+reaping; uncertain cleanup blocks replacement. Experimental read factory now
+charges DNS against the original20s authentication deadline and supplies validated
+numeric hosts to avoid a second lookup.115 focused tests passed (89.6MiB/no swap),
+Ruff/targeted mypy passed. Existing PTZ callers unchanged; no deployment/camera I/O.
+Next: server-owned read-only warmup integration with legacy-login exclusion and
+shutdown ownership. See [factory boundary](docs/internal/account-read-connect.md).
+
 2026-10-13 generation handoff: an experimental read-account lifecycle now reserves
 before authentication, rejects competing runs and permits replacement only after
 the finite worker confirms physical close. Stop/drain latch during connection;

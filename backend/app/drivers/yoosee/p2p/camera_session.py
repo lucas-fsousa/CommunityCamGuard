@@ -21,6 +21,7 @@ def open_camera_session(
     deadline: float,
     *,
     inventory: list[OnlineDevice] | None = None,
+    resolved_hosts: tuple[str, ...] | None = None,
 ) -> tuple[CertifiedNode, OnlineDevice, int]:
     """Open the access-node control route for exactly the enrolled camera.
 
@@ -31,7 +32,11 @@ def open_camera_session(
     """
 
     material = LoginMaterial(enrollment.access_id, enrollment.access_token)
-    endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline)
+    if resolved_hosts is None:
+        endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline)
+    else:
+        endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline,
+                                resolved_hosts=resolved_hosts)
     endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
     node, devices, _skipped = establish_initialized_node(
         sock,

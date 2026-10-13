@@ -28,15 +28,13 @@ from .contracts import (
     P2PProbeError,
 )
 from .crypto import gute_mode1_decrypt, gute_mode2_decrypt
+from .list_dns import LIST_HOST, LIST_PORT, validate_hosts
 from .session_io import (
     acknowledge_reliable_node_frame,
     decrypt_node_frame,
     local_route_ip,
     receive_datagrams,
 )
-
-LIST_HOST = "list.iotvideo.tencentcs.com"
-LIST_PORT = 51701
 
 
 def obtain_list(
@@ -46,13 +44,14 @@ def obtain_list(
     *,
     retries: int = 3,
     deadline: float | None = None,
+    resolved_hosts: tuple[str, ...] | None = None,
 ) -> list[tuple[str, int]]:
     """Query the stateless UDP list service with bounded, side-effect-free retransmission."""
 
     if retries < 1:
         raise ValueError("list-service retries must be positive")
     try:
-        hosts = {
+        hosts = validate_hosts(resolved_hosts) if resolved_hosts is not None else {
             item[4][0]
             for item in socket.getaddrinfo(LIST_HOST, LIST_PORT, socket.AF_INET, socket.SOCK_DGRAM)
         }

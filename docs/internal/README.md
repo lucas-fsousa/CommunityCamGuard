@@ -112,6 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
+| [Read-account DNS and connection factory](account-read-connect.md) | Cancellable one-child DNS and original authentication deadline; experimental only, legacy PTZ unchanged |
 | [Read-account generation lifecycle](account-read-lifecycle.md) | Offline-tested exclusive handoff, immediate admission closure and uncertain-cleanup blocking; production warmup/PTZ migration pending |
 | [ARM64 Termux checkpoint](arm64-termux-check.md) | Real Android/PRoot API, three recordings, one HD and three reduced views; three-HD probe failed, native Linux/Compose and sustained validation pending |
 | [Native archive playback](recordings-native-playback.md) | HEVC capability hints, one-shot fallback, original delivery, HTTP measurements and capped Chromium smoke test; native HEVC/mobile validation pending |

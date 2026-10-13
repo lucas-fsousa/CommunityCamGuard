@@ -77,3 +77,7 @@ Before background integration, define bounded resolver admission/cancellation,
 then ensure authentication has actually terminated and its socket is closed before
 another generation starts. Preserve DNS/proxy configuration; do not hardcode vendor
 IPs or confuse this issue with the separate LAN-only DNS-redirect investigation.
+
+Follow-up: [bounded DNS and connection factory](account-read-connect.md) now
+implements that boundary for the experimental path. Default production callers
+remain unchanged; server-owned warmup/account coordination is the next integration.

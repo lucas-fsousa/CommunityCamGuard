@@ -38,6 +38,14 @@ def test_camera_session_selects_only_the_durable_enrollment(monkeypatch):
     assert target.device_id == 7000000002
     assert sequence == 17
 
+    hosts = ("192.0.2.5",)
+    def resolved_list(*args, **kwargs):
+        assert kwargs["resolved_hosts"] == hosts
+        return [("192.0.2.10", 19800)]
+    monkeypatch.setattr(camera_session, "obtain_list", resolved_list)
+    assert camera_session.open_camera_session(object(), enrollment, 0.1, 10**20,
+                                               resolved_hosts=hosts)[1] == target
+
 
 def test_camera_control_session_never_opens_a_direct_media_route(monkeypatch):
     enrollment = P2PEnrollment("7000000002", 123, bytes(range(64)), None, "now", "now")

@@ -80,3 +80,21 @@ def test_list_query_rejects_unbounded_retry_configuration():
         assert "positive" in str(exc)
     else:
         raise AssertionError("zero retries were accepted")
+
+
+def test_pre_resolved_hosts_never_trigger_another_lookup(monkeypatch):
+    import pytest
+
+    sent = []
+    class Socket:
+        def sendto(self, wire, peer): sent.append(peer)
+    monkeypatch.setattr(access_session.socket, "getaddrinfo", lambda *a: pytest.fail("second DNS"))
+    monkeypatch.setattr(access_session, "receive_datagrams",
+                        lambda *a: [(b"\x7f\x16" + bytes(62), ("192.0.2.1", 51701))])
+    monkeypatch.setattr(access_session, "parse_list_reply", lambda _: [("192.0.2.9", 19800)])
+    assert access_session.obtain_list(Socket(), 123, 0.1, resolved_hosts=("192.0.2.1",)) == [
+        ("192.0.2.9", 19800)]
+    assert sent == [("192.0.2.1", 51701)]
+    with pytest.raises(P2PProbeError):
+        access_session.obtain_list(Socket(), 123, 0.1, resolved_hosts=("untrusted.invalid",))
+    assert len(sent) == 1
