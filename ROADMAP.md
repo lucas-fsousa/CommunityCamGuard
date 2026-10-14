@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+Driver adapter audit2026-10-14: native_ptz_policy's enrolled-camera directions
+are CANDIDATES, not verified grants. Preserve three correlated identity/version/
+axis reads, model intersection and online enrollment binding per generation.
+Do not reuse blocking exchange_model_read alongside the sole worker reader.
+Preflight must precede ownership transfer or consume typed worker read evidence.
+Persistent lifetime/renewal remains undefined; no production enablement yet.
+
 2026-10-14 lifecycle PTZ scope: immutable driver grants restrict up to8devices,
 one access identity and reviewed directions. Typed lifecycle submit/take/cancel
 enforces active state and generations; empty grants keep existing callers read-only.

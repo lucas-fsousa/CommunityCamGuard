@@ -211,3 +211,26 @@ pre-admission refusal, lifecycle drain and stale cancellation across generations
 Still pending: the concrete driver adapter supplying these grants, coordinated
 legacy-login exclusion, a production session lifetime/replacement policy and
 successful CI. The60-second experiment is NOT a periodic production warmup.
+
+### Driver adapter audit: do not promote candidates to grants
+
+`native_ptz_policy.selected` deliberately returns all candidate directions for an
+enrolled device when exact identity is not yet known. This is NOT acceptable input
+for constructing a motion grant by itself. The existing `verify_ptz_target` first
+uses three fresh correlated property reads: product identity, version identity and
+device axis information. It intersects the model's supported directions with the
+reviewed profile and actual axis evidence, then verifies the selected direction.
+
+The future adapter must preserve that validation per authenticated generation,
+exact camera/enrollment/access binding and online target inventory. Do not call
+the current blocking `exchange_model_read` helper alongside the worker: it would
+introduce a second reader on the same socket. Either complete preflight before
+exclusive socket transfer or build equivalent evidence from the worker's typed
+read outcomes. Static lifecycle grants are not a freshness mechanism. Enrollment
+or credential changes require revalidation, not copying grants into a new login.
+
+`reserve_read_handoff` already excludes legacy account users and retires the idle
+cache, but the production motion adapter must retain that exclusion through final
+STOP and physical close. Neither the experimental60s worker nor the120s account
+model defines the eventual persistent-session renewal policy. These are remaining
+integration requirements, not reasons to bypass fresh capability checks.
