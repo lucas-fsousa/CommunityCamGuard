@@ -354,3 +354,9 @@ or thread is introduced, and no production scheduler activates this lifecycle.
 72 focused tests passed with87MiB peak and zero swap. This is cooperative bounded
 cancellation, not a guarantee of FIFO fairness or a measured15s live latency SLA.
 Persistent lifetime, server-owned scheduling and physical validation remain open.
+
+Concurrency follow-up: a real competing thread now exercises the complete finite
+adapter, not a mocked contention predicate. It can enter only after socket close
+and cache unquiesce; an injected close failure instead makes it receive
+ControlChannelBusy with the shared cleanup barrier set.74 focused tests passed
+(86MiB/no swap), including both outcomes. No camera or provider traffic.

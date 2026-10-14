@@ -1,3 +1,5 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
 import pytest
@@ -155,3 +157,53 @@ def test_competing_control_stops_reads_but_never_bypasses_close(owner, monkeypat
         assert run(sock).failure == "stopped"
     assert sock.now < 1 and sock.closed == 1 and calls == ["auth"]
     assert control_ownership._cleanup_uncertain == close_fails
+
+
+@pytest.mark.parametrize("close_fails", [False, True])
+def test_actual_waiter_enters_only_after_adapter_cleanup(owner, monkeypatch, close_fails):
+    sock = WorkerSocket("close" if close_fails else None)
+    monkeypatch.setattr(control_ownership, "WAIT_SECONDS", 2)
+    original_lock = control_ownership._channel
+    owner_thread = threading.get_ident()
+    waiting = threading.Event()
+    class Lock:
+        def acquire(self, **kwargs):
+            if threading.get_ident() != owner_thread:
+                waiting.set()
+            return original_lock.acquire(**kwargs)
+        def release(self): original_lock.release()
+        def __enter__(self):
+            original_lock.acquire()
+            return self
+        def __exit__(self, *args): original_lock.release()
+    monkeypatch.setattr(control_ownership, "_channel", Lock())
+    monkeypatch.setattr(preparation, "open_read_connection", lambda *a, **k:
+                        ReadConnection(NODE, sock, "192.0.2.1", 1234))
+    outcomes = []
+    def contender():
+        try:
+            with control_ownership.own_control_channel():
+                assert sock.closed == 1 and not owner._paused
+                return "entered"
+        except control_ownership.ControlChannelBusy:
+            assert sock.closed == 1 and control_ownership._cleanup_uncertain
+            return "blocked"
+    receive = sock.recvfrom
+    close = sock.close
+    def closing():
+        assert owner._paused and control_ownership.control_channel_contended()
+        close()
+    monkeypatch.setattr(sock, "close", closing)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        def receiving(size):
+            if not outcomes:
+                outcomes.append(pool.submit(contender))
+                assert waiting.wait(1)
+            return receive(size)
+        monkeypatch.setattr(sock, "recvfrom", receiving)
+        if close_fails:
+            with pytest.raises(preparation.P2PProbeError, match="cleanup"): run(sock)
+        else:
+            assert run(sock).failure == "stopped"
+        assert outcomes[0].result(timeout=2) == ("blocked" if close_fails else "entered")
+    assert sock.now < 1 and not control_ownership.control_channel_contended()

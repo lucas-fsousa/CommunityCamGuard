@@ -1,5 +1,9 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 contention integration verified with actual competing threads: adapter
+closes its socket and unquiesces cache before another caller enters; injected close
+failure blocks that caller instead.74 focused tests passed (86MiB/no swap).
+
 2026-10-14 cooperative cancellation integrated into finite identity preparation:
 competing legacy controls now cancel before/during authentication or during reads,
 always retaining the reservation through physical close. Shared motion lifecycle
