@@ -7,12 +7,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .account_output_budget import AccountOutputBudget
 from .broker_heartbeat import BrokerHeartbeat, HeartbeatCompletion
 from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
 from .model_protocol import build_model_read
+from .ptz_scheduler import PtzScheduler
 
 Retirement = Literal["closed", "transport", "lifetime", "heartbeat_timeout",
                      "input_budget", "drained", "drain_timeout", "prepare"]
@@ -54,13 +56,46 @@ class BrokerAccount:
         self._drain_deadline: float | None = None
         self._reason: Retirement | None = None
         self._messages = self._bytes = 0
+        self._ptz: PtzScheduler | None = None
+
+    @property
+    def motion_cleanup_pending(self) -> bool:
+        """Retirement is not permission to close a socket with an unfinished job."""
+        return self._ptz is not None and self._ptz.result is None
+
+    def prepare_ptz(self, output: AccountOutputBudget, *, access_id: int, device_id: int,
+                    direction: str, reviewed_directions: frozenset[str],
+                    duration: float = 0.2) -> PtzScheduler:
+        """Trusted sole-owner API, not mailbox admission or a capability grant.
+
+        Caller authorizes enrollment/model and drives the returned job on this
+        account's existing socket through terminal STOP, even after retirement.
+        Uses the SAME sequence source as reads/heartbeats; never a second login.
+        """
+        if (self.state != "active" or self._deadline - self._clock() < 4
+                or self.motion_cleanup_pending):
+            raise ValueError("account not accepting PTZ")
+        if (self._ptz is not None and self._ptz.result is not None
+                and self._ptz.result.start_attempted
+                and not self._ptz.result.release_delivery_confirmed):
+            self.retire("transport")
+            raise ValueError("previous PTZ release unconfirmed")
+        assert self._node is not None
+        job = PtzScheduler(self._node, self._source, output, generation=self._generation,
+            access_id=access_id, device_id=device_id, direction=direction,
+            reviewed_directions=reviewed_directions, duration=duration, clock=self._clock)
+        self._ptz = job
+        return job
 
     @property
     def state(self) -> Literal["active", "draining", "retired"]:
         return "retired" if self._reason else "draining" if self._drain_deadline is not None else "active"
 
     def submit_read(self, device_id: int, path: str, timeout: float = 2.0) -> AccountRead:
-        if self.state != "active" or self._clock() >= self._deadline:
+        if (self.state != "active" or self._clock() >= self._deadline
+                or (self._ptz is not None and self._ptz.result is not None
+                    and self._ptz.result.start_attempted
+                    and not self._ptz.result.release_delivery_confirmed)):
             raise ValueError("account not accepting reads; poll for terminal events")
         if (type(timeout) not in (int, float) or not math.isfinite(timeout)
                 or timeout > self._deadline - self._clock()):
@@ -80,6 +115,8 @@ class BrokerAccount:
             raise ValueError("unknown account retirement reason")
         if self._reason is not None:
             return AccountEvents(retired=self._reason)
+        if self._ptz is not None:
+            self._ptz.cancel()
         self._reason = reason
         self._source.close()  # Block late deliveries before releasing consumer state.
         reads = self._reads.close()
@@ -94,6 +131,10 @@ class BrokerAccount:
     def _expire(self) -> AccountEvents:
         if self._reason is not None:
             return AccountEvents(retired=self._reason)
+        if (self._ptz is not None and self._ptz.result is not None
+                and self._ptz.result.start_attempted
+                and not self._ptz.result.release_delivery_confirmed):
+            return self.retire("transport")
         if self._clock() >= self._deadline:
             return self.retire("lifetime")
         reads = self._reads.poll()
@@ -102,7 +143,8 @@ class BrokerAccount:
             tail = self.retire("heartbeat_timeout")
             return AccountEvents(reads + tail.reads, (heartbeat,), retired=tail.retired)
         if self._drain_deadline is not None:
-            empty = not self._reads.pending_count and not self._heartbeat.pending_count
+            empty = (not self._reads.pending_count and not self._heartbeat.pending_count
+                     and not self.motion_cleanup_pending)
             if empty or self._clock() >= self._drain_deadline:
                 tail = self.retire("drained" if empty else "drain_timeout")
                 return AccountEvents(reads + tail.reads, tail.heartbeats, retired=tail.retired)
@@ -146,4 +188,6 @@ class BrokerAccount:
         """Stop admission/keepalives; finish outstanding work for at most two seconds."""
         if self.state == "active":
             self._drain_deadline = self._clock() + 2
+            if self._ptz is not None:
+                self._ptz.cancel()
         return self._expire()

@@ -107,3 +107,27 @@ receipt in the two-fragment test, with no duplicate message ACK path.
 121 focused tests passed (87.1MiB peak, no swap); targeted mypy and Ruff passed.
 No deployment or camera commands. Next: shared account lifecycle and heartbeat/read
 multiplexing; this remains a finite experimental owner, not background activation.
+
+## Shared account admission composition (2026-10-14)
+
+`BrokerAccount.prepare_ptz` now creates the typed scheduler from the account's
+existing sequence namespace: read, heartbeat and motion identifiers cannot collide.
+This is a trusted sole-owner API, not a public route/mailbox or capability grant.
+Driver authorization must still establish the exact device/enrollment/profile.
+Only one unfinished gesture is admitted, even if a caller supplies another output
+budget. Admission requires four seconds of remaining account lifetime.
+
+Drain and retirement cancel the gesture. Drain does not report an empty account
+while its scheduler is unfinished. `motion_cleanup_pending` remains explicit after
+account retirement: the future socket owner must keep driving the returned scheduler
+on the old socket until terminal state before closing it. It must not authenticate
+a replacement account to send STOP. A completed but unconfirmed RELEASE blocks
+both reads and new gestures and retires the account on its next tick/admission.
+Cancellation before START allows another gesture without poisoning the account.
+
+88 focused account/lifecycle/worker/PTZ tests passed (87MiB peak, no swap), with
+Ruff and targeted mypy passing. Existing read-only worker has no PTZ admission
+path; production PTZ is unchanged. Still pending: shared socket-loop integration,
+thread-safe typed motion admission and receipt ownership for mixed traffic. Do not
+wire this API into the old read worker: its immediate shutdown currently closes
+the socket without a motion drain.

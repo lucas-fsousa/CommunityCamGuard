@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 shared account PTZ admission: typed scheduler now uses BrokerAccount's
+existing read/heartbeat sequence namespace. One unfinished gesture, bounded
+lifetime admission, drain/retirement cancellation and explicit pending cleanup.
+Unknown RELEASE blocks reads/new motion; retirement is not permission to close
+before STOP drain.88 focused tests passed (87MiB/no swap), Ruff/mypy passed.
+No camera traffic/production activation. Next: shared socket-loop shutdown and
+mixed receipt ownership before enabling motion in any concurrent worker.
+
 2026-10-14 PTZ fragmented responses: finite owner reuses bounded maintenance
 reassembly with delegated message ACKs. Fragment ACKs consume ordinary capacity,
 never the reserved STOP slots. Existing read/media ACK behavior unchanged.
