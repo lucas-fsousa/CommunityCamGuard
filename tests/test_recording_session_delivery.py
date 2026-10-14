@@ -36,8 +36,16 @@ def scope(token, **extra):
             "headers": [(b"cookie", f"{auth.COOKIE_NAME}={token}".encode())], **extra}
 
 
-async def receive():
-    return {"type": "http.request", "body": b"", "more_body": False}
+def request_receiver():
+    """One request body, then wait for a disconnect without starving the loop."""
+    received = False
+    async def receive():
+        nonlocal received
+        if received:
+            await asyncio.Future()  # Connected idle client; cancellation must propagate.
+        received = True
+        return {"type": "http.request", "body": b"", "more_body": False}
+    return receive
 
 
 @pytest.mark.parametrize("endpoint", ["file", "download"])
@@ -71,7 +79,7 @@ def test_expired_or_revoked_key_denied_before_file_delivery(archive):
     messages = []
     async def send(message):
         messages.append(message)
-    asyncio.run(SessionFileResponse(source)(scope(token), receive, send))
+    asyncio.run(SessionFileResponse(source)(scope(token), request_receiver(), send))
     assert messages[0]["status"] == 401
     assert source.read_bytes()[:256] not in messages[-1]["body"]
 
@@ -97,7 +105,7 @@ def test_slow_inflight_transfer_is_cancelled_without_successful_completion(archi
                 cancelled.append(True)
     async def run():
         with pytest.raises(ConnectionAbortedError, match="Session ended"):
-            await asyncio.wait_for(SessionFileResponse(source)(scope(token), receive, send), 1)
+            await asyncio.wait_for(SessionFileResponse(source)(scope(token), request_receiver(), send), 1)
         assert not [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
     asyncio.run(run())
     bodies = [m for m in messages if m["type"] == "http.response.body"]
@@ -112,7 +120,7 @@ def test_temporary_delivery_cannot_escape_via_pathsend(archive):
     request_scope = scope(token, extensions={"http.response.pathsend": {}})
     async def send(message):
         messages.append(message)
-    asyncio.run(SessionFileResponse(source)(request_scope, receive, send))
+    asyncio.run(SessionFileResponse(source)(request_scope, request_receiver(), send))
     assert "http.response.pathsend" in request_scope["extensions"]  # No shared-scope mutation.
     assert all(m["type"] != "http.response.pathsend" for m in messages)
     assert b"".join(m.get("body", b"") for m in messages) == source.read_bytes()
@@ -130,7 +138,7 @@ def test_client_cancellation_reaps_delivery_and_guard(archive):
                     await asyncio.Future()
                 finally:
                     cancelled.append(True)
-        transfer = asyncio.create_task(SessionFileResponse(source)(scope(token), receive, send))
+        transfer = asyncio.create_task(SessionFileResponse(source)(scope(token), request_receiver(), send))
         await asyncio.wait_for(started.wait(), 1)
         transfer.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -162,7 +170,7 @@ def test_primary_keeps_pathsend_and_is_independent_of_key_store(archive, monkeyp
     messages = []
     async def send(message):
         messages.append(message)
-    asyncio.run(SessionFileResponse(source)(scope(auth.issue_token(), extensions={"http.response.pathsend": {}}), receive, send))
+    asyncio.run(SessionFileResponse(source)(scope(auth.issue_token(), extensions={"http.response.pathsend": {}}), request_receiver(), send))
     assert messages[-1]["type"] == "http.response.pathsend"
 
 
@@ -188,3 +196,16 @@ def test_prepare_allowed_but_missing_auth_and_traversal_still_denied(archive):
         client.cookies.set(auth.COOKIE_NAME, token)
         assert client.post("/api/recordings/prepare", params={"path": str(source)}).json()["ready"]
         assert client.get("/api/recordings/file", params={"path": str(source.parent.parent / "outside")}).status_code == 404
+
+
+def test_synthetic_receiver_delivers_body_once_then_waits_cancellably():
+    async def run():
+        receive = request_receiver()
+        assert await receive() == {"type": "http.request", "body": b"", "more_body": False}
+        waiting = asyncio.create_task(receive())
+        await asyncio.sleep(0)
+        assert not waiting.done()
+        waiting.cancel()
+        with pytest.raises(asyncio.CancelledError): await waiting
+        assert not [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+    asyncio.run(run())

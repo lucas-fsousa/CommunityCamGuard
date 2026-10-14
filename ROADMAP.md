@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 CI hang identified and patched: bounded run38572877606 exposed a
+synthetic HTTP receive callback repeatedly returning immediately in recording
+delivery cancellation tests, starving the event loop. Receiver now emits body
+once then blocks cancellably; regression+range/delivery suite39tests passed
+(113.5MiB/no swap). Override pytest's configured quiet mode for real per-test CI
+progress. Await new CI confirmation; production recording code unchanged.
+
 Driver adapter audit2026-10-14: native_ptz_policy's enrolled-camera directions
 are CANDIDATES, not verified grants. Preserve three correlated identity/version/
 axis reads, model intersection and online enrollment binding per generation.
