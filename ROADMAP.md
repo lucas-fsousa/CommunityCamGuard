@@ -1,5 +1,9 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+PTZ evidence hardening2026-10-14: reject malformed tickets and boolean identities
+even when Python dataclass equality would match True to generation1.97 focused
+tests passed (84.2MiB/no swap). No live I/O or scope expansion.
+
 2026-10-14 correlated PTZ evidence adapter: exactly three issued read/completion
 pairs bind camera, device, generation, sequence and path; strict successful camera
 responses only. Shared legacy/new identity policy plus current axis intersection

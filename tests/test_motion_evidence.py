@@ -80,3 +80,18 @@ def test_wrong_binding_stale_partial_or_mismatched_identity_fails_closed(changes
 def test_unknown_firmware_is_not_promoted_from_candidate_directions():
     version = replace(COMPLETIONS[1], value=dict(VALUES[1], swVer="40.1.99"))
     with pytest.raises(ValueError): derive(completions=(COMPLETIONS[0], version, COMPLETIONS[2]))
+
+
+def test_boolean_generation_cannot_match_integer_generation_by_dataclass_equality():
+    first = COMPLETIONS[0]
+    forged = replace(first, request=replace(first.request, ticket=ReceiptTicket(True, 17, 0xB7)))
+    assert forged.request == first.request  # Python considers True == 1.
+    with pytest.raises(ValueError): derive(completions=(forged, *COMPLETIONS[1:]))
+
+
+@pytest.mark.parametrize("target", ["request", "completion"])
+def test_malformed_ticket_fails_closed_without_attribute_error(target):
+    bad = replace(REQUESTS[0], ticket=None)
+    changes = (dict(requests=(bad, *REQUESTS[1:])) if target == "request" else
+               dict(completions=(replace(COMPLETIONS[0], request=bad), *COMPLETIONS[1:])))
+    with pytest.raises(ValueError): derive(**changes)

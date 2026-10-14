@@ -264,3 +264,9 @@ no swap); Ruff and targeted mypy passed. No camera I/O or deployment. Remaining:
 wire collection/grant consumption into the driver-owned transfer on the same live
 generation, then define production lifetime/replacement. Do not feed evidence from
 the completed/closed60s diagnostic into a newly authenticated account.
+
+Evidence hardening follow-up: both issued and completed tickets require their
+typed structures and numeric identities. In particular, Python dataclass equality
+considers generation `True` equal to `1`; that must not pass generation matching.
+Malformed tickets now fail with a bounded validation error, not attribute access.
+97 focused tests passed (84.2MiB peak/no swap), including these regressions.

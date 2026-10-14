@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from ...db.p2p import P2PEnrollment
 from .native_ptz_policy import PtzProfile
 from .p2p.broker_reads import ReadCompletion, ReadRequest
+from .p2p.broker_transactions import ReceiptTicket
 from .p2p.contracts import P2PPropertyRead
 from .p2p.ptz_authority import PtzAuthority, PtzGrant
 from .p2p.ptz_protocol import DIRECTIONS, direction_supported
@@ -70,7 +71,8 @@ def grant_from_completions(
     for request in requests:
         if (not isinstance(request, ReadRequest) or request.path not in _PATHS
                 or request.path in expected or type(request.device_id) is not int
-                or request.device_id != int(device) or request.ticket.generation != generation
+                or request.device_id != int(device) or not isinstance(request.ticket, ReceiptTicket)
+                or request.ticket.generation != generation
                 or type(request.ticket.generation) is not int or request.ticket.kind != 0xB7
                 or type(request.ticket.sequence) is not int
                 or not 0 <= request.ticket.sequence < 1 << 32
@@ -83,7 +85,10 @@ def grant_from_completions(
         if not isinstance(completion, ReadCompletion) or not isinstance(completion.request, ReadRequest):
             raise ValueError("typed camera completion required")
         request = completion.request
-        if (request.path in observations or expected.get(request.path) != request
+        if (not isinstance(request.ticket, ReceiptTicket)
+                or type(request.device_id) is not int or type(request.ticket.generation) is not int
+                or type(request.ticket.sequence) is not int or type(request.ticket.kind) is not int
+                or request.path in observations or expected.get(request.path) != request
                 or completion.status != "response" or type(completion.error_code) is not int
                 or completion.error_code != 0
                 or (completion.transport_result is not None
