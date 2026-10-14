@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 CI diagnostics: recent runs still pending in pytest, logs unavailable
+until completion. Added20min job/10min test-step limits, verbose test names and
+60s faulthandler stack dump. Last inspected green job took63s. Root cause remains
+pending; these settings are diagnostics/containment, not proof of a fix. No local
+full-suite run or cancellation of existing CI runs. See
+[CI diagnostics](docs/internal/ci-test-diagnostics.md).
+
 2026-10-14 mixed account reader: optional trusted bootstrap PTZ now runs beside
 reads/heartbeat on one experimental worker socket. Shared identifiers/output,
 exclusive reply ACK routing and mandatory finally-block STOP drain before close.

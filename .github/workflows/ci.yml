@@ -8,6 +8,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -20,7 +21,10 @@ jobs:
       - name: Type-check (mypy)
         run: mypy backend/app
       - name: Test (pytest)
-        run: pytest
+        timeout-minutes: 10
+        # Print the active test and dump thread stacks for a stalled test. The
+        # workflow timeout is the hard stop; faulthandler is diagnostic only.
+        run: pytest -v -o faulthandler_timeout=60
       - name: Frontend contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/camera-controls.cjs
       - name: Recording playback lifecycle (Node)

@@ -113,6 +113,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 | Topic | Evidence / scope |
 | --- | --- |
 | [Finite PTZ scheduler](ptz-scheduler.md) | Shared single-reader bootstrap PTZ/read/heartbeat, fragment/ACK routing and shutdown STOP drain; concurrent gesture admission and production integration pending |
+| [CI test diagnostics](ci-test-diagnostics.md) | Explicit job/test deadlines, per-test progress and stalled-thread traces; pending CI hang root cause not yet established |
 | [Shared PTZ output/delivery](ptz-shared-output.md) | Non-borrowable output reserve, bounded correlated RELEASE observations; read worker accounting integrated, motion scheduling still pending |
 | [Typed PTZ reservation](ptz-command-reservation.md) | Atomic sequence group and one-shot START/identical bounded STOP retries; offline only, no shared-worker motion activation |
 | [Guarded read preparation](read-preparation-adapter.md) | Existing disabled diagnostic now composes retirement/DNS/generation/worker; confirmed-vs-uncertain cleanup tests, no production warmup activation |
