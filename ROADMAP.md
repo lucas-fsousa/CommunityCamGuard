@@ -5,7 +5,8 @@ now uses the PTZ retirement barrier, bounded DNS/factory, generation lifecycle a
 actual worker as one owned flow. Confirmed factory/read cleanup returns failure
 without poisoning PTZ; unknown/failed close blocks legacy authentication before
 scope exit. Fixed identity observations only; response-before-transport-ACK allowed,
-ACK-only never success.120 focused tests passed (108.6MiB/no swap), Ruff/mypy passed.
+ACK-only never success.121 focused tests passed (104.2MiB/no swap), Ruff/mypy passed.
+Pending-PTZ rejection maps to sanitized409 instead of an uncaught500.
 No live I/O/deployment or background activation. Next: typed foreground/STOP handoff
 and lifetime/shutdown ownership before replacing production PTZ warmup; this finite
 60s diagnostic must not become the periodic warmup. See

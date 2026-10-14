@@ -113,7 +113,8 @@ def test_no_client_parameters(setup, kwargs):
 
 
 @pytest.mark.parametrize("error,status", [(OSError, 502), (api.P2PProbeError, 502),
-    (ValueError, 409), (api.ControlBusy, 409), (api.ControlChannelBusy, 409), (api.CameraNotFound, 409)])
+    (ValueError, 409), (api.ControlBusy, 409), (api.ControlChannelBusy, 409),
+    (api.ControlNotReady, 409), (api.CameraNotFound, 409)])
 def test_failure_sanitized_and_consumes_attempt(setup, monkeypatch, error, status):
     client, _, _ = setup
     def fail(**kwargs): raise error("private secret")

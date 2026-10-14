@@ -7,6 +7,8 @@ The existing disabled `BROKER_READ_DIAGNOSTIC_WORKER` profile now calls
 legacy unbounded-DNS diagnostic branch. The short/heartbeat profiles are unchanged.
 No new endpoint, frontend control, capability or automatic background task was added.
 Existing primary/local/reviewed-target/one-use API guards remain in force.
+Pending PTZ/warmup rejection (`ControlNotReady`) maps to the existing sanitized
+HTTP409 unavailable response and consumes the attempt, not an uncaught500.
 
 ## Ownership sequence
 
@@ -46,8 +48,8 @@ response, a transport rejection or an application error never counts as success.
 
 ## Validation and remaining work
 
-120 focused adapter/lifecycle/factory/cache/worker/ownership/service/diagnostic/API
-tests passed under192MiB/no-swap/half-CPU limits, peak108.6MiB. Ruff and targeted
+121 focused adapter/lifecycle/factory/cache/worker/ownership/service/diagnostic/API
+tests passed under192MiB/no-swap/half-CPU limits, peak104.2MiB. Ruff and targeted
 mypy passed. Synthetic tests exercise the actual encryption/decoding worker and
 legacy reservation through physical close, cancellation, known/unknown factory
 failure, closed read failures, uncertain close, detached results and API dispatch.

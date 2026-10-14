@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import require_primary_session
 from ..config import get_settings
+from ..drivers.contracts import ControlNotReady
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
 from ..drivers.yoosee.p2p.control_ownership import ControlChannelBusy
 from ..services.camera_controls import CameraNotFound, ControlBusy
@@ -39,7 +40,7 @@ def broker_reads(request: Request) -> dict:
                                           reviewed_device_id=device_id,
                                           with_heartbeat=settings.broker_read_diagnostic_heartbeat,
                                           with_worker=settings.broker_read_diagnostic_worker)
-    except (ControlBusy, ControlChannelBusy, CameraNotFound, ValueError):
+    except (ControlBusy, ControlChannelBusy, ControlNotReady, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
     except (P2PProbeError, OSError):
         raise HTTPException(502, "broker read diagnostic failed; attempt consumed") from None
