@@ -112,6 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
+| [Finite PTZ scheduler](ptz-scheduler.md) | Socket-free command/budget/STOP composition, cancellation cleanup and uncertain-stop admission block; transport integration pending |
 | [Shared PTZ output/delivery](ptz-shared-output.md) | Non-borrowable output reserve, bounded correlated RELEASE observations; read worker accounting integrated, motion scheduling still pending |
 | [Typed PTZ reservation](ptz-command-reservation.md) | Atomic sequence group and one-shot START/identical bounded STOP retries; offline only, no shared-worker motion activation |
 | [Guarded read preparation](read-preparation-adapter.md) | Existing disabled diagnostic now composes retirement/DNS/generation/worker; confirmed-vs-uncertain cleanup tests, no production warmup activation |

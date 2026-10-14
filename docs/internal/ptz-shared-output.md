@@ -54,3 +54,7 @@ single-owner scheduler with finite gesture/STOP deadlines and shutdown draining.
 Do not enable shared-worker motion by merely widening the read mailbox allowlist.
 Only after that composition is tested should the camera3-only physical check be
 considered, retaining RTSP/ONVIF and current PTZ as unchanged production paths.
+
+Follow-up: the [finite scheduler](ptz-scheduler.md) now composes these contracts
+offline. It emits bounded packets/results for a future sole socket owner; the
+read worker still does not admit motion and production behavior is unchanged.

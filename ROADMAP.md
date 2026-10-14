@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 finite PTZ scheduler: typed commands/output reservation/RELEASE tracker
+now compose socket-free. One-shot START,0.1–0.5s gesture,<=3 identical STOP attempts
+within2s, cancellation-driven cleanup and20ms positive-result settling. Unknown STOP
+retains the account PTZ reservation, preventing another gesture.81 focused tests
+passed (86.4MiB/no swap), Ruff/mypy passed. No socket integration/motion/deployment.
+Next: sole-owner transport pump with bounded receipt routing and mandatory shutdown
+drain, not widening the identity-read mailbox. See [scheduler](docs/internal/ptz-scheduler.md).
+
 2026-10-14 shared PTZ capacity/delivery foundation: read worker output limits now
 use explicit attempted-send accounting. One optional typed reservation protects
 START/3RELEASE/2receipt slots and bytes from ordinary traffic. Separate RELEASE
