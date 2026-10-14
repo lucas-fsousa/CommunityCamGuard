@@ -55,3 +55,29 @@ Next: integrate this scheduler into a separately reviewed sole-owner transport p
 with receipt routing and mandatory shutdown draining. Keep the identity-read mailbox
 restricted and production PTZ unchanged until that transport composition is tested.
 Physical camera3 validation remains separate, after CI and bounded deployment.
+
+## Experimental finite transport (2026-10-14)
+
+`ptz_transport.run_ptz_transport` now owns one supplied UDP socket for one gesture,
+including close on invalid admission. It creates no socket, login or thread, and is
+not connected to production. The caller must retain account exclusion and verify
+the device/profile before transferring exclusive ownership.
+
+The owner uses 20ms socket timeouts, never resends START, and drains the scheduler's
+three bounded RELEASE attempts on cancellation, ambiguous writes, receive failure
+or an interrupt. Original callback exceptions/interrupts are re-raised after drain
+and close. Close failure is explicit on ordinary returns; exceptional exits must
+be treated as uncertain ownership by the future lifecycle adapter.
+
+Input is bounded to 64 datagrams (the 65th triggers rejection), at most 4096 bytes
+each. Oversize/flood/error disables reception and cancels movement while retaining
+bounded STOP sends; a 20ms wait prevents a failed socket from busy-spinning.
+Only direct encrypted mode-2 frames from the pinned peer reach the scheduler.
+The scheduler alone generates receipts, avoiding duplicate generic ACK handling.
+Fragment reassembly, heartbeat/read multiplexing and reusable account lifecycle
+integration remain pending. This finite transport is not the final shared worker.
+
+94 focused tests passed with a 192MiB/no-swap/half-CPU limit (87.1MiB peak).
+Targeted mypy passed under the same limit; Ruff passed. Encrypted synthetic STOP
+success, wrong peers/plaintext rejection, failures, interruption and flood cleanup
+were tested offline. No physical STOP guarantee, camera traffic or deployment.

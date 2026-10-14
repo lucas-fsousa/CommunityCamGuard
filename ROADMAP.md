@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 experimental finite PTZ transport: one supplied socket/reader, 20ms
+polling, bounded input and STOP drain before close on cancellation/write/read
+failure or interrupt. Synthetic encrypted replies route through one receipt owner.
+94 focused tests passed (87.1MiB/no swap), Ruff/targeted mypy passed. No production
+activation or camera traffic. Next: fragment/maintenance receipt ownership and
+account lifecycle integration; do not deploy this one-gesture transport as a
+replacement for the shared session. See [scheduler](docs/internal/ptz-scheduler.md).
+
 2026-10-14 finite PTZ scheduler: typed commands/output reservation/RELEASE tracker
 now compose socket-free. One-shot START,0.1–0.5s gesture,<=3 identical STOP attempts
 within2s, cancellation-driven cleanup and20ms positive-result settling. Unknown STOP
