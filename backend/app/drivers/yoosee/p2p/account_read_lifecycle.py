@@ -10,6 +10,9 @@ from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode
+from .ptz_authority import PtzAuthority, PtzGrant
+from .ptz_inbox import MotionTicket
+from .ptz_scheduler import PtzSpec, ScheduledPtzResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +39,9 @@ class AccountReadLifecycle:
     This does not yet coordinate legacy production login paths.
     """
 
-    def __init__(self, *, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, *, clock: Callable[[], float] = time.monotonic,
+                 motion_grants: tuple[PtzGrant, ...] = ()):
+        self._motion_authority = PtzAuthority(motion_grants)
         self._clock = clock
         self._lock = threading.Lock()
         self._state: Literal["idle", "connecting", "active", "draining", "blocked"] = "idle"
@@ -55,6 +60,29 @@ class AccountReadLifecycle:
             if self._state != "active" or self._worker is None:
                 raise ValueError("account not accepting reads")
             return self._worker.mailbox.submit(device_id, path, timeout)
+
+    def submit_motion(self, spec: PtzSpec) -> MotionTicket:
+        """Trusted driver callers only; grants are fixed before authentication."""
+        self._motion_authority.authorize(spec)
+        with self._lock:
+            if (self._state != "active" or self._worker is None
+                    or self._worker.motion_inbox is None):
+                raise ValueError("account not accepting motion")
+            return self._worker.motion_inbox.submit(spec)
+
+    def take_motion(self, ticket: MotionTicket) -> ScheduledPtzResult | None:
+        with self._lock:
+            if (ticket.generation != self._generation or self._worker is None
+                    or self._worker.motion_inbox is None):
+                return None
+            return self._worker.motion_inbox.take(ticket)
+
+    def cancel_motion(self, ticket: MotionTicket) -> bool:
+        with self._lock:
+            if (ticket.generation != self._generation or self._worker is None
+                    or self._worker.motion_inbox is None):
+                return False
+            return self._worker.motion_inbox.cancel(ticket)
 
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
         with self._lock:
@@ -131,7 +159,8 @@ class AccountReadLifecycle:
         try:
             connection = connect(generation)
             worker = AccountReadWorker(connection.node, generation, connection.local_ip,
-                                       connection.local_port, clock=self._clock)
+                                       connection.local_port, clock=self._clock,
+                                       allow_motion=self._motion_authority.enabled)
             tickets = tuple(worker.mailbox.submit(r.device_id, r.path, r.timeout) for r in reads)
             with self._lock:
                 self._worker = worker

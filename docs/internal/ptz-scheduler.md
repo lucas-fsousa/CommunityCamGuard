@@ -187,3 +187,27 @@ Tests include two-thread submit contention, cross-thread stop, stale tickets,
 unread result capacity, flood cleanup and two gestures around a heartbeat on one
 socket. No production caller opts in. Next: expose reviewed driver-level admission
 through lifecycle and enforce enrollment/legacy-login exclusion before rollout.
+
+## Lifecycle motion scope (2026-10-14)
+
+`AccountReadLifecycle(motion_grants=(PtzGrant(...), ...))` enables the worker inbox
+only for an immutable, bounded driver-provided scope (up to8devices, one access
+identity, unique device IDs, reviewed directions). Empty/default grants preserve
+read-only behavior. `submit_motion` checks device, account and direction scope
+before occupying the inbox; `take_motion`/`cancel_motion` reject old generations.
+Drain/stop reject new lifecycle submissions immediately. Grants hide identifiers
+in repr and create no authentication, socket, capability detection or callback.
+
+These grants must come from the driver after verifying enrollment and actual
+capabilities, never from frontend JSON. They are a scope enforcement mechanism,
+not evidence that a camera supports PTZ or that provider credentials are valid.
+Changing enrollment requires a new reviewed lifecycle; scope cannot be mutated
+while a session is running. Existing production/read-preparation callers supply
+no grants and therefore cannot dispatch motion through this path.
+
+168 focused tests passed (91.1MiB peak/no swap); targeted mypy and Ruff passed.
+Coverage includes invalid/mixed-account grants, attempted scope expansion,
+pre-admission refusal, lifecycle drain and stale cancellation across generations.
+Still pending: the concrete driver adapter supplying these grants, coordinated
+legacy-login exclusion, a production session lifetime/replacement policy and
+successful CI. The60-second experiment is NOT a periodic production warmup.

@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 lifecycle PTZ scope: immutable driver grants restrict up to8devices,
+one access identity and reviewed directions. Typed lifecycle submit/take/cancel
+enforces active state and generations; empty grants keep existing callers read-only.
+168 focused tests passed (91.1MiB/no swap), Ruff/mypy passed. No production enablement.
+Remaining: concrete driver grant/enrollment adapter, legacy-login exclusion,
+production session lifetime/replacement policy and successful CI before rollout.
+The60s experimental reader must not become a periodic warmup/login loop.
+
 2026-10-14 bounded concurrent motion admission: opt-in worker inbox holds one
 typed gesture/unread result, expires unclaimed work after1s and correlates caller
 cancellation by generation+serial. Multiple gestures now share one reader/socket
