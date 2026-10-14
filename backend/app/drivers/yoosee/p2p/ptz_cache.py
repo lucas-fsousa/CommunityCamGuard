@@ -21,10 +21,14 @@ class _Idle:
     created: float
     timer: threading.Timer
     expires: float
+    checked: float
 
 
 class PtzRouteCache:
-    """At most four idle sockets, 8s idle/20s absolute lifetime including preparation.
+    """At most four idle sockets, with an 8s idle timeout.
+
+    Shared accounts survive while maintained; private diagnostic routes retain
+    their 20s absolute bound. Target selection independently refreshes evidence.
 
     Key must bind camera, reviewed profile and current credentials. Direction changes
     are permitted only within the axes verified when the route was prepared.
@@ -89,11 +93,7 @@ class PtzRouteCache:
 
     def warm(self, key: tuple[object, ...], prepare: Callable[[], NativePtzRoute], *,
              select: Callable[[NativePtzRoute], NativePtzRoute] | None = None) -> bool:
-        """Retain a never-started/stopped route; replace before its absolute deadline.
-
-        Caller owns this camera exclusively. Broker heartbeats validate liveness
-        without extending the 20s absolute lifetime. At most four idle sockets.
-        """
+        """Keep a healthy stopped account, without periodic reauthentication."""
         if self._shared_account and select is None:
             raise ValueError("shared PTZ session requires explicit target selection")
         now = time.monotonic()
@@ -103,10 +103,12 @@ class PtzRouteCache:
             full = len(self._idle) >= 4
         if idle is not None:
             idle.timer.cancel()
-            if now < idle.expires and now - idle.created < 15:
+            if now < idle.expires and (self._shared_account or now - idle.created < 15):
                 route = idle.route
                 try:
-                    route.keepalive()
+                    if not self._shared_account or now - idle.checked >= 2:
+                        route.keepalive()
+                        idle.checked = time.monotonic()
                 except BaseException as exc:
                     route.close()
                     if isinstance(exc, Exception):
@@ -118,7 +120,7 @@ class PtzRouteCache:
                 except BaseException:
                     route.close()
                     raise
-                lease = CachedPtzRoute(self, key, route, idle.created, True)
+                lease = CachedPtzRoute(self, key, route, idle.created, True, checked=idle.checked)
                 return self._return(lease, prepared=True)
             idle.route.close()
         if full:
@@ -154,10 +156,12 @@ class PtzRouteCache:
         now = time.monotonic()
         if idle is not None:
             idle.timer.cancel()
-            if now - idle.created < 20 and now < idle.expires:
+            if (self._shared_account or now - idle.created < 20) and now < idle.expires:
                 if self._shared_account:
                     try:
-                        idle.route.keepalive()
+                        if now - idle.checked >= 2:
+                            idle.route.keepalive()
+                            idle.checked = time.monotonic()
                     except (OSError, P2PProbeError):
                         idle.route.close()
                         created = time.monotonic()
@@ -165,7 +169,7 @@ class PtzRouteCache:
                 try:
                     renewed = (select(idle.route) if select is not None else
                                idle.route.renew() if direction is None else idle.route.renew(direction))
-                    return CachedPtzRoute(self, key, renewed, idle.created, True)
+                    return CachedPtzRoute(self, key, renewed, idle.created, True, checked=idle.checked)
                 except BaseException as exc:
                     idle.route.close()
                     if isinstance(exc, Exception):
@@ -175,7 +179,7 @@ class PtzRouteCache:
         return CachedPtzRoute(self, key, prepare(), now, False)
 
     def _return(self, lease: CachedPtzRoute, *, prepared: bool = False) -> bool:
-        remaining = 20 - (time.monotonic() - lease.created)
+        remaining = 8 if self._shared_account else 20 - (time.monotonic() - lease.created)
         if remaining <= 0 or (not prepared and not lease.confirmed) or lease.failed:
             lease.route.close()
             return False
@@ -186,7 +190,8 @@ class PtzRouteCache:
             if self._paused or self._close_failed or len(self._idle) >= 4 or key in self._idle:
                 lease.route.close()
                 return False
-            self._idle[key] = _Idle(lease.route, lease.created, timer, time.monotonic()+min(8, remaining))
+            self._idle[key] = _Idle(lease.route, lease.created, timer,
+                                  time.monotonic()+min(8, remaining), lease.checked)
             try:
                 timer.start()
             except BaseException:
@@ -207,9 +212,10 @@ class PtzRouteCache:
 
 class CachedPtzRoute:
     def __init__(self, pool: PtzRouteCache, key: tuple[object, ...], route: NativePtzRoute,
-                 created: float, reused: bool) -> None:
+                 created: float, reused: bool, *, checked: float | None = None) -> None:
         self.pool, self.key, self.route = pool, key, route
         self.created, self.reused = created, reused
+        self.checked = time.monotonic() if checked is None else checked
         self.failed = self.confirmed = self.closed = False
 
     def send_start(self) -> None:

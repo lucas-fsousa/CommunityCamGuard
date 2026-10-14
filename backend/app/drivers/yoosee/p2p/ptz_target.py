@@ -28,7 +28,8 @@ def select_target(route: NativePtzRoute, enrollment: P2PEnrollment,
     key = ((camera_id, enrollment.device_id), expected, reviewed, enrollment.access_id,
            enrollment.access_token, enrollment.dev_token)
     allowed = route._verified.get(key)
-    if allowed is None:
+    verified_at = route._verified_at.get(key)
+    if allowed is None or verified_at is None or not 0 <= time.monotonic() - verified_at < 20:
         sequence = route._receipt_sequence
         route._receipt_sequence = (sequence + 3) & 0xFFFFFFFF
         try:
@@ -39,13 +40,17 @@ def select_target(route: NativePtzRoute, enrollment: P2PEnrollment,
             route._sock.setblocking(False)
         # Bounded metadata, no per-model shortcuts. Eviction only means rereading.
         if len(route._verified) >= 16:
-            route._verified.pop(next(iter(route._verified)))
+            evicted = next(iter(route._verified))
+            route._verified.pop(evicted)
+            route._verified_at.pop(evicted, None)
         route._verified[key] = allowed
+        route._verified_at[key] = time.monotonic()
     if direction not in allowed:
         raise P2PProbeError("native PTZ direction lacks current axis evidence")
     fresh = NativePtzRoute(route._sock, route._node, access_id=route._access_id,
                            device_id=target.device_id, direction=direction,
                            sequence=route._receipt_sequence, allowed_directions=allowed)
     fresh._inventory, fresh._verified = route._inventory, route._verified
+    fresh._verified_at = route._verified_at
     route._closed = True
     return fresh

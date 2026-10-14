@@ -33,6 +33,15 @@ class Socket:
         self.closed += 1
 
 
+@pytest.mark.parametrize("sequence", [True, -1, (1 << 32) - 1024, (1 << 32) - 1])
+def test_exhausted_sequence_rejects_before_any_wire_io(sequence):
+    sock = Socket()
+    with pytest.raises(ValueError, match="sequence"):
+        ptz_route.NativePtzRoute(sock, NODE, access_id=123, device_id=456,
+                                direction="right", sequence=sequence)
+    assert not sock.sent
+
+
 @pytest.fixture
 def prepared(monkeypatch):
     ids = iter((100, 200, 101, 201, 102, 202, 103, 203))

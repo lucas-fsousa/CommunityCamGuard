@@ -55,6 +55,7 @@ def prepare_ptz_route(enrollment: P2PEnrollment, expected: CapabilityIdentity | 
         key = ((camera_id, enrollment.device_id), expected, reviewed, enrollment.access_id,
                enrollment.access_token, enrollment.dev_token)
         route._verified = {key: allowed}
+        route._verified_at = {key: time.monotonic()}
         return route
     except BaseException:
         sock.close()

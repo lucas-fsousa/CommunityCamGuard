@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 PRODUCTION PTZ cache corrected and deployed: removed shared-account
+15/20s forced reauthentication; reused fresh heartbeat checks, retaining8s idle
+cleanup, bounded caches and per-camera20s evidence revalidation. Two real camera3
+dashboard requests succeeded with native reused=True, confirmed STOP/no errors,
+preparation11ms then8ms. Physical confirmation remains with operator. This fixes
+the current dashboard path; experimental worker integration is NOT a prerequisite
+for this correction and remains separate. See internal/ptz-credential-renewal.md.
+
 2026-10-14 contention integration verified with actual competing threads: adapter
 closes its socket and unquiesces cache before another caller enters; injected close
 failure blocks that caller instead.74 focused tests passed (86MiB/no swap).

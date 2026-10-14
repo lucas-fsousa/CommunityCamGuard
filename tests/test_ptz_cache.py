@@ -226,6 +226,38 @@ def test_shared_account_failed_liveness_prepares_before_any_movement(pool, monke
     def fail():
         raise ptz_cache.P2PProbeError("gone")
     monkeypatch.setattr(old, "keepalive", fail)
+    state.now = 3
     lease = cache.acquire(key, state.prepare, select=lambda route: route)
     assert not lease.reused and state.prepares == 2 and old.closed == 1
+    lease.close()
+
+
+def test_shared_healthy_account_survives_without_periodic_login(pool, monkeypatch):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    key = ("camera", None, frozenset({"right"}), 123, b"secret", None)
+    cache.warm(key, state.prepare, select=lambda route: route)
+    route = next(iter(cache._idle.values())).route
+    beats = []
+    monkeypatch.setattr(route, "keepalive", lambda: beats.append(state.now))
+    for now in range(3, 604, 3):
+        state.now = now
+        assert cache.warm(key, state.prepare, select=lambda route: route)
+        lease = cache.acquire(key, state.prepare, select=lambda route: route)
+        assert lease.reused
+        lease.confirmed = True
+        lease.close()
+    assert state.prepares == 1 and len(beats) == 201
+    assert len(cache._idle) == 1
+    cache.close_idle()
+
+
+def test_shared_idle_without_maintenance_still_expires(pool):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    key = ("camera", None, frozenset({"right"}), 123, b"secret", None)
+    cache.warm(key, state.prepare, select=lambda route: route)
+    state.now = 9
+    lease = cache.acquire(key, state.prepare, select=lambda route: route)
+    assert not lease.reused and state.prepares == 2
     lease.close()

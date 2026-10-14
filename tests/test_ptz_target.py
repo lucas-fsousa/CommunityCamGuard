@@ -1,4 +1,5 @@
 """Account socket sharing must never share a camera's capability authority."""
+import time
 from dataclasses import replace
 
 import pytest
@@ -27,6 +28,7 @@ def route():
     result._inventory = {int(e.device_id): OnlineDevice(int(e.device_id), 1, False, 0, b"")
                          for e in (ENTRY, OTHER)}
     result._verified = {key(): REVIEWED}
+    result._verified_at = {key(): time.monotonic()}
     return result
 
 
@@ -99,3 +101,26 @@ def test_unknown_offline_or_unverified_axis_never_constructs_transfer(route, mon
     route.send_start()
     with pytest.raises(P2PProbeError, match="uncertain"):
         select(route)
+
+
+def test_expired_evidence_is_read_again_on_same_socket(route, monkeypatch):
+    route._verified_at[key()] = time.monotonic() - 21
+    old_timestamp = route._verified_at[key()]
+    calls = []
+    def verify(*args):
+        calls.append(args[0])
+        return frozenset({"right"})
+    monkeypatch.setattr(ptz_target, "verify_ptz_target", verify)
+    fresh = select(route)
+    assert calls == [route._sock] and fresh._sock is route._sock
+    assert fresh._allowed_directions == frozenset({"right"})
+    assert fresh._verified_at[key()] > old_timestamp + 20
+    assert not fresh._sock.sent
+
+
+def test_expired_evidence_failure_cannot_authorize_motion(route, monkeypatch):
+    route._verified_at[key()] = time.monotonic() - 21
+    def fail(*args): raise P2PProbeError("offline")
+    monkeypatch.setattr(ptz_target, "verify_ptz_target", fail)
+    with pytest.raises(P2PProbeError): select(route)
+    assert not route._sock.sent

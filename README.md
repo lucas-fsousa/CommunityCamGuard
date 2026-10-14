@@ -48,8 +48,11 @@ drivers: XiongMai / XMEye, Dahua- and Hikvision-style, plus a generic fallback. 
 Enrolled, PTZ-capable Yoosee cameras get read-only control-session preparation in
 the background, reducing cold-click setup latency without moving the camera.
 One worker shares an authenticated channel per account while validating each
-camera separately, with at most four idle account routes, bounded lifetimes and
-failure backoff. Set `CONTROL_SESSION_WARMUP=false` and restart the app to disable
+camera separately, with at most four idle account routes and failure backoff.
+Healthy shared sessions are maintained instead of reauthenticated every20seconds;
+unused routes expire after8seconds without maintenance. Camera identity/axis
+evidence is refreshed every20seconds, and a heartbeat validated within2seconds
+is reused by the next click. Set `CONTROL_SESSION_WARMUP=false` and restart the app to disable
 the periodic broker traffic. Account credentials remain server-side; other control
 transports are not yet pooled. See [session lifecycle](docs/internal/ptz-credential-renewal.md).
 Native PTZ and broker-using Yoosee controls serialize access to protect the STOP

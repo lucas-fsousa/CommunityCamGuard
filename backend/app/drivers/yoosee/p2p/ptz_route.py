@@ -36,6 +36,7 @@ class NativePtzRoute:
         self._access_id = access_id
         self._inventory: dict[int, OnlineDevice] = {}
         self._verified: dict[tuple[object, ...], frozenset[str]] = {}
+        self._verified_at: dict[tuple[object, ...], float] = {}
         self._device_id = device_id
         self._direction = direction
         self._allowed_directions = allowed_directions or frozenset({direction})
@@ -49,6 +50,9 @@ class NativePtzRoute:
         self._application = False
         self._error = False
         self._confirmed = False
+        # Retire before wrapping wire identifiers in a long-lived account.
+        if type(sequence) is not int or not 0 <= sequence < (1 << 32) - 1024:
+            raise ValueError("PTZ sequence namespace exhausted")
         self._start = build_ptz_request(node, access_id, device_id, direction, pressed=True, sequence=sequence,
                                         message_id=secrets.randbits(31), request_id=secrets.randbits(32))
         self._release_ids: _ReplyIdentity = dict(node=node, access_id=access_id, device_id=device_id,
@@ -137,6 +141,7 @@ class NativePtzRoute:
                                sequence=self._receipt_sequence,
                                allowed_directions=self._allowed_directions)
         route._inventory, route._verified = self._inventory, self._verified
+        route._verified_at = self._verified_at
         self._closed = True  # socket ownership transferred, not duplicated
         return route
 

@@ -1,5 +1,26 @@
 # PTZ credential renewal — 2026-09-15
 
+## Production cache correction — 2026-10-14
+
+The dashboard path previously discarded healthy routes at20seconds; background
+warming prepared replacements from15seconds. Shared accounts now retain the same
+socket while maintenance succeeds. The8second idle expiry and four-account bound
+remain. Private diagnostic caches keep their old absolute limits. Recent broker
+liveness checks (under2seconds) avoid another synchronous heartbeat per click.
+
+This does not make capability evidence permanent: per-camera identity/version/axis
+reads are repeated on the same socket after20seconds. Credential/profile keys still
+partition authority, failed reads cannot authorize movement, and sequence exhaustion
+rejects new gestures before identifiers wrap. START remains outside renewal/retry.
+
+Rebuilt with512MiB/no-swap/50%CPU build limits and deployed only the app container.
+Real camera3 requests through the authenticated dashboard endpoint returned200:
+right preparation11ms/total510ms; left preparation8ms/total399ms. Both reported
+reused=True, RELEASE confirmed and no errors. The second request was made after
+the previous20second lifetime. This verifies protocol delivery/STOP receipts, not
+physical movement: operator confirmation is still required for that observation.
+No movement commands were sent to cameras1/2. go2rtc was not restarted.
+
 Native PTZ now wraps **route acquisition/preparation only** in the existing
 `run_with_fresh_access` helper. Explicit INITINFO rejection `0x216B` permits one
 credential refresh/retry; other errors do not trigger account refresh. A concurrent
