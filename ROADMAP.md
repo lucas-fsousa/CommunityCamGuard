@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 shared PTZ capacity/delivery foundation: read worker output limits now
+use explicit attempted-send accounting. One optional typed reservation protects
+START/3RELEASE/2receipt slots and bytes from ordinary traffic. Separate RELEASE
+tracker correlates identities within2s/64frames, with sticky error precedence.
+107 focused tests passed (86.4MiB/no swap), Ruff/mypy passed. No shared-worker motion
+admission, deployment or camera traffic. Next: typed scheduler/deadlines/shutdown
+composition, not a raw-command read-mailbox expansion. See
+[shared output and delivery](docs/internal/ptz-shared-output.md).
+
 2026-10-13 typed shared-PTZ reservation: sequence groups now reserve atomically
 without wrap/partial consumption. Offline typed commands reserve START/RELEASE/
 receipt before encoding, consume START once and allow<=3 identical RELEASE attempts

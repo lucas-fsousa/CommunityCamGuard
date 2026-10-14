@@ -51,3 +51,8 @@ Next: reserve wire/queue budget and implement correlated PTZ results in the sole
 worker, separately from enabling motion. Keep the read-only mailbox allowlist and
 existing production motion/STOP lifecycle intact until the complete adapter is
 validated. This is not physical STOP confirmation or production shared-session PTZ.
+
+2026-10-14 follow-up: [output reservation and RELEASE observations](ptz-shared-output.md)
+now provide bounded send accounting and a socket-free correlation tracker. The
+read worker uses the accounting but still admits no motion; scheduling and cleanup
+composition remain pending.

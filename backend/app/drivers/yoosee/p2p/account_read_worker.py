@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .account_output_budget import AccountOutputBudget, OutputExhausted
 from .account_read_dispatcher import AccountReadDispatcher
 from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
@@ -71,7 +72,8 @@ class AccountReadWorker:
                 failed = True
             return WorkerSummary("already_started", 0, 0, 0, failed)
 
-        sent = received = sent_bytes = beats = 0
+        sent = received = beats = 0
+        output = AccountOutputBudget()
         reason = "stopped"
         close_failed = False
         maintenance = None
@@ -88,13 +90,14 @@ class AccountReadWorker:
                     raise _Stop("deadline")
 
             def send(wire: bytes) -> None:
-                nonlocal sent, sent_bytes
+                nonlocal sent
                 check()
-                if sent >= 512 or sent_bytes + len(wire) > 1024 * 1024:
-                    raise _Stop("output_budget")
+                try:
+                    output.charge(len(wire))
+                except OutputExhausted:
+                    raise _Stop("output_budget") from None
                 sock.settimeout(min(0.2, max(0.001, deadline - self._clock())))
                 sent += 1
-                sent_bytes += len(wire)
                 if sock.sendto(wire, node.address) != len(wire):
                     raise OSError("partial broker datagram")
 
