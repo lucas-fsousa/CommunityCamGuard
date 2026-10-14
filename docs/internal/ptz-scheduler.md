@@ -312,3 +312,24 @@ cancellation remains reserved until the worker reaps it. Repeated close cannot
 cancel later submissions because tickets are not reused.164 focused tests passed
 (89.3MiB/no swap), including abandonment before and after dispatch. Full CI
 run38580028642 for668e073 passed before this cleanup follow-up.
+
+## Cooperative legacy contention signal (2026-10-14)
+
+The driver-wide `own_control_channel` currently permits other control operations
+to wait at most15seconds. Holding it for an entire persistent worker without a
+handoff policy would starve those existing controls. `control_channel_contended`
+now reports competing acquisitions so a future server owner can request bounded
+drain/close before yielding. It does not release ownership, authenticate or alter
+waiter ordering. Reentrant acquisitions by the current owner do not create false
+demand; timeout/interruption removes the waiter count in finally.
+
+An offline integration test drives an encrypted START, starts a competing caller,
+feeds contention into the worker's cancellation predicate and confirms STOP plus
+physical close before that caller enters.39 focused ownership/read/motion tests
+passed (84.9MiB/no swap), Ruff/mypy passed. Production does not consume the signal
+yet; the existing exclusion/uncertain-cleanup block remains intact. Unknown STOP
+must still block replacement rather than yield into a new authentication.
+
+Next: server scheduling must combine this signal with enrollment freshness,
+shutdown and the existing uncertain-cleanup barrier. Do not automatically restart
+a login loop after yielding. The persistent lifetime policy is still pending.

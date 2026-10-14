@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 cooperative account contention: existing15s legacy control wait would
+conflict with a persistent owner. Added advisory competing-waiter signal (reentrant
+owner excluded; timeout/interruption cleaned). Offline test proves STOP+physical
+close before another caller enters.39 focused tests passed (84.9MiB/no swap),
+Ruff/mypy passed. Signal not consumed in production; unknown STOP must still block
+reauthentication. Next server scheduler/lifetime policy, no automatic login loop.
+
 2026-10-14 collector abandonment: context-managed cleanup cancels/consumes only
 its own reads, including exceptions and partial admission. Tests verify all slots
 reusable before dispatch and worker-side reaping after dispatch.164 focused tests

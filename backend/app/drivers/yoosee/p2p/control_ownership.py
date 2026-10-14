@@ -9,11 +9,25 @@ from .contracts import P2PProbeError
 
 _channel = threading.RLock()
 _cleanup_uncertain = False
+_waiters_lock = threading.Lock()
+_waiters = 0
+_local = threading.local()
 WAIT_SECONDS = 15.0
 
 
 class ControlChannelBusy(P2PProbeError):
     """No channel ownership was obtained; no operation was started."""
+
+
+def control_channel_contended() -> bool:
+    """Advisory signal for an existing owner to drain/close BEFORE yielding.
+
+    Does not release the lock, authenticate, or guarantee waiter ordering. A
+    future persistent owner may use it as cancellation input; never skip STOP.
+    Reentrant acquisition by the owner is not considered competing demand.
+    """
+    with _waiters_lock:
+        return _waiters > 0
 
 
 def block_uncertain_channel() -> None:
@@ -35,11 +49,24 @@ def own_control_channel() -> Iterator[None]:
     helper and subsequent motion. A conservative driver-wide lock also covers
     refreshed access IDs; it is not a queue of repeatable movement commands.
     """
-    if not _channel.acquire(timeout=WAIT_SECONDS):
+    global _waiters
+    depth = getattr(_local, "depth", 0)
+    if not depth:
+        with _waiters_lock:
+            _waiters += 1
+    try:
+        acquired = _channel.acquire(timeout=WAIT_SECONDS)
+    finally:
+        if not depth:
+            with _waiters_lock:
+                _waiters -= 1
+    if not acquired:
         raise ControlChannelBusy("another broker control operation is still running")
+    _local.depth = depth + 1
     try:
         if _cleanup_uncertain:
             raise ControlChannelBusy("broker cleanup unconfirmed; authentication blocked")
         yield
     finally:
+        _local.depth = depth
         _channel.release()
