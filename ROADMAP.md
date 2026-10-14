@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-13 typed shared-PTZ reservation: sequence groups now reserve atomically
+without wrap/partial consumption. Offline typed commands reserve START/RELEASE/
+receipt before encoding, consume START once and allow<=3 identical RELEASE attempts
+on the pinned old session.56 focused tests passed (85.1MiB/no swap), Ruff/mypy passed.
+No worker integration or motion I/O. Next: reserved wire/queue budget and correlated
+STOP results before foreground migration. Do not interpret identifier reservation
+as guaranteed transport capacity or physical STOP. See
+[PTZ command reservation](docs/internal/ptz-command-reservation.md).
+
 2026-10-13 guarded preparation composition: the existing disabled worker diagnostic
 now uses the PTZ retirement barrier, bounded DNS/factory, generation lifecycle and
 actual worker as one owned flow. Confirmed factory/read cleanup returns failure

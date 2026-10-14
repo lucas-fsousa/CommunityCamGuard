@@ -64,3 +64,8 @@ Keep deployed PTZ preparation/RTSP unchanged until those responsibilities migrat
 together. New-path physical validation remains pending after green CI and a
 deliberately bounded deployment; the previous worker-only live check does not
 homologate this newly composed path.
+
+Next-step foundation: [typed PTZ reservations](ptz-command-reservation.md) now
+preallocate command identifiers and preserve one-shot START/identical STOP retry
+semantics offline. Output capacity, response dispatch and physical cleanup still
+require integration before any shared-worker movement.

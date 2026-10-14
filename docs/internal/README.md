@@ -112,6 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
+| [Typed PTZ reservation](ptz-command-reservation.md) | Atomic sequence group and one-shot START/identical bounded STOP retries; offline only, no shared-worker motion activation |
 | [Guarded read preparation](read-preparation-adapter.md) | Existing disabled diagnostic now composes retirement/DNS/generation/worker; confirmed-vs-uncertain cleanup tests, no production warmup activation |
 | [PTZ/read handoff](ptz-read-handoff.md) | Physical idle-close tracking, timer-race barrier and legacy-login exclusion; no production handoff activation |
 | [Read-account DNS and connection factory](account-read-connect.md) | Cancellable one-child DNS and original authentication deadline; experimental only, legacy PTZ unchanged |
