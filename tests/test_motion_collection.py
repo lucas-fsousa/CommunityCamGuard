@@ -123,3 +123,44 @@ def test_partial_read_admission_is_cancelled_and_consumed():
     with pytest.raises(ValueError, match="full"):
         MotionCollection(owner, ENROLLMENT, camera_id="cam_test", profile=PROFILE, online=TARGET)
     assert len(owner.cancelled) == 1 and owner.cancelled == owner.consumed
+
+
+def test_abandoned_context_releases_all_unclaimed_slots(monkeypatch):
+    sock = EvidenceSocket()
+    owner = AccountReadLifecycle(clock=lambda: sock.now)
+    submitted = []
+    receive = sock.recvfrom
+    def receiving(size):
+        if not submitted:
+            with pytest.raises(RuntimeError, match="abandon"):
+                with MotionCollection(owner, ENROLLMENT, camera_id="cam_test",
+                        profile=PROFILE, online=TARGET, clock=lambda: sock.now) as collector:
+                    assert not collector.poll()
+                    raise RuntimeError("abandon")
+            # All eight slots available; closing old tickets again cannot cancel them.
+            submitted.extend(owner.submit(TARGET.device_id, "ProConst._productInfo") for _ in range(8))
+            collector.close()
+            with pytest.raises(ValueError): collector.poll()
+        return receive(size)
+    monkeypatch.setattr(sock, "recvfrom", receiving)
+    owner.run(lambda _: connection(sock))
+    assert sock.reads == 8 and not sock.moves
+    assert all(owner.take(ticket).status == "response" for ticket in submitted)
+
+
+def test_abandoned_claimed_reads_are_reaped_by_worker(monkeypatch):
+    sock = EvidenceSocket("silent")
+    owner = AccountReadLifecycle(clock=lambda: sock.now)
+    collector = []
+    receive = sock.recvfrom
+    def receiving(size):
+        if not collector:
+            collector.append(MotionCollection(owner, ENROLLMENT, camera_id="cam_test",
+                profile=PROFILE, online=TARGET, clock=lambda: sock.now))
+        elif sock.reads == 3:
+            collector[0].close()
+        return receive(size)
+    monkeypatch.setattr(sock, "recvfrom", receiving)
+    owner.run(lambda _: connection(sock))
+    assert sock.reads == 3 and not sock.moves and sock.closed == 1
+    assert not owner._worker.mailbox._slots

@@ -304,3 +304,11 @@ No production caller activates this collector. Remaining: server-owned schedulin
 under the existing legacy exclusion boundary and a persistent account lifetime /
 replacement policy. The research worker is still finite60s; do not deploy it as a
 periodic login loop. Physical validation/deployment are separate from this evidence.
+
+Collector cleanup follow-up: use `with MotionCollection(...) as collection` when
+the caller's lifetime is lexical; exceptions close its reads without suppressing
+the exception. Closing before claim returns all slots immediately, whereas claimed
+cancellation remains reserved until the worker reaps it. Repeated close cannot
+cancel later submissions because tickets are not reused.164 focused tests passed
+(89.3MiB/no swap), including abandonment before and after dispatch. Full CI
+run38580028642 for668e073 passed before this cleanup follow-up.

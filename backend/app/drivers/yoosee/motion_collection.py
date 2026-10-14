@@ -2,6 +2,7 @@
 
 import time
 from collections.abc import Callable
+from types import TracebackType
 
 from ...db.p2p import P2PEnrollment
 from .motion_evidence import VerifiedMotionScope, grant_from_completions
@@ -48,6 +49,13 @@ class MotionCollection:
         except BaseException:
             self.close()
             raise
+
+    def __enter__(self) -> "MotionCollection":
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None,
+                 exc: BaseException | None, traceback: TracebackType | None) -> None:
+        self.close()
 
     def close(self) -> None:
         self._closed = True

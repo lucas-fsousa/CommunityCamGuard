@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 collector abandonment: context-managed cleanup cancels/consumes only
+its own reads, including exceptions and partial admission. Tests verify all slots
+reusable before dispatch and worker-side reaping after dispatch.164 focused tests
+passed (89.3MiB/no swap). Active-session integration CI38580028642/668e073 green.
+No runtime activation or camera traffic.
+
 2026-10-14 active-session PTZ collection: three fixed reads flow through the sole
 worker, carrying original pre-send request bindings into evidence validation.
 One verified gesture then enters the same account inbox with an atomic expected-
