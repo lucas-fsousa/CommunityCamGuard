@@ -112,7 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
-| [Finite PTZ scheduler](ptz-scheduler.md) | Shared PTZ/read/heartbeat, scoped inbox, correlated evidence-to-grant adapter and STOP drain; live generation transfer/lifetime rollout pending |
+| [Finite PTZ scheduler](ptz-scheduler.md) | Shared PTZ/read/heartbeat, active-generation evidence collection, scoped inbox and STOP drain; server scheduling/persistent lifetime rollout pending |
 | [CI test diagnostics](ci-test-diagnostics.md) | Explicit job/test deadlines, per-test progress and stalled-thread traces; pending CI hang root cause not yet established |
 | [Shared PTZ output/delivery](ptz-shared-output.md) | Non-borrowable output reserve, bounded correlated RELEASE observations; read worker accounting integrated, motion scheduling still pending |
 | [Typed PTZ reservation](ptz-command-reservation.md) | Atomic sequence group and one-shot START/identical bounded STOP retries; offline only, no shared-worker motion activation |

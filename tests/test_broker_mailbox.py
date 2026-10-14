@@ -17,6 +17,21 @@ def completion(generation=1, device=DEVICE.device_id, path=PATH, sequence=40):
     return ReadCompletion(request, "response", 0, 0, {"private": "value"})
 
 
+def test_bound_take_retains_original_request_and_consumes_exactly_once():
+    box = BrokerMailbox(1)
+    ticket = submit(box)
+    box.poll()
+    issued = completion().request
+    assert box.bind(ticket, issued)
+    returned = completion()
+    assert returned.request == issued and returned.request is not issued
+    assert box.finish(ticket, returned)
+    bound = box.take_bound(ticket)
+    assert bound.request is issued and bound.outcome.completion is returned
+    assert "private" not in repr(bound)
+    assert box.take(ticket) is None and box.take_bound(ticket) is None
+
+
 def test_concurrent_admission_is_bounded_and_unique():
     box = BrokerMailbox(1)
     def attempt(_):

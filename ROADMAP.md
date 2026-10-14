@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 active-session PTZ collection: three fixed reads flow through the sole
+worker, carrying original pre-send request bindings into evidence validation.
+One verified gesture then enters the same account inbox with an atomic expected-
+generation check. Partial admission rollback and response-payload release bounded.
+162 focused tests passed (89.7MiB/no swap), Ruff/mypy passed. No camera I/O/deployment.
+Next: server-owned scheduling under legacy exclusion and persistent lifetime /
+replacement policy, not periodic reauthentication of the60s experimental worker.
+
 PTZ evidence hardening2026-10-14: reject malformed tickets and boolean identities
 even when Python dataclass equality would match True to generation1.97 focused
 tests passed (84.2MiB/no swap). No live I/O or scope expansion.

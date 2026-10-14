@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from .account_read_worker import AccountReadWorker, WorkerSummary
-from .broker_mailbox import BrokerMailbox, MailboxTicket, ReadOutcome
+from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode
 from .ptz_authority import PtzAuthority, PtzGrant
@@ -61,14 +61,26 @@ class AccountReadLifecycle:
                 raise ValueError("account not accepting reads")
             return self._worker.mailbox.submit(device_id, path, timeout)
 
-    def submit_motion(self, spec: PtzSpec) -> MotionTicket:
+    def submit_motion(self, spec: PtzSpec, *, generation: int | None = None) -> MotionTicket:
         """Trusted driver callers only; grants are fixed before authentication."""
         self._motion_authority.authorize(spec)
         with self._lock:
             if (self._state != "active" or self._worker is None
-                    or self._worker.motion_inbox is None):
+                    or self._worker.motion_inbox is None
+                    or (generation is not None and
+                        (type(generation) is not int or generation != self._generation))):
                 raise ValueError("account not accepting motion")
             return self._worker.motion_inbox.submit(spec)
+
+    def is_active_generation(self, generation: int) -> bool:
+        with self._lock:
+            return type(generation) is int and self._state == "active" and generation == self._generation
+
+    def take_bound(self, ticket: MailboxTicket) -> BoundReadOutcome | None:
+        with self._lock:
+            if ticket.generation != self._generation or self._worker is None:
+                return None
+            return self._worker.mailbox.take_bound(ticket)
 
     def take_motion(self, ticket: MotionTicket) -> ScheduledPtzResult | None:
         with self._lock:

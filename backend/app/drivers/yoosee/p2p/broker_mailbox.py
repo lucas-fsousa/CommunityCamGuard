@@ -33,6 +33,12 @@ class ReadOutcome:
 
 
 @dataclass(frozen=True, slots=True)
+class BoundReadOutcome:
+    request: ReadRequest | None = field(repr=False)
+    outcome: ReadOutcome = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
 class MailboxWork:
     submissions: tuple[ReadSubmission, ...]
     cancellations: tuple[MailboxTicket, ...]
@@ -162,6 +168,11 @@ class BrokerMailbox:
             return slot.request is not None and slot.outcome is None and not slot.consumed
 
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
+        bound = self.take_bound(ticket)
+        return bound.outcome if bound is not None else None
+
+    def take_bound(self, ticket: MailboxTicket) -> BoundReadOutcome | None:
+        """Atomically consume result with the ORIGINAL pre-send request binding."""
         with self._lock:
             slot = self._slots.get(ticket)
             if slot is None or slot.consumed:
@@ -174,7 +185,7 @@ class BrokerMailbox:
                     slot.outcome, slot.consumed = None, True
                 else:
                     del self._slots[ticket]
-            return outcome
+            return BoundReadOutcome(slot.request, outcome) if outcome is not None else None
 
     def close(self) -> None:
         """Reject admission; worker still polls cancellations, callers take endings."""

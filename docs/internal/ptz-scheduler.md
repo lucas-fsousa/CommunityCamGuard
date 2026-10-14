@@ -270,3 +270,37 @@ typed structures and numeric identities. In particular, Python dataclass equalit
 considers generation `True` equal to `1`; that must not pass generation matching.
 Malformed tickets now fail with a bounded validation error, not attribute access.
 97 focused tests passed (84.2MiB peak/no swap), including these regressions.
+
+## Collect and consume on the active generation (2026-10-14)
+
+`MotionCollection` submits the three fixed identity/axis reads through the active
+lifecycle, polls their results and submits at most one verified gesture through
+the same account's motion inbox. It creates no socket/thread/login, never invokes
+blocking model-read helpers and never takes ownership from the sole socket reader.
+It requires an exact enrolled online target from that session's inventory. The
+caller still retains enrollment and account/legacy-login exclusion for the entire
+lifecycle; the collector itself does not acquire another account lock or login.
+
+`BrokerMailbox.take_bound` consumes a result together with the ORIGINAL request
+bound before send (not a request reconstructed from the reply). Lifecycle exposes
+this bounded operation with generation checks. Existing take callers retain their
+previous behavior and both APIs share the same single-consumption semantics.
+
+Collection rejects partial/failed evidence, expired collection and changed account
+generation. Partial admission cancels/consumes its already submitted reads. Once
+verified, decoded response payloads are released. Scope consumption then supplies
+an expected generation to `submit_motion`; the lifecycle checks this atomically
+with admission, closing the race between successful evidence polling and a later
+account replacement. Closing the collector cancels its reads, not an already
+submitted gesture; use the returned motion ticket for motion cancellation.
+
+162 focused tests passed (89.7MiB peak/no swap); Ruff and targeted mypy passed.
+An encrypted synthetic end-to-end test performs all three reads, verifies current
+model/axes and sends START/STOP through ONE active socket. Negative tests cover
+offline/wrong inventory, absent axes, read timeout, account stop, generation change
+between polling and submission, and partial mailbox admission rollback.
+
+No production caller activates this collector. Remaining: server-owned scheduling
+under the existing legacy exclusion boundary and a persistent account lifetime /
+replacement policy. The research worker is still finite60s; do not deploy it as a
+periodic login loop. Physical validation/deployment are separate from this evidence.
