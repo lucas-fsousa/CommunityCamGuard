@@ -34,3 +34,8 @@ camera code changed for this correction. CI confirmation remains required.
 Also override the repository's `addopts=-q` in the CI command: otherwise `-v`
 only cancels quiet mode and prints module progress rather than individual tests.
 The command is now `pytest -o addopts='' -v -o faulthandler_timeout=60`.
+
+Confirmed: run38574667703 for commit70a365a completed successfully in65seconds.
+Lint, mypy, the full Python suite and all six frontend contract steps passed.
+This validates the receiver fix and includes the shared PTZ/inbox/lifecycle work
+committed earlier in the same series. Production remains unchanged.

@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+CI confirmation2026-10-14: run38574667703 /70a365a SUCCESS in65seconds: lint,
+types, full Python suite and all frontend contracts. The recording test receiver
+fix resolves the observed stall. Shared PTZ/inbox/scope changes are included in
+this green run but remain experimental; concrete driver evidence and production
+session lifetime integration are still pending. No camera traffic/deployment.
+
 2026-10-14 CI hang identified and patched: bounded run38572877606 exposed a
 synthetic HTTP receive callback repeatedly returning immediately in recording
 delivery cancellation tests, starving the event loop. Receiver now emits body
