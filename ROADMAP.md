@@ -1,5 +1,16 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-13 guarded preparation composition: the existing disabled worker diagnostic
+now uses the PTZ retirement barrier, bounded DNS/factory, generation lifecycle and
+actual worker as one owned flow. Confirmed factory/read cleanup returns failure
+without poisoning PTZ; unknown/failed close blocks legacy authentication before
+scope exit. Fixed identity observations only; response-before-transport-ACK allowed,
+ACK-only never success.120 focused tests passed (108.6MiB/no swap), Ruff/mypy passed.
+No live I/O/deployment or background activation. Next: typed foreground/STOP handoff
+and lifetime/shutdown ownership before replacing production PTZ warmup; this finite
+60s diagnostic must not become the periodic warmup. See
+[integrated adapter](docs/internal/read-preparation-adapter.md).
+
 2026-10-13 PTZ/read ownership boundary: idle timer/shutdown retirement now tracks
 physical close completion, not just cache removal. Experimental handoff retains
 the broker reservation, rejects pending PTZ/warmup, pauses admission and waits

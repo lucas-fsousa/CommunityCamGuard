@@ -112,6 +112,7 @@ hardware/browser validation and pending work; dates/build IDs are checkpoints, n
 
 | Topic | Evidence / scope |
 | --- | --- |
+| [Guarded read preparation](read-preparation-adapter.md) | Existing disabled diagnostic now composes retirement/DNS/generation/worker; confirmed-vs-uncertain cleanup tests, no production warmup activation |
 | [PTZ/read handoff](ptz-read-handoff.md) | Physical idle-close tracking, timer-race barrier and legacy-login exclusion; no production handoff activation |
 | [Read-account DNS and connection factory](account-read-connect.md) | Cancellable one-child DNS and original authentication deadline; experimental only, legacy PTZ unchanged |
 | [Read-account generation lifecycle](account-read-lifecycle.md) | Offline-tested exclusive handoff, immediate admission closure and uncertain-cleanup blocking; production warmup/PTZ migration pending |

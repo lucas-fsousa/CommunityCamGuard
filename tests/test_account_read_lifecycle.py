@@ -7,6 +7,7 @@ from backend.app.drivers.yoosee.p2p.account_read_lifecycle import (
     AccountReadLifecycle,
     ReadConnection,
 )
+from backend.app.drivers.yoosee.p2p.broker_read_socket import ReadSpec
 from tests.test_account_read_worker import WorkerSocket
 from tests.test_broker_reads import DEVICE, NODE, PATH
 
@@ -202,3 +203,24 @@ def test_generation_exhaustion_never_calls_authentication():
     with pytest.raises(ValueError, match="exhausted"):
         owner.run(lambda _: pytest.fail("generation wraparound"))
     assert owner.state == "blocked"
+
+
+def test_batch_results_are_detached_before_next_generation():
+    sock = WorkerSocket()
+    owner = AccountReadLifecycle(clock=lambda: sock.now)
+    batch = owner.run_reads(lambda _: connection(sock), (ReadSpec(DEVICE.device_id, PATH),))
+    assert batch.outcomes[0].status == "response"
+    assert "completion" not in repr(batch)
+    second = WorkerSocket()
+    owner.run_reads(lambda _: connection(second), (ReadSpec(DEVICE.device_id, PATH),),
+                    cancelled=lambda: True)
+    assert batch.outcomes[0].status == "response" and second.closed == 1
+
+
+@pytest.mark.parametrize("reads", [(), (None,), (ReadSpec(1, "Action.expelCtrl"),),
+    (ReadSpec(DEVICE.device_id, PATH, -1),), (ReadSpec(DEVICE.device_id, PATH),) * 9])
+def test_invalid_bootstrap_batch_never_authenticates(reads):
+    owner = AccountReadLifecycle()
+    with pytest.raises(ValueError):
+        owner.run_reads(lambda _: pytest.fail("invalid batch authenticated"), reads)
+    assert owner.state == "idle"

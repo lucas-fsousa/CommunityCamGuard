@@ -65,3 +65,9 @@ Follow-up: the [native PTZ retirement boundary](ptz-read-handoff.md) now provide
 experimental exclusion through physical idle-close completion, including timer
 races. Composing it with this factory and the worker remains separate from
 activating replacement background preparation.
+
+The [integrated adapter](read-preparation-adapter.md) now uses this factory in the
+disabled worker diagnostic. `ReadConnectFailure` distinguishes confirmed broker
+cleanup from uncertain close, so ordinary connection failures need not poison the
+legacy channel. An unconfirmed resolver child remains independently blocked by
+the resolver gate; it never holds broker credentials or authenticates a camera.

@@ -7,7 +7,6 @@ from typing import cast
 
 from ..db import p2p, registry
 from ..drivers.yoosee.p2p.account_read_worker import WorkerSummary
-from ..drivers.yoosee.p2p.account_worker_check import run_owned_worker_check
 from ..drivers.yoosee.p2p.av_route_io import BudgetSocket
 from ..drivers.yoosee.p2p.broker_account_check import run_owned_account_check
 from ..drivers.yoosee.p2p.broker_read_socket import ReadSpec, run_owned_reads
@@ -15,6 +14,7 @@ from ..drivers.yoosee.p2p.camera_session import open_camera_session
 from ..drivers.yoosee.p2p.contracts import ACCOUNT_IDENTITY_READ_PATHS
 from ..drivers.yoosee.p2p.control_ownership import own_control_channel
 from ..drivers.yoosee.p2p.session_io import local_route_ip
+from ..drivers.yoosee.read_preparation import prepare_identity_reads
 from ..services.camera_controls import CameraNotFound, _exclusive
 
 IDENTITY_PATHS = ACCOUNT_IDENTITY_READ_PATHS
@@ -67,6 +67,14 @@ def run_reviewed_broker_reads(*, camera_id: str, reviewed_camera_id: str,
         if (enrollment is None or enrollment.camera_id != camera_id
                 or enrollment.device_id != reviewed_device_id):
             raise ValueError("broker read enrollment mismatch")
+        if with_worker:
+            prepared = prepare_identity_reads(enrollment, camera_id=camera_id,
+                                              device_id=reviewed_device_id, cancelled=cancelled)
+            summary = prepared.worker
+            return BrokerReadSummary(tuple(BrokerReadObservation(
+                r.path, r.status, r.transport_result, r.error_code) for r in prepared.observations),
+                prepared.failure, summary.sent_datagrams if summary else 0,
+                summary.received_datagrams if summary else 0, worker=summary)
         bounded = BudgetSocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM), cancelled)
         transferred = False
         try:
@@ -76,16 +84,6 @@ def run_reviewed_broker_reads(*, camera_id: str, reviewed_camera_id: str,
             if str(target.device_id) != reviewed_device_id or not target.status:
                 raise ValueError("broker read online target mismatch")
             specs = tuple(ReadSpec(target.device_id, path, 2.0) for path in IDENTITY_PATHS)
-            if with_worker:
-                local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
-                transferred = True
-                worker_check = run_owned_worker_check(bounded.sock, node, 1, specs, local_ip,
-                                                     local_port, cancelled=cancelled)
-                return BrokerReadSummary(
-                    tuple(BrokerReadObservation(r.request.path, r.status, r.transport_result,
-                                               r.error_code) for r in worker_check.completions),
-                    worker_check.failure, worker_check.worker.sent_datagrams,
-                    worker_check.worker.received_datagrams, worker=worker_check.worker)
             if with_heartbeat:
                 local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
                 transferred = True

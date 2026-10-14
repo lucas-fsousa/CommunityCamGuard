@@ -14,6 +14,10 @@ from .list_dns import resolve_list_hosts
 from .session_io import local_route_ip
 
 
+class ReadConnectFailure(P2PProbeError):
+    """Opening failed, but any allocated broker socket was confirmed closed."""
+
+
 def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
                          cancelled: Callable[[], bool] = lambda: False) -> ReadConnection:
     """Resolve then authenticate within one original20s budget, no credential renewal.
@@ -27,12 +31,12 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
             or enrollment.device_id != device_id):
         raise ValueError("read connection enrollment mismatch")
     deadline = time.monotonic() + 20.0
-    hosts = resolve_list_hosts(deadline, cancelled=cancelled)
-    if cancelled() or time.monotonic() >= deadline:
-        raise P2PProbeError("read connection deadline or cancellation")
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    transferred = False
+    sock = None
     try:
+        hosts = resolve_list_hosts(deadline, cancelled=cancelled)
+        if cancelled() or time.monotonic() >= deadline:
+            raise P2PProbeError("read connection deadline or cancellation")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         bounded = BudgetSocket(sock, cancelled)
         bounded.deadline = deadline  # DNS time is charged; never grant a new budget.
         bounded.bind(("", 0))
@@ -44,8 +48,11 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
         local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
         bounded.check()
         connection = ReadConnection(node, bounded.sock, local_ip, local_port)
-        transferred = True
         return connection
-    finally:
-        if not transferred:
+    except BaseException as exc:
+        if sock is not None:
+            # A close exception must escape unchanged: it does NOT prove cleanup.
             sock.close()
+        if isinstance(exc, Exception):
+            raise ReadConnectFailure("read connection failed with confirmed cleanup") from None
+        raise

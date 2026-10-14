@@ -13,7 +13,7 @@ from tests.test_native_av_broker_ownership import available_from_other_thread
 
 
 @pytest.mark.parametrize("fault", [None, "missing", "enrollment", "auth", "target", "exchange"])
-@pytest.mark.parametrize("profile", ["short", "heartbeat", "worker"])
+@pytest.mark.parametrize("profile", ["short", "heartbeat"])
 def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, profile):
     heartbeat, worker = profile == "heartbeat", profile == "worker"
     sockets, events = [], []
@@ -59,7 +59,6 @@ def test_reviewed_pilot_owns_both_locks_and_one_socket(monkeypatch, fault, profi
     monkeypatch.setattr(diagnostic, "open_camera_session", authenticate)
     monkeypatch.setattr(diagnostic, "run_owned_reads", exchange)
     monkeypatch.setattr(diagnostic, "run_owned_account_check", exchange)
-    monkeypatch.setattr(diagnostic, "run_owned_worker_check", exchange)
     monkeypatch.setattr(diagnostic, "local_route_ip", lambda _: "192.0.2.1")
     kwargs = dict(camera_id="cam_test", reviewed_camera_id="cam_test", reviewed_device_id="123",
                   with_heartbeat=heartbeat, with_worker=worker)
@@ -119,3 +118,28 @@ def test_conflicting_profiles_do_not_authenticate(monkeypatch):
     with pytest.raises(ValueError):
         diagnostic.run_reviewed_broker_reads(camera_id="cam_test", reviewed_camera_id="cam_test",
             reviewed_device_id="123", with_heartbeat=True, with_worker=True)
+
+
+@pytest.mark.parametrize("failure", [None, "connection"])
+def test_worker_profile_uses_guarded_preparation_before_old_socket_path(monkeypatch, failure):
+    from backend.app.drivers.yoosee.read_preparation import IdentityObservation, ReadPreparation
+
+    monkeypatch.setattr(diagnostic.registry, "get_camera_by_id", lambda _: object())
+    monkeypatch.setattr(diagnostic.p2p, "get_enrollment_for_camera", lambda _: ENROLLMENT)
+    monkeypatch.setattr(diagnostic.socket, "socket", lambda *a: pytest.fail("legacy socket"))
+    def prepare(enrollment, *, camera_id, device_id, cancelled):
+        assert enrollment is ENROLLMENT and camera_id == "cam_test" and device_id == "123"
+        assert not available_from_other_thread()
+        with pytest.raises(camera_controls.ControlBusy):
+            with camera_controls._exclusive(camera_id): pass
+        if failure:
+            return ReadPreparation(failure, 0)
+        return ReadPreparation(None, 3, WorkerSummary("deadline", 24, 21, 1, False),
+            tuple(IdentityObservation(path, "response", None, 0) for path in diagnostic.IDENTITY_PATHS))
+    monkeypatch.setattr(diagnostic, "prepare_identity_reads", prepare)
+    result = diagnostic.run_reviewed_broker_reads(camera_id="cam_test", reviewed_camera_id="cam_test",
+        reviewed_device_id="123", with_worker=True)
+    assert result.failure == failure
+    assert result.sent_datagrams == (0 if failure else 24)
+    assert len(result.observations) == (0 if failure else 3)
+    assert available_from_other_thread()

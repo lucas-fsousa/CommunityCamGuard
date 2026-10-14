@@ -103,3 +103,9 @@ continued writes, not browser playback or absence of gaps during recreation.
 2026-10-13 follow-up: the [generation lifecycle](account-read-lifecycle.md) now
 wraps this worker with offline-tested exclusive handoff and fail-closed physical
 cleanup. No production ownership migration yet; read-only warmup integration is next.
+
+The existing disabled worker diagnostic now uses the complete
+[guarded preparation adapter](read-preparation-adapter.md), including cache
+retirement, bounded DNS and generation ownership. Earlier live evidence above
+predates that composition; new-path live validation and production pooling remain
+pending. Regular background PTZ warmup is unchanged.

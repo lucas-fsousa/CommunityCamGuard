@@ -42,7 +42,8 @@ def test_factory_preserves_budget_and_socket_ownership(monkeypatch, fault):
     monkeypatch.setattr(opener, "open_camera_session", authenticate)
     monkeypatch.setattr(opener, "local_route_ip", route)
     if fault:
-        with pytest.raises((OSError, P2PProbeError, KeyboardInterrupt)):
+        expected = KeyboardInterrupt if fault == "interrupt" else opener.ReadConnectFailure
+        with pytest.raises(expected):
             opener.open_read_connection(ENROLLMENT, camera_id="cam_test", device_id="123")
         assert all(sock.closed == 1 for sock in sockets)
     else:
@@ -56,3 +57,15 @@ def test_mismatched_enrollment_never_resolves(monkeypatch):
     monkeypatch.setattr(opener, "resolve_list_hosts", lambda *a, **k: pytest.fail("DNS"))
     with pytest.raises(ValueError):
         opener.open_read_connection(ENROLLMENT, camera_id="other", device_id="123")
+
+
+def test_auth_error_with_failed_close_is_not_classified_as_confirmed(monkeypatch):
+    class Socket:
+        def bind(self, address): pass
+        def close(self): raise OSError("close failed")
+    monkeypatch.setattr(opener, "resolve_list_hosts", lambda *a, **k: ("192.0.2.1",))
+    monkeypatch.setattr(opener.socket, "socket", lambda *a: Socket())
+    def authenticate(*args, **kwargs): raise P2PProbeError("authentication failed")
+    monkeypatch.setattr(opener, "open_camera_session", authenticate)
+    with pytest.raises(OSError):
+        opener.open_read_connection(ENROLLMENT, camera_id="cam_test", device_id="123")

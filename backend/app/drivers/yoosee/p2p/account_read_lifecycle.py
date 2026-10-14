@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from .account_read_worker import AccountReadWorker, WorkerSummary
-from .broker_mailbox import MailboxTicket, ReadOutcome
-from .broker_read_socket import ReadSocket
+from .broker_mailbox import BrokerMailbox, MailboxTicket, ReadOutcome
+from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode
 
 
@@ -18,6 +18,12 @@ class ReadConnection:
     socket: ReadSocket = field(repr=False)
     local_ip: str = field(repr=False)
     local_port: int = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class ReadBatchSummary:
+    worker: WorkerSummary
+    outcomes: tuple[ReadOutcome | None, ...] = field(repr=False)
 
 
 class AccountReadLifecycle:
@@ -82,6 +88,25 @@ class AccountReadLifecycle:
                 self._worker.stop()
 
     def run(self, connect: Callable[[int], ReadConnection]) -> WorkerSummary:
+        return self._run(connect, (), lambda: False).worker
+
+    def run_reads(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...], *,
+                  cancelled: Callable[[], bool] = lambda: False) -> ReadBatchSummary:
+        """Trusted bounded bootstrap batch; retain results before admitting replacement."""
+        if not isinstance(reads, tuple) or not 1 <= len(reads) <= 8:
+            raise ValueError("bounded initial read tuple required")
+        # Reuse admission validation before claiming/authenticating. No wire I/O.
+        validation = BrokerMailbox(1)
+        for spec in reads:
+            if not isinstance(spec, ReadSpec):
+                raise ValueError("invalid initial read specification")
+            validation.submit(spec.device_id, spec.path, spec.timeout)
+        validation.close()
+        del validation
+        return self._run(connect, reads, cancelled)
+
+    def _run(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...],
+             cancelled: Callable[[], bool]) -> ReadBatchSummary:
         """Claim before auth; permit replacement only after verified physical close.
 
         No I/O under the lifecycle lock. Old results are retained only until the
@@ -100,12 +125,14 @@ class AccountReadLifecycle:
             self._drain = self._stop = False
 
         connection = None
+        worker = None
         transferred = False
         summary = None
         try:
             connection = connect(generation)
             worker = AccountReadWorker(connection.node, generation, connection.local_ip,
                                        connection.local_port, clock=self._clock)
+            tickets = tuple(worker.mailbox.submit(r.device_id, r.path, r.timeout) for r in reads)
             with self._lock:
                 self._worker = worker
                 if self._stop:
@@ -117,12 +144,16 @@ class AccountReadLifecycle:
                 else:
                     self._state = "active"
             transferred = True
-            summary = worker.run(connection.socket)
-            return summary
+            summary = worker.run(connection.socket, cancelled=cancelled)
+            return ReadBatchSummary(summary, tuple(worker.mailbox.take(t) for t in tickets))
         finally:
             try:
                 if connection is not None and not transferred:
-                    connection.socket.close()
+                    if worker is not None:
+                        worker.stop()
+                        worker.run(connection.socket)
+                    else:
+                        connection.socket.close()
             finally:
                 with self._lock:
                     # An exception has no verified WorkerSummary. Fail closed,
