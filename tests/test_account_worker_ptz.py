@@ -1,5 +1,6 @@
 import json
 import struct
+import threading
 
 import pytest
 
@@ -115,3 +116,113 @@ def test_lifecycle_blocks_new_auth_when_stop_is_unknown(monkeypatch, silent):
     if silent:
         with pytest.raises(ValueError):
             lifecycle.run(lambda _: pytest.fail("unexpected reauthentication"))
+
+
+def test_other_thread_stop_does_not_close_socket_before_release():
+    sock = MotionSocket()
+    owner = worker(sock)
+    started = threading.Event()
+    stopped = threading.Event()
+    def stop_from_caller():
+        assert started.wait(2)
+        owner.stop()
+        stopped.set()
+    thread = threading.Thread(target=stop_from_caller)
+    def on_start():
+        started.set()
+        assert stopped.wait(2)
+        assert not sock.closed
+    sock.on_start = on_start
+    thread.start()
+    try:
+        result = owner.run(sock, initial_motion=SPEC, wait=sock.wait)
+    finally:
+        started.set()
+        thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert result.reason == "stopped" and result.motion.release_delivery_confirmed
+    assert len(sock.moves) == 2 and sock.closed == 1
+
+
+def test_input_flood_retires_without_consuming_reserved_stop(monkeypatch):
+    sock = MotionSocket("silent")
+    owner = worker(sock)
+    def flood(size):
+        assert size == 4097
+        # Bounded packets may arrive faster than the monotonic clock advances.
+        sock.now += 0.0001
+        return b"noise", NODE.address
+    monkeypatch.setattr(sock, "recvfrom", flood)
+    result = owner.run(sock, initial_motion=SPEC, wait=sock.wait)
+    assert result.reason == "protocol" and not result.motion.release_delivery_confirmed
+    assert len(sock.moves) == 4 and sock.closed == 1
+    assert result.received_datagrams == 513 + 65
+    assert sock.now < 2.2
+
+
+def test_unread_motion_failure_does_not_replay_reads_during_cleanup():
+    sock = MotionSocket("send")
+    owner = worker(sock)
+    ticket = submit(owner)
+    result = owner.run(sock, initial_motion=SPEC, wait=sock.wait)
+    assert result.motion.release_delivery_confirmed and result.motion.send_failed
+    assert owner.mailbox.take(ticket).status == "cancelled"
+    assert not sock.reads and not sock.beats and sock.closed == 1
+
+
+def test_typed_inbox_reuses_account_before_and_after_heartbeat(monkeypatch):
+    sock = MotionSocket()
+    owner = AccountReadWorker(NODE, 1, "192.0.2.1", 1234,
+                              clock=lambda: sock.now, allow_motion=True)
+    inbox = owner.motion_inbox
+    first = inbox.submit(SPEC)
+    ticket = submit(owner)
+    observed = []
+    second = []
+    receive = sock.recvfrom
+    def receiving(size):
+        if not observed:
+            result = inbox.take(first)
+            if result is not None: observed.append(result)
+        if observed and sock.beats and not second:
+            second.append(inbox.submit(SPEC))
+            assert not inbox.cancel(first)  # stale UI cancellation cannot hit gesture2
+        return receive(size)
+    monkeypatch.setattr(sock, "recvfrom", receiving)
+    result = owner.run(sock, wait=sock.wait)
+    assert result.reason == "deadline" and result.motion.release_delivery_confirmed
+    assert observed[0].release_delivery_confirmed
+    assert inbox.take(second[0]).release_delivery_confirmed
+    assert len(sock.moves) == 4 and sock.reads == sock.beats == 1 and sock.closed == 1
+    assert owner.mailbox.take(ticket).status == "response"
+    sequences = [struct.unpack_from("<I", gute_mode2_decrypt(wire, NODE.session_key), 12)[0]
+                 for wire in sock.moves]
+    assert len(set(sequences)) == 4
+
+
+def test_active_inbox_cancel_waits_for_stop_result():
+    sock = MotionSocket()
+    owner = AccountReadWorker(NODE, 1, "192.0.2.1", 1234,
+                              clock=lambda: sock.now, allow_motion=True)
+    inbox = owner.motion_inbox
+    ticket = inbox.submit(SPEC)
+    def cancel():
+        assert inbox.cancel(ticket)
+        assert inbox.take(ticket) is None
+    sock.on_start = cancel
+    result = owner.run(sock, wait=sock.wait)
+    assert result.motion.release_delivery_confirmed
+    assert inbox.take(ticket).release_delivery_confirmed and len(sock.moves) == 2
+
+
+def test_inbox_unknown_stop_prevents_further_motion():
+    sock = MotionSocket("silent")
+    owner = AccountReadWorker(NODE, 1, "192.0.2.1", 1234,
+                              clock=lambda: sock.now, allow_motion=True)
+    inbox = owner.motion_inbox
+    ticket = inbox.submit(SPEC)
+    result = owner.run(sock, wait=sock.wait)
+    assert result.reason == "transport" and not result.motion.release_delivery_confirmed
+    assert inbox.take(ticket).reason == "release_unconfirmed"
+    with pytest.raises(ValueError): inbox.submit(SPEC)
+    assert len(sock.moves) == 4 and sock.closed == 1

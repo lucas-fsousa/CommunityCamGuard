@@ -161,3 +161,29 @@ pre-start stop and lifecycle refusal after unknown STOP are tested offline.
 Next: bounded thread-safe typed gesture admission while the worker is active,
 then driver/lifecycle integration and CI-gated physical validation. No deployment,
 new authentication, camera action or change to dashboard controls occurred.
+
+## Opt-in concurrent gesture admission (2026-10-14)
+
+`AccountReadWorker(..., allow_motion=True)` now exposes a separate typed
+`motion_inbox`; default remains disabled. This is not a dashboard route and does
+not alter the identity-read mailbox. Bootstrap and inbox modes are mutually
+exclusive. Driver/enrollment authorization remains mandatory before submitting.
+
+The inbox has one slot, including the unread result. Each ticket has generation
+and monotonic serial identifiers; stale cancellations cannot target its successor.
+Syntax/duration/direction are validated before occupying the slot. Unclaimed work
+expires after1second. Claimed cancellation only requests cleanup: the result is
+published after the sole owner completes STOP handling, never when the caller
+merely releases a button. Close rejects admission and latches cancellation while
+preserving the final result for take(). Unknown STOP permanently closes admission.
+
+The owner can now execute multiple gestures on the same authenticated socket,
+including before and after heartbeat, interleaved with reads. No thread/socket/login
+is created by this feature. Queueing is not an unbounded backlog and consumed
+results are not retained as history. Dispatcher/account still owns wire sequences.
+
+154 focused tests passed (90.1MiB peak/no swap); Ruff and targeted mypy passed.
+Tests include two-thread submit contention, cross-thread stop, stale tickets,
+unread result capacity, flood cleanup and two gestures around a heartbeat on one
+socket. No production caller opts in. Next: expose reviewed driver-level admission
+through lifecycle and enforce enrollment/legacy-login exclusion before rollout.

@@ -13,6 +13,7 @@ from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
+from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
 
@@ -41,9 +42,12 @@ class AccountReadWorker:
     """
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, allow_motion: bool = False):
+        if type(allow_motion) is not bool:
+            raise ValueError("explicit motion admission flag required")
         self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port, clock=clock)
         self.mailbox = self._dispatcher.mailbox
+        self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
         self._generation, self._clock = generation, clock
         self._stop = threading.Event()
@@ -53,10 +57,14 @@ class AccountReadWorker:
         self._socket: ReadSocket | None = None
 
     def stop(self) -> None:
+        if self.motion_inbox is not None:
+            self.motion_inbox.close()
         self._stop.set()
 
     def drain(self) -> None:
         """Request no new work, with <=2 seconds for already active replies."""
+        if self.motion_inbox is not None:
+            self.motion_inbox.close()
         self._drain.set()
 
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
@@ -90,14 +98,17 @@ class AccountReadWorker:
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
+        motion_ticket: MotionTicket | None = None
+        last_motion: ScheduledPtzResult | None = None
+        mixed = initial_motion is not None or self.motion_inbox is not None
         node = self._node
         try:
             assert node is not None
             deadline = self._clock() + 60
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
-                acknowledge_messages=initial_motion is None)
+                acknowledge_messages=not mixed)
             if initial_motion is not None:
-                if not isinstance(initial_motion, PtzSpec):
+                if not isinstance(initial_motion, PtzSpec) or self.motion_inbox is not None:
                     raise ValueError("typed motion specification required")
                 motion = self._dispatcher.prepare_ptz(initial_motion, output)
 
@@ -115,7 +126,7 @@ class AccountReadWorker:
                         output.charge(len(wire))
                 except OutputExhausted:
                     raise _Stop("output_budget") from None
-                sock.settimeout(min(0.02 if motion else 0.2, max(0.001, deadline - self._clock())))
+                sock.settimeout(min(0.02 if mixed else 0.2, max(0.001, deadline - self._clock())))
                 sent += 1
                 try:
                     if sock.sendto(wire, node.address) != len(wire):
@@ -137,6 +148,25 @@ class AccountReadWorker:
                 check()
                 if self._drain.is_set():
                     service(self._dispatcher.drain())
+                if self.motion_inbox is not None:
+                    if motion is not None and motion.result is not None:
+                        assert motion_ticket is not None
+                        last_motion = motion.result
+                        self.motion_inbox.finish(motion_ticket, last_motion)
+                        motion, motion_ticket = None, None
+                    if motion is None:
+                        claimed = self.motion_inbox.claim()
+                        if claimed is not None:
+                            motion_ticket, spec = claimed
+                            try:
+                                motion = self._dispatcher.prepare_ptz(spec, output)
+                            except BaseException:
+                                self.motion_inbox.finish(motion_ticket,
+                                    ScheduledPtzResult("cancelled", False, 0, False, False))
+                                raise
+                    if motion is not None and motion_ticket is not None:
+                        if self.motion_inbox.should_cancel(motion_ticket):
+                            motion.cancel()
                 if motion is not None:
                     packet = motion.next_packet()
                     if packet is not None:
@@ -147,7 +177,7 @@ class AccountReadWorker:
                     check()
                     if self.mailbox.ready(item.ticket):
                         send(item.prepared.wire)
-                sock.settimeout(min(0.02 if motion else 0.05, max(0.001, deadline - self._clock())))
+                sock.settimeout(min(0.02 if mixed else 0.05, max(0.001, deadline - self._clock())))
                 try:
                     wire, peer = sock.recvfrom(4097)
                 except TimeoutError:
@@ -161,8 +191,9 @@ class AccountReadWorker:
                     if motion is not None:
                         for packet in motion.observe(plain, peer, generation=self._generation):
                             send(packet.wire, reserved=True)
+                    if mixed:
                         flags = struct.unpack_from("<I", plain, 20)[0]
-                        if (not motion.owns_release_reply(plain)
+                        if ((motion is None or not motion.owns_release_reply(plain))
                                 and not flags & (1 << 20) and (flags >> 18) & 3):
                             send(build_mode2_response_ack(node, plain))
                 for acknowledgement in acknowledgements:
@@ -175,6 +206,8 @@ class AccountReadWorker:
             reason = "protocol"
         finally:
             try:
+                if self.motion_inbox is not None:
+                    self.motion_inbox.close()
                 self._dispatcher.close()
                 if motion is not None and motion.result is None:
                     assert node is not None
@@ -192,6 +225,9 @@ class AccountReadWorker:
                     maintenance.close()
                 self._node = None
             finally:
+                if (self.motion_inbox is not None and motion_ticket is not None
+                        and motion is not None and motion.result is not None):
+                    self.motion_inbox.finish(motion_ticket, motion.result)
                 try:
                     sock.close()
                 except OSError:
@@ -200,4 +236,4 @@ class AccountReadWorker:
                     with self._claim:
                         self._socket = None
         return WorkerSummary(reason, sent, received, beats, close_failed,
-                             motion.result if motion is not None else None)
+                             motion.result if motion is not None else last_motion)

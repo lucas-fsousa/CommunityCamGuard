@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 bounded concurrent motion admission: opt-in worker inbox holds one
+typed gesture/unread result, expires unclaimed work after1s and correlates caller
+cancellation by generation+serial. Multiple gestures now share one reader/socket
+with reads/heartbeat; unknown STOP permanently closes admission.154 focused tests
+passed (90.1MiB/no swap), Ruff/mypy passed. Default disabled; no camera traffic.
+Next: reviewed driver/lifecycle admission and enrollment/legacy-login exclusion,
+then successful CI before production activation. See [scheduler](docs/internal/ptz-scheduler.md).
+
 2026-10-14 CI diagnostics: recent runs still pending in pytest, logs unavailable
 until completion. Added20min job/10min test-step limits, verbose test names and
 60s faulthandler stack dump. Last inspected green job took63s. Root cause remains
