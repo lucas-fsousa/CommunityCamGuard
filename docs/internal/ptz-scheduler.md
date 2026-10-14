@@ -88,3 +88,22 @@ and close failure. Stale callers cannot allocate commands for a closed transport
 The expanded focused suite passed 99 tests (85.9MiB peak, no swap). This retirement
 is specific to the finite owner; a consumer inside a future shared worker must not
 close the shared namespace when only its own gesture ends.
+
+## Fragment transport composition (2026-10-14)
+
+The finite transport now uses `BrokerMaintenance` for bounded reassembly (two
+incomplete groups) and mode-2/session validation. It explicitly delegates inner
+message ACK ownership to the scheduler; maintenance returns only fragment ACKs.
+Existing maintenance callers keep their original automatic message ACK behavior.
+Outer fragment group identity is not treated as authenticated session identity.
+
+Fragment ACK attempts debit ordinary account output before send. Exhaustion or
+malformed fragments disable input and request STOP without borrowing its reserved
+capacity. The existing 64-datagram input ceiling also bounds fragment traffic.
+Maintenance state is closed with the transport. Out-of-order encrypted reliable
+STOP replies produce exactly two fragment ACKs, one reliable ACK and one application
+receipt in the two-fragment test, with no duplicate message ACK path.
+
+121 focused tests passed (87.1MiB peak, no swap); targeted mypy and Ruff passed.
+No deployment or camera commands. Next: shared account lifecycle and heartbeat/read
+multiplexing; this remains a finite experimental owner, not background activation.

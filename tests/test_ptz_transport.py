@@ -8,6 +8,7 @@ from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.ptz_transport import run_ptz_transport
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2
 from tests.test_ptz_protocol import NODE, reply
+from tests.test_vendor_resource_service_protocol import _fragment
 
 
 class Socket:
@@ -16,6 +17,8 @@ class Socket:
         self.sent = []
         self.closed = False
         self.reads = 0
+        self.fragments = []
+        self.fragment_started = False
 
     def settimeout(self, timeout):
         assert timeout == 0.02
@@ -33,6 +36,19 @@ class Socket:
         assert size == 4097
         self.reads += 1
         self.now[0] += 0.02
+        if self.fragments:
+            return self.fragments.pop(0), NODE.address
+        if self.failure == "fragment" and len(self.sent) >= 2 and not self.fragment_started:
+            self.fragment_started = True
+            frame = gute_mode2_decrypt(self.sent[1], NODE.session_key)
+            response = bytearray(reply(sequence=struct.unpack_from("<I", frame, 16)[0],
+                message=struct.unpack_from("<I", frame, 44)[0],
+                request=struct.unpack_from("<I", frame, 56)[0]))
+            struct.pack_into("<I", response, 20, (2 << 16) | (1 << 18))
+            wire = finish_mode2(response, NODE.session_key)
+            size = (len(wire) + 1) // 2
+            self.fragments = [_fragment(i, 2, wire, size) for i in (1, 0)]
+            return self.fragments.pop(0), NODE.address
         if self.failure in ("success", "wrong_peer", "plain") and len(self.sent) >= 2:
             frame = gute_mode2_decrypt(self.sent[1], NODE.session_key)
             response = reply(sequence=struct.unpack_from("<I", frame, 16)[0],
@@ -112,6 +128,27 @@ def test_correlated_encrypted_reply_completes_with_one_receipt():
     assert result.motion.release_delivery_confirmed
     assert result.motion.release_attempts == 1
     assert len(sock.sent) == 3 and sock.closed and now[0] < 0.4
+
+
+def test_fragmented_reliable_reply_has_no_duplicate_message_ack():
+    sock, _, execute = run("fragment")
+    result = execute()
+    assert result.motion.release_delivery_confirmed
+    # START, STOP, two fragment ACKs, one reliable ACK, one app receipt.
+    assert len(sock.sent) == 6
+    assert sum(wire[:2] == b"\x70\x02" for wire in sock.sent) == 2
+
+
+def test_fragment_ack_cannot_borrow_stop_reservation():
+    now = [0.0]
+    sock = Socket(now, "fragment")
+    def wait(seconds): now[0] += seconds
+    result = run_ptz_transport(sock, NODE, BrokerSequences(9, 1, 17),
+        AccountOutputBudget(packets=6), generation=1, access_id=123, device_id=456,
+        direction="right", reviewed_directions=frozenset({"right"}),
+        clock=lambda: now[0], wait=wait)
+    assert result.input_failed and not result.motion.release_delivery_confirmed
+    assert len(sock.sent) == 4 and sock.sent[1] == sock.sent[2] == sock.sent[3]
 
 
 @pytest.mark.parametrize("failure", ["wrong_peer", "plain"])

@@ -6,10 +6,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .account_output_budget import AccountOutputBudget
+from .broker_maintenance import BrokerMaintenance
 from .broker_sequences import BrokerSequences
 from .contracts import CertifiedNode
 from .ptz_scheduler import PtzPacket, PtzScheduler, ScheduledPtzResult
-from .session_io import decrypt_node_frame
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +33,14 @@ def run_ptz_transport(
     Caller must hold account exclusion and authorize the exact device/profile.
     Ownership includes retiring the supplied sequence namespace before close.
     No authentication, socket creation, other reader or replacement is allowed.
-    Direct mode-2 frames only; fragmented replies are not supported here yet.
+    Mode-2 frames may be fragmented; only the scheduler owns message receipts.
     Interrupts drain STOP before re-raising. This is not a reusable account worker.
     Clock/wait injection exists for deterministic offline tests only.
     """
     close_failed = input_failed = False
     received = 0
     pending_error: BaseException | None = None
+    maintenance = BrokerMaintenance(node, clock=clock, acknowledge_messages=False)
     try:
         job = PtzScheduler(node, sequences, output, generation=generation,
             access_id=access_id, device_id=device_id, direction=direction,
@@ -81,13 +82,20 @@ def run_ptz_transport(
                     input_failed = True
                     job.cancel()
                     continue
-                # Reject other peers and unencrypted/legacy modes before decode.
-                # Only the scheduler creates receipts: no second generic ACK path.
-                if peer == node.address and len(wire) >= 32 and wire[22] & 3 == 2:
-                    plain = decrypt_node_frame(wire, node)
-                    if plain is not None:
-                        for receipt in job.observe(plain, peer, generation=generation):
-                            send(receipt)
+                messages: list[bytes] = []
+                try:
+                    fragment_acks = maintenance.receive(wire, peer, inspect_message=messages.append)
+                    for ack in fragment_acks:
+                        # Fragment ACKs use ordinary capacity, never STOP slots.
+                        output.charge(len(ack))
+                        send(PtzPacket("fragment", ack))
+                except ValueError:
+                    input_failed = True
+                    job.cancel()
+                    continue
+                for plain in messages:
+                    for receipt in job.observe(plain, peer, generation=generation):
+                        send(receipt)
             except BaseException as exc:
                 # Preserve the original interrupt/error, disable input/callbacks,
                 # but retain this same socket for the finite RELEASE attempts.
@@ -106,6 +114,7 @@ def run_ptz_transport(
                         send(packet)
         result = job.result
     finally:
+        maintenance.close()
         sequences.close()
         try:
             sock.close()

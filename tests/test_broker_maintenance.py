@@ -31,6 +31,23 @@ def test_current_reliable_message_gets_ack_only():
         owner.receive(message(), NODE.address)
 
 
+def test_delegated_message_ack_keeps_fragment_ack_and_delivers_plain_once():
+    owner = BrokerMaintenance(NODE, acknowledge_messages=False)
+    inspected = []
+    wire = message()
+    assert not owner.receive(wire, NODE.address, inspect_message=inspected.append)
+    assert len(inspected) == 1
+    inspected.clear()
+    for index in (1, 0):
+        assert len(owner.receive(_fragment(index, 2, wire, 16), NODE.address,
+                                 inspect_message=inspected.append)) == 1
+    assert len(inspected) == 1 and owner.acknowledgements == 2
+
+
+def test_ack_ownership_requires_boolean():
+    with pytest.raises(ValueError): BrokerMaintenance(NODE, acknowledge_messages="false")
+
+
 @pytest.mark.parametrize("fault", ["peer", "session", "key", "plain"])
 def test_uncorrelated_input_cannot_trigger_message_ack(fault):
     owner = BrokerMaintenance(NODE)

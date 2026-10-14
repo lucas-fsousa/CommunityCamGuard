@@ -22,11 +22,18 @@ from .tcp_budget import TcpProfile, validate_profile
 
 
 class BrokerMaintenance:
-    """One broker/session, default 15 seconds, 512 datagrams, 1 MiB; no history."""
+    """One broker/session, default 15 seconds, 512 datagrams, 1 MiB; no history.
+
+    acknowledge_messages=False delegates inner message ACKs to the caller;
+    fragment ACKs remain here. Existing callers retain automatic message ACKs.
+    """
 
     def __init__(self, node: CertifiedNode, *, clock: Callable[[], float] = time.monotonic,
-                 profile: TcpProfile = TcpProfile.SHORT):
+                 profile: TcpProfile = TcpProfile.SHORT, acknowledge_messages: bool = True):
         validate_profile(profile)
+        if type(acknowledge_messages) is not bool:
+            raise ValueError("message acknowledgement ownership must be explicit")
+        self._acknowledge_messages = acknowledge_messages
         self._node: CertifiedNode | None = node
         self._clock, self._deadline = clock, clock() + profile.budget.broker_seconds
         self._fragments = FragmentReassembler(max_groups=2)
@@ -84,7 +91,7 @@ class BrokerMaintenance:
             if inspect_message is not None:
                 inspect_message(plain)
             flags = struct.unpack_from("<I", plain, 20)[0]
-            if not flags & (1 << 20) and (flags >> 18) & 3:
+            if self._acknowledge_messages and not flags & (1 << 20) and (flags >> 18) & 3:
                 replies.append(build_mode2_response_ack(node, plain))
                 self.acknowledgements += 1
             return tuple(replies)

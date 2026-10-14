@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 PTZ fragmented responses: finite owner reuses bounded maintenance
+reassembly with delegated message ACKs. Fragment ACKs consume ordinary capacity,
+never the reserved STOP slots. Existing read/media ACK behavior unchanged.
+121 focused tests passed (87.1MiB/no swap), Ruff/targeted mypy passed. No deployment
+or camera traffic. Next: shared lifecycle and heartbeat/read multiplexing; not a
+new periodic login. See [scheduler](docs/internal/ptz-scheduler.md).
+
 2026-10-14 finite transport ownership audit: retire the account sequence namespace
 before physical socket close on every exit, preventing stale command allocation.
 99 focused tests passed (85.9MiB/no swap). Shared-worker consumers must not copy
