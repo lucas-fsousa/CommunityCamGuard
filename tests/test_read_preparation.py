@@ -116,3 +116,42 @@ def test_mismatched_target_fails_before_cache_retirement(owner, monkeypatch):
     with pytest.raises(ValueError):
         preparation.prepare_identity_reads(ENROLLMENT, camera_id="other", device_id="123")
     assert not owner._paused and not control_ownership._cleanup_uncertain
+
+
+def test_competing_control_before_auth_yields_without_login(owner, monkeypatch):
+    monkeypatch.setattr(preparation, "control_channel_contended", lambda: True)
+    monkeypatch.setattr(preparation, "open_read_connection", lambda *a, **k: pytest.fail("auth"))
+    assert run(WorkerSocket()).failure == "cancelled"
+    assert not owner._paused and not control_ownership._cleanup_uncertain
+
+
+def test_competing_control_during_auth_reaches_factory_cancellation(owner, monkeypatch):
+    demand = [False]
+    monkeypatch.setattr(preparation, "control_channel_contended", lambda: demand[0])
+    def opening(*args, **kwargs):
+        assert not kwargs["cancelled"]()
+        demand[0] = True
+        assert kwargs["cancelled"]()
+        raise ReadConnectFailure("cancelled with confirmed cleanup")
+    monkeypatch.setattr(preparation, "open_read_connection", opening)
+    assert run(WorkerSocket()).failure == "connection"
+    assert not owner._paused and not control_ownership._cleanup_uncertain
+
+
+@pytest.mark.parametrize("close_fails", [False, True])
+def test_competing_control_stops_reads_but_never_bypasses_close(owner, monkeypatch, close_fails):
+    sock = WorkerSocket("close" if close_fails else None)
+    calls = connect(sock, monkeypatch, owner)
+    demand = [False]
+    monkeypatch.setattr(preparation, "control_channel_contended", lambda: demand[0])
+    receive = sock.recvfrom
+    def receiving(size):
+        demand[0] = True
+        return receive(size)
+    monkeypatch.setattr(sock, "recvfrom", receiving)
+    if close_fails:
+        with pytest.raises(preparation.P2PProbeError, match="cleanup"): run(sock)
+    else:
+        assert run(sock).failure == "stopped"
+    assert sock.now < 1 and sock.closed == 1 and calls == ["auth"]
+    assert control_ownership._cleanup_uncertain == close_fails

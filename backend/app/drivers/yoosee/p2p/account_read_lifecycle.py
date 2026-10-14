@@ -127,8 +127,14 @@ class AccountReadLifecycle:
                 self._worker.mailbox.close()
                 self._worker.stop()
 
-    def run(self, connect: Callable[[int], ReadConnection]) -> WorkerSummary:
-        return self._run(connect, (), lambda: False).worker
+    def run(self, connect: Callable[[int], ReadConnection], *,
+            cancelled: Callable[[], bool] = lambda: False) -> WorkerSummary:
+        """One explicit session; cancellation drains cleanup, never reconnects.
+
+        The trusted connection factory must also observe cancellation during
+        authentication. The worker observes it after ownership transfer.
+        """
+        return self._run(connect, (), cancelled).worker
 
     def run_reads(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...], *,
                   cancelled: Callable[[], bool] = lambda: False) -> ReadBatchSummary:

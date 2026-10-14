@@ -11,6 +11,7 @@ from .p2p.account_read_lifecycle import AccountReadLifecycle
 from .p2p.account_read_worker import WorkerSummary
 from .p2p.broker_read_socket import ReadSpec
 from .p2p.contracts import ACCOUNT_IDENTITY_READ_PATHS, P2PProbeError
+from .p2p.control_ownership import control_channel_contended
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,13 +48,16 @@ def prepare_identity_reads(enrollment: P2PEnrollment, *, camera_id: str, device_
         return ReadPreparation("cancelled", 0)
     specs = tuple(ReadSpec(int(device_id), path, 2.0) for path in ACCOUNT_IDENTITY_READ_PATHS)
     with reserve_read_handoff():
-        if cancelled():
+        def should_yield() -> bool:
+            return cancelled() or control_channel_contended()
+
+        if should_yield():
             return ReadPreparation("cancelled", 0)
         lifecycle = AccountReadLifecycle(clock=clock)
         try:
             result = lifecycle.run_reads(lambda _: open_read_connection(
-                enrollment, camera_id=camera_id, device_id=device_id, cancelled=cancelled),
-                specs, cancelled=cancelled)
+                enrollment, camera_id=camera_id, device_id=device_id, cancelled=should_yield),
+                specs, cancelled=should_yield)
         except ReadConnectFailure:
             # The factory explicitly confirmed resource cleanup; a DNS timeout
             # or rejected authentication is not an uncertain live broker socket.

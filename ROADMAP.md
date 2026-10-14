@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 cooperative cancellation integrated into finite identity preparation:
+competing legacy controls now cancel before/during authentication or during reads,
+always retaining the reservation through physical close. Shared motion lifecycle
+also accepts owner cancellation and drains STOP; unknown STOP/close still blocks
+replacement.72 focused tests passed (87MiB/no swap). No production activation,
+camera traffic or automatic reconnect. Persistent lifetime/server integration
+remains pending; the finite diagnostic must not become a periodic login loop.
+
 2026-10-14 cooperative account contention: existing15s legacy control wait would
 conflict with a persistent owner. Added advisory competing-waiter signal (reentrant
 owner excluded; timeout/interruption cleaned). Offline test proves STOP+physical

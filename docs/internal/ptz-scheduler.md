@@ -333,3 +333,24 @@ must still block replacement rather than yield into a new authentication.
 Next: server scheduling must combine this signal with enrollment freshness,
 shutdown and the existing uncertain-cleanup barrier. Do not automatically restart
 a login loop after yielding. The persistent lifetime policy is still pending.
+
+## Cancellation reaches the connection factory and lifecycle (2026-10-14)
+
+The finite `prepare_identity_reads` adapter now combines caller cancellation with
+competing control demand after acquiring the reservation. The same predicate is
+passed to connection establishment and the sole reader. Contention before auth
+avoids login; contention during auth uses the factory's existing bounded cleanup;
+contention during reads ends the diagnostic without waiting for its60s deadline.
+The reservation still covers physical close. A close failure poisons the shared
+channel, so yielding cannot silently permit an unsafe replacement authentication.
+
+`AccountReadLifecycle.run` also accepts a cancellation predicate, matching its
+batch API. A trusted connection factory must observe that predicate itself while
+authenticating; after transfer the worker observes it. Offline tests submit an
+authorized gesture, cancel after START and verify STOP on the same socket before
+close. Missing STOP confirmation leaves the lifecycle blocked. No automatic retry
+or thread is introduced, and no production scheduler activates this lifecycle.
+
+72 focused tests passed with87MiB peak and zero swap. This is cooperative bounded
+cancellation, not a guarantee of FIFO fairness or a measured15s live latency SLA.
+Persistent lifetime, server-owned scheduling and physical validation remain open.

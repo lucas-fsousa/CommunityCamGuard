@@ -10,6 +10,32 @@ from tests.test_account_worker_ptz import SPEC, MotionSocket
 GRANT = PtzGrant(123, 456, frozenset({"right"}))
 
 
+@pytest.mark.parametrize("silent", [False, True])
+def test_external_cancellation_drains_motion_without_automatic_reconnect(monkeypatch, silent):
+    sock = MotionSocket("silent" if silent else None)
+    owner = AccountReadLifecycle(clock=lambda: sock.now, motion_grants=(GRANT,))
+    tickets = []
+    auth = []
+    receive = sock.recvfrom
+    def receiving(size):
+        if not tickets:
+            tickets.append(owner.submit_motion(SPEC))
+        return receive(size)
+    monkeypatch.setattr(sock, "recvfrom", receiving)
+    def connect(generation):
+        auth.append(generation)
+        return connection(sock)
+    result = owner.run(connect, cancelled=lambda: bool(sock.moves))
+    assert result.reason == "stopped"
+    assert result.motion.release_delivery_confirmed == (not silent)
+    assert len(sock.moves) == (4 if silent else 2)
+    assert sock.closed == 1 and auth == [1]
+    assert owner.state == ("blocked" if silent else "idle")
+    if silent:
+        with pytest.raises(ValueError): owner.run(connect)
+        assert auth == [1]
+
+
 @pytest.mark.parametrize("grants", [[GRANT], (GRANT,) * 9, (GRANT, GRANT),
     (replace(GRANT, access_id=True),), (replace(GRANT, device_id=0),),
     (replace(GRANT, directions=frozenset({"diagonal"})),),
