@@ -119,3 +119,29 @@ def test_untrusted_reply_never_confirms_stop(failure):
     sock, _, execute = run(failure)
     assert not execute().motion.release_delivery_confirmed
     assert len(sock.sent) == 4 and sock.closed
+
+
+@pytest.mark.parametrize("mode", ["cancel", "invalid", "interrupt", "close", "success"])
+def test_transport_retires_namespace_before_socket_close(mode):
+    now = [0.0]
+    sequences = BrokerSequences(9, 1, 17)
+    class OwnedSocket(Socket):
+        def close(self):
+            assert sequences.closed
+            super().close()
+    sock = OwnedSocket(now, mode)
+    def wait(seconds): now[0] += seconds
+    def execute():
+        return run_ptz_transport(sock, NODE, sequences, AccountOutputBudget(),
+            generation=1, access_id=123, device_id=456,
+            direction="up" if mode == "invalid" else "right",
+            reviewed_directions=frozenset({"right"}),
+            cancelled=lambda: mode == "cancel", clock=lambda: now[0], wait=wait)
+    if mode == "invalid":
+        with pytest.raises(ValueError): execute()
+    elif mode == "interrupt":
+        with pytest.raises(KeyboardInterrupt): execute()
+    else:
+        execute()
+    assert sock.closed and not sequences.matches(9, 1)
+    with pytest.raises(ValueError): sequences.allocate()

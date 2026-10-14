@@ -1,5 +1,10 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 finite transport ownership audit: retire the account sequence namespace
+before physical socket close on every exit, preventing stale command allocation.
+99 focused tests passed (85.9MiB/no swap). Shared-worker consumers must not copy
+this whole-owner retirement behavior. CI pending; no production changes.
+
 2026-10-14 experimental finite PTZ transport: one supplied socket/reader, 20ms
 polling, bounded input and STOP drain before close on cancellation/write/read
 failure or interrupt. Synthetic encrypted replies route through one receipt owner.

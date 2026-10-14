@@ -31,6 +31,7 @@ def run_ptz_transport(
     """Take exclusive ownership of a socket, run one gesture, then close it.
 
     Caller must hold account exclusion and authorize the exact device/profile.
+    Ownership includes retiring the supplied sequence namespace before close.
     No authentication, socket creation, other reader or replacement is allowed.
     Direct mode-2 frames only; fragmented replies are not supported here yet.
     Interrupts drain STOP before re-raising. This is not a reusable account worker.
@@ -105,6 +106,7 @@ def run_ptz_transport(
                         send(packet)
         result = job.result
     finally:
+        sequences.close()
         try:
             sock.close()
         except OSError:

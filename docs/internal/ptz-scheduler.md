@@ -81,3 +81,10 @@ integration remain pending. This finite transport is not the final shared worker
 Targeted mypy passed under the same limit; Ruff passed. Encrypted synthetic STOP
 success, wrong peers/plaintext rejection, failures, interruption and flood cleanup
 were tested offline. No physical STOP guarantee, camera traffic or deployment.
+
+Ownership audit: the finite owner now retires its supplied sequence namespace
+before closing the socket, including invalid admission, cancellation, interrupt
+and close failure. Stale callers cannot allocate commands for a closed transport.
+The expanded focused suite passed 99 tests (85.9MiB peak, no swap). This retirement
+is specific to the finite owner; a consumer inside a future shared worker must not
+close the shared namespace when only its own gesture ends.
