@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 mixed account reader: optional trusted bootstrap PTZ now runs beside
+reads/heartbeat on one experimental worker socket. Shared identifiers/output,
+exclusive reply ACK routing and mandatory finally-block STOP drain before close.
+Lifecycle blocks replacement after unknown STOP.132 focused tests passed
+(88.8MiB/no swap), Ruff/targeted mypy passed. Production callers unchanged.
+Next: bounded typed concurrent gesture admission, driver/lifecycle integration,
+then CI-gated camera3 validation. See [scheduler](docs/internal/ptz-scheduler.md).
+
 2026-10-14 shared account PTZ admission: typed scheduler now uses BrokerAccount's
 existing read/heartbeat sequence namespace. One unfinished gesture, bounded
 lifetime admission, drain/retirement cancellation and explicit pending cleanup.

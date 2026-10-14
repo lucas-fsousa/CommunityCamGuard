@@ -131,3 +131,33 @@ path; production PTZ is unchanged. Still pending: shared socket-loop integration
 thread-safe typed motion admission and receipt ownership for mixed traffic. Do not
 wire this API into the old read worker: its immediate shutdown currently closes
 the socket without a motion drain.
+
+## Single-reader mixed worker (2026-10-14)
+
+The experimental `AccountReadWorker.run(initial_motion=PtzSpec(...))` now supports
+one trusted bootstrap gesture alongside identity reads and heartbeat on the same
+socket. No production caller supplies this option; it is not a public PTZ mailbox.
+`PtzSpec` hides device/access identifiers in repr and does not grant capabilities.
+The dispatcher reserves identifiers from the same account and all output shares
+one budget with protected STOP capacity.
+
+The mixed reader polls at20ms, routes correlated RELEASE replies to the scheduler,
+and generates generic reliable ACKs only for other messages. Fragment ACKs remain
+ordinary output. Existing read-only callers retain their original ACK behavior.
+The reusable `ptz_socket_pump` drives an existing scheduler without closing its
+socket or retiring its namespace; `ptz_transport` remains the finite owning wrapper.
+This separation lets the worker drain STOP in its finally block before physical
+close, including on stop, drain, receive/write failure and interruption. Cleanup
+send/receive counts are included on normal returns. Exceptions remain fail-closed.
+
+`WorkerSummary.motion` exposes the finite result. Lifecycle cannot admit another
+authentication after unconfirmed RELEASE even if socket close itself succeeded.
+Confirmed delivery still does not prove motor state. Cleanup is bounded by the
+existing scheduler deadline and may outlive the ordinary worker deadline by2s.
+
+132 focused tests passed (88.8MiB peak/no swap); Ruff and mypy on seven affected
+modules passed. Mixed encrypted PTZ/read/heartbeat, ACK counts, failure drain,
+pre-start stop and lifecycle refusal after unknown STOP are tested offline.
+Next: bounded thread-safe typed gesture admission while the worker is active,
+then driver/lifecycle integration and CI-gated physical validation. No deployment,
+new authentication, camera action or change to dashboard controls occurred.

@@ -159,4 +159,6 @@ class AccountReadLifecycle:
                     # An exception has no verified WorkerSummary. Fail closed,
                     # including interruptions even if the worker attempted close.
                     self._state = ("idle" if summary is not None
-                                   and not summary.socket_close_failed else "blocked")
+                                   and not summary.socket_close_failed
+                                   and (summary.motion is None or not summary.motion.start_attempted
+                                        or summary.motion.release_delivery_confirmed) else "blocked")

@@ -4,11 +4,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from .account_output_budget import AccountOutputBudget
 from .broker_account import AccountEvents, AccountRead, BrokerAccount, Retirement
 from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .ptz_scheduler import PtzScheduler, PtzSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +47,12 @@ class AccountReadDispatcher:
             self._routes.pop(request.ticket, None)
             self._account.cancel_read(request.ticket)
         self.mailbox.acknowledge_cancel(ticket)
+
+    def prepare_ptz(self, spec: PtzSpec, output: AccountOutputBudget) -> PtzScheduler:
+        """Sole owner only; never accept gestures through the identity mailbox."""
+        return self._account.prepare_ptz(output, access_id=spec.access_id,
+            device_id=spec.device_id, direction=spec.direction,
+            reviewed_directions=spec.reviewed_directions, duration=spec.duration)
 
     def _publish(self, events: AccountEvents) -> AccountEvents:
         for completion in events.reads:

@@ -1,16 +1,20 @@
 """Finite exclusive encrypted socket pump; concurrent callers use only its mailbox."""
 
+import struct
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .access_protocol import build_mode2_response_ack
 from .account_output_budget import AccountOutputBudget, OutputExhausted
 from .account_read_dispatcher import AccountReadDispatcher
 from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
+from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
+from .ptz_socket_pump import pump_ptz
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +24,7 @@ class WorkerSummary:
     received_datagrams: int
     heartbeat_responses: int
     socket_close_failed: bool
+    motion: ScheduledPtzResult | None = None
 
 
 class _Stop(Exception):
@@ -54,7 +59,14 @@ class AccountReadWorker:
         """Request no new work, with <=2 seconds for already active replies."""
         self._drain.set()
 
-    def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False) -> WorkerSummary:
+    def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
+            initial_motion: PtzSpec | None = None,
+            wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
+        """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
+
+        Motion is driven by this same reader. Driver must authorize the spec.
+        Every shutdown path drains its STOP before physically closing the socket.
+        """
         # A rejected second invocation still owns/closes its supplied socket,
         # but must not tear down the first invocation's account or mailbox.
         with self._claim:
@@ -77,11 +89,17 @@ class AccountReadWorker:
         reason = "stopped"
         close_failed = False
         maintenance = None
+        motion: PtzScheduler | None = None
         node = self._node
         try:
             assert node is not None
             deadline = self._clock() + 60
-            maintenance = BrokerMaintenance.account_check(node, clock=self._clock)
+            maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
+                acknowledge_messages=initial_motion is None)
+            if initial_motion is not None:
+                if not isinstance(initial_motion, PtzSpec):
+                    raise ValueError("typed motion specification required")
+                motion = self._dispatcher.prepare_ptz(initial_motion, output)
 
             def check() -> None:
                 if self._stop.is_set() or cancelled():
@@ -89,17 +107,23 @@ class AccountReadWorker:
                 if self._clock() >= deadline:
                     raise _Stop("deadline")
 
-            def send(wire: bytes) -> None:
+            def send(wire: bytes, *, reserved: bool = False) -> None:
                 nonlocal sent
                 check()
                 try:
-                    output.charge(len(wire))
+                    if not reserved:
+                        output.charge(len(wire))
                 except OutputExhausted:
                     raise _Stop("output_budget") from None
-                sock.settimeout(min(0.2, max(0.001, deadline - self._clock())))
+                sock.settimeout(min(0.02 if motion else 0.2, max(0.001, deadline - self._clock())))
                 sent += 1
-                if sock.sendto(wire, node.address) != len(wire):
-                    raise OSError("partial broker datagram")
+                try:
+                    if sock.sendto(wire, node.address) != len(wire):
+                        raise OSError("partial broker datagram")
+                except BaseException:
+                    if reserved and motion is not None:
+                        motion.send_failed()
+                    raise
 
             def service(events: AccountEvents) -> None:
                 nonlocal beats
@@ -113,13 +137,17 @@ class AccountReadWorker:
                 check()
                 if self._drain.is_set():
                     service(self._dispatcher.drain())
+                if motion is not None:
+                    packet = motion.next_packet()
+                    if packet is not None:
+                        send(packet.wire, reserved=True)
                 batch = self._dispatcher.step()
                 service(batch.maintenance)
                 for item in batch.reads:
                     check()
                     if self.mailbox.ready(item.ticket):
                         send(item.prepared.wire)
-                sock.settimeout(min(0.05, max(0.001, deadline - self._clock())))
+                sock.settimeout(min(0.02 if motion else 0.05, max(0.001, deadline - self._clock())))
                 try:
                     wire, peer = sock.recvfrom(4097)
                 except TimeoutError:
@@ -130,6 +158,13 @@ class AccountReadWorker:
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
                     service(self._dispatcher.receive(plain, peer, generation=self._generation))
+                    if motion is not None:
+                        for packet in motion.observe(plain, peer, generation=self._generation):
+                            send(packet.wire, reserved=True)
+                        flags = struct.unpack_from("<I", plain, 20)[0]
+                        if (not motion.owns_release_reply(plain)
+                                and not flags & (1 << 20) and (flags >> 18) & 3):
+                            send(build_mode2_response_ack(node, plain))
                 for acknowledgement in acknowledgements:
                     send(acknowledgement)
         except _Stop as stopped:
@@ -141,6 +176,18 @@ class AccountReadWorker:
         finally:
             try:
                 self._dispatcher.close()
+                if motion is not None and motion.result is None:
+                    assert node is not None
+                    motion.cancel()
+                    try:
+                        cleanup = pump_ptz(sock, node, motion, output, generation=self._generation,
+                                           cancelled=lambda: True, clock=self._clock, wait=wait)
+                        sent += cleanup.sent_datagrams
+                        received += cleanup.received_datagrams
+                    finally:
+                        if maintenance is not None:
+                            maintenance.close()
+                        self._node = None
                 if maintenance is not None:
                     maintenance.close()
                 self._node = None
@@ -152,4 +199,5 @@ class AccountReadWorker:
                 finally:
                     with self._claim:
                         self._socket = None
-        return WorkerSummary(reason, sent, received, beats, close_failed)
+        return WorkerSummary(reason, sent, received, beats, close_failed,
+                             motion.result if motion is not None else None)

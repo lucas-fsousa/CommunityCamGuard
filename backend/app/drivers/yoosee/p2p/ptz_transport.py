@@ -1,15 +1,15 @@
-"""Experimental finite UDP PTZ owner; deliberately not wired into production."""
+"""Finite PTZ socket owner; production activation remains disabled."""
 
-import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from .account_output_budget import AccountOutputBudget
-from .broker_maintenance import BrokerMaintenance
+from .broker_read_socket import ReadSocket
 from .broker_sequences import BrokerSequences
 from .contracts import CertifiedNode
-from .ptz_scheduler import PtzPacket, PtzScheduler, ScheduledPtzResult
+from .ptz_scheduler import PtzScheduler, ScheduledPtzResult
+from .ptz_socket_pump import pump_ptz
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,106 +21,30 @@ class PtzTransportResult:
 
 
 def run_ptz_transport(
-    sock: socket.socket, node: CertifiedNode, sequences: BrokerSequences,
+    sock: ReadSocket, node: CertifiedNode, sequences: BrokerSequences,
     output: AccountOutputBudget, *, generation: int, access_id: int,
     device_id: int, direction: str, reviewed_directions: frozenset[str],
     duration: float = 0.2, cancelled: Callable[[], bool] = lambda: False,
     clock: Callable[[], float] = time.monotonic,
     wait: Callable[[float], None] = time.sleep,
 ) -> PtzTransportResult:
-    """Take exclusive ownership of a socket, run one gesture, then close it.
+    """Transfer exclusive socket ownership for one authorized gesture and close.
 
-    Caller must hold account exclusion and authorize the exact device/profile.
-    Ownership includes retiring the supplied sequence namespace before close.
-    No authentication, socket creation, other reader or replacement is allowed.
-    Mode-2 frames may be fragmented; only the scheduler owns message receipts.
-    Interrupts drain STOP before re-raising. This is not a reusable account worker.
-    Clock/wait injection exists for deterministic offline tests only.
+    Caller holds account/enrollment exclusion. No login, socket creation or retry.
+    Invalid admission also retires the namespace and closes the supplied socket.
     """
-    close_failed = input_failed = False
-    received = 0
-    pending_error: BaseException | None = None
-    maintenance = BrokerMaintenance(node, clock=clock, acknowledge_messages=False)
+    close_failed = False
     try:
         job = PtzScheduler(node, sequences, output, generation=generation,
             access_id=access_id, device_id=device_id, direction=direction,
             reviewed_directions=reviewed_directions, duration=duration, clock=clock)
-
-        def send(packet: PtzPacket) -> None:
-            # Scheduler already charged this attempt. Never replay START even if
-            # sendto failed after the kernel may have accepted the datagram.
-            try:
-                sock.settimeout(0.02)
-                if sock.sendto(packet.wire, node.address) != len(packet.wire):
-                    job.send_failed()
-            except OSError:
-                job.send_failed()
-
-        while job.result is None:
-            try:
-                if pending_error is None and cancelled():
-                    job.cancel()
-                packet = job.next_packet()
-                if packet is not None:
-                    send(packet)
-                if job.result is not None:
-                    break
-                if input_failed:
-                    wait(0.02)
-                    continue
-                sock.settimeout(0.02)
-                try:
-                    wire, peer = sock.recvfrom(4097)
-                except TimeoutError:
-                    continue
-                except OSError:
-                    input_failed = True
-                    job.cancel()
-                    continue
-                received += 1
-                if received > 64 or len(wire) > 4096:
-                    input_failed = True
-                    job.cancel()
-                    continue
-                messages: list[bytes] = []
-                try:
-                    fragment_acks = maintenance.receive(wire, peer, inspect_message=messages.append)
-                    for ack in fragment_acks:
-                        # Fragment ACKs use ordinary capacity, never STOP slots.
-                        output.charge(len(ack))
-                        send(PtzPacket("fragment", ack))
-                except ValueError:
-                    input_failed = True
-                    job.cancel()
-                    continue
-                for plain in messages:
-                    for receipt in job.observe(plain, peer, generation=generation):
-                        send(receipt)
-            except BaseException as exc:
-                # Preserve the original interrupt/error, disable input/callbacks,
-                # but retain this same socket for the finite RELEASE attempts.
-                if pending_error is None:
-                    pending_error = exc
-                input_failed = True
-                job.send_failed()
-                # A repeated interruption in wait must not create a tight loop.
-                if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-                    continue
-                if job.result is None:
-                    # Transport callbacks may fail; scheduler itself must remain
-                    # healthy for cleanup. Its next step runs outside the handler.
-                    packet = job.next_packet()
-                    if packet is not None:
-                        send(packet)
-        result = job.result
+        result = pump_ptz(sock, node, job, output, generation=generation,
+                          cancelled=cancelled, clock=clock, wait=wait)
     finally:
-        maintenance.close()
         sequences.close()
         try:
             sock.close()
         except OSError:
             close_failed = True
-    if pending_error is not None:
-        raise pending_error
-    assert result is not None
-    return PtzTransportResult(result, received, input_failed, close_failed)
+    return PtzTransportResult(result.motion, result.received_datagrams,
+                              result.input_failed, close_failed)

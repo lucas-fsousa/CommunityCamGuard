@@ -42,13 +42,14 @@ class BrokerMaintenance:
 
     @classmethod
     def account_check(cls, node: CertifiedNode, *,
-                      clock: Callable[[], float] = time.monotonic) -> BrokerMaintenance:
+                      clock: Callable[[], float] = time.monotonic,
+                      acknowledge_messages: bool = True) -> BrokerMaintenance:
         """Fixed 60-second read/heartbeat experiment; all traffic caps unchanged.
 
         Not a streaming profile or general lifetime override. Existing native AV
         users retain their original 15/28-second ceilings.
         """
-        owner = cls(node, clock=clock)
+        owner = cls(node, clock=clock, acknowledge_messages=acknowledge_messages)
         owner._deadline = clock() + 60
         return owner
 

@@ -12,8 +12,18 @@ from .account_output_budget import AccountOutputBudget
 from .broker_sequences import BrokerSequences
 from .contracts import CertifiedNode
 from .ptz_command_reservation import reserve_ptz_commands
-from .ptz_protocol import build_ptz_receipt
+from .ptz_protocol import build_ptz_receipt, parse_ptz_reply
 from .ptz_release_delivery import ReleaseDelivery
+
+
+@dataclass(frozen=True, slots=True)
+class PtzSpec:
+    """Trusted driver-reviewed gesture, not a public capability assertion."""
+    access_id: int = field(repr=False)
+    device_id: int = field(repr=False)
+    direction: str
+    reviewed_directions: frozenset[str]
+    duration: float = 0.2
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +130,15 @@ class PtzScheduler:
         self._releases += 1
         self._retry_at = now + 0.5
         return PtzPacket("release", wire)
+
+    def owns_release_reply(self, plain: bytes) -> bool:
+        """Sole-reader routing only: prevents a second generic message ACK path."""
+        if not self._releases:
+            return False
+        ids = self._commands.release_correlation
+        return parse_ptz_reply(plain, node=self._node, access_id=self._access,
+            device_id=self._device, sequence=ids.sequence, message_id=ids.message_id,
+            request_id=ids.request_id) is not None
 
     def observe(self, plain: bytes, peer: tuple[str, int], *, generation: int) -> tuple[PtzPacket, ...]:
         if self.result is not None or self._delivery is None or not self._releases:
