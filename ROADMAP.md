@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 correlated PTZ evidence adapter: exactly three issued read/completion
+pairs bind camera, device, generation, sequence and path; strict successful camera
+responses only. Shared legacy/new identity policy plus current axis intersection
+produce a generation-scoped grant with10s freshness.94 focused tests passed
+(84.1MiB/no swap), Ruff/mypy passed. No live I/O/deployment. Next: collect and consume
+the grant within the same driver-owned live generation, retaining inventory and
+legacy-login exclusion; production lifetime/replacement policy remains pending.
+
 CI confirmation2026-10-14: run38574667703 /70a365a SUCCESS in65seconds: lint,
 types, full Python suite and all frontend contracts. The recording test receiver
 fix resolves the observed stall. Shared PTZ/inbox/scope changes are included in

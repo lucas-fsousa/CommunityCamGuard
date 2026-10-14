@@ -234,3 +234,33 @@ cache, but the production motion adapter must retain that exclusion through fina
 STOP and physical close. Neither the experimental60s worker nor the120s account
 model defines the eventual persistent-session renewal policy. These are remaining
 integration requirements, not reasons to bypass fresh capability checks.
+
+## Correlated evidence-to-grant adapter (2026-10-14)
+
+`motion_evidence.grant_from_completions` now derives a scoped grant from exactly
+three expected `ReadRequest`/`ReadCompletion` pairs. Requests must have distinct
+sequences/paths, B7 kind and the same device/generation; every completion must
+match its issued request and be a successful camera response. A missing transport
+ACK is allowed when the camera response arrives first. Transport rejection,
+ACK-only, booleans masquerading as numeric error codes, duplicate paths, old
+sequences and cross-device/generation results are rejected.
+
+The driver verifies exact enrollment/camera binding, normalizes product/version,
+intersects model-reviewed candidates with current first-head axis evidence and
+rejects an empty result. `ptz_identity_policy.identity_directions` is now shared
+with the legacy preparation path, preserving its early identity rejection before
+the third read. An exact previously reviewed unit must still match all identity
+fields; otherwise the driver's model catalogue must recognize the variant.
+
+`VerifiedMotionScope.for_generation` refuses another generation, an expired
+ten-second collection window or a clock preceding that window. Consume it under
+the same enrollment/account lock before releasing the socket; never persist or
+reuse it after reauthentication. This is trusted backend evidence processing,
+not proof of provenance from caller-supplied DTOs. The owner must supply its actual
+issued requests and collection start time and must still verify online inventory.
+
+94 focused evidence/legacy-target/lifecycle/worker tests passed (84.1MiB peak,
+no swap); Ruff and targeted mypy passed. No camera I/O or deployment. Remaining:
+wire collection/grant consumption into the driver-owned transfer on the same live
+generation, then define production lifetime/replacement. Do not feed evidence from
+the completed/closed60s diagnostic into a newly authenticated account.

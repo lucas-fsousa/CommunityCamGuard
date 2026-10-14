@@ -11,8 +11,8 @@ import socket
 import time
 
 from ....db.p2p import P2PEnrollment
-from ..capability_identity import CapabilityIdentity, normalize_identity
-from ..ptz_models import directions_for
+from ..capability_identity import CapabilityIdentity
+from ..ptz_identity_policy import identity_directions
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, OnlineDevice, P2PProbeError, P2PPropertyRead
 from .model_session import exchange_model_read
@@ -79,13 +79,13 @@ def verify_ptz_target(sock: socket.socket, node: CertifiedNode, target: OnlineDe
         reads.append(P2PPropertyRead(enrollment.device_id, path, True, False,
                                      result.transport_acknowledged, 0, result.value))
         if offset == 1:
-            identity = normalize_identity(reads[0], reads[1], device_id=enrollment.device_id)
-            if identity is None or (expected is not None and identity != expected):
-                raise P2PProbeError("native PTZ identity does not match reviewed evidence")
-            if expected is None:
-                reviewed = reviewed & directions_for(identity)
-                if direction not in reviewed:
-                    raise P2PProbeError("native PTZ model profile is not supported")
+            try:
+                reviewed = identity_directions(reads[0], reads[1], device_id=enrollment.device_id,
+                                               expected=expected, reviewed=reviewed)
+            except ValueError as exc:
+                raise P2PProbeError(str(exc)) from None
+            if direction not in reviewed:
+                raise P2PProbeError("native PTZ model profile is not supported")
     if time.monotonic() >= deadline:
         raise P2PProbeError("native PTZ preparation exhausted its time budget")
     if not direction_supported(reads[2].value, direction):
