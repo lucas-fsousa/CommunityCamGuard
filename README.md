@@ -60,6 +60,10 @@ boundary; a long-running control operation can briefly make PTZ busy.
 
 ## Why it exists
 
+Deploying behind HTTPS? See the [proxy validation guide](docs/public/https-proxy-check.md)
+for origin configuration, the recordings-route redirect pitfall and bounded
+temporary-access checks against your real public deployment.
+
 Cheap IP cameras usually speak **ONVIF + RTSP** on the LAN, but their official apps lock you
 into the cloud and expose few controls. This project talks to the cameras directly on your
 network and gives you one dashboard with live view, 24/7 recording, and (per-camera, when

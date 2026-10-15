@@ -2,6 +2,8 @@
 
 ## Production cache correction — 2026-10-14
 
+Operator subsequently confirmed "ptz ta funcionando": physical acceptance complete.
+
 The dashboard path previously discarded healthy routes at20seconds; background
 warming prepared replacements from15seconds. Shared accounts now retain the same
 socket while maintenance succeeds. The8second idle expiry and four-account bound
@@ -18,7 +20,7 @@ Real camera3 requests through the authenticated dashboard endpoint returned200:
 right preparation11ms/total510ms; left preparation8ms/total399ms. Both reported
 reused=True, RELEASE confirmed and no errors. The second request was made after
 the previous20second lifetime. This verifies protocol delivery/STOP receipts, not
-physical movement: operator confirmation is still required for that observation.
+physical movement; the subsequent operator confirmation supplies that observation.
 No movement commands were sent to cameras1/2. go2rtc was not restarted.
 
 Native PTZ now wraps **route acquisition/preparation only** in the existing

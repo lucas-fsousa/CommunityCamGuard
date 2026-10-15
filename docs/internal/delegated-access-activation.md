@@ -1,5 +1,24 @@
 # Delegated access activation and deployment — 2026-09-27
 
+## Real HTTPS acceptance — 2026-10-14 (local time)
+
+The configured public deployment passed owner/temporary login, per-feature denial,
+five-second expiry, revocation and rejected relogin. All known test keys were
+revoked, including failed-check cleanup; audit rows intentionally remain.
+Three cameras stayed online and recording. No camera actions or media conversions.
+
+The first probe found nginx's trailing-slash auto-redirect on `/api/recordings`:
+301 to HTTP at internal port3080 instead of the expected application403. Added an
+exact slashless location in the external deployment's `nginx/apps/ccg.conf`, tested
+the loaded `/etc/nginx/proxy/nginx.conf` and gracefully reloaded. No app restart.
+That external config is not in this repository; the portable correction and
+repeatable check are documented in [HTTPS proxy checks](../public/https-proxy-check.md).
+
+After correction, anonymous APIs returned401; `.env`, `.git/config`, `data/ccg.db`,
+`temp/` and `re/` returned404 through public HTTPS. Owner cookie Secure/HttpOnly/
+SameSite flags and cross-origin logout rejection passed. HTTP acceptance is now
+verified; full browser/mobile/channel interruption remains separate, not certified.
+
 Follow-up: [bounded desktop/narrow-viewport browser validation](delegated-access-browser-check.md)
 fixed stretched checkboxes and checked creation/disposal/scrolling. Physical mobile
 devices and proxy interruption remain separate acceptance work.
@@ -40,8 +59,10 @@ From the repository root, `docker exec -i ccg-app python - < scripts/check_deleg
 checks health, build and aggregate status without creating keys. Adding
 `--exercise-access-keys` after `python -` explicitly creates and revokes two test
 keys, including one with five-second expiry. Run only when lifecycle testing is
-intended; completed tests leave revoked audit rows. It always connects to loopback,
-uses the container's configured primary key internally and prints only aggregates.
+intended; completed tests leave revoked audit rows. By default it connects to loopback;
+explicit `--public` uses only the configured HTTPS origin with TLS verification and
+redirects disabled. It uses the primary key internally and prints only aggregates
+and sanitized failure status/route metadata.
 Cleanup failure emits a count requiring operator attention. Isolated ASGI tests
 cover the success path and revocation after an intermediate check failure.
 If creation loses its response, the check emits

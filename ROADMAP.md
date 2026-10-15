@@ -1,10 +1,18 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-14 real HTTPS delegated-access acceptance completed after correcting an
+nginx redirect: exact `/api/recordings` location prevents301 to HTTP/internal3080.
+Public login/permission denials/expiry/revocation pass; known test keys revoked.
+Anonymous APIs401, selected sensitive paths404, secure owner cookie flags and
+cross-origin rejection confirmed. Three cameras online/recording. No camera actions
+or app rebuild. Remaining: physical mobile/browser WebSocket and multi-tab acceptance.
+See [repeatable proxy check](docs/public/https-proxy-check.md).
+
 2026-10-14 PRODUCTION PTZ cache corrected and deployed: removed shared-account
 15/20s forced reauthentication; reused fresh heartbeat checks, retaining8s idle
 cleanup, bounded caches and per-camera20s evidence revalidation. Two real camera3
 dashboard requests succeeded with native reused=True, confirmed STOP/no errors,
-preparation11ms then8ms. Physical confirmation remains with operator. This fixes
+preparation11ms then8ms. Operator subsequently confirmed PTZ working: homologated. This fixes
 the current dashboard path; experimental worker integration is NOT a prerequisite
 for this correction and remains separate. See internal/ptz-credential-renewal.md.
 

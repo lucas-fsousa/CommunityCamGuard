@@ -44,6 +44,47 @@ def test_probe_exercises_lifecycle_and_leaves_only_revoked_records(probe):
     assert {record.label for record in records} == {"Deployment check — expiry", "Deployment check — revocation"}
 
 
+def test_default_stays_loopback_public_uses_configured_origin_only(probe):
+    module, _, _ = probe
+    settings = SimpleNamespace(port=3200, dashboard_public_origin="https://dashboard.example")
+    local = module.connection_options(settings)
+    assert local["base_url"] == "http://127.0.0.1:3200"
+    assert local["headers"]["Host"] == "dashboard.example"
+    remote = module.connection_options(settings, public=True)
+    assert remote == {"base_url": "https://dashboard.example",
+                      "headers": {"Origin": "https://dashboard.example"}}
+
+
+@pytest.mark.parametrize("origin", ["", "http://dashboard.example", "https://a.example/path",
+                                    "https://user:password@a.example", "https://a.example?next=b"])
+def test_public_probe_rejects_unsafe_target_before_credentials(probe, origin):
+    module, _, _ = probe
+    with pytest.raises(ValueError):
+        module.connection_options(SimpleNamespace(port=3200, dashboard_public_origin=origin), True)
+
+
+def test_public_boundaries_only_read_fixed_paths_without_credentials(probe, monkeypatch):
+    module, client, _ = probe
+    calls = []
+    monkeypatch.setattr(module, "check", lambda *args: calls.append(args[1:]))
+    module.public_boundaries(client)
+    assert len(calls) == 8
+    assert all(method == "GET" and status in (401, 404) for method, _, status in calls)
+    assert ("GET", "/api/recordings", 401) in calls
+
+
+def test_redirect_is_failure_not_followed_and_diagnostic_redacts_identifier(probe, monkeypatch, capsys):
+    module, _, _ = probe
+    class Client:
+        def request(self, *args, **kwargs):
+            return SimpleNamespace(status_code=301)
+    with pytest.raises(RuntimeError):
+        module.check(Client(), "POST", "/api/access-keys/private-id/revoke", token="private-token")
+    output = capsys.readouterr().out
+    assert '"status": 301' in output
+    assert "private-id" not in output and "private-token" not in output
+
+
 def test_mid_check_failure_still_revokes_created_key(probe, monkeypatch):
     module, client, owner = probe
     original = module.check
