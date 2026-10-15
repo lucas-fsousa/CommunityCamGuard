@@ -1,8 +1,10 @@
-"""Explicit HTTPS/WSS acceptance; creates/revokes test keys, never sends media.
+"""Explicit HTTPS/WSS acceptance; creates/revokes labeled test keys.
 
 Run with python -m scripts.check_public_channels --camera-id <registered id>.
 Idle accepted sockets receive no MSE request: the app never opens go2rtc upstream.
-No camera command, audio, playback or encoder. Revoked audit rows remain.
+Default: no camera command, audio, playback or encoder. --active-media explicitly
+opens two video-only consumers on the shared reduced-quality source (may start one
+encoder). No decoding or saved frames. Revoked audit rows remain.
 """
 import argparse
 import inspect
@@ -53,7 +55,7 @@ def expect_invalidated(socket):
     raise RuntimeError("Unexpected payload on idle channel")
 
 
-def exercise(client, owner, origin, camera_id, connector=connect):
+def exercise(client, owner, origin, camera_id, connector=connect, *, active_media=False):
     keys = []
     pending = False
 
@@ -70,7 +72,7 @@ def exercise(client, owner, origin, camera_id, connector=connect):
         return login.cookies["ccg_session"]
 
     base = ("wss" + origin[5:]) if origin.startswith("https:") else ("ws" + origin[4:])
-    url = base + "/api/go2rtc/ws?src=" + camera_id + "_hd"
+    url = base + "/api/go2rtc/ws?src=" + camera_id + ("_web" if active_media else "_hd")
     try:
         print(json.dumps({"stage": "permission_denials"}), flush=True)
         denied = create(["ptz"])
@@ -81,23 +83,47 @@ def exercise(client, owner, origin, camera_id, connector=connect):
         live = create(["live"])
         revoked_id = keys[-1]
         other = create(["live"])
+        def options(token):
+            result = socket_options(origin, token)
+            if active_media:
+                result["max_size"] = 2 * 1024 * 1024
+            return result
         with ExitStack() as sockets:
             print(json.dumps({"stage": "open_revocation_channel"}), flush=True)
-            victim = sockets.enter_context(connector(url, **socket_options(origin, live)))
+            victim = sockets.enter_context(connector(url, **options(live)))
+            if active_media:
+                from scripts.channel_media_probe import (
+                    drain_until_invalidated,
+                    receive_media,
+                    verify_independent_flow,
+                )
+                print(json.dumps({"stage": "receive_victim_media"}), flush=True)
+                receive_media(victim, start=True)
             print(json.dumps({"stage": "open_independent_channel"}), flush=True)
-            unaffected = sockets.enter_context(connector(url, **socket_options(origin, other)))
+            unaffected = sockets.enter_context(connector(url, **options(other)))
+            if active_media:
+                print(json.dumps({"stage": "receive_independent_media"}), flush=True)
+                receive_media(unaffected, start=True)
             print(json.dumps({"stage": "revoke_open_channel"}), flush=True)
             check(client, "POST", f"/api/access-keys/{revoked_id}/revoke", token=owner, body={})
-            revoke_ms = expect_invalidated(victim)
-            if not unaffected.ping().wait(2):
-                raise RuntimeError("Independent channel lost")
-            try:
-                unaffected.recv(timeout=0.1)
-            except TimeoutError:
-                pass
+            if active_media:
+                result = drain_until_invalidated(victim)
+                verify_independent_flow(unaffected)
             else:
-                raise RuntimeError("Unexpected independent channel payload")
+                revoke_ms = expect_invalidated(victim)
+            if not active_media and not unaffected.ping().wait(2):
+                raise RuntimeError("Independent channel lost")
+            if not active_media:
+                try:
+                    unaffected.recv(timeout=0.1)
+                except TimeoutError:
+                    pass
+                else:
+                    raise RuntimeError("Unexpected independent channel payload")
         expect_denied(url, socket_options(origin, live), connector)
+        if active_media:
+            return dict(active_media=True, **result, independent_media_preserved=True,
+                        revoked_reconnect_denied=True, media_requests_sent=2)
         print(json.dumps({"stage": "expiry"}), flush=True)
         expires = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
         expiring = create(["live"], expires)
@@ -125,6 +151,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--camera-id", required=True)
     parser.add_argument("--loopback", action="store_true", help="Compare direct local channel behavior")
+    parser.add_argument("--active-media", action="store_true",
+                        help="Opt in to two reduced-quality video consumers on one shared producer")
     parser.add_argument("--proxy-loopback-port", type=int,
                         help="Diagnostic: connect to loopback nginx while preserving public Host/Origin")
     args = parser.parse_args()
@@ -155,12 +183,17 @@ def main():
         cameras = check(client, "GET", "/api/cameras/status", token=owner).json()
         if not any(camera["id"] == args.camera_id for camera in cameras):
             raise ValueError("Camera is not registered")
-        print(json.dumps(exercise(client, owner, origin, args.camera_id, connector)), flush=True)
+        print(json.dumps(exercise(client, owner, origin, args.camera_id, connector,
+                                  active_media=args.active_media)), flush=True)
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(json.dumps({"check_failed": True, "error_type": type(exc).__name__}), flush=True)
+        safe = {"Missing authorization close frame", "Active channel did not close within probe budget",
+                "No media fragment within probe budget", "Media probe input limit",
+                "Independent channel lost", "Media source rejected probe"}
+        print(json.dumps({"check_failed": True, "error_type": type(exc).__name__,
+                          "reason": str(exc) if str(exc) in safe else "check_failed"}), flush=True)
         sys.exit(1)

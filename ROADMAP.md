@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-15 ACTIVE VIDEO revocation validated on camera3: actual fMP4 delivery over
+local/public WSS, revoked channel closed1008 in725/628ms, independent key continued
+video/pong, revoked reconnect denied. Test encoder retired (zero consumers/active
+producers). Fixed/deployed bridge teardown exception when peer already disappeared.
+No microphone/camera actions or retained media. Remaining: rendered browser/multi-tab
+UI/mobile and expiry during active video; remote handshake intermittency unattributed.
+See [active probe](docs/public/https-proxy-check.md#revocation-during-actual-media-delivery).
+
 2026-10-15 public idle WebSocket acceptance passed: ungranted video/intercom denied,
 revocation closed1008 in825ms, independent key stayed open, expiry/reconnect denied.
 Reusable operator test creates/revokes only labeled test keys; zero media requests

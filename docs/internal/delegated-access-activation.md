@@ -1,5 +1,30 @@
 # Delegated access activation and deployment — 2026-09-27
 
+## Active video revocation — 2026-10-15
+
+Camera3 real reduced-quality MSE delivery passed both locally and over public
+HTTPS/WSS. Two delegated sessions each received fMP4 media; revoking one closed
+it with1008 in725ms locally/628ms publicly. Another key continued media delivery
+and pong, and the revoked key could not reconnect. Already-buffered/in-flight
+bytes drained:292176 local/530236 public, not zero-latency recall. No decoding,
+saved media, microphone or camera actions. Public probe47.4MiB peak/no swap;
+after exit the reduced source reported zero consumers and zero active producers.
+All known test keys revoked. Physical browser decoding and active-stream expiry
+remain separate checks. Earlier intermittent remote handshake timeouts remain
+unattributed; this passing run is not evidence that their root cause was fixed.
+
+The probe initially falsely reported a lost independent session because it waited
+for pong without draining its bounded video queue. Corrected the diagnostic to
+consume media during pong verification, with regression coverage. Cold encoder
+startup is now allowed15seconds, separate from the unchanged7second close budget.
+
+Live logs also exposed an actual app cleanup defect: closing an already vanished
+peer could raise WebSocketDisconnect1006 from the bridge's finally block and log
+an ASGI exception. Teardown now tolerates WebSocketDisconnect/OSError specifically;
+authorization and upstream cancellation behavior are unchanged. Regression tests
+cover both failures. Deployed app image9a89a9f3d81e with512MiB/no-swap/50%CPU build
+limits; go2rtc was not restarted. No such exception observed in the final test window.
+
 ## Real HTTPS acceptance — 2026-10-14 (local time)
 
 Follow-up2026-10-15: public WSS idle-channel authorization passed using

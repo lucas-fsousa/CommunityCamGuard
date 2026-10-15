@@ -10,7 +10,7 @@ import re
 from urllib.parse import quote
 
 import websockets
-from starlette.websockets import WebSocket, WebSocketState
+from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
 from .. import auth
 from ..config import get_settings
@@ -104,10 +104,18 @@ async def _bridge(socket: WebSocket, src: str) -> None:
                 await asyncio.gather(*tasks, return_exceptions=True)
     except (ValueError, TimeoutError):
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await socket.close(code=1008)
+            await _close(socket, 1008)
     except Exception:
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await socket.close(code=1011)
+            await _close(socket, 1011)
     finally:
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await socket.close()
+            await _close(socket)
+
+
+async def _close(socket: WebSocket, code: int = 1000) -> None:
+    """A peer disappearing during teardown isn't an application failure."""
+    try:
+        await socket.close(code=code)
+    except (WebSocketDisconnect, OSError):
+        pass

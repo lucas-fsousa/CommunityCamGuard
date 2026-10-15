@@ -8,13 +8,27 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.websockets import WebSocketDisconnect
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from backend.app import access_keys, auth, session_channels
 from backend.app.api import media, temporary_media
 from backend.app.db import registry
 
 REQUEST = '{"type":"mse","value":"avc1.640029,mp4a.40.2,opus"}'
+
+
+@pytest.mark.parametrize("error", [WebSocketDisconnect(1006), OSError("peer gone")])
+def test_disconnected_peer_during_final_close_is_normal_cleanup(error):
+    class Socket:
+        application_state = WebSocketState.CONNECTING
+        async def accept(self): self.application_state = WebSocketState.CONNECTED
+        async def receive(self): return {"type": "websocket.disconnect"}
+        async def close(self, code=1000):
+            self.application_state = WebSocketState.DISCONNECTED
+            raise error
+    socket = Socket()
+    asyncio.run(temporary_media._bridge(socket, "unused"))
+    assert socket.application_state == WebSocketState.DISCONNECTED
 
 
 @pytest.fixture

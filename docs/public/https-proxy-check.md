@@ -85,3 +85,28 @@ timeouts as failures, not successful revocation. Expiry timing is measured from
 socket acceptance, not key creation; login/network latency consumes part of its
 five-second lifetime. A successful idle-channel check does not homologate media
 delivery, rendered browser frames, active-stream interruption or mobile behavior.
+
+## Revocation during actual media delivery
+
+Explicit opt-in (test camera only):
+
+```bash
+python -m scripts.check_public_channels --active-media --camera-id <registered-camera-id>
+```
+
+This variant creates three test keys and requests video-only MSE for two sessions
+on the same reduced-quality source. It may start one shared on-demand encoder;
+check available resources first. No microphone, camera control, saved media or
+decoder is used. Run under a bounded cgroup and check producer/consumer cleanup
+afterward. Do not run multiple copies concurrently.
+
+The probe requires actual fMP4 media data before revocation, drains bounded bytes
+already in flight until close1008, confirms another key still receives media and
+answers ping, then verifies denied reconnection. Startup allows15seconds for a
+cold encoder; revocation retains a separate7second deadline and16MiB input cap.
+It drains video while awaiting pong: waiting for pong with a full bounded receive
+queue would falsely report a disconnected independent session.
+
+This mode checks revocation, not expiry during active playback. It verifies media
+delivery at the WebSocket boundary, not successful browser decoding or removal of
+previously buffered frames. All known test keys are revoked during cleanup.
