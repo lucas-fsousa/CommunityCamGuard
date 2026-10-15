@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-15 public idle WebSocket acceptance passed: ungranted video/intercom denied,
+revocation closed1008 in825ms, independent key stayed open, expiry/reconnect denied.
+Reusable operator test creates/revokes only labeled test keys; zero media requests
+or camera commands. Earlier intermittent handshake timeouts/missing close frame
+remain unexplained (not reported fixed); final public run passed unchanged runtime.
+Remaining: active-stream/browser multi-tab and physical mobile acceptance. See
+[channel check](docs/public/https-proxy-check.md#idle-websocket-authorization-checks).
+
 2026-10-14 real HTTPS delegated-access acceptance completed after correcting an
 nginx redirect: exact `/api/recordings` location prevents301 to HTTP/internal3080.
 Public login/permission denials/expiry/revocation pass; known test keys revoked.

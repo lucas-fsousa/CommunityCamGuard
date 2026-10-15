@@ -2,6 +2,20 @@
 
 ## Real HTTPS acceptance — 2026-10-14 (local time)
 
+Follow-up2026-10-15: public WSS idle-channel authorization passed using
+`scripts/check_public_channels.py`: denied media/intercom without grants,
+revocation close1008 in825ms, independent key channel still open, expiry close1008
+and rejected reconnect. Expiry close was1046ms after socket acceptance, not after
+key creation (five-second TTL includes HTTP/login/setup time). No MSE or PCM sent;
+no camera actions/media/transcodes. Known test keys revoked in finally. The live
+probe peaked at61.4MiB/no swap. Direct loopback also passed (987ms revocation).
+
+Earlier public handshakes timed out, and a direct-nginx expiry check lacked a close
+frame. The successful public rerun required no server/proxy change. Root cause of
+those intermittent transport failures is NOT established; retain as monitoring
+evidence, not a fixed bug. This closes idle-WSS acceptance only; active streaming,
+browser multiple-tab UI disposal and physical mobile remain separate checks.
+
 The configured public deployment passed owner/temporary login, per-feature denial,
 five-second expiry, revocation and rejected relogin. All known test keys were
 revoked, including failed-check cleanup; audit rows intentionally remain.
