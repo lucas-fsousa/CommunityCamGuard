@@ -145,3 +145,12 @@ Desktop and375px viewport runs passed. The separate opt-in
 and player/socket teardown: public expiry657ms and revocation690ms. Follow the
 [resource limits and camera isolation procedure](../internal/delegated-access-browser-check.md#rendered-video-invalidation--2026-10-15).
 Physical mobile and long-duration stability remain pending checks.
+
+## Forwarded headers and login pacing
+
+The bundled server disables forwarded-header identity rewriting. A reverse proxy
+therefore shares its transport-peer login quota across users; changing
+X-Forwarded-For cannot assign a new quota. Do not enable arbitrary proxy trust as
+a workaround. Secure cookies/origin checks use the configured public origin.
+The deployed policy and malformed-header403 correction were verified2026-10-16;
+see [the bounded audit and its limits](../internal/proxy-trust-acceptance.md).

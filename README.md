@@ -212,6 +212,9 @@ Physical mobile and long-duration streaming stability remain separate checks.
 Actual application-container restart was also validated on 2026-10-16: valid
 sessions survived, revoked/expired keys stayed denied, browser reload remained
 authenticated and all three recorders resumed. See the deployment evidence above.
+The deployed [proxy trust policy](docs/internal/proxy-trust-acceptance.md) was also
+checked: forwarded headers do not override client identity, and proxied users
+share the proxy's login quota. Malformed local-access headers are rejected with403.
 
 The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
 [request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),

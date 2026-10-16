@@ -56,8 +56,13 @@ def _header_hostname(value: str) -> str:
     if not raw or raw.lower() in {"null", "unknown"} or raw.startswith("_"):
         return ""
     # urlsplit needs ``//`` to interpret a bare host:port as an authority.
-    parsed = urlsplit(raw if "://" in raw else f"//{raw}")
-    return parsed.hostname or ""
+    try:
+        parsed = urlsplit(raw if "://" in raw else f"//{raw}")
+        return parsed.hostname or ""
+    except ValueError:
+        # Broken IPv6 brackets and invalid authorities are untrusted metadata,
+        # not server failures. The caller rejects an empty hostname.
+        return ""
 
 
 def _forwarded_addresses(request: HTTPConnection) -> list[str]:
@@ -122,7 +127,10 @@ def require_local_or_remote_ble_request(request: Request) -> None:
 
     host = _header_hostname(request.headers.get("host", ""))
     source = request.headers.get("origin") or request.headers.get("referer") or ""
-    parsed_source = urlsplit(source)
+    try:
+        parsed_source = urlsplit(source)
+    except ValueError:
+        raise HTTPException(403, "remote BLE provisioning requires a same-origin HTTPS tunnel") from None
     forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
     fetch_site = request.headers.get("sec-fetch-site", "").lower()
     if (

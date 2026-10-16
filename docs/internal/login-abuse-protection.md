@@ -1,7 +1,9 @@
 # Login pacing checkpoint — 2026-09-25
 
-Implemented in source; backend deployment remains pending. Temporary public login
-is still disabled. This checkpoint does not declare internet exposure safe.
+Implementation is deployed, including temporary login. The actual forwarding
+boundary was verified on2026-10-16; see [deployment evidence](proxy-trust-acceptance.md).
+This checkpoint does not declare internet exposure safe. Historical rollout gates
+below are superseded by that evidence and the delegated-access activation record.
 
 `login_throttle.py` wraps POST `/api/login` before body parsing/key verification.
 All admitted attempts count, including malformed input and successful logins.
@@ -36,10 +38,10 @@ The bundled `python -m backend.app.main` launcher explicitly sets
 `--no-proxy-headers` to retain this boundary. A proxy currently becomes the shared
 origin: do not enable arbitrary forwarded-header trust to bypass that constraint.
 
-Disabling server-level rewriting also leaves the ASGI scheme as the transport's
-actual scheme. TLS-terminating proxies and strict Origin/locality checks need an
-explicit trusted-proxy design and end-to-end validation before deployment. This
-step has not changed running containers, proxy configuration or camera services.
+Disabling server-level rewriting leaves the ASGI scheme as the transport's actual
+scheme. The configured canonical public origin handles HTTPS cookies/origin checks
+without trusting forwarded identity; this deployment policy is now validated.
+Remote-IP attribution would require a separate design, not a configuration shortcut.
 
 ## Evidence / remaining gates
 
@@ -55,8 +57,8 @@ contracts passed. The serial test cgroup peaked at 85.1 MiB with no swap, capped
 
 Request size/time/concurrency limits and transport-based Secure cookies are now
 implemented in source; see [request boundaries and remaining review](login-request-boundaries.md).
-Still pending: explicit trusted-proxy/cookie policy, CSRF/origin review, final temporary-user
-operation permissions, real browser/proxy validation, temporary login/UI activation
-and deployment. Login pacing alone does not make weak primary keys safe. Keep a
+Those rollout gates now have deployed HTTP/browser/channel/restart evidence and
+explicit proxy policy; physical mobile and ongoing new-route review remain.
+Login pacing alone does not make weak primary keys safe. Keep a
 strong server key, restrict network exposure and do not expose internal media ports.
 See [activation gates](temporary-access-keys.md).

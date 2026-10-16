@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-16 PROXY TRUST boundary reviewed/deployed: bundled runtime and source
+hashes verified; forwarded headers do not select login-limiter identity (shared
+proxy-peer quota remains deliberate). Fixed malformed local/BLE source headers
+raising500: ten regression cases now deny403 without handler execution.105 focused
+tests passed,133.9MiB/no swap. Bounded rebuild image13fa9ca7912f, only app recreated.
+Public/direct readonly checks passed, secure cookie intact, three cameras recording.
+No brute-force, camera commands or proxy config changes. See
+[scope and evidence](docs/internal/proxy-trust-acceptance.md).
+
 2026-10-16 DEPLOYMENT RESTART access acceptance passed: restarted only ccg-app;
 go2rtc start time unchanged. Existing primary/zero-grant non-expiring guest cookies
 survived; revoked/previously expired sessions stayed invalid and relogin denied401.
@@ -1066,9 +1075,9 @@ settings/authentication brand-agnostic; capabilities remain owned by drivers.
 | P1 | **Multiple delegated keys**: owner-only modal, per-feature grants, optional expiry, one-time secret, hashed verifiers and revocation implemented/deployed. HTTP lifecycle, isolated modal and full-dashboard two-tab HTTPS login/invalidation passed. Remaining: physical mobile acceptance. Grants cover all cameras, never unsupported driver features | wip |
 | P1 | **Expiry/revocation — desktop/server acceptance**: fresh DB-backed HTTP checks, guarded MSE/intercom/files and session watcher implemented. Concurrent MSE isolation, two browser tabs, actual rendered camera3 interruption over HTTPS and deployed-container restart/session reload passed (2026-10-15/16). Channel checks are bounded periodic enforcement, not zero-latency recall of buffered data. Physical mobile is tracked separately below | done |
 | P2 | **Physical mobile access acceptance**: validate login/grants, expiry/revocation returning to login, background/resume and real media teardown on Android/iOS. Desktop Chromium narrow viewport is not device homologation. Only camera3 for controlled tests; no audio/siren/light actions required | pending |
-| P1 | **Authentication abuse resistance**: bounded login pacing/requests, cryptographic keys, cookie and origin policies implemented and regression-tested. Remaining: validate the actual HTTPS proxy/trusted-forwarding deployment; no production brute-force tests or blanket internet-safety claim. See `docs/internal/login-abuse-protection.md` | wip |
+| P1 | **Authentication abuse resistance — defined policy**: bounded login pacing/requests, cryptographic keys, cookie and origin policies implemented/tested. Actual HTTPS forwarding deployment verified2026-10-16: bundled launcher ignores forwarded identity and proxied users intentionally share the transport-peer quota. Malformed local metadata now denies403. No production brute-force/load test or blanket internet-safety claim. See `docs/internal/proxy-trust-acceptance.md` | done |
 | P1 | **No bypass / secret exposure**: default-deny route tests, static allowlist, sensitive-error projection and Docker-context audit implemented; local public-path checks passed. Continue auditing new routes, proxy behavior and diagnostics. Secrets, DB/backups, RE/temp and VCS must never become static assets; frontend hiding is never authorization. See `docs/internal/public-file-audit.md` | wip |
-| P1 | **Security suite / deployment guidance**: CI covers both key types, grants, expiry/revocation, channels, origin and abuse boundaries. Guides document limits. Remaining: real mobile/proxy/channel acceptance, separate from automated evidence; login alone does not certify internet exposure | wip |
+| P1 | **Security suite / deployment guidance**: CI covers both key types, grants, expiry/revocation, channels, origin and abuse boundaries. Actual desktop HTTPS/channel/restart and forwarding-policy checks passed; guides document limits. Remaining: physical mobile acceptance and ongoing review of new surfaces; login alone does not certify internet exposure | wip |
 
 Recordings follow-up (2026-09-23): frontend selection/player lifecycle repaired in
 an isolated module: cancel stale requests/polling on navigation/logout, preserve

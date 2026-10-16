@@ -1,7 +1,8 @@
 # Login request and cookie checkpoint — 2026-09-25
 
-Implemented/tested in source; backend deployment remains pending. Temporary login
-is still disabled. No production logins, camera actions or container restarts.
+Implemented/tested and now deployed with temporary login enabled. Actual HTTPS
+cookie/forwarding checks passed2026-10-16; see [current evidence](proxy-trust-acceptance.md).
+The September rollout observations below are historical, not current deployment blockers.
 
 ## Request lifecycle
 
@@ -38,8 +39,8 @@ writes/login/logout/socket handshakes and adds optional canonical HTTPS origin c
 handling. The observations below record the prior checkpoint; proxy/browser rollout
 and exceptional-route review are still pending.
 
-`api/auth.py` now sets `Secure` when the ASGI request scheme is HTTPS; local HTTP
-remains supported. Cookies remain host-only, HttpOnly, SameSite=Lax, Path=/ and
+`api/auth.py` sets `Secure` for HTTPS transport or a configured canonical HTTPS
+origin; direct local HTTP remains supported under its explicit policy. Cookies remain host-only, HttpOnly, SameSite=Lax, Path=/ and
 seven days; logout deletes with matching security attributes and no-store. Raw
 forwarded headers never select this flag. Existing cookies require a fresh login
 to obtain updated attributes. Primary logout still does not revoke other copies.
@@ -48,13 +49,12 @@ Reviewed boundaries, not claims of a completed security audit:
 
 - `management_http.py` requires JSON/same Origin for key/settings writes, allows
   absent Origin for scripts and rejects cross-site fetch metadata.
-- `require_auth` verifies identity/temporary permissions, not a universal CSRF policy.
-  Login/logout and legacy control writes still need a coordinated origin/CSRF review.
+- `require_auth` applies the shared browser-write origin boundary in addition to
+  identity/temporary permissions. New exceptional routes still need explicit review.
 - The bundled launcher disables forwarded-header rewriting. A TLS-terminating proxy
-  therefore presents HTTP to the app unless an explicit trusted-proxy policy is
-  implemented. HTTPS outside the proxy alone does **not** activate this Secure flag;
-  strict Origin checks may also mismatch. Do not deploy by blindly enabling forwarded
-  trust. Host allowlisting, canonical public origin and proxy trust remain pending.
+  presents HTTP to the app; configure the canonical HTTPS public origin for the
+  external cookie/origin boundary. HTTPS outside the proxy alone is insufficient
+  without this configuration. Do not blindly enable forwarded-header trust.
 - HTTP LAN cookies are still transport-readable; these changes do not make public
   HTTP exposure safe. Browser-side hiding is never an authorization mechanism.
 
@@ -67,6 +67,6 @@ redaction and HTTPS/HTTP cookie behavior with spoofed forwarded headers. No came
 traffic was generated. Serial test peak: 82.8 MiB, no swap, capped at 512 MiB/75% CPU.
 Mypy passed for 206 files; ruff and Node session lifecycle contracts passed.
 
-Next: explicit proxy/public-origin policy and consistent origin/CSRF protection;
-then final temporary operation permissions, real browser/proxy validation and public
-login/UI rollout. See [activation gates](temporary-access-keys.md).
+Public-origin/CSRF policy, permission checks and browser/proxy rollout are now
+deployed and validated. Physical mobile and continued review of new endpoints
+remain separate. See [current deployment evidence](proxy-trust-acceptance.md).
