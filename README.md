@@ -205,7 +205,10 @@ Isolated real-Chromium component checks passed desktop and narrow-screen layouts
 see [modal/browser evidence](docs/internal/delegated-access-browser-check.md).
 Full-dashboard HTTPS checks also passed revocation, expiry and logout in two
 Chromium tabs (desktop/narrow viewport), using zero-camera-permission test keys.
-Physical mobile and rendered-video interruption in the browser remain pending.
+Rendered-video interruption also passed with the actual player and camera3 over
+HTTPS: expiry657ms/revocation690ms, player removed and socket closed. This bounded
+test filters the camera list only in its disposable browser, not server grants.
+Physical mobile and long-duration streaming stability remain separate checks.
 
 The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
 [request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),

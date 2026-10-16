@@ -21,6 +21,7 @@ jobs:
           ruff check backend tests scripts/check_delegated_access.py
           scripts/check_recording_browser.py scripts/browser_test_safety.py
           scripts/browser_cdp.py scripts/check_browser_session.py
+          scripts/check_browser_media.py
           scripts/check_public_channels.py scripts/channel_media_probe.py
       - name: Type-check (mypy)
         run: mypy backend/app
@@ -41,6 +42,8 @@ jobs:
         run: node --max-old-space-size=64 tests/frontend/access-keys.cjs
       - name: Session lifecycle contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/session-lifecycle.cjs
+      - name: Browser media isolation contracts (Node)
+        run: node --max-old-space-size=64 tests/frontend/browser-media-probe.cjs
     # Note: `black --check` is intentionally not enforced yet — adopting the formatter across the
     # existing codebase is a deliberate, separate step (see ROADMAP M2). The config lives in
     # pyproject so it is a one-command switch once that lands.

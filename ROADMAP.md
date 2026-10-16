@@ -1,5 +1,17 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-15 RENDERED VIDEO browser acceptance passed with camera3: real dashboard
+and player, test-only camera-list isolation, reduced stream, compositor callbacks
+with advancing media timestamps. Public HTTPS expiry returned to login and removed
+player/cleared video/closed socket in657ms; public revocation690ms (local621ms).
+No reconnect during2s observation. One socket per successful run; no camera writes.
+Sequential capped Chromium237.4/242.8MiB peaks, zero swap. All6 testkeys revoked;
+source consumers/active producers0, browsers0, cameras3online/3recording.
+Fixed test harness Page-domain initialization; no app change/rebuild required.
+Remaining: physical Android/iOS acceptance and long-duration streaming stability;
+short desktop-Chromium checks do not certify these. See
+[rendered video evidence](docs/internal/delegated-access-browser-check.md#rendered-video-invalidation--2026-10-15).
+
 2026-10-15 FULL DASHBOARD session acceptance passed through public HTTPS in two
 real Chromium tabs: revocation1098ms (1280px), expiry1728ms (375px), logout1214ms
 (375px); both tabs returned to login and stayed logged out on reload. Zero-grant

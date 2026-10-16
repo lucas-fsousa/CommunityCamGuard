@@ -47,3 +47,14 @@ def test_wait_pages_requires_every_tab(monkeypatch):
     browser = SimpleNamespace(evaluate=lambda page, expression: page == "first")
     with pytest.raises(RuntimeError, match="deadline"):
         probe.wait_pages(browser, ["first", "second"], "test", 2)
+
+
+def test_new_page_enables_domain_before_navigation_instrumentation():
+    calls = []
+    class RecordingBrowser(Browser):
+        def call(self, method, params=None, session=None):
+            calls.append((method, session))
+            return {"targetId": "target", "sessionId": "page"}
+    assert RecordingBrowser(None).page(375) == "page"
+    assert calls == [("Target.createTarget", None), ("Target.attachToTarget", None),
+                     ("Page.enable", "page"), ("Emulation.setDeviceMetricsOverride", "page")]

@@ -1,5 +1,67 @@
 # Delegated access: bounded browser validation — 2026-09-28
 
+## Rendered video invalidation — 2026-10-15
+
+`scripts/check_browser_media.py` runs the production dashboard/player against
+real camera3 media. Test-only instrumentation filters the actual `/api/cameras`
+response to the requested camera, selects its existing reduced-quality option
+in the disposable browser profile, and rejects other stream URLs and control
+writes. Server permissions are unchanged: the live grant still covers cameras
+generally. This is not evidence of per-camera authorization or full-grid behavior.
+
+After login, the check observes `requestVideoFrameCallback` and advancing
+`mediaTime`, not merely arriving fMP4 bytes or a changing wall clock. The final
+probe counts only increasing media timestamps (re-presenting an old image does
+not count). It requires eight progressing frames, then expiry/revocation and:
+login visible/dashboard hidden, player detached, video paused/source cleared,
+all tracked sockets closed, no mounted player and no reconnect during2seconds.
+The frames are decoded/presented by headless Chromium, not saved or photographed.
+
+Successful results:
+
+| Transport / operation | Login and media stopped | Peak RAM |
+| --- | --- | --- |
+| Local revocation diagnostic | 621ms | 229.4MiB |
+| Public HTTPS expiry | 657ms after scheduled expiry | 237.4MiB |
+| Public HTTPS revocation | 690ms | 242.8MiB |
+
+Each successful run had one socket, no blocked attempts/control writes and no
+reconnect in the observation window. The expiry/local runs used the earlier
+eight-callback/advancing-timestamp check; the final public revocation additionally
+required all eight timestamps to advance. All runs used512MiB/no swap/75%CPU/
+128tasks/90sec caps. Afterward: six known test keys revoked, zero Chromium
+processes, zero consumers/active producers for the test source, and three cameras
+online/recording.21 focused Python tests passed (79.5MiB/no swap), plus Node
+isolation/frame/teardown contracts, now included in CI. No app rebuild needed.
+
+An initial test defect was isolated: CDP `Page` domain was not enabled before
+installing the new-document safety script. The first live attempt therefore
+did not establish camera isolation and may have briefly subscribed to other
+configured streams; its result is discarded. No camera control was sent. A
+subsequent login timeout remains unattributed. The local diagnostic then confirmed
+the missing script. `Browser.page()` now enables the Page domain, and the media
+probe refuses login if its isolation observer is absent. Regression tests cover
+both preconditions. Corrected isolated runs passed without changing the app.
+
+Example, only on an authorized test camera and one run at a time:
+
+```sh
+systemd-run --user --wait --pipe \
+  -p WorkingDirectory=/absolute/repo \
+  -p MemoryMax=512M -p MemorySwapMax=0 -p CPUQuota=75% \
+  -p TasksMax=128 -p RuntimeMaxSec=90 \
+  /absolute/repo/.venv/bin/python -m scripts.check_browser_media \
+  --browser /absolute/path/to/chrome --camera-id <registered-test-camera-id> \
+  --mode expiry
+```
+
+Also supports `--mode revoke`; `--loopback` is a diagnostic, not HTTPS proof.
+Creates one live-only50second key per run and revokes its known ID in cleanup.
+No microphone, speaker/siren/light/PTZ command, media file or primary credential
+in the browser. May start one on-demand reduced encoder; check resource headroom
+and cleanup. Physical Android/iOS, full-grid load and long-duration stability
+remain separate from this bounded desktop-Chromium acceptance.
+
 ## Full dashboard through public HTTPS — 2026-10-15
 
 `scripts/check_browser_session.py` now exercises the actual production login form

@@ -38,6 +38,7 @@ class Browser:
     def page(self, width):
         target = self.call("Target.createTarget", {"url": "about:blank"})["targetId"]
         session = self.call("Target.attachToTarget", {"targetId": target, "flatten": True})["sessionId"]
+        self.call("Page.enable", {}, session)
         self.call("Emulation.setDeviceMetricsOverride", {
             "width": width, "height": 800, "deviceScaleFactor": 1, "mobile": False,
         }, session)

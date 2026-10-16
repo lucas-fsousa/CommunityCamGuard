@@ -140,5 +140,8 @@ The opt-in `python -m scripts.check_browser_session` checks actual HTTPS login,
 revocation/expiry/logout and return to login in two Chromium tabs, without camera
 permissions or streams. It requires explicit browser cgroup limits; see the
 [commands, limits and recorded evidence](../internal/delegated-access-browser-check.md).
-Desktop and375px viewport runs passed. Physical mobile and rendered-video
-interruption are separate, still-pending acceptance checks.
+Desktop and375px viewport runs passed. The separate opt-in
+`python -m scripts.check_browser_media` now verifies actual rendered camera video
+and player/socket teardown: public expiry657ms and revocation690ms. Follow the
+[resource limits and camera isolation procedure](../internal/delegated-access-browser-check.md#rendered-video-invalidation--2026-10-15).
+Physical mobile and long-duration stability remain pending checks.
