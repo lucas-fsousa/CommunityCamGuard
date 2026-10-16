@@ -1,5 +1,46 @@
 # Delegated access activation and deployment — 2026-09-27
 
+## Actual deployment restart — 2026-10-16
+
+Operational acceptance restarted only the existing `ccg-app` container (no build,
+configuration change, camera reboot or go2rtc restart). Verified the exact Compose
+service before restart and compared app/relay start times afterward. The app did
+restart; go2rtc did not. All three recorders briefly stopped with the app.
+
+Created three labeled test keys: one without expiry, one explicitly revoked and
+one allowed to expire before restart. All had zero camera permissions. Existing
+primary and non-expiring guest cookies remained valid after startup, with the
+guest still non-manager and permissions empty. Previously revoked/expired cookies
+returned `authenticated:false`; fresh login using those secrets returned401.
+
+A real Chromium tab logged into the configured public HTTPS dashboard before
+restart using only the non-expiring guest key. After restart, the dashboard was
+visible and a full page reload retained the guest session without another login.
+A browser-origin `/api/me` request confirmed its authentication and exact grants.
+The primary credential never entered the browser. No live player/camera command
+was requested. This does not test active-video continuity through a server restart,
+expiry occurring while offline, database restore or signing-key rotation.
+
+Restart plus recovery/auth/browser/status checks took13.135seconds; this is not
+an exact measurement of outage duration. Entire bounded run31.167seconds,
+450.9MiB peak/no swap, under512MiB/75%CPU/128tasks/120sec limits. All three known
+test keys revoked in cleanup (zero failures), browser process terminated. Both
+containers running with OOMKilled=false. Three cameras reported online/recording;
+filesystem inspection additionally found three nonempty files in three recording
+directories modified after the app's new start time. No originals deleted.
+
+The one-off operator script remains in ignored `temp/restart_acceptance.py` with
+no embedded credentials; it is not a shipped automated maintenance task. To repeat,
+plan a short recording interruption, create dedicated keys, retain their IDs for
+cleanup, verify container identity, restart only the application, check old
+cookies and denied logins, reload a zero-grant browser session and verify recorder
+files advance. Revoke only the known test IDs, not keys selected by label.
+
+This closes the actual-deployment credential persistence/reload item. Physical
+mobile and long-duration media resilience remain separate; no app changes or
+rebuild were needed. Previous browser acceptance commits f9213d5/a29ffb2 have
+green CI38840833769/38840965260.
+
 ## Active video expiry — 2026-10-15
 
 Public HTTPS/WSS camera3 probe received fMP4 before a 25-second test key expired,

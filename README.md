@@ -209,6 +209,9 @@ Rendered-video interruption also passed with the actual player and camera3 over
 HTTPS: expiry657ms/revocation690ms, player removed and socket closed. This bounded
 test filters the camera list only in its disposable browser, not server grants.
 Physical mobile and long-duration streaming stability remain separate checks.
+Actual application-container restart was also validated on 2026-10-16: valid
+sessions survived, revoked/expired keys stayed denied, browser reload remained
+authenticated and all three recorders resumed. See the deployment evidence above.
 
 The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
 [request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),

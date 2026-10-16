@@ -1,5 +1,16 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-16 DEPLOYMENT RESTART access acceptance passed: restarted only ccg-app;
+go2rtc start time unchanged. Existing primary/zero-grant non-expiring guest cookies
+survived; revoked/previously expired sessions stayed invalid and relogin denied401.
+Real HTTPS Chromium reload retained the guest session without another login.
+Restart plus checks13.135s, browser run450.9MiB/no swap; all3 test keys revoked,
+browser exited, containers running/no OOM. Three cameras resumed recording and
+three nonempty files in three recording directories were modified after app start.
+No camera commands, stream request, rebuild or signing-key changes. Desktop session
+acceptance is complete; physical mobile and long-duration media resilience remain
+separate checks. See [restart evidence](docs/internal/delegated-access-activation.md#actual-deployment-restart--2026-10-16).
+
 2026-10-15 RENDERED VIDEO browser acceptance passed with camera3: real dashboard
 and player, test-only camera-list isolation, reduced stream, compositor callbacks
 with advancing media timestamps. Public HTTPS expiry returned to login and removed
@@ -1053,7 +1064,8 @@ settings/authentication brand-agnostic; capabilities remain owned by drivers.
 | P1 | **Recordings playback**: lifecycle fixes, bounded startup, native fallback and Range delivery implemented. Chromium passed autoplay recovery, seeking to minute four with nine seconds buffered, and integrated Recordings-view selection/seek/cancellation/list-timeout at desktop and narrow widths. Source-identity cache and two-probe admission budget are deployed with green CI. Remaining: authenticated full-dashboard/proxy, physical mobile and representative end-to-end cold-HEVC measurements. Preserve downloads and bounded encoder/buffering budgets. See `docs/internal/recordings-browser-acceptance.md` | wip |
 | P1 | **Settings screen**: environment inventory and revisioned two-field allowlist implemented/deployed, with localization and primary-only authorization. Desktop/narrow layout passed. Additional settings need separate service-owned application/impact review; main key, secrets and raw environment remain server-only. See `docs/internal/settings-dashboard-plan.md` | wip |
 | P1 | **Multiple delegated keys**: owner-only modal, per-feature grants, optional expiry, one-time secret, hashed verifiers and revocation implemented/deployed. HTTP lifecycle, isolated modal and full-dashboard two-tab HTTPS login/invalidation passed. Remaining: physical mobile acceptance. Grants cover all cameras, never unsupported driver features | wip |
-| P1 | **Expiry/revocation**: fresh DB-backed HTTP checks, guarded MSE/intercom/files and session watcher implemented. Concurrent MSE isolation, two browser tabs and actual rendered camera3 video interruption over HTTPS passed (2026-10-15). Remaining: deployment restart/reconnect acceptance and physical mobile. Channel checks are bounded periodic enforcement, not zero-latency recall of buffered data | wip |
+| P1 | **Expiry/revocation — desktop/server acceptance**: fresh DB-backed HTTP checks, guarded MSE/intercom/files and session watcher implemented. Concurrent MSE isolation, two browser tabs, actual rendered camera3 interruption over HTTPS and deployed-container restart/session reload passed (2026-10-15/16). Channel checks are bounded periodic enforcement, not zero-latency recall of buffered data. Physical mobile is tracked separately below | done |
+| P2 | **Physical mobile access acceptance**: validate login/grants, expiry/revocation returning to login, background/resume and real media teardown on Android/iOS. Desktop Chromium narrow viewport is not device homologation. Only camera3 for controlled tests; no audio/siren/light actions required | pending |
 | P1 | **Authentication abuse resistance**: bounded login pacing/requests, cryptographic keys, cookie and origin policies implemented and regression-tested. Remaining: validate the actual HTTPS proxy/trusted-forwarding deployment; no production brute-force tests or blanket internet-safety claim. See `docs/internal/login-abuse-protection.md` | wip |
 | P1 | **No bypass / secret exposure**: default-deny route tests, static allowlist, sensitive-error projection and Docker-context audit implemented; local public-path checks passed. Continue auditing new routes, proxy behavior and diagnostics. Secrets, DB/backups, RE/temp and VCS must never become static assets; frontend hiding is never authorization. See `docs/internal/public-file-audit.md` | wip |
 | P1 | **Security suite / deployment guidance**: CI covers both key types, grants, expiry/revocation, channels, origin and abuse boundaries. Guides document limits. Remaining: real mobile/proxy/channel acceptance, separate from automated evidence; login alone does not certify internet exposure | wip |
