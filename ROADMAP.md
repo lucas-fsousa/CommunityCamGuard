@@ -1,11 +1,20 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-15 ACTIVE VIDEO expiry validated on camera3 through public HTTPS/WSS:
+actual fMP4 arrived before expiry; close1008 followed expiry by486ms. Expired
+reconnect denied403 and HTTP denied401. Single video-only reduced consumer;
+46.3MiB/no swap, known test key revoked, zero source consumers/active producers
+after cleanup, three cameras online/recording.72 focused tests passed. No runtime
+change/rebuild required. Remaining: rendered browser/multi-tab/mobile acceptance;
+remote handshake intermittency still unattributed. See
+[expiry probe](docs/public/https-proxy-check.md#expiry-during-actual-media-delivery).
+
 2026-10-15 ACTIVE VIDEO revocation validated on camera3: actual fMP4 delivery over
 local/public WSS, revoked channel closed1008 in725/628ms, independent key continued
 video/pong, revoked reconnect denied. Test encoder retired (zero consumers/active
 producers). Fixed/deployed bridge teardown exception when peer already disappeared.
 No microphone/camera actions or retained media. Remaining: rendered browser/multi-tab
-UI/mobile and expiry during active video; remote handshake intermittency unattributed.
+UI/mobile; active expiry subsequently passed above. Remote handshake intermittency unattributed.
 See [active probe](docs/public/https-proxy-check.md#revocation-during-actual-media-delivery).
 
 2026-10-15 public idle WebSocket acceptance passed: ungranted video/intercom denied,

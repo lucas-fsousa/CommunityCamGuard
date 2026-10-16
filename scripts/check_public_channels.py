@@ -55,7 +55,8 @@ def expect_invalidated(socket):
     raise RuntimeError("Unexpected payload on idle channel")
 
 
-def exercise(client, owner, origin, camera_id, connector=connect, *, active_media=False):
+def exercise(client, owner, origin, camera_id, connector=connect, *, active_media=False,
+             active_expiry=False):
     keys = []
     pending = False
 
@@ -72,8 +73,26 @@ def exercise(client, owner, origin, camera_id, connector=connect, *, active_medi
         return login.cookies["ccg_session"]
 
     base = ("wss" + origin[5:]) if origin.startswith("https:") else ("ws" + origin[4:])
-    url = base + "/api/go2rtc/ws?src=" + camera_id + ("_web" if active_media else "_hd")
+    url = base + "/api/go2rtc/ws?src=" + camera_id + ("_web" if active_media or active_expiry else "_hd")
     try:
+        if active_expiry:
+            from scripts.channel_media_probe import drain_until_invalidated, receive_media
+            print(json.dumps({"stage": "active_video_expiry"}), flush=True)
+            expires = datetime.now(UTC) + timedelta(seconds=25)
+            invalid_at = time.monotonic() + (expires - datetime.now(UTC)).total_seconds()
+            expiring = create(["live"], expires.isoformat())
+            options = socket_options(origin, expiring)
+            options["max_size"] = 2 * 1024 * 1024
+            with connector(url, **options) as victim:
+                receive_media(victim, start=True)
+                if time.monotonic() >= invalid_at:
+                    raise RuntimeError("No media before expiry")
+                result = drain_until_invalidated(victim, invalid_at=invalid_at)
+            expect_denied(url, socket_options(origin, expiring), connector)
+            check(client, "GET", "/api/cameras/status", 401, expiring)
+            return dict(active_expiry=True, expiry_close_delay_ms=result["closed_ms"],
+                        drained_bytes=result["inflight_bytes"], expired_reconnect_denied=True,
+                        expired_http_denied=True, media_requests_sent=1)
         print(json.dumps({"stage": "permission_denials"}), flush=True)
         denied = create(["ptz"])
         expect_denied(url, socket_options(origin, denied), connector)
@@ -151,8 +170,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--camera-id", required=True)
     parser.add_argument("--loopback", action="store_true", help="Compare direct local channel behavior")
-    parser.add_argument("--active-media", action="store_true",
+    media_mode = parser.add_mutually_exclusive_group()
+    media_mode.add_argument("--active-media", action="store_true",
                         help="Opt in to two reduced-quality video consumers on one shared producer")
+    media_mode.add_argument("--active-expiry", action="store_true",
+                           help="Opt in to video delivery across a 25-second key expiry")
     parser.add_argument("--proxy-loopback-port", type=int,
                         help="Diagnostic: connect to loopback nginx while preserving public Host/Origin")
     args = parser.parse_args()
@@ -184,7 +206,8 @@ def main():
         if not any(camera["id"] == args.camera_id for camera in cameras):
             raise ValueError("Camera is not registered")
         print(json.dumps(exercise(client, owner, origin, args.camera_id, connector,
-                                  active_media=args.active_media)), flush=True)
+                                  active_media=args.active_media,
+                                  active_expiry=args.active_expiry)), flush=True)
 
 
 if __name__ == "__main__":

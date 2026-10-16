@@ -1,5 +1,16 @@
 # Delegated access activation and deployment — 2026-09-27
 
+## Active video expiry — 2026-10-15
+
+Public HTTPS/WSS camera3 probe received fMP4 before a 25-second test key expired,
+then observed close1008 at486ms after scheduled expiry. Reconnection denied403;
+HTTP status denied401 with the same expired session. Drained2150206bytes across
+the observation window, not bytes exclusively after expiry. Test46.3MiB/no swap;
+known key revoked in cleanup, source consumers/active producers0, cameras3/3
+online/recording.72 focused tests passed with122.9MiB peak/no swap. No runtime
+changes, rebuild, audio or camera commands. Browser decoding/UI/mobile remain
+unverified; this closes only the active-delivery expiry acceptance item.
+
 ## Active video revocation — 2026-10-15
 
 Camera3 real reduced-quality MSE delivery passed both locally and over public
@@ -9,8 +20,8 @@ and pong, and the revoked key could not reconnect. Already-buffered/in-flight
 bytes drained:292176 local/530236 public, not zero-latency recall. No decoding,
 saved media, microphone or camera actions. Public probe47.4MiB peak/no swap;
 after exit the reduced source reported zero consumers and zero active producers.
-All known test keys revoked. Physical browser decoding and active-stream expiry
-remain separate checks. Earlier intermittent remote handshake timeouts remain
+All known test keys revoked. Physical browser decoding remains a separate check;
+active-stream expiry subsequently passed above. Earlier intermittent remote handshake timeouts remain
 unattributed; this passing run is not evidence that their root cause was fixed.
 
 The probe initially falsely reported a lost independent session because it waited

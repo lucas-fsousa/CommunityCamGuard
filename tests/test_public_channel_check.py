@@ -32,7 +32,8 @@ def test_non_permission_handshake_failure_is_not_accepted(status):
     with pytest.raises(RuntimeError): probe.expect_denied("wss://example", {}, connect)
 
 
-def test_known_keys_are_revoked_when_opening_channel_fails(monkeypatch):
+@pytest.mark.parametrize("active_expiry", [False, True])
+def test_known_keys_are_revoked_when_opening_channel_fails(monkeypatch, active_expiry):
     created, revoked = [], []
     def check(client, method, path, expected=200, token=None, body=None):
         if path == "/api/access-keys":
@@ -47,8 +48,9 @@ def test_known_keys_are_revoked_when_opening_channel_fails(monkeypatch):
     monkeypatch.setattr(probe, "expect_denied", lambda *args: None)
     def connect(*args, **kwargs): raise TimeoutError
     with pytest.raises(TimeoutError):
-        probe.exercise(None, "owner", "https://example", "cam_" + "a" * 24, connect)
-    assert created == revoked == ["0", "1", "2"]
+        probe.exercise(None, "owner", "https://example", "cam_" + "a" * 24, connect,
+                       active_expiry=active_expiry)
+    assert created == revoked == (["0"] if active_expiry else ["0", "1", "2"])
 
 
 def test_unknown_creation_outcome_is_reported_without_retry(monkeypatch, capsys):

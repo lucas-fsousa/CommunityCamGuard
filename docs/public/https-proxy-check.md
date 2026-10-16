@@ -110,3 +110,26 @@ queue would falsely report a disconnected independent session.
 This mode checks revocation, not expiry during active playback. It verifies media
 delivery at the WebSocket boundary, not successful browser decoding or removal of
 previously buffered frames. All known test keys are revoked during cleanup.
+
+## Expiry during actual media delivery
+
+```bash
+python -m scripts.check_public_channels --active-expiry --camera-id <registered-camera-id>
+```
+
+Separate opt-in, mutually exclusive with `--active-media`: creates one live-only
+key expiring25seconds after preparation and starts one reduced-quality video-only
+consumer. Requires actual fMP4 before expiry, drains the bounded receive queue
+while waiting, and requires close1008 within7seconds after scheduled expiry.
+Early closure does not count as success. Verifies denied WebSocket reconnection
+and HTTP401 with the expired session; revokes the known test key in cleanup.
+
+Timing is measured from scheduled expiry, not socket acceptance. The byte counter
+covers the entire drain window (including before expiry), capped at16MiB/1024
+frames. No recording, decoding, microphone or camera control. Use the same resource
+limits and cleanup checks as the revocation probe. This verifies delivery-level
+expiry, not removal of already-buffered browser frames or UI logout behavior.
+
+Public acceptance2026-10-15: camera3 close486ms after expiry, reconnect/HTTP denied,
+46.3MiB peak/no swap. Zero source consumers/active producers after cleanup;
+three cameras still online and recording. No application rebuild required.

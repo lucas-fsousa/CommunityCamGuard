@@ -46,9 +46,11 @@ def receive_media(socket, *, start=False):
     raise RuntimeError("No media fragment within probe budget")
 
 
-def drain_until_invalidated(socket):
+def drain_until_invalidated(socket, *, invalid_at=None):
     """Allow bounded buffered/in-flight bytes; never claim instantaneous recall."""
-    started = time.monotonic()
+    started = time.monotonic() if invalid_at is None else invalid_at
+    if started - time.monotonic() > 30:
+        raise ValueError("Expiry exceeds probe budget")
     deadline = started + 7
     received = 0
     for _ in range(1024):
@@ -60,6 +62,8 @@ def drain_until_invalidated(socket):
         except ConnectionClosed as exc:
             if exc.rcvd is None or exc.rcvd.code != 1008:
                 raise RuntimeError("Missing authorization close frame") from None
+            if time.monotonic() < started:
+                raise RuntimeError("Channel closed before scheduled expiry") from None
             return {"closed_ms": round((time.monotonic() - started) * 1000),
                     "inflight_bytes": received}
         received += len(frame)

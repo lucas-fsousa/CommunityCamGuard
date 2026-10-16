@@ -49,6 +49,32 @@ def test_missing_close_is_not_reported_as_revocation():
     with pytest.raises(RuntimeError): probe.drain_until_invalidated(Socket())
 
 
+def test_expiry_drains_until_deadline_and_measures_from_expiry(monkeypatch):
+    clock = [10.0]
+    monkeypatch.setattr(probe.time, "monotonic", lambda: clock[0])
+    class Socket:
+        def recv(self, timeout):
+            assert timeout <= 12
+            if clock[0] == 10:
+                clock[0] = 15.5
+                return box(b"mdat", b"video")
+            raise ConnectionClosedError(Close(1008, ""), Close(1008, ""), True)
+    result = probe.drain_until_invalidated(Socket(), invalid_at=15)
+    assert result["closed_ms"] == 500
+    assert result["inflight_bytes"] == 13
+
+
+def test_early_policy_close_does_not_prove_expiry(monkeypatch):
+    monkeypatch.setattr(probe.time, "monotonic", lambda: 10)
+    class Socket:
+        def recv(self, timeout):
+            raise ConnectionClosedError(Close(1008, ""), Close(1008, ""), True)
+    with pytest.raises(RuntimeError, match="before scheduled expiry"):
+        probe.drain_until_invalidated(Socket(), invalid_at=15)
+    with pytest.raises(ValueError, match="budget"):
+        probe.drain_until_invalidated(Socket(), invalid_at=41)
+
+
 @pytest.mark.parametrize("operation", [probe.receive_media, probe.drain_until_invalidated])
 def test_input_flood_is_bounded(monkeypatch, operation):
     monkeypatch.setattr(probe, "MAX_BYTES", 8)
