@@ -1,5 +1,54 @@
 # Delegated access: bounded browser validation — 2026-09-28
 
+## Full dashboard through public HTTPS — 2026-10-15
+
+`scripts/check_browser_session.py` now exercises the actual production login form
+and dashboard in two real Chromium tabs sharing the browser cookie. The primary
+key stays in the Python HTTP client; Chromium receives only a labeled test key
+with zero permissions and a45second expiry. No camera control/media is requested.
+Known test keys are revoked in cleanup, including after test failure; audit rows
+remain. An unknown creation result is reported, not retried. The short expiry
+also bounds credentials if the process is forcibly killed before cleanup.
+
+Public HTTPS results, sequential runs:
+
+| Operation | Viewport | Both tabs at login after invalidation | Peak RAM |
+| --- | --- | --- | --- |
+| Owner revokes test key | 1280px | 1098ms | 261.9MiB |
+| Key expires | 375px | 1728ms after scheduled expiry | 228.9MiB |
+| Logout in first tab | 375px | 1214ms | 233.5MiB |
+
+Reloading both tabs kept the login visible. The final logout run also directly
+confirmed unauthenticated `/api/me` in each reloaded tab. This is application DOM
+state verification, not screenshot review or physical mobile/touch validation.
+The zero-grant test does not verify decoded live frames or media cleanup in a
+browser. Server-side media expiry/revocation has separate acceptance evidence.
+
+First attempt ended in RuntimeError before stage diagnostics were added (25.1s,
+455.8MiB); cause not established. Repeat passed without an application change.
+Do not describe that intermittent failure as fixed. No production rebuild needed.
+
+Example (replace absolute paths, use exactly one run at a time):
+
+```sh
+systemd-run --user --wait --pipe \
+  -p WorkingDirectory=/absolute/repo \
+  -p MemoryMax=512M -p MemorySwapMax=0 -p CPUQuota=75% \
+  -p TasksMax=128 -p RuntimeMaxSec=90 \
+  /absolute/repo/.venv/bin/python -m scripts.check_browser_session \
+  --browser /absolute/path/to/chrome --mode expiry --width 375
+```
+
+Modes: `revoke`, `expiry`, `logout`; widths:375 or1280. Browser binary must be an
+ELF, not a launcher escaping the cgroup. Uses only configured public HTTPS origin,
+normal certificate validation and a disposable profile. No credentials/screenshots
+are logged or retained. The CDP helper owns and terminates its browser process
+group; it never kills unrelated browser processes.39 focused tests passed with
+85MiB peak/no swap, plus Node session lifecycle contracts. CI now lints both
+browser and WebSocket acceptance helpers as well.
+
+## Earlier isolated component evidence
+
 The real Chromium check reproduced a layout defect missed by fake DOM tests:
 the global full-width input rule stretched permission checkboxes and squeezed
 their labels on narrow screens. Scoped checkbox dimensions now keep the labels

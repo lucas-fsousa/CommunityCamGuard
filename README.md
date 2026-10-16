@@ -197,13 +197,15 @@ browser session. Only primary-key sessions can create/revoke keys. Rights apply
 across configured cameras and never enable a feature unsupported by its driver.
 Local-only control restrictions remain in force.
 
-The local deployment was updated on 2026-09-27 to build **`b-a84862f46bfb`**.
-Live HTTP checks passed for delegated login, permission denials, expiration,
-revocation and protected public paths; all three cameras resumed recording.
+Live HTTPS checks passed for delegated login, permission denials, expiration,
+revocation and protected public paths. Active video-channel expiry/revocation
+were verified on 2026-10-15; all three cameras remained online and recording.
 See [deployment evidence, safe check and remaining acceptance](docs/internal/delegated-access-activation.md).
 Isolated real-Chromium component checks passed desktop and narrow-screen layouts;
 see [modal/browser evidence](docs/internal/delegated-access-browser-check.md).
-Physical mobile, full-page and proxy/channel interruption acceptance remain pending.
+Full-dashboard HTTPS checks also passed revocation, expiry and logout in two
+Chromium tabs (desktop/narrow viewport), using zero-camera-permission test keys.
+Physical mobile and rendered-video interruption in the browser remain pending.
 
 The deployment also includes [bounded login pacing](docs/internal/login-abuse-protection.md),
 [request limits](docs/internal/login-request-boundaries.md), [origin checks](docs/internal/browser-origin-policy.md),

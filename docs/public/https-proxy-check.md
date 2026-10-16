@@ -133,3 +133,12 @@ expiry, not removal of already-buffered browser frames or UI logout behavior.
 Public acceptance2026-10-15: camera3 close486ms after expiry, reconnect/HTTP denied,
 46.3MiB peak/no swap. Zero source consumers/active producers after cleanup;
 three cameras still online and recording. No application rebuild required.
+
+## Full dashboard in two browser tabs
+
+The opt-in `python -m scripts.check_browser_session` checks actual HTTPS login,
+revocation/expiry/logout and return to login in two Chromium tabs, without camera
+permissions or streams. It requires explicit browser cgroup limits; see the
+[commands, limits and recorded evidence](../internal/delegated-access-browser-check.md).
+Desktop and375px viewport runs passed. Physical mobile and rendered-video
+interruption are separate, still-pending acceptance checks.

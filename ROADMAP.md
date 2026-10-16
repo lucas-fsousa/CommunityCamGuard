@@ -1,5 +1,15 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-15 FULL DASHBOARD session acceptance passed through public HTTPS in two
+real Chromium tabs: revocation1098ms (1280px), expiry1728ms (375px), logout1214ms
+(375px); both tabs returned to login and stayed logged out on reload. Zero-grant
+short-lived test keys, no camera/media requests. Sequential capped browser runs:
+261.9/228.9/233.5MiB, no swap.39 focused Python tests and Node session contracts
+passed. First uninstrumented browser attempt failed with RuntimeError; cause
+unattributed, successful repeat is not a fix. Remaining: rendered-video browser
+interruption and physical mobile acceptance. See
+[browser evidence](docs/internal/delegated-access-browser-check.md).
+
 2026-10-15 ACTIVE VIDEO expiry validated on camera3 through public HTTPS/WSS:
 actual fMP4 arrived before expiry; close1008 followed expiry by486ms. Expired
 reconnect denied403 and HTTP denied401. Single video-only reduced consumer;
