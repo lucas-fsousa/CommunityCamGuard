@@ -32,3 +32,20 @@ alone does not guarantee that an idle route survives a later login. Compare a pa
 no-query window before changing lifetime/backoff or adding authentication retries.
 Do not replay movement/actions, renew tokens on generic timeout, or weaken target,
 sequence/session checks to make this test pass.
+
+## Stopped-route authentication generation
+
+The production stopped PTZ cache now records a process-local broker authentication
+generation. `open_camera_session` advances it immediately before node authentication,
+including attempts whose initialization later fails (not failed list discovery).
+A shared stopped route from an older generation is closed before liveness checking
+or target selection; normal bounded preparation creates a fresh route. Returning an
+older lease cannot repopulate the cache. Healthy sessions still reuse without periodic
+login. No token refresh, motion replay, new polling worker or timing increase added.
+
+The generation is conservative and driver-wide, matching broker ownership. It does
+not observe other processes, external vendor clients or all experimental SDK paths.
+It prevents local stale-cache reuse; it does not prove that every observed timeout
+was caused by broker replacement.64 focused tests passed (106.7 MiB/no swap), covering
+both warm/acquire paths, delayed lease return, failed initialization, and existing
+healthy long-lived cache reuse. Live post-deployment comparison remains required.

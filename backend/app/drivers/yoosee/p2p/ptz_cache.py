@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from . import broker_epoch
 from .contracts import P2PProbeError
 from .ptz_route import NativePtzRoute
 
@@ -22,6 +23,7 @@ class _Idle:
     timer: threading.Timer
     expires: float
     checked: float
+    epoch: int
 
 
 class PtzRouteCache:
@@ -103,6 +105,10 @@ class PtzRouteCache:
             full = len(self._idle) >= 4
         if idle is not None:
             idle.timer.cancel()
+            if self._shared_account and idle.epoch != broker_epoch.current():
+                idle.route.close()
+                idle = None
+        if idle is not None:
             if now < idle.expires and (self._shared_account or now - idle.created < 15):
                 route = idle.route
                 try:
@@ -156,6 +162,10 @@ class PtzRouteCache:
         now = time.monotonic()
         if idle is not None:
             idle.timer.cancel()
+            if self._shared_account and idle.epoch != broker_epoch.current():
+                idle.route.close()
+                idle = None
+        if idle is not None:
             if (self._shared_account or now - idle.created < 20) and now < idle.expires:
                 if self._shared_account:
                     try:
@@ -180,7 +190,8 @@ class PtzRouteCache:
 
     def _return(self, lease: CachedPtzRoute, *, prepared: bool = False) -> bool:
         remaining = 8 if self._shared_account else 20 - (time.monotonic() - lease.created)
-        if remaining <= 0 or (not prepared and not lease.confirmed) or lease.failed:
+        if (remaining <= 0 or (not prepared and not lease.confirmed) or lease.failed
+                or (self._shared_account and lease.epoch != broker_epoch.current())):
             lease.route.close()
             return False
         key = self._storage_key(lease.key)
@@ -191,7 +202,7 @@ class PtzRouteCache:
                 lease.route.close()
                 return False
             self._idle[key] = _Idle(lease.route, lease.created, timer,
-                                  time.monotonic()+min(8, remaining), lease.checked)
+                                  time.monotonic()+min(8, remaining), lease.checked, lease.epoch)
             try:
                 timer.start()
             except BaseException:
@@ -216,6 +227,7 @@ class CachedPtzRoute:
         self.pool, self.key, self.route = pool, key, route
         self.created, self.reused = created, reused
         self.checked = time.monotonic() if checked is None else checked
+        self.epoch = broker_epoch.current()
         self.failed = self.confirmed = self.closed = False
 
     def send_start(self) -> None:

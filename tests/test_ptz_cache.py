@@ -261,3 +261,43 @@ def test_shared_idle_without_maintenance_still_expires(pool):
     lease = cache.acquire(key, state.prepare, select=lambda route: route)
     assert not lease.reused and state.prepares == 2
     lease.close()
+
+
+@pytest.mark.parametrize("warm", [False, True])
+def test_new_authentication_retires_old_shared_route_before_liveness_or_selection(pool, monkeypatch, warm):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    key = ("camera", None, frozenset({"right"}), 123, b"secret", None)
+    cache.warm(key, state.prepare, select=lambda route: route)
+    old = next(iter(cache._idle.values())).route
+
+    def forbidden(*args):
+        raise AssertionError("superseded route used")
+
+    monkeypatch.setattr(old, "keepalive", forbidden)
+    monkeypatch.setattr(old, "send_start", forbidden)
+    ptz_cache.broker_epoch.authentication_started()
+
+    def select(route):
+        assert route is not old
+        return route
+
+    if warm:
+        assert cache.warm(key, state.prepare, select=select)
+    else:
+        lease = cache.acquire(key, state.prepare, select=select)
+        assert not lease.reused
+        lease.close()
+    assert old.closed == 1 and state.prepares == 2
+    cache.close_idle()
+
+
+def test_returned_shared_lease_cannot_repopulate_cache_after_new_authentication(pool):
+    _, state = pool
+    cache = ptz_cache.PtzRouteCache(shared_account=True)
+    key = ("camera", None, frozenset({"right"}), 123, b"secret", None)
+    lease = cache.acquire(key, state.prepare, select=lambda route: route)
+    ptz_cache.broker_epoch.authentication_started()
+    lease.confirmed = True
+    lease.close()
+    assert not cache._idle and lease.route.closed == 1

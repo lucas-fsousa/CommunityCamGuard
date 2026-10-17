@@ -6,6 +6,7 @@ import socket
 import time
 
 from ....db.p2p import P2PEnrollment
+from . import broker_epoch
 from .access_session import (
     establish_initialized_node,
     heartbeat_node,
@@ -38,6 +39,9 @@ def open_camera_session(
         endpoints = obtain_list(sock, material.access_id, timeout, deadline=deadline,
                                 resolved_hosts=resolved_hosts)
     endpoints.sort(key=lambda endpoint: endpoint[1] != 19800)
+    # A new broker authentication may supersede cached stopped PTZ sessions.
+    # Advance before certification: even a later failed init cannot prove reuse safe.
+    broker_epoch.authentication_started()
     node, devices, _skipped = establish_initialized_node(
         sock,
         material,

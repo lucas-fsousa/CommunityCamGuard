@@ -5,6 +5,9 @@ during capability refresh); second round8/8 verified at1.9–3.8s. No actions. P
 maintenance warnings appeared during probes despite shared ownership; investigate
 cached broker lifetime across independent authenticated operations, without replaying
 actions or weakening checks. [Evidence](docs/internal/camera3-read-stability-2026-10-17.md).
+Stopped shared PTZ cache now tracks local broker authentication generations: a new
+authentication retires older stopped routes before reuse. Healthy reuse and motion
+ownership remain unchanged.64 focused tests passed; live read-only comparison pending.
 
 2026-10-16 PROXY TRUST boundary reviewed/deployed: bundled runtime and source
 hashes verified; forwarded headers do not select login-limiter identity (shared
