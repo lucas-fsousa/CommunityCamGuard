@@ -1552,6 +1552,10 @@ had an unconfirmed readback, but an independent strict read confirmed mode0 afte
 Speaker-volume validation now accepts only exact integer setVal0..10 and correlated
 responses, with session target checks.71 focused tests passed; camera3 read-only live
 check confirmed raw5/50%, no audio or volume changes.
+Smart Protection master and weekly schedule now require correlated preflight/readback
+and reject mismatched session targets before property I/O. Master state uses only the
+exact guard enable field.55 focused tests cover delayed confirmation, single write,
+read-only flow and wrong-device refusal; no live arming/schedule changes required.
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 

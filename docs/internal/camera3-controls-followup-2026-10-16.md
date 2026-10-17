@@ -81,3 +81,15 @@ cross-device sessions before property I/O. Existing APK percentage buckets remai
 71 focused tests passed (92.1 MiB/no swap), Ruff passed. One bounded native read of
 camera3 confirmed raw5/50%, error0 (38 MiB/no swap). No volume write or audio playback.
 This does not resolve earlier missing write acknowledgements or certify other models.
+
+## Smart Protection confirmation, 2026-10-17
+
+Master switch and weekly schedule now require correlated B8 preflight/readback rather
+than accepting unsolicited AA reports. Both operations validate the opened session's
+device before property I/O. Master parsing accepts the exact enable field on guardParm
+or its setVal map, not standalone scalars or nested wrappers. No schedule fields,
+percentage buckets, timeouts, write retries or capability grants were changed.
+55 focused tests passed (91.4 MiB/no swap), including wrong-device rejection for
+both read/write paths, correlated read-only calls, delayed matching readback with one
+write, and socket cleanup. Real acceptance must be read-only: do not disarm a camera
+or change detection schedules merely to test the response boundary.

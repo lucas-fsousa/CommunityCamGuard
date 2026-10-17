@@ -151,6 +151,8 @@ def read_camera_smart_protection_schedule(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("smart-protection session device identity mismatch")
         result = exchange_model_read(
             sock,
             node,
@@ -159,6 +161,7 @@ def read_camera_smart_protection_schedule(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         schedule = extract_smart_protection_schedule(result.value)
         if result.error_code != 0 or schedule is None:
@@ -196,6 +199,8 @@ def set_camera_smart_protection_schedule(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("smart-protection session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -204,6 +209,7 @@ def set_camera_smart_protection_schedule(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous = extract_smart_protection_schedule(preflight.value)
         if preflight.error_code != 0 or previous is None:
@@ -239,6 +245,7 @@ def set_camera_smart_protection_schedule(
                 min(bounded_timeout, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=True,
             )
             if (
                 readback.error_code == 0

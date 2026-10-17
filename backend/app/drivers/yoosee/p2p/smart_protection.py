@@ -39,20 +39,15 @@ class P2PSmartProtectionWrite:
 
 
 def extract_smart_protection_enabled(value: object) -> bool | None:
-    """Extract only ``guardParm.setVal.enable`` and its standalone scalar form."""
-
-    if type(value) is int and value in (0, 1):
-        return bool(value)
+    """Extract only the guard root's exact master switch, never another enable."""
     if not isinstance(value, dict):
         return None
-    direct = value.get("enable")
+    fields = value.get("setVal", value)
+    if not isinstance(fields, dict):
+        return None
+    direct = fields.get("enable")
     if type(direct) is int and direct in (0, 1):
         return bool(direct)
-    for key in ("setVal", "guardParm", "ProWritable"):
-        if key in value:
-            candidate = extract_smart_protection_enabled(value[key])
-            if candidate is not None:
-                return candidate
     return None
 
 
@@ -121,6 +116,8 @@ def read_camera_smart_protection(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("smart-protection session device identity mismatch")
         result = exchange_model_read(
             sock,
             node,
@@ -129,6 +126,7 @@ def read_camera_smart_protection(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         enabled = extract_smart_protection_enabled(result.value)
         if result.error_code != 0 or enabled is None:
@@ -166,6 +164,8 @@ def set_camera_smart_protection(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("smart-protection session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -174,6 +174,7 @@ def set_camera_smart_protection(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous = extract_smart_protection_enabled(preflight.value)
         if preflight.error_code != 0 or previous is None:
@@ -210,6 +211,7 @@ def set_camera_smart_protection(
                 min(bounded_timeout, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=True,
             )
             if (
                 readback.error_code == 0
