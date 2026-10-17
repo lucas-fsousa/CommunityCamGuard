@@ -11,6 +11,7 @@ from backend.app.drivers.yoosee.p2p.contracts import (
     ModelReadResult,
     ModelWriteResult,
     OnlineDevice,
+    P2PProbeError,
 )
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 
@@ -44,6 +45,44 @@ def test_volume_buckets_match_the_apk(raw, percent):
     assert volume.extract_volume_raw({"setVal": raw, "t": 1788000000}) == raw
 
 
+@pytest.mark.parametrize("payload", [
+    5, True, {"value": 5}, {"v": 5}, {"other": 5},
+    {"nested": {"setVal": 5}}, {"setVal": True, "other": 5},
+    {"setVal": 11, "other": 5}, {"setVal": 5.0}, {"t": 5},
+])
+def test_volume_rejects_unrelated_or_malformed_values(payload):
+    assert volume.extract_volume_raw(payload) is None
+
+
+@pytest.mark.parametrize("write", [False, True])
+def test_volume_refuses_wrong_session_target_before_property_io(monkeypatch, write):
+    closed = []
+
+    class FakeSocket:
+        def bind(self, _address):
+            pass
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(volume.socket, "socket", lambda *_args: FakeSocket())
+    monkeypatch.setattr(volume, "open_camera_session", lambda *_args: (
+        CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17),
+        OnlineDevice(7000000003, 1, False, 1, bytes(16)), 40))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("property I/O to wrong camera")
+
+    monkeypatch.setattr(volume, "exchange_model_read", forbidden)
+    monkeypatch.setattr(volume, "exchange_volume_write", forbidden)
+    with pytest.raises(P2PProbeError, match="identity mismatch"):
+        if write:
+            volume.set_camera_speaker_volume(_enrollment(), 50)
+        else:
+            volume.read_camera_speaker_volume(_enrollment())
+    assert closed == [True]
+
+
 def test_volume_change_requires_preflight_d3_and_exact_readback(monkeypatch):
     enrollment = _enrollment()
     node = CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17)
@@ -68,6 +107,7 @@ def test_volume_change_requires_preflight_d3_and_exact_readback(monkeypatch):
     )
 
     def fake_read(_sock, _node, _device, _path, sequence, _timeout, **_kwargs):
+        assert _kwargs["require_correlated_response"] is True
         calls.append(("read", sequence))
         return next(reads)
 
@@ -109,11 +149,11 @@ def test_volume_read_returns_normalized_percent_and_preserves_raw_value(monkeypa
 
     monkeypatch.setattr(volume.socket, "socket", lambda *_args, **_kwargs: FakeSocket())
     monkeypatch.setattr(volume, "open_camera_session", lambda *_args: (node, target, 40))
-    monkeypatch.setattr(
-        volume,
-        "exchange_model_read",
-        lambda *_args, **_kwargs: ModelReadResult(True, 0, {"setVal": 6}),
-    )
+    def read(*args, **kwargs):
+        assert kwargs["require_correlated_response"] is True
+        return ModelReadResult(True, 0, {"setVal": 6})
+
+    monkeypatch.setattr(volume, "exchange_model_read", read)
 
     result = volume.read_camera_speaker_volume(enrollment)
 

@@ -68,23 +68,11 @@ def parse_volume_write_response(frame: bytes, message_id: int) -> int | None:
 
 
 def extract_volume_raw(value: object) -> int | None:
-    """Extract a firmware speaker-volume value in its documented 0..10 range."""
-
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value if 0 <= value <= 10 else None
-    if isinstance(value, dict):
-        for key in ("setVal", "value", "v"):
-            direct = value.get(key)
-            if isinstance(direct, int) and not isinstance(direct, bool):
-                if 0 <= direct <= 10:
-                    return direct
-        for key, nested in value.items():
-            if key in {"t", "time", "timestamp"}:
-                continue
-            candidate = extract_volume_raw(nested)
-            if candidate is not None:
-                return candidate
-    return None
+    """Read only the documented ProWritable.volume.setVal integer, not aliases."""
+    if not isinstance(value, dict):
+        return None
+    raw = value.get("setVal")
+    return raw if type(raw) is int and 0 <= raw <= 10 else None
 
 
 def volume_percent(raw: int) -> int:
@@ -143,6 +131,8 @@ def read_camera_speaker_volume(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("speaker-volume session device identity mismatch")
         result = exchange_model_read(
             sock,
             node,
@@ -151,6 +141,7 @@ def read_camera_speaker_volume(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         raw = extract_volume_raw(result.value)
         if result.error_code != 0 or raw is None:
@@ -190,6 +181,8 @@ def set_camera_speaker_volume(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("speaker-volume session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -198,6 +191,7 @@ def set_camera_speaker_volume(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous_raw = extract_volume_raw(preflight.value)
         if preflight.error_code != 0 or previous_raw is None:
@@ -243,6 +237,7 @@ def set_camera_speaker_volume(
                 min(bounded_timeout, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=True,
             )
             if readback.error_code == 0 and extract_volume_raw(readback.value) == requested_raw:
                 verified = True

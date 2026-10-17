@@ -1547,6 +1547,11 @@ verified. [Detailed test/deployment evidence](docs/internal/camera3-controls-fol
 2026-10-17: fixed night-mode parser accepting unrelated scalar fields; exact legacy
 field, correlated preflight/readback and session target checks now enforced. No new
 night-mode capability grant; physical IR validation still pending.
+The operator deferred physical IR testing until nighttime. Return-to-automatic write
+had an unconfirmed readback, but an independent strict read confirmed mode0 afterward.
+Speaker-volume validation now accepts only exact integer setVal0..10 and correlated
+responses, with session target checks.71 focused tests passed; camera3 read-only live
+check confirmed raw5/50%, no audio or volume changes.
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 

@@ -62,3 +62,22 @@ This fixes a demonstrated interpretation defect, not proof of the earlier live f
 cause. The existing bounded readback loop already tolerates delayed state application;
 the earlier operator harness made only one immediate check and is not a timing test
 of that production loop. Physical night/IR validation remains pending.
+
+The corrected night code was deployed as image44a44b78c18d after green CI39037807637
+(commit2a36065). Canonical automatic-mode check returned200/verified/changedfalse
+after capability refresh completed. At the operator's explicit request, native IR
+activation returned night/previous0/verifiedtrue. Daylight made physical validation
+inconclusive; the operator deferred it until nighttime. Return-to-automatic write
+failed its final confirmation, but an independent correlated read then confirmed0.
+Do not leave the continuation state recorded as IR active.
+
+## Speaker-volume confirmation, 2026-10-17
+
+The analogous recursive volume parser also accepted unrelated values/aliases as
+speaker volume. Eight regression failures demonstrated seven invalid-value cases
+plus missing correlation enforcement. Now only exact integer setVal0..10 is accepted;
+read, preflight and readback require correlated responses. Both read and write reject
+cross-device sessions before property I/O. Existing APK percentage buckets remain.
+71 focused tests passed (92.1 MiB/no swap), Ruff passed. One bounded native read of
+camera3 confirmed raw5/50%, error0 (38 MiB/no swap). No volume write or audio playback.
+This does not resolve earlier missing write acknowledgements or certify other models.
