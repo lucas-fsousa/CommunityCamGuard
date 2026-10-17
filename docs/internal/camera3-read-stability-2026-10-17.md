@@ -49,3 +49,18 @@ It prevents local stale-cache reuse; it does not prove that every observed timeo
 was caused by broker replacement.64 focused tests passed (106.7 MiB/no swap), covering
 both warm/acquire paths, delayed lease return, failed initialization, and existing
 healthy long-lived cache reuse. Live post-deployment comparison remains required.
+
+## Post-deployment comparison
+
+Commit51a2bd4 passed full CI39072118661 (59s), deployed as image7637705f225d with
+bounded512 MiB/no extra swap/50% CPU build. Only app recreated; go2rtc unchanged.
+Same canonical eight-read camera3 probe: 8/8 HTTP200/verified,1840–4958ms,33.82s
+total,64.1 MiB peak/no swap. No mutations, movement, sound or external native client.
+The post-deployment bounded log review (last150 lines, preceding3 minutes) showed
+three prepared-camera entries and no warm_failed/prepare_failed/capability-refresh
+warnings. HealthOK; app/go2rtc running, no OOM flags.
+
+This short comparison supports the cache-generation correction but is not a long-run
+or controlled causal study: app recreation also resets runtime state. The ~5s outlier
+means no general latency improvement is claimed. Continue passive observation before
+further timing changes. Physical IR/night test remains separate and pending.

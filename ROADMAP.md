@@ -8,6 +8,9 @@ actions or weakening checks. [Evidence](docs/internal/camera3-read-stability-202
 Stopped shared PTZ cache now tracks local broker authentication generations: a new
 authentication retires older stopped routes before reuse. Healthy reuse and motion
 ownership remain unchanged.64 focused tests passed; live read-only comparison pending.
+Post-deployment comparison passed8/8 canonical camera3 reads with no matching PTZ
+maintenance warnings in the bounded log review. Runtime51a2bd4; full CI green.
+Long-duration stability and latency remain open; no new physical PTZ/audio tests.
 
 2026-10-16 PROXY TRUST boundary reviewed/deployed: bundled runtime and source
 hashes verified; forwarded headers do not select login-limiter identity (shared
