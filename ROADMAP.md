@@ -1528,8 +1528,10 @@ siren/intercom gates; physically validate only camera 3 when needed.
 Siren migration now has an offline strict boundary: exact timestamped `Action.expelCtrl.stVal`,
 correlated B7 preflight/readback, encrypted session/message-correlated AC/AD and sequence-matched
 ACKs. Single ON and unconditional OFF cleanup remain covered. It is opt-in and not yet enabled
-in runtime rollout; no new sound or camera test was performed. Next is a harmless camera-3 state
-read with exact identity, then a bounded strict pulse before registering operation proofs.
+in runtime rollout. On 2026-10-16, a harmless camera-3 correlated state read succeeded with
+complete identity and OFF state (3.2 seconds, 41.7 MiB/no swap). Explicit optional collection
+now normalizes this evidence without enabling actions or changing default polling.
+Next: a bounded strict pulse with operator notification before registering operation proofs.
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 

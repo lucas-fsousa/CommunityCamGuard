@@ -18,6 +18,7 @@ from .capability_evidence import (
 from .capability_identity import CapabilityIdentity, normalize_identity
 from .p2p.contracts import P2PPropertyRead
 from .p2p.white_light import P2PWhiteLightState
+from .siren_evidence import siren_evidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +67,7 @@ def normalize_snapshot(
     ):
         return None
     paths = CAPABILITY_PATHS
-    if len(observations) > len(paths) + 1:
+    if len(observations) > len(paths) + 2:
         return None
     reads: dict[str, P2PPropertyRead] = {}
     light: P2PWhiteLightState | None = None
@@ -79,7 +80,7 @@ def normalize_snapshot(
         if (
             read.device_id != device_id
             or read.authenticated is not True
-            or read.property_path not in paths
+            or read.property_path not in (*paths, "Action.expelCtrl")
             or read.property_path in reads
         ):
             return None
@@ -121,4 +122,10 @@ def normalize_snapshot(
     state = (EvidenceState.SUPPORTED if light is not None and type(light.enabled) is bool
              else EvidenceState.UNKNOWN)
     evidence.append(PropertyEvidence("white_light", state, None))
+    # Presence is optional until strict pulse validation. A readable state is not
+    # an operation proof and must never enable the action on its own.
+    if "Action.expelCtrl" in reads:
+        payload, timestamp = _property(reads["Action.expelCtrl"])
+        state = siren_evidence(payload)
+        evidence.append(PropertyEvidence("siren_pulse", state, timestamp))
     return CapabilitySnapshot(camera_id, identity, collected_at, tuple(evidence))

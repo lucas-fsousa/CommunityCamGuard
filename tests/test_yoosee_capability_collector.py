@@ -14,7 +14,8 @@ ENROLLMENT = P2PEnrollment("1234567890", 1, bytes(64), None, "", "", "cam_" + "1
 
 
 @pytest.mark.parametrize("failure", (None, 20001, "timeout", "exception"))
-def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
+@pytest.mark.parametrize("include_siren", (False, True))
+def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure, include_siren):
     opened = []
     calls = []
     closed = []
@@ -71,18 +72,20 @@ def test_one_session_fixed_read_paths_and_cleanup(monkeypatch, failure):
     monkeypatch.setattr(collector, "exchange_white_light", light_read)
     if failure == "exception":
         with pytest.raises(OSError):
-            collector.collect(ENROLLMENT)
+            collector.collect(ENROLLMENT, include_siren=include_siren)
     else:
-        observations = collector.collect(ENROLLMENT)
-        assert len(observations) == (6 if failure is None else 1)
+        observations = collector.collect(ENROLLMENT, include_siren=include_siren)
+        assert len(observations) == (6 + int(include_siren) if failure is None else 1)
     assert opened == closed and len(opened) == 1
     expected = collector.CAPABILITY_PATHS if failure is None else collector.CAPABILITY_PATHS[:1]
+    if failure is None and include_siren:
+        expected += ("Action.expelCtrl",)
     assert [path for path, _sequence in calls] == list(expected)
     if failure is None:
-        assert [seq for _path, seq in calls] == [0xFFFFFFFF, 0, 1, 2, 3, 4]
+        assert [seq for _path, seq in calls] == [0xFFFFFFFF, *range(5 + int(include_siren))]
         args, kwargs = light_calls[0]
         assert len(light_calls) == 1 and args[0] is opened[0]
-        assert args[4] is None and args[5] == 5
+        assert args[4] is None and args[5] == 5 + int(include_siren)
         assert kwargs["require_correlated_response"] is True and kwargs["retries"] == 1
     else:
         assert not light_calls

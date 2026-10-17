@@ -19,13 +19,15 @@ from .p2p.model_session import exchange_model_read
 from .p2p.white_light import P2PWhiteLightState, exchange_white_light, extract_white_light_state
 
 
-def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
+def collect_snapshot(
+    enrollment: P2PEnrollment, *, include_siren: bool = False,
+) -> CapabilitySnapshot | None:
     """Explicit backend-only collection plus normalization; no persistence or grants.
 
     The server samples receipt time after the bounded exchange, never from camera t.
     No raw observations or credentials are retained in the returned snapshot.
     """
-    observations = collect(enrollment)
+    observations = collect(enrollment, include_siren=include_siren)
     return normalize_snapshot(
         observations,
         camera_id=enrollment.camera_id or "",
@@ -34,7 +36,9 @@ def collect_snapshot(enrollment: P2PEnrollment) -> CapabilitySnapshot | None:
     )
 
 
-def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
+def collect(
+    enrollment: P2PEnrollment, *, include_siren: bool = False,
+) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
     """Read six fixed roots and optional lamp status within one 20-second session budget.
 
     Only device/session/sequence-correlated B8 responses are collected, not AA reports.
@@ -51,7 +55,9 @@ def collect(enrollment: P2PEnrollment) -> tuple[P2PPropertyRead | P2PWhiteLightS
         node, target, sequence = open_camera_session(sock, enrollment, 1.0, deadline)
         if str(target.device_id) != enrollment.device_id:
             raise P2PProbeError("capability session device identity mismatch")
-        for path in CAPABILITY_PATHS:
+        # Explicit backend opt-in only: B7 reads state, never sends the AC action.
+        paths = CAPABILITY_PATHS + (("Action.expelCtrl",) if include_siren else ())
+        for path in paths:
             if time.monotonic() >= deadline:
                 break
             result = exchange_model_read(

@@ -33,6 +33,28 @@ def normalize(reads, **kwargs):
     )
 
 
+@pytest.mark.parametrize("value,code,expected", [
+    ({"t": 100, "stVal": 1}, 0, State.SUPPORTED),
+    ({"t": 100, "stVal": 2}, 0, State.SUPPORTED),
+    ({"t": -1}, 0, State.UNSUPPORTED),
+    ({"t": 100.0, "stVal": 1}, 0, State.UNKNOWN),
+    ({"t": True, "stVal": 1}, 0, State.UNKNOWN),
+    ({"t": 100, "stVal": True}, 0, State.UNKNOWN),
+    ({"t": 100, "nested": {"stVal": 1}}, 0, State.UNKNOWN),
+    ({"t": 100, "stVal": 1}, None, State.UNKNOWN),
+    ({"t": 100, "stVal": 1}, False, State.UNKNOWN),
+])
+def test_optional_siren_read_is_not_an_action_proof(value, code, expected):
+    read = P2PPropertyRead(DEVICE, "Action.expelCtrl", True, False, True, code, value)
+    snapshot = normalize((*batch(), read))
+    assert snapshot.evidence[-1].feature == "siren_pulse"
+    assert snapshot.evidence[-1].state == expected
+    assert not hasattr(snapshot, "operations")
+    assert normalize((*batch(), read, read)) is None
+    assert normalize((*batch(), replace(read, device_id="7000000003"))) is None
+    assert normalize((*batch(), replace(read, authenticated=False))) is None
+
+
 def test_old_property_timestamp_is_not_server_receipt_time_or_unsupported():
     snapshot = normalize(batch())
     assert snapshot.collected_at == 2000
@@ -113,7 +135,8 @@ def test_homologated_control_fields_do_not_infer_related_features(field, value, 
 def test_collector_wrapper_samples_backend_time_after_collection(monkeypatch):
     calls = []
 
-    def collect(enrollment):
+    def collect(enrollment, *, include_siren=False):
+        assert include_siren is False
         calls.append(enrollment)
         return batch()
 

@@ -1,7 +1,29 @@
 # Siren capability migration
 
-Status (2026-09-11): strict transport/evidence boundary implemented and tested offline;
-not opted into production capability rollout. No live camera calls in this step.
+Status (2026-10-16): camera-3 correlated identity/state read verified; optional bounded
+collection implemented. Strict actuation is not opted into production capability rollout.
+
+## Camera-3 read acceptance, 2026-10-16
+
+One session returned complete ProConst identity and a correlated successful
+`Action.expelCtrl` response: timestamped state 1 (OFF), readable evidence supported.
+All three reads had transport ACK and application error code 0. The successful
+exchange took 3.2 seconds; process peak 41.7 MiB, no swap. An earlier attempt failed
+with P2PProbeError before yielding observations; its specific reason was not retained.
+This is not evidence of audible output or guaranteed cache freshness. No AC actions,
+audio, light changes, token renewal, profile registration or database writes occurred.
+
+`collect(..., include_siren=True)` / `collect_snapshot(..., include_siren=True)` now
+allow the additional B7 read within the existing single-session 20-second budget.
+Default collection remains unchanged. Normalization binds the optional observation to
+the same exact device/identity and rejects duplicate or cross-device roots. Missing or
+failed evidence cannot authorize a pulse; operation profiles remain independently required.
+No rule-version bump is necessary: existing evidence semantics and default snapshots
+are unchanged, and a missing optional feature resolves to unknown.
+The local operator script is ignored `re/check_camera3_siren_read.py`; it has a fixed
+test-camera association, read-only database access and sanitized output only.
+Validation: 87 focused collector/snapshot/store/policy/correlation tests passed
+(102.4 MiB peak, no swap), plus Ruff. No rebuild or production rollout in this step.
 
 ## Separate claims
 
@@ -35,9 +57,9 @@ The full 1,320-test suite, Ruff and mypy (156 source files) passed with bounded 
 
 ## Next bounded steps
 
-1. Camera 3 only: read `Action.expelCtrl` with correlated B7 alongside the complete ProConst
-   identity. Record sanitized provenance; do not add automatic collection before verification.
-2. Add normalized siren evidence to bounded collection, then register an exact-unit operation
+1. DONE: camera-3 correlated state/identity read and opt-in normalized collection.
+   Automatic collection remains disabled.
+2. Register an exact-unit operation
    profile only after a controlled strict pulse with confirmed OFF cleanup. Prove each duration
    before advertising it. Physical audibility is separate from ACK/readback success.
 3. Opt in that unit/control explicitly, keeping other cameras untouched.
