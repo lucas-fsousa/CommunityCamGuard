@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-17 finite read-only control stability: camera3 first round6/8 (two initial409
+during capability refresh); second round8/8 verified at1.9–3.8s. No actions. PTZ
+maintenance warnings appeared during probes despite shared ownership; investigate
+cached broker lifetime across independent authenticated operations, without replaying
+actions or weakening checks. [Evidence](docs/internal/camera3-read-stability-2026-10-17.md).
+
 2026-10-16 PROXY TRUST boundary reviewed/deployed: bundled runtime and source
 hashes verified; forwarded headers do not select login-limiter identity (shared
 proxy-peer quota remains deliberate). Fixed malformed local/BLE source headers
