@@ -1540,6 +1540,10 @@ a strict 2-second pulse passed ON/OFF/readback and physical sound/stop confirmat
 Five/ten-second durations and dashboard strict rollout remain unvalidated. The earlier
 intermittency is not considered fixed. Capability collection now reserves the shared
 broker lock; 99 focused tests passed. See the follow-up report linked below.
+Deployed `4f29242` after green CI: camera-3 canonical floodlight OFF→ON→OFF passed
+with independent verified GETs and original state restored. Physical light confirmation
+is still pending. Night mode remains unconfirmed; original automatic mode independently
+verified. [Detailed test/deployment evidence](docs/internal/camera3-controls-followup-2026-10-16.md).
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 

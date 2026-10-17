@@ -33,6 +33,18 @@ This prevents an in-process overlap, but does not establish causation for the ne
 failures above. Locks are process-local: standalone RE scripts are not coordinated
 with production maintenance and cannot certify production concurrency.
 
-Next: validate the serialized production refresh/control path, then recheck the
-visual controls via the canonical API. Do not bypass unknown-capability guards or
-interpret the successful repeat as a fix for the intermittent transport failure.
+## Deployment and canonical floodlight acceptance
+
+Commit `4f29242`, full CI `38986183758` passed. Built image `44713c754084` with
+512 MiB RAM/no additional swap/50% CPU limits; only app recreated, go2rtc untouched.
+After deployment, authenticated canonical floodlight GET returned200/off/verified.
+The subsequent reversible API cycle returned200 and verified values for each step:
+GET OFF → PUT ON → GET ON → PUT OFF → GET OFF, restored true. Total process20.516s,
+47.9 MiB/no swap. The three-second pause followed the ON read; it is not a measurement
+of actual light-on duration. Operator visual confirmation requested, still pending.
+
+This is a successful end-to-end API operation after deployment, not controlled proof
+that serialization alone fixed prior intermittent errors: recreation also resets
+runtime state. A later PTZ maintenance keepalive warning still occurred; do not claim
+all session failures resolved. Next: visual confirmation and longer serialized-control
+observation, then night-mode validation without bypassing runtime capability guards.
