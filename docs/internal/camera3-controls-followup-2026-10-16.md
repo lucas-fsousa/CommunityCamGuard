@@ -93,3 +93,11 @@ percentage buckets, timeouts, write retries or capability grants were changed.
 both read/write paths, correlated read-only calls, delayed matching readback with one
 write, and socket cleanup. Real acceptance must be read-only: do not disarm a camera
 or change detection schedules merely to test the response boundary.
+
+Deployed commit00274b2 after full CI39038728553 passed (1m15s), image95fccb553540.
+Build capped512 MiB/no extra swap/50% CPU; app only recreated. Initial canonical
+GETs returned409 during evidence refresh; after the fresh snapshot appeared, both
+smart_protection and smart_protection_schedule returned200/verifiedtrue with correct
+public types. Probe6.6s/48.3 MiB/no swap. No guard or schedule writes. HealthOK;
+app/go2rtc running/no OOM. A maintenance keepalive warning remains observed; this
+does not establish a fix for all intermittent broker/session failures.
