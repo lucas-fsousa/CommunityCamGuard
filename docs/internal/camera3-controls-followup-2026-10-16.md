@@ -48,3 +48,17 @@ that serialization alone fixed prior intermittent errors: recreation also resets
 runtime state. A later PTZ maintenance keepalive warning still occurred; do not claim
 all session failures resolved. Next: visual confirmation and longer serialized-control
 observation, then night-mode validation without bypassing runtime capability guards.
+
+## Night-mode parser correction, 2026-10-17
+
+Review found recursive extraction accepted unrelated scalars (for example videoLevel
+or a small timestamp) as a legacy mode when nightViewMode was missing/invalid. Nine
+regressions failed before the correction (eight invalid-value cases plus correlation
+enforcement). Extraction now accepts only the exact nightViewMode field of videoParm
+or its setVal map. Preflight and readback require correlated responses, excluding
+unsolicited AA reports; a wrong session device is rejected before property I/O.
+No timeouts increased, no action retries added, no new mode enabled in the catalogue.
+This fixes a demonstrated interpretation defect, not proof of the earlier live failure's
+cause. The existing bounded readback loop already tolerates delayed state application;
+the earlier operator harness made only one immediate check and is not a timing test
+of that production loop. Physical night/IR validation remains pending.

@@ -62,22 +62,14 @@ def parse_night_vision_write_response(frame: bytes, message_id: int) -> int | No
 
 
 def extract_night_vision_mode(value: object) -> int | None:
-    """Extract only one proven legacy mode, never a V2 support bitfield."""
-
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value if value in NIGHT_VISION_VALUES.values() else None
-    if isinstance(value, dict):
-        direct = value.get("nightViewMode")
-        if isinstance(direct, int) and not isinstance(direct, bool):
-            if direct in NIGHT_VISION_VALUES.values():
-                return direct
-        for key, nested in value.items():
-            if key == "nightViewModeV2":
-                continue
-            candidate = extract_night_vision_mode(nested)
-            if candidate is not None:
-                return candidate
-    return None
+    """Read the exact legacy field from videoParm, never unrelated scalar fields."""
+    if not isinstance(value, dict):
+        return None
+    fields = value.get("setVal", value)
+    if not isinstance(fields, dict):
+        return None
+    mode = fields.get("nightViewMode")
+    return mode if type(mode) is int and mode in NIGHT_VISION_VALUES.values() else None
 
 
 def exchange_night_vision_write(
@@ -128,6 +120,8 @@ def set_camera_night_vision(
     sock.bind(("", 0))
     try:
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("night-vision session device identity mismatch")
         preflight = exchange_model_read(
             sock,
             node,
@@ -136,6 +130,7 @@ def set_camera_night_vision(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous = extract_night_vision_mode(preflight.value)
         if preflight.error_code != 0 or previous is None:
@@ -173,6 +168,7 @@ def set_camera_night_vision(
                 min(bounded_timeout, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=True,
             )
             if readback.error_code == 0 and extract_night_vision_mode(readback.value) == requested:
                 verified = True

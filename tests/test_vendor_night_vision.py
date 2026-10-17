@@ -11,6 +11,7 @@ from backend.app.drivers.yoosee.p2p.contracts import (
     ModelReadResult,
     ModelWriteResult,
     OnlineDevice,
+    P2PProbeError,
 )
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
 
@@ -49,10 +50,46 @@ def test_extract_night_vision_mode_accepts_only_legacy_states(mode):
 
 @pytest.mark.parametrize(
     "value",
-    [True, -1, 3, {"nightViewModeV2": {"setVal": {"enable": 2}}}],
+    [True, -1, 3, 0, 1, 2,
+     {"nightViewModeV2": {"setVal": {"enable": 2}}},
+     {"t": 1}, {"setVal": {"videoLevel": 0}},
+     {"setVal": {"nightViewMode": True, "videoLevel": 1}},
+     {"setVal": {"nightViewMode": 99, "videoLevel": 2}},
+     {"other": {"nightViewMode": 1}}],
 )
 def test_extract_night_vision_mode_rejects_unrelated_or_unknown_values(value):
     assert night_vision.extract_night_vision_mode(value) is None
+
+
+def test_night_mode_ignores_other_fields_even_when_they_precede_the_mode():
+    assert night_vision.extract_night_vision_mode(
+        {"setVal": {"videoLevel": 0, "nightViewMode": 2}}
+    ) == 2
+
+
+def test_wrong_session_target_is_rejected_before_any_property_io(monkeypatch):
+    closed = []
+
+    class FakeSocket:
+        def bind(self, _address):
+            pass
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(night_vision.socket, "socket", lambda *_args: FakeSocket())
+    monkeypatch.setattr(night_vision, "open_camera_session", lambda *_args: (
+        CertifiedNode(("192.0.2.10", 19800), 9, bytes(32), 17),
+        OnlineDevice(7000000003, 1, False, 1, bytes(16)), 40))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("property I/O to wrong camera")
+
+    monkeypatch.setattr(night_vision, "exchange_model_read", forbidden)
+    monkeypatch.setattr(night_vision, "exchange_night_vision_write", forbidden)
+    with pytest.raises(P2PProbeError, match="identity mismatch"):
+        night_vision.set_camera_night_vision(_enrollment(), "night")
+    assert closed == [True]
 
 
 def test_night_vision_change_requires_preflight_d3_and_exact_readback(monkeypatch):
@@ -79,6 +116,7 @@ def test_night_vision_change_requires_preflight_d3_and_exact_readback(monkeypatc
     )
 
     def fake_read(_sock, _node, _device, path, sequence, _timeout, **_kwargs):
+        assert _kwargs["require_correlated_response"] is True
         calls.append(("read", path, sequence))
         return next(reads)
 

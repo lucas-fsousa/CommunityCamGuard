@@ -1544,6 +1544,9 @@ Deployed `4f29242` after green CI: camera-3 canonical floodlight OFF→ON→OFF 
 with independent verified GETs and original state restored. Physical light confirmation
 is still pending. Night mode remains unconfirmed; original automatic mode independently
 verified. [Detailed test/deployment evidence](docs/internal/camera3-controls-followup-2026-10-16.md).
+2026-10-17: fixed night-mode parser accepting unrelated scalar fields; exact legacy
+field, correlated preflight/readback and session target checks now enforced. No new
+night-mode capability grant; physical IR validation still pending.
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 
