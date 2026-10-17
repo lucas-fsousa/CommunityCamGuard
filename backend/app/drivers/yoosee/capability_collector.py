@@ -15,6 +15,7 @@ from .capability_evidence import CAPABILITY_PATHS
 from .capability_snapshot import CapabilitySnapshot, normalize_snapshot
 from .p2p.camera_session import open_camera_session
 from .p2p.contracts import P2PProbeError, P2PPropertyRead
+from .p2p.control_ownership import own_control_channel
 from .p2p.model_session import exchange_model_read
 from .p2p.white_light import P2PWhiteLightState, exchange_white_light, extract_white_light_state
 
@@ -38,6 +39,20 @@ def collect_snapshot(
 
 def collect(
     enrollment: P2PEnrollment, *, include_siren: bool = False,
+) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
+    """Keep capability authentication/reads inside the shared broker ownership.
+
+    A refresh must not invalidate a concurrent control session between its action
+    and cleanup. No renewal or action retry is introduced by this reservation.
+    """
+    if not enrollment.camera_id:
+        raise P2PProbeError("capability collection requires a linked camera identity")
+    with own_control_channel():
+        return _collect_owned(enrollment, include_siren=include_siren)
+
+
+def _collect_owned(
+    enrollment: P2PEnrollment, *, include_siren: bool,
 ) -> tuple[P2PPropertyRead | P2PWhiteLightState, ...]:
     """Read six fixed roots and optional lamp status within one 20-second session budget.
 

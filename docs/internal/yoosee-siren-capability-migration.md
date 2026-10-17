@@ -57,6 +57,27 @@ The full 1,320-test suite, Ruff and mypy (156 source files) passed with bounded 
 
 ## Next bounded steps
 
+Latest authorized retest: two-second pulse passed protocol ON/OFF/final-state and
+operator sound/stop confirmation at requested 50% speaker volume. Earlier failures
+remain unattributed. See [results and concurrency fix](camera3-controls-followup-2026-10-16.md).
+
+### Controlled pulse follow-up, 2026-10-16
+
+The operator confirmed audible siren output from the single camera-3 two-second
+strict pulse attempt. However, the operation returned `camera did not confirm the
+final siren OFF state` after 19.44 seconds (38.5 MiB peak, no swap). The ON application
+response passed; the routine attempted its unconditional OFF cleanup, but this result
+does not distinguish an OFF application failure from a failed final state read.
+A subsequent read-only check failed at access-node heartbeat. One safety OFF-only
+attempt also failed at heartbeat, before sending its OFF command. No activation was
+repeated. Audible output is physically confirmed; exact audible duration and final
+OFF are not confirmed by the retained evidence. Do not register a complete successful
+pulse proof or enable strict rollout on this basis.
+
+The operator explicitly prohibited further audio/siren tests because people are
+sleeping. Only visual tests are allowed until that restriction is lifted. Diagnose
+the cleanup/session failure offline; do not retry sound tests automatically.
+
 1. DONE: camera-3 correlated state/identity read and opt-in normalized collection.
    Automatic collection remains disabled.
 2. Register an exact-unit operation

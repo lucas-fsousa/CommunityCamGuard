@@ -1532,6 +1532,14 @@ in runtime rollout. On 2026-10-16, a harmless camera-3 correlated state read suc
 complete identity and OFF state (3.2 seconds, 41.7 MiB/no swap). Explicit optional collection
 now normalizes this evidence without enabling actions or changing default polling.
 Next: a bounded strict pulse with operator notification before registering operation proofs.
+Follow-up: the operator confirmed audible camera-3 output from one strict 2-second
+attempt, but final OFF confirmation failed. Subsequent read/safety-OFF sessions failed
+at heartbeat. Full pulse homologation remains incomplete; investigate cleanup/session
+handling offline. The operator later authorized sound again: at requested 50% volume,
+a strict 2-second pulse passed ON/OFF/readback and physical sound/stop confirmation.
+Five/ten-second durations and dashboard strict rollout remain unvalidated. The earlier
+intermittency is not considered fixed. Capability collection now reserves the shared
+broker lock; 99 focused tests passed. See the follow-up report linked below.
 Audio needs separate route-specific proofs; RTSP coordinates/P2P enrollment are not capability
 evidence. See `docs/internal/yoosee-siren-capability-migration.md`.
 

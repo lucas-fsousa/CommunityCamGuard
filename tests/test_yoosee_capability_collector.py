@@ -1,7 +1,11 @@
+import threading
+from contextlib import contextmanager
+
 import pytest
 
 from backend.app.db.p2p import P2PEnrollment
 from backend.app.drivers.yoosee import capability_collector as collector
+from backend.app.drivers.yoosee.p2p import control_ownership
 from backend.app.drivers.yoosee.p2p.contracts import (
     CertifiedNode,
     ModelReadResult,
@@ -98,3 +102,57 @@ def test_requires_linked_identity_before_network(monkeypatch):
     monkeypatch.setattr(collector.socket, "socket", forbidden)
     with pytest.raises(P2PProbeError, match="linked camera"):
         collector.collect(P2PEnrollment("1234567890", 1, bytes(64), None, "", ""))
+
+
+def test_refresh_cannot_open_network_while_another_thread_owns_controls(monkeypatch):
+    monkeypatch.setattr(control_ownership, "WAIT_SECONDS", 0.01)
+    failures = []
+
+    def forbidden(*args):
+        raise AssertionError("refresh opened network during control ownership")
+
+    monkeypatch.setattr(collector.socket, "socket", forbidden)
+
+    def collect():
+        try:
+            collector.collect(ENROLLMENT)
+        except Exception as exc:
+            failures.append(exc)
+
+    with control_ownership.own_control_channel():
+        worker = threading.Thread(target=collect)
+        worker.start()
+        worker.join(timeout=1)
+        assert not worker.is_alive()
+    assert len(failures) == 1
+    assert isinstance(failures[0], control_ownership.ControlChannelBusy)
+
+
+@pytest.mark.parametrize("fail", (False, True))
+def test_reservation_covers_complete_collection_and_releases_on_failure(monkeypatch, fail):
+    events = []
+
+    @contextmanager
+    def own():
+        events.append("acquire")
+        try:
+            yield
+        finally:
+            events.append("release")
+
+    def collect(enrollment, *, include_siren):
+        assert events == ["acquire"]
+        assert enrollment is ENROLLMENT and include_siren is True
+        events.append("collect")
+        if fail:
+            raise OSError("offline failure")
+        return ()
+
+    monkeypatch.setattr(collector, "own_control_channel", own)
+    monkeypatch.setattr(collector, "_collect_owned", collect)
+    if fail:
+        with pytest.raises(OSError):
+            collector.collect(ENROLLMENT, include_siren=True)
+    else:
+        assert collector.collect(ENROLLMENT, include_siren=True) == ()
+    assert events == ["acquire", "collect", "release"]
