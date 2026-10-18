@@ -15,6 +15,8 @@
 const STRINGS = {
   en: {
     "panel.accessDenied": "Not permitted for this access.",
+    "panel.loading": "Checking controls…",
+    "panel.loadFailed": "Could not check this camera's controls. Try opening the panel again.",
     "rec.loadFailed": "Could not load recordings. Try searching again.",
     "settings.accessTab": "Access",
     "settings.sections": "Settings sections",
@@ -584,6 +586,8 @@ const STRINGS = {
     "control.failed": "Falha no controle: {msg}",
     "control.busy": "A câmera está ocupada com outra operação. Aguarde alguns segundos e tente novamente.",
     "control.notReady": "Este controle ainda não está pronto. Aguarde alguns segundos e reabra os controles. Se persistir, verifique a conexão da câmera.",
+    "panel.loading": "Verificando controles…",
+    "panel.loadFailed": "Não foi possível consultar os controles desta câmera. Tente abrir o painel novamente.",
     "control.unconfirmed": "A câmera não confirmou o valor solicitado. O estado atual é desconhecido.",
     "intercom.open": "Gravar mensagem de voz",
     "intercom.title": "Mensagem de voz — {name}",

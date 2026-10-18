@@ -62,3 +62,23 @@ selector and removes the applying spinner after rejection.30 focused Python test
 and Node camera-panel/PTZ contracts passed; no camera commands or rebuild required
 for this frontend-bound update. Persistent six-event log survived the prior real
 container recreation byte-for-byte; backend5059ac0 CI39155871796 passed.
+
+## Fresh panel catalogue
+
+Inspection found that closing/reopening the panel used `state.cameras` without
+fetching a catalogue. Status polling does not replace that list, so the previous
+guidance could leave the same stale options on screen. Opening the panel now makes
+one GET `/api/cameras`, applies session permissions to the returned exact camera,
+and never falls back to the tile snapshot. It does not replace global camera state,
+rerender players, issue a control write or start a polling loop. The existing backend
+may schedule its bounded capability read when evidence is stale; opening again after
+that read can obtain recovered controls. This is not a guarantee against expiry
+after a panel has already opened; the backend remains authoritative for every write.
+
+The trigger shows localized checking feedback, blocks duplicate clicks and restores
+itself on completion. A ten-second abort and session-end cancellation bound the fetch;
+late/detached/session-invalid responses cannot open a panel. Failure/missing camera
+shows a localized notification rather than stale controls. Node regressions cover
+those races and fresh removal of old capabilities.22 focused Python tests passed
+(129.4MiB/no swap). The browser fixture now serves synthetic catalogue reads; no
+real-browser/device acceptance was performed in this step.

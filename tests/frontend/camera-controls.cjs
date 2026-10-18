@@ -104,13 +104,49 @@ const controlWidgets = load("camera-control-actions.js", { el, api, t }, "contro
   console.log("Toast contracts passed");
 }
 let audioButtons = 0;
+let catalogueRequests = 0;
 const audioButton = () => { audioButtons++; return el("button"); };
 const cameraControls = load("camera-controls.js", {
   el, state, t, controlWidgets, audioMessageButton: audioButton, pushToTalkButton: audioButton,
+  api: async (url) => { assert.equal(url, "/cameras"); catalogueRequests++; return state.cameras; },
   allowed: () => true, permittedCamera: cam => cam,
 }, "cameraControls");
 
 (async () => {
+  for (const mode of ["failure", "missing", "session", "detached", "timeout", "fresh"]) {
+    let resolve, reject, end, signal, expire, calls = 0;
+    const response = new Promise((yes, no) => { resolve = yes; reject = no; });
+    const factory = load("camera-controls.js", {
+      el, state, t, controlWidgets, audioMessageButton: audioButton, pushToTalkButton: audioButton,
+      allowed: () => true, permittedCamera: cam => cam,
+      api: (url, options) => { assert.equal(url, "/cameras"); calls++; signal = options.signal; return response; },
+      onSessionEnd: callback => { end = callback; return () => {}; },
+      setTimeout: (callback, ms) => { assert.equal(ms, 10000); expire = callback; return 1; },
+      clearTimeout: () => {},
+    }, "cameraControls");
+    const button = factory({ id: "race", controls: { orientation: { writable: true, options: ["normal"] } } });
+    document.body.append(button);
+    const count = document.body.children.length;
+    const opening = button.click();
+    assert.equal(button.disabled, true);
+    await button.dispatch("click");
+    assert.equal(calls, 1);
+    if (mode === "session") { end(); assert.equal(signal.aborted, true); }
+    if (mode === "timeout") { expire(); assert.equal(signal.aborted, true); }
+    if (mode === "detached") button.remove();
+    if (mode === "failure") reject(new Error("unavailable"));
+    else resolve(mode === "missing" ? [] : [{ id: "race", controls: {} }]);
+    await opening;
+    assert.equal(button.disabled, false);
+    assert.equal(button.textContent, "control.menu");
+    if (mode === "fresh") {
+      const panel = document.body.children.at(-1);
+      assert.equal(document.body.children.length, count + 1);
+      assert(!walk(panel).some(n => n.dataset.controlKey === "orientation")); // No stale fallback.
+      await walk(panel).find(n => n.textContent === "×").click();
+    } else assert.equal(document.body.children.length, count - (mode === "detached" ? 1 : 0));
+    button.remove();
+  }
   for (const [file, name] of [["audio-message.js", "audioMessageButton"], ["push-to-talk.js", "pushToTalkButton"]]) {
     const cleanups = new Set();
     const button = load(file, { el, api, t, onSessionEnd: fn => {
@@ -123,6 +159,7 @@ const cameraControls = load("camera-controls.js", {
     assert.equal(document.body.children.length, count);
   }
   const cam = { id: "cam_test", name: "Test", controls: {}, capabilities: {} };
+  state.cameras = [cam];
   const app = el("main"), alreadyInert = el("aside", { inert: true });
   document.body.style.overflow = "auto";
   document.body.append(app, alreadyInert);
@@ -130,6 +167,7 @@ const cameraControls = load("camera-controls.js", {
   app.append(trigger);
   assert.equal(requests.length, 0);
   await trigger.click();
+  assert.equal(catalogueRequests, 1);
   let shell = document.body.children.at(-1);
   assert.equal(walk(shell).filter((item) => item.tagName === "h3").length, 5);
   assert.equal(walk(shell).filter((item) => item.disabled).length, 11);

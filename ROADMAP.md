@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 stale control-panel catalogue fixed: reopening previously used browser
+state only. Now one bounded GET obtains current driver capabilities without player
+rerender, write replay or stale fallback. Duplicate-click/session-end/timeout/detached
+response races tested;22 focused Python tests and Node contracts passed. Frontend
+fixture updated for synthetic reads; real-browser acceptance remains separate.
+
 2026-10-18 control availability follow-up: regression reproduces expired-evidence
 rejection/recovery without camera I/O. Dashboard distinguishes exact409 busy/not-ready
 responses in English/Portuguese, clears spinner and never auto-replays actions.

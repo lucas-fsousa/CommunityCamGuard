@@ -1,5 +1,6 @@
 // Presentation only: the driver catalogue remains the authority for every active control.
-import { el, onSessionEnd, state } from "ccg/core";
+import { api, el, onSessionEnd, state } from "ccg/core";
+import { notify } from "ccg/notifications";
 import { t } from "ccg/i18n";
 import { controlWidgets } from "ccg/control-actions";
 import { audioMessageButton } from "ccg/audio-message";
@@ -39,10 +40,32 @@ export function cameraControls(camera, extras = {}) {
     title: t("control.menu"),
   });
   trigger.setAttribute("aria-haspopup", "dialog");
-  trigger.addEventListener("click", (event) => {
+  trigger.addEventListener("click", async (event) => {
     event.stopPropagation();
-    // Use the latest server catalogue when opening, not the tile's original snapshot.
-    const cam = permittedCamera(state.cameras.find((item) => item.id === camera.id) || camera);
+    if (trigger.disabled) return;
+    trigger.disabled = true;
+    trigger.textContent = t("panel.loading");
+    const controller = new AbortController();
+    let active = true;
+    const cancel = onSessionEnd(() => { active = false; controller.abort(); });
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let cam;
+    try {
+      // One explicit catalogue read. Never rebuild tiles/players or replay a write.
+      const cameras = await api("/cameras", { signal: controller.signal });
+      if (!active || controller.signal.aborted || !trigger.isConnected) return;
+      const current = Array.isArray(cameras) && cameras.find((item) => item.id === camera.id);
+      if (!current) throw new Error("Camera unavailable");
+      cam = permittedCamera(current);
+    } catch (_error) {
+      if (active && trigger.isConnected) notify(t("panel.loadFailed"), { anchor: trigger, error: true });
+      return;
+    } finally {
+      clearTimeout(timeout);
+      cancel();
+      trigger.disabled = false;
+      trigger.textContent = t("control.menu");
+    }
     const status = el("small", { className: "camera-control-status" });
     status.setAttribute("role", "status");
     const widgets = new Map([...controlWidgets(cam, status).children]

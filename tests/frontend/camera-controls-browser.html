@@ -17,7 +17,12 @@ import { notify } from '/notifications.js';
 import { setLang, t } from '/i18n.js';
 setLang('pt-BR');
 let requests = 0;
-window.fetch = async () => { requests++; throw new Error('No network allowed in control layout fixture'); };
+window.fetch = async (url, options = {}) => {
+  if (url === '/api/cameras' && (!options.method || options.method === 'GET')) {
+    return new Response(JSON.stringify([camera]), {headers: {'Content-Type': 'application/json'}});
+  }
+  requests++; throw new Error('No network allowed in control layout fixture');
+};
 const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 const stage = document.querySelector('#stage');
@@ -87,6 +92,7 @@ try {
   window.fetch = async (url, options = {}) => {
     check(!options.method || options.method === 'GET', 'Unexpected write');
     let body;
+    if (url === '/api/cameras') return new Response(JSON.stringify([camera]), {headers: {'Content-Type': 'application/json'}});
     if (url === '/api/cameras/synthetic/controls/alarm_voice/options') body = {options: [{value: 'tone', label: 'Synthetic tone'}]};
     else if (url === '/api/cameras/synthetic/controls/smart_protection_schedule') body = {value: {start: '08:00', end: '18:00', weekdays: ['mon']}};
     else { requests++; throw new Error('Unexpected request'); }
