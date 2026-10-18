@@ -65,6 +65,21 @@ def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):
     monkeypatch.setattr(controls.time, "time", lambda: 200)
     assert "night_vision" not in {item.key for item in controls.catalog(camera)}
     assert requested == [(CAMERA, IDENTITY.device_id)]
+    # Expiry blocks dispatch before a write, while asynchronous collection runs.
+    from backend.app.drivers.contracts import ControlNotReady
+    from backend.app.drivers.yoosee.capability_availability import unavailable_control
+
+    with pytest.raises(ControlNotReady):
+        unavailable_control(camera, "night_vision")
+    snapshots.save(
+        CapabilitySnapshot(CAMERA, IDENTITY, 200, (
+            PropertyEvidence("night_vision", State.SUPPORTED, 1),
+        )), generation=snapshots.begin(CAMERA), expires_at=300,
+    )
+    requested.clear()
+    restored = {item.key: item for item in controls.catalog(camera)}
+    assert restored["night_vision"].options == ("automatic", "daytime")
+    assert requested == []
 
 
 def test_refresh_is_bounded_single_worker_with_backoff(monkeypatch):

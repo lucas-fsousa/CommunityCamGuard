@@ -46,3 +46,19 @@ and restoration. Independent final property read confirmed normal.13.931s operat
 elapsed,45.7MiB peak/no swap. Both operation IDs and completions are retained in
 `data/logs/control-events.jsonl`. No audio, no other-camera action. Physical visual
 confirmation has been requested; protocol confirmation is not its substitute.
+
+## Availability feedback
+
+An offline regression now reproduces the evidence-expiry boundary: a previously
+available control becomes unavailable and raises `ControlNotReady` at expiry;
+publishing fresh exact-identity evidence restores its proven options. This verifies
+the mechanism, not which409 category caused the historical incident.
+
+The dashboard now translates the exact public409 busy/not-ready responses into
+distinct English/Portuguese guidance across control selectors and dialogs. Unknown
+conflicts and other HTTP statuses retain generic failure handling. No action retry,
+background polling or weakened capability gate was introduced. The UI resets the
+selector and removes the applying spinner after rejection.30 focused Python tests
+and Node camera-panel/PTZ contracts passed; no camera commands or rebuild required
+for this frontend-bound update. Persistent six-event log survived the prior real
+container recreation byte-for-byte; backend5059ac0 CI39155871796 passed.

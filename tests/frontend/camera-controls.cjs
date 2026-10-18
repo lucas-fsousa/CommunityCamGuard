@@ -210,6 +210,25 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(status.classList.contains("error"), true);
   assert.equal(volume.disabled, false);
   assert.equal(volume.value, "");
+  for (const [code, message, expected] of [
+    [409, "camera is busy; try again shortly", "control.busy"],
+    [409, "camera control is not ready; check connection and session", "control.notReady"],
+    [409, "unrelated conflict", "control.failed"],
+    [502, "camera control is not ready; check connection and session", "control.failed"],
+  ]) {
+    const before = requests.length;
+    volume.value = "50";
+    pending = new Promise((resolve, reject) => { fail = reject; });
+    const attempt = volume.dispatch("change");
+    fail(Object.assign(new Error(message), { status: code }));
+    await attempt;
+    pending = null;
+    assert.equal(notifications.at(-1).message, expected);
+    assert.equal(requests.length, before + 1); // Never replay the action or refresh implicitly.
+    assert.equal(volume.value, "");
+    assert.equal(volume.disabled, false);
+    assert.equal(status.classList.contains("applying"), false);
+  }
   night.value = "daytime";
   pending = Promise.resolve({ verified: true, value: "daytime" });
   await night.dispatch("change");

@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 control availability follow-up: regression reproduces expired-evidence
+rejection/recovery without camera I/O. Dashboard distinguishes exact409 busy/not-ready
+responses in English/Portuguese, clears spinner and never auto-replays actions.
+30 focused tests and Node panel/PTZ contracts pass; no capability/timing changes.
+Original incident remains unattributed; await categorized recurrence/physical feedback.
+
 2026-10-18 orientation incident investigation: yesterday's app logs were lost on
 container recreation. Added scoped persistent stage/outcome diagnostics under data/logs,
 bounded to four1MiB files, no secrets/payloads.54 focused tests passed97.5MiB/no swap.

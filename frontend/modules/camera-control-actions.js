@@ -37,6 +37,17 @@ function completed(status, message, error = false) {
   notify(message, { anchor: status, error });
 }
 
+function controlFailureMessage(error) {
+  // Match the public contract exactly: an arbitrary 409 is not proof of readiness.
+  if (error.status === 409) {
+    if (error.message === "camera is busy; try again shortly") return t("control.busy");
+    if (error.message === "camera control is not ready; check connection and session") {
+      return t("control.notReady");
+    }
+  }
+  return t("control.failed", { msg: error.message });
+}
+
 async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
   trigger.disabled = true;
   status.classList.remove("error");
@@ -106,7 +117,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
       } catch (error) {
         if (!lifecycle.active()) return;
         modalStatus.classList.add("error");
-        completed(modalStatus, t("control.failed", { msg: error.message }), true);
+        completed(modalStatus, controlFailureMessage(error), true);
       } finally {
         finishApplying(modalStatus);
         apply.disabled = false;
@@ -117,7 +128,7 @@ async function openDynamicChoice(cam, controlKey, status, trigger, strings) {
   } catch (error) {
     if (!trigger.isConnected) return;
     status.classList.add("error");
-    completed(status, t("control.failed", { msg: error.message }), true);
+    completed(status, controlFailureMessage(error), true);
   } finally {
     trigger.disabled = false;
   }
@@ -191,7 +202,7 @@ async function openProtectionSchedule(cam, status, trigger) {
       } catch (error) {
         if (!lifecycle.active()) return;
         modalStatus.classList.add("error");
-        completed(modalStatus, t("control.failed", { msg: error.message }), true);
+        completed(modalStatus, controlFailureMessage(error), true);
       } finally {
         finishApplying(modalStatus);
         save.disabled = false;
@@ -202,7 +213,7 @@ async function openProtectionSchedule(cam, status, trigger) {
   } catch (error) {
     if (!trigger.isConnected) return;
     status.classList.add("error");
-    completed(status, t("control.failed", { msg: error.message }), true);
+    completed(status, controlFailureMessage(error), true);
   } finally {
     trigger.disabled = false;
   }
@@ -253,7 +264,7 @@ export function controlWidgets(cam, status) {
         if (!select.isConnected) return;
         confirmed = "";
         status.classList.add("error");
-        completed(status, t("control.failed", { msg: error.message }), true);
+        completed(status, controlFailureMessage(error), true);
       } finally {
         finishApplying(status);
         select.value = confirmed;
