@@ -4,8 +4,11 @@
 requires exact encrypted session/request/device/account correlation, including
 acknowledged writes (previously strict readback was conditional on a missing reply).
 Regression first failed in both sequence/wraparound cases;35 focused tests now pass,
-80.1MiB/no swap. No action replay, timeout or capability changes. Runtime deployment
-and physical light confirmation remain pending; no camera command was sent.
+80.1MiB/no swap. No action replay, timeout or capability changes. Deployed404dd89
+after full CI39130214661 passed; bounded512MiB build, only app recreated.
+Post-startup read initially409, subsequent camera3 GET200 verified OFF (49.2MiB,
+no swap). Health OK/no OOM. Physical light confirmation remains pending; no
+actuation was sent and this read does not certify the updated write cycle.
 
 2026-10-17 finite read-only control stability: camera3 first round6/8 (two initial409
 during capability refresh); second round8/8 verified at1.9–3.8s. No actions. PTZ
