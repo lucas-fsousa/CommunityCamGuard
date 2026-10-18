@@ -25,7 +25,8 @@ def test_persistent_bounded_sink_is_idempotent_and_sanitized(sink):
     assert len(handlers) == 1
     handler = handlers[0]
     assert handler.maxBytes == 1024 * 1024 and handler.backupCount == 3
-    diagnostics.record("secret", stage="secret", outcome="secret", operation="secret", error=True)
+    diagnostics.record("secret", stage="secret", outcome="secret", operation="secret", error=True,
+                       reason="secret")
     event = json.loads(sink.read_text())
     assert "secret" not in sink.read_text()
     assert event["error_code"] is None and event["at"].endswith("+00:00")
@@ -62,6 +63,7 @@ def test_api_rejection_is_persisted_without_driver_exception(monkeypatch, sink):
     assert caught.value.status_code == 502
     event = json.loads(sink.read_text())
     assert event["stage"] == "api" and event["error_code"] == 502
+    assert event["reason"] == "ControlOperationError"
     assert "private-token" not in sink.read_text()
 
 

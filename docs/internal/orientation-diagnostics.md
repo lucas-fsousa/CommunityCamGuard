@@ -24,3 +24,25 @@ No protocol behavior or retry timings were changed in this diagnostic step.
 The incident from October17 cannot be retrospectively attributed: the app container
 was recreated on October18 and its former stdout logs were not retained. Live
 reproduction results must be recorded separately rather than claimed as its cause.
+
+## Live reproduction, October18
+
+Deployed187e9ac/imageef1401aac7d2 after CI39134717696 passed. Build512MiB,
+no additional swap/half CPU; only app recreated. Initial operator probe failed
+before startup completed; a subsequent probe lacked the required label capability
+code and returned422 without camera action. Corrected to the recorded camera3 label.
+
+Camera3 read returned normal. First cycle's inversion and restoration requests both
+returned409 at18:47:23–24UTC, with only API-rejection events and no orientation-session
+event: neither reached the orientation setter. A subsequently inspected capability
+snapshot was fresh/supported. This suggests a transient availability/refresh window
+but does not distinguish that from camera-busy contention; the first harness did not
+retain the projected error detail. Do not call this the proven cause of yesterday's
+failure. Diagnostic API events now also retain an allowlisted exception category
+(`ControlBusy` versus `ControlNotReady`, etc.), never exception text.
+
+A second finite cycle at18:48:02–11UTC returned200/verified/changed for inversion
+and restoration. Independent final property read confirmed normal.13.931s operator
+elapsed,45.7MiB peak/no swap. Both operation IDs and completions are retained in
+`data/logs/control-events.jsonl`. No audio, no other-camera action. Physical visual
+confirmation has been requested; protocol confirmation is not its substitute.

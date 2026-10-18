@@ -130,7 +130,8 @@ def write_camera_control(
     except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
         failure = _failure(exc)
         if control_key == "orientation":
-            record(camera_id, stage="api", outcome="rejected", error=failure.status_code)
+            record(camera_id, stage="api", outcome="rejected", error=failure.status_code,
+                   reason=type(exc).__name__)
         raise failure from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"

@@ -12,6 +12,7 @@ from pathlib import Path
 _log = logging.getLogger("ccg.control_diagnostics")
 _STAGES = {"session", "preflight", "write", "readback", "complete", "api"}
 _OUTCOMES = {"started", "failed", "confirmed", "unchanged", "rejected"}
+_REASONS = {"CameraNotFound", "Unsupported", "ControlNotReady", "ControlBusy", "ControlOperationError"}
 
 
 class _SafeHandler(RotatingFileHandler):
@@ -42,6 +43,7 @@ def configure(directory: Path) -> None:
 def record(
     camera_id: str | None, *, stage: str, outcome: str,
     operation: str = "", error: int | None = None,
+    reason: str = "",
 ) -> None:
     """Orientation-only instrumentation; free-form data cannot reach the sink."""
     event = {
@@ -52,5 +54,6 @@ def record(
         "outcome": outcome if outcome in _OUTCOMES else "unknown",
         "operation": operation if re.fullmatch(r"[0-9a-f]{32}", operation) else None,
         "error_code": error if type(error) is int and -(2**31) <= error < 2**31 else None,
+        "reason": reason if reason in _REASONS else None,
     }
     _log.info(json.dumps(event, separators=(",", ":")))

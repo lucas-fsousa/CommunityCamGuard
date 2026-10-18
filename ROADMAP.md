@@ -4,6 +4,10 @@
 container recreation. Added scoped persistent stage/outcome diagnostics under data/logs,
 bounded to four1MiB files, no secrets/payloads.54 focused tests passed97.5MiB/no swap.
 Live camera3 reproduction/restoration pending; original incident cause unproven.
+Follow-up: first cycle rejected409 before setter; fresh-evidence second cycle passed
+normal→inverted→normal200verified, independent final normal read (45.7MiB/no swap).
+Persistent operation events confirmed; added API failure categories to distinguish
+busy/not-ready on recurrence. Yesterday's cause remains unproven; physical feedback pending.
 See [diagnostics](docs/internal/orientation-diagnostics.md).
 
 2026-10-18 siren migration wiring: selected exact-device refresh includes the optional
