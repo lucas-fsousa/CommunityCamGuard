@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 orientation incident investigation: yesterday's app logs were lost on
+container recreation. Added scoped persistent stage/outcome diagnostics under data/logs,
+bounded to four1MiB files, no secrets/payloads.54 focused tests passed97.5MiB/no swap.
+Live camera3 reproduction/restoration pending; original incident cause unproven.
+See [diagnostics](docs/internal/orientation-diagnostics.md).
+
 2026-10-18 siren migration wiring: selected exact-device refresh includes the optional
 correlated state read within its existing session; selected siren dispatch uses strict
 transport.62 focused tests passed107.2MiB/no swap, including two-second-only options

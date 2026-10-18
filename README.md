@@ -242,7 +242,11 @@ configuration is [owner-only](docs/internal/private-media-config.md); custom ser
 UIDs must have compatible ownership.
 
 For a content-free diagnostic snapshot, use `bash scripts/diagnose_streams_safe.sh`;
-see [safe diagnostics](docs/internal/safe-stream-diagnostics.md). Historical logs and
+see [safe diagnostics](docs/internal/safe-stream-diagnostics.md). Orientation control
+diagnostics persist across container recreation in `data/logs/control-events.jsonl`
+(UTC, size-rotated to about 4 MiB total, without credentials or response payloads);
+see [scope and troubleshooting](docs/internal/orientation-diagnostics.md).
+Historical logs and
 bundles are not retroactively sanitized. After environment changes, recreate the app
 container; browser refresh does not reconfigure workers. Never publish `.env`,
 cookies, camera credentials or database backups. The [settings inventory](docs/internal/settings-dashboard-plan.md)

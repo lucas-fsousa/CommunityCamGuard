@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import socket
 import time
+import uuid
 from dataclasses import dataclass
 
+from ....control_diagnostics import record
 from ....db.p2p import P2PEnrollment
 from .camera_session import open_camera_session
 from .contracts import CertifiedNode, ModelWriteResult, OnlineDevice, P2PProbeError
@@ -124,9 +126,14 @@ def set_camera_orientation(
     bounded_timeout = max(0.5, min(float(timeout), 5.0))
     deadline = time.monotonic() + max(10.0, min(float(total_timeout), 40.0))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", 0))
+    operation = uuid.uuid4().hex
+    stage = "session"
+    error = None
+    record(enrollment.camera_id, stage=stage, outcome="started", operation=operation)
     try:
+        sock.bind(("", 0))
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        stage = "preflight"
         preflight = exchange_model_read(
             sock,
             node,
@@ -137,13 +144,17 @@ def set_camera_orientation(
             deadline=deadline,
         )
         previous = extract_orientation(preflight.value)
+        error = preflight.error_code
         if preflight.error_code != 0 or previous is None:
             raise P2PProbeError("camera orientation preflight returned no supported state")
         if previous == requested:
+            record(enrollment.camera_id, stage="complete", outcome="unchanged", operation=operation)
             return P2POrientationWrite(
                 enrollment.device_id, orientation, previous, requested, False, False, 0, True
             )
 
+        stage = "write"
+        error = None
         write = exchange_orientation_write(
             sock,
             node,
@@ -153,9 +164,12 @@ def set_camera_orientation(
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
         )
+        error = write.error_code
         if write.error_code != 0:
             raise P2PProbeError("camera rejected the orientation change")
 
+        stage = "readback"
+        error = None
         verified = False
         for attempt in range(5):
             if attempt:
@@ -173,17 +187,21 @@ def set_camera_orientation(
                 retries=1,
                 deadline=deadline,
             )
+            error = readback.error_code
             if readback.error_code == 0 and extract_orientation(readback.value) == requested:
                 verified = True
                 break
         if not verified:
             raise P2PProbeError("camera did not confirm the orientation change")
     except P2PProbeError:
+        record(enrollment.camera_id, stage=stage, outcome="failed", operation=operation, error=error)
         raise
     except (OSError, ValueError) as exc:
+        record(enrollment.camera_id, stage=stage, outcome="failed", operation=operation, error=error)
         raise P2PProbeError("P2P orientation change failed") from exc
     finally:
         sock.close()
+    record(enrollment.camera_id, stage="complete", outcome="confirmed", operation=operation)
     return P2POrientationWrite(
         device_id=enrollment.device_id,
         orientation=orientation,

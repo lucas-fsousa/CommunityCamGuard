@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..auth import require_auth
+from ..control_diagnostics import record
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..drivers.contracts import (
     ControlResult,
@@ -127,7 +128,10 @@ def write_camera_control(
     try:
         result = write_control(camera_id, control_key, body.contract_value())
     except (CameraNotFound, Unsupported, ControlNotReady, ControlBusy, ControlOperationError) as exc:
-        raise _failure(exc) from None
+        failure = _failure(exc)
+        if control_key == "orientation":
+            record(camera_id, stage="api", outcome="rejected", error=failure.status_code)
+        raise failure from None
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return _public(camera_id, result)
