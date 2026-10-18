@@ -4,8 +4,11 @@
 correlated state read within its existing session; selected siren dispatch uses strict
 transport.62 focused tests passed107.2MiB/no swap, including two-second-only options
 and wrong-device exclusion. No sound, profile registration or rollout activation.
-Next: preserve existing proofs while importing the confirmed camera3 two-second
-operation and collect fresh siren evidence before activating it. See
+Follow-up complete: deployed82b9179 after green full CI39133559433, imported the
+confirmed camera3 two-second proof preserving existing sources and dynamic rollout.
+Fresh production-owned collection plus canonical HTTP catalogue verified only option2
+and all existing static controls (46.9MiB/no swap). No sound replay; other units
+unchanged. Real dashboard pulse remains a separate optional acceptance. See
 [migration](docs/internal/yoosee-siren-capability-migration.md).
 
 2026-10-18 floodlight confirmation hardening: every setter preflight/readback now

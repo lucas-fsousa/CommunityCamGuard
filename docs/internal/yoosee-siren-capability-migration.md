@@ -1,8 +1,26 @@
 # Siren capability migration
 
 Status (2026-10-18): camera-3 strict two-second pulse physically confirmed (including
-stop), following the later authorized retest below. Runtime wiring is implemented;
-the exact-unit operation profile and rollout have not yet been activated.
+stop), following the later authorized retest below. Runtime wiring deployed and exact-unit
+two-second profile/rollout activated; fresh HTTP catalogue accepted. No sound replay.
+
+## Deployed exact-unit migration, 2026-10-18
+
+Code82b9179 passed full CI39133559433 in55s. Image0c1a0dd78c13 built with512MiB,
+no additional swap and half a CPU; only app recreated, go2rtc retained. Camera3
+profile registration preserved all six previous operations and their source references,
+added only writable `siren_pulse` option `2`, and retained dynamic `alarm_voice`
+rollout. Provenance references the SHA-256 of the existing
+[physically confirmed results](camera3-controls-followup-2026-10-16.md#results).
+No other camera profile was changed. Registration alone does not certify a device.
+
+The old snapshot was invalidated explicitly. A bounded canonical HTTP catalogue
+check triggered production-owned collection and confirmed fresh evidence plus all
+seven static controls; siren options were exactly `["2"]`. Night/volume options
+remained unchanged. Check5.588s,46.9MiB/no swap. Health OK, app/go2rtc running,
+neither reports OOM. Zero actuation/media commands were sent by these procedures.
+The existing physical pulse proof is reused; a real dashboard-originated pulse was
+not repeated, so that specific end-to-end actuation check remains separate.
 
 ## Runtime wiring, 2026-10-18
 
@@ -17,8 +35,8 @@ current identity/evidence and individually proven duration options.
 
 62 focused tests passed (107.2 MiB/no swap), including dispatch, optional collection,
 wrong-device exclusion, and a two-second-only proof that cannot advertise five/ten
-seconds. Tests use synthetic data, never real sound. This stage does not register a
-profile, activate rollout, or claim live acceptance of the integrated dashboard path.
+seconds. Tests use synthetic data, never real sound. The later deployment/registration
+and read-only HTTP acceptance are recorded above; unit tests do not prove audibility.
 
 Activation must preserve existing operation/source records and dynamic-resource
 rollout, add only the independently proven two-second option, and obtain a fresh
