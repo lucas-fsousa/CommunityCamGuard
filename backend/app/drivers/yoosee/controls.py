@@ -316,9 +316,16 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
         if key == SIREN_PULSE:
             if type(value) is not int or value not in {2, 5, 10}:
                 raise ValueError("siren pulse must be 2, 5 or 10 seconds")
+            from .capability_rollout import selected as selected_rollout
+
+            rollout = selected_rollout(camera.camera_id)
+            strict = rollout is not None and SIREN_PULSE in rollout[1]
             pulse_result = run_with_fresh_access(
                 enrollment,
-                lambda selected: pulse_camera_siren(selected, value),
+                lambda selected: (
+                    pulse_camera_siren(selected, value, require_correlated_response=True)
+                    if strict else pulse_camera_siren(selected, value)
+                ),
             )
             return ControlResult(
                 key=key,

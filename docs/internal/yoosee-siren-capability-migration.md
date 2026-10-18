@@ -1,7 +1,30 @@
 # Siren capability migration
 
-Status (2026-10-16): camera-3 correlated identity/state read verified; optional bounded
-collection implemented. Strict actuation is not opted into production capability rollout.
+Status (2026-10-18): camera-3 strict two-second pulse physically confirmed (including
+stop), following the later authorized retest below. Runtime wiring is implemented;
+the exact-unit operation profile and rollout have not yet been activated.
+
+## Runtime wiring, 2026-10-18
+
+Demand-driven refresh now rereads explicit rollout selection in its existing single
+worker and includes `Action.expelCtrl` only for the selected control and matching
+enrolled native device. It uses the existing session/budget; no extra worker or
+action is introduced. Other units/controls retain the default collection.
+The control dispatcher requests strict transport for explicitly migrated siren
+controls; legacy dispatch remains unchanged. Selection alone is not authorization:
+the normal capability intersection must still supply exact-unit operation proofs,
+current identity/evidence and individually proven duration options.
+
+62 focused tests passed (107.2 MiB/no swap), including dispatch, optional collection,
+wrong-device exclusion, and a two-second-only proof that cannot advertise five/ten
+seconds. Tests use synthetic data, never real sound. This stage does not register a
+profile, activate rollout, or claim live acceptance of the integrated dashboard path.
+
+Activation must preserve existing operation/source records and dynamic-resource
+rollout, add only the independently proven two-second option, and obtain a fresh
+snapshot containing siren evidence. An older otherwise-current snapshot omits this
+optional root; it cannot authorize the new control. Do not repeatedly pulse the
+siren merely to repeat the already completed physical validation.
 
 ## Camera-3 read acceptance, 2026-10-16
 

@@ -12,6 +12,7 @@ import time
 
 from ...db import p2p
 from .capability_refresh import refresh
+from .capability_rollout import selected
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -38,7 +39,12 @@ def request_refresh(camera_id: str, device_id: str) -> None:
         try:
             enrollment = p2p.get_enrollment_for_camera(camera_id)
             if enrollment is not None and enrollment.device_id == device_id:
-                refresh(enrollment, validity_seconds=VALIDITY_SECONDS)
+                rollout = selected(camera_id)
+                include_siren = (
+                    rollout is not None and rollout[0].device_id == device_id
+                    and "siren_pulse" in rollout[1]
+                )
+                refresh(enrollment, validity_seconds=VALIDITY_SECONDS, include_siren=include_siren)
         except Exception as exc:
             # Never log payloads or exception text that may contain credentials.
             log.warning(

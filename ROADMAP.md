@@ -1,5 +1,13 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 siren migration wiring: selected exact-device refresh includes the optional
+correlated state read within its existing session; selected siren dispatch uses strict
+transport.62 focused tests passed107.2MiB/no swap, including two-second-only options
+and wrong-device exclusion. No sound, profile registration or rollout activation.
+Next: preserve existing proofs while importing the confirmed camera3 two-second
+operation and collect fresh siren evidence before activating it. See
+[migration](docs/internal/yoosee-siren-capability-migration.md).
+
 2026-10-18 floodlight confirmation hardening: every setter preflight/readback now
 requires exact encrypted session/request/device/account correlation, including
 acknowledged writes (previously strict readback was conditional on a missing reply).

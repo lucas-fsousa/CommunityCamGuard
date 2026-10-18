@@ -9,7 +9,9 @@ from . import capability_snapshot_store as store
 from .capability_collector import collect_snapshot
 
 
-def refresh(enrollment: P2PEnrollment, *, validity_seconds: float) -> bool:
+def refresh(
+    enrollment: P2PEnrollment, *, validity_seconds: float, include_siren: bool = False,
+) -> bool:
     """Caller must choose cache validity; this does not certify source-cache freshness.
 
     Failed or superseded collection leaves evidence unknown. No camera write/action,
@@ -22,7 +24,8 @@ def refresh(enrollment: P2PEnrollment, *, validity_seconds: float) -> bool:
     ):
         raise ValueError("snapshot validity must be positive and at most one day")
     generation = store.begin(enrollment.camera_id or "")
-    snapshot = collect_snapshot(enrollment)
+    snapshot = (collect_snapshot(enrollment, include_siren=True)
+                if include_siren else collect_snapshot(enrollment))
     if snapshot is None:
         return False
     return store.save(
