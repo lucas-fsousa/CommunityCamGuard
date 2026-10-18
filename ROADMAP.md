@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 floodlight confirmation hardening: every setter preflight/readback now
+requires exact encrypted session/request/device/account correlation, including
+acknowledged writes (previously strict readback was conditional on a missing reply).
+Regression first failed in both sequence/wraparound cases;35 focused tests now pass,
+80.1MiB/no swap. No action replay, timeout or capability changes. Runtime deployment
+and physical light confirmation remain pending; no camera command was sent.
+
 2026-10-17 finite read-only control stability: camera3 first round6/8 (two initial409
 during capability refresh); second round8/8 verified at1.9–3.8s. No actions. PTZ
 maintenance warnings appeared during probes despite shared ownership; investigate

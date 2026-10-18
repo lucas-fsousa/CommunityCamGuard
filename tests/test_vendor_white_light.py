@@ -111,6 +111,8 @@ def test_change_requires_preflight_acceptance_and_fresh_readback(monkeypatch, ba
     used_sequences = set()
 
     def fake_exchange(_sock, _node, access_id, device, enabled, sequence, _timeout, **kwargs):
+        if enabled is None:
+            assert kwargs.get("require_correlated_response") is True
         # Include possible BA receipt IDs, not just the B9 command itself.
         assert sequence not in used_sequences, "command reused an earlier receipt sequence"
         reserved = {(sequence + i) & 0xFFFFFFFF for i in range(1 + kwargs.get("retries", 3))}

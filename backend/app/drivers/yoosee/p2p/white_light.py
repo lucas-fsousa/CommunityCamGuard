@@ -347,6 +347,7 @@ def set_camera_white_light(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous = extract_white_light_state(preflight.response)
         if previous is None:
@@ -401,9 +402,9 @@ def set_camera_white_light(
                 min(2.0, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
-                # A lost write reply is ambiguous, not rejection. Only a fresh,
-                # exact-session/request/device read may resolve that ambiguity.
-                require_correlated_response=reply_missing,
+                # Even an acknowledged write does not make a delayed status current.
+                # Always bind confirmation to this session/request/device/account.
+                require_correlated_response=True,
             )
             if extract_white_light_state(readback.response) is enabled:
                 verified = True
