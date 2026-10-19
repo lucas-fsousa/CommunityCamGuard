@@ -16,9 +16,10 @@ import { cameraControls } from '/camera-controls.js';
 import { notify } from '/notifications.js';
 import { setLang, t } from '/i18n.js';
 setLang('pt-BR');
-let requests = 0;
+let requests = 0, catalogueReads = 0;
 window.fetch = async (url, options = {}) => {
   if (url === '/api/cameras' && (!options.method || options.method === 'GET')) {
+    catalogueReads++;
     return new Response(JSON.stringify([camera]), {headers: {'Content-Type': 'application/json'}});
   }
   requests++; throw new Error('No network allowed in control layout fixture');
@@ -34,6 +35,16 @@ const camera = {id: 'synthetic', name: 'Câmera de teste — corredor e entrada 
   }};
 const trigger = cameraControls(camera);
 stage.append(trigger);
+async function openPanel() {
+  const previousReads = catalogueReads;
+  trigger.click();
+  const deadline = performance.now() + 3000;
+  while (!document.querySelector('.camera-panel')) {
+    check(performance.now() < deadline, 'Panel did not open after catalogue response');
+    await tick();
+  }
+  check(catalogueReads === previousReads + 1, 'Panel must make exactly one catalogue read');
+}
 function layout() {
   const panel = document.querySelector('.camera-panel');
   const box = panel.getBoundingClientRect();
@@ -52,7 +63,7 @@ function layout() {
 try {
   state.authentication = 'primary'; state.cameras = [camera];
   document.body.style.overflow = 'auto';
-  trigger.click(); await tick();
+  await openPanel();
   let panel = layout();
   check(requests === 0, 'Opening panel made a request');
   check(stage.inert && document.body.style.overflow === 'hidden', 'Background not locked');
@@ -80,7 +91,7 @@ try {
   check(document.activeElement === trigger, 'Trigger focus not restored');
   // Hardware support must remain intact even when session permissions disable its UI.
   state.authentication = 'temporary'; state.permissions = ['ptz'];
-  trigger.click(); await tick(); panel = layout();
+  await openPanel(); panel = layout();
   check([...panel.querySelectorAll('.control-row button, .control-row select')].every(input => input.disabled), 'Unauthorized control enabled');
   check(panel.textContent.includes(t('panel.accessDenied')), 'Permission reason missing');
   check(camera.audio_messages && camera.controls.orientation.writable, 'Driver capability mutated');
@@ -92,7 +103,10 @@ try {
   window.fetch = async (url, options = {}) => {
     check(!options.method || options.method === 'GET', 'Unexpected write');
     let body;
-    if (url === '/api/cameras') return new Response(JSON.stringify([camera]), {headers: {'Content-Type': 'application/json'}});
+    if (url === '/api/cameras') {
+      catalogueReads++;
+      return new Response(JSON.stringify([camera]), {headers: {'Content-Type': 'application/json'}});
+    }
     if (url === '/api/cameras/synthetic/controls/alarm_voice/options') body = {options: [{value: 'tone', label: 'Synthetic tone'}]};
     else if (url === '/api/cameras/synthetic/controls/smart_protection_schedule') body = {value: {start: '08:00', end: '18:00', weekdays: ['mon']}};
     else { requests++; throw new Error('Unexpected request'); }
@@ -102,15 +116,15 @@ try {
   camera.controls.alarm_voice = {writable: true, dynamic_options: true};
   camera.controls.smart_protection_schedule = {writable: true};
   for (const key of ['alarm_voice', 'smart_protection_schedule']) {
-    state.authentication = 'primary'; state.cameras = [camera]; trigger.click(); await tick();
+    state.authentication = 'primary'; state.cameras = [camera]; await openPanel();
     document.querySelector(`[data-control-key="${key}"]`).click(); await tick(); await tick();
     check(document.querySelector('.modal'), 'Configuration dialog did not open');
     endSession(); await tick();
     check(!document.querySelector('.modal, .camera-panel') && !stage.inert, 'Configuration survived session end');
   }
   check(mockReads === 2 && requests === 0, 'Unexpected configuration traffic');
-  state.authentication = 'primary'; state.cameras = [camera]; trigger.click(); await tick(); panel = layout();
-  window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], requests,
+  state.authentication = 'primary'; state.cameras = [camera]; await openPanel(); panel = layout();
+  window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], requests, catalogueReads,
     panelWidth: Math.round(panel.getBoundingClientRect().width), permissions: true, nestedFocus: true,
     sessionCleanup: true, toastDismissal: true, configurationCleanup: true, mockReads};
 } catch (error) { window.smokeResult = {ok: false, error: error.message}; }

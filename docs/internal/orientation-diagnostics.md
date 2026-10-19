@@ -82,3 +82,21 @@ shows a localized notification rather than stale controls. Node regressions cove
 those races and fresh removal of old capabilities.22 focused Python tests passed
 (129.4MiB/no swap). The browser fixture now serves synthetic catalogue reads; no
 real-browser/device acceptance was performed in this step.
+
+## Isolated real-browser acceptance
+
+The updated panel subsequently passed Chromium at375×667 and1280×900 using only
+synthetic camera catalogues. Initial desktop measurement failed because the fixture
+waited one animation frame instead of waiting for the asynchronous panel; the fixture
+now waits up to three seconds for panel creation and asserts exactly one catalogue
+read per opening. This fixes the test synchronization, not a proven production defect.
+
+Final runs: five catalogue reads across five openings, two synthetic configuration
+reads, zero unexpected/network camera requests. Panel widths351px/640px, centered
+and without horizontal overflow; permissions, nested focus, close/session cleanup,
+configuration cleanup and toast dismissal all passed. Desktop peak263.1MiB and
+mobile187.3MiB, no swap. Runs were sequential with384MiB/no-swap/half-CPU/128-task/
+60-second caps and browser cleanup. The first mobile run also passed but reached
+the384MiB cap. No production login, streams, audio, camera commands or container
+restart occurred. This is desktop Chromium with mobile viewport, not physical
+Android/iOS certification. Source0b8dfb8 full CI39157076036 passed.

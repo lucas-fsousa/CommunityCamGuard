@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 control panel browser acceptance passed375×667 and1280×900. Fixed
+fixture synchronization for asynchronous catalogue loading; exactly one synthetic
+catalogue read per opening, five openings/run. Focus/permissions/session cleanup/
+toast dismissal/layout passed. Final peaks187.3/263.1MiB,no swap, sequential bounded
+Chromium. No camera traffic or restart. Physical mobile remains separate.
+
 2026-10-18 stale control-panel catalogue fixed: reopening previously used browser
 state only. Now one bounded GET obtains current driver capabilities without player
 rerender, write replay or stale fallback. Duplicate-click/session-end/timeout/detached
