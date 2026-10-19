@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 persisted audio lifecycle acceptance passed for message and streaming:
+exact expiry blocks dispatch, valid renewal restores it, failed collection and
+firmware change cannot reuse prior permissions. Real temporary SQLite profiles,
+rollout and snapshots; synthetic transport only.30 focused tests130.4MiB/no swap.
+Read-only production catalogue still advertises both camera3 audio modes and seven
+static controls. No audio, production expiry manipulation, build or profile changes.
+
 2026-10-19 camera3 audio migration deployed/activated: existing physical RTSP
 recorded-message and hold-to-speak proofs from ADR0008 imported with document digest,
 exact identity/firmware and separate operations. Seven prior operation/source records

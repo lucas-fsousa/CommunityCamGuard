@@ -1,5 +1,21 @@
 # Siren capability migration
 
+## Persisted lifecycle acceptance, 2026-10-19
+
+Both recorded-message and streaming paths now have an integrated test using actual
+temporary SQLite profile, rollout and snapshot stores (no production DB). A virtual
+clock reaches the exact expiry boundary: support becomes false and send is denied
+without additional synthetic transport calls. Publishing fresh matching identity
+restores dispatch. Starting collection invalidates prior evidence even if collection
+never finishes; publishing another firmware does not inherit the old operation proof.
+The refresh scheduler is replaced by a call recorder, so no worker or camera I/O runs.
+
+Thirty focused lifecycle/route/snapshot-store tests passed (130.4MiB/no swap), Ruff
+clean. This tests the existing runtime policy without changing its behaviour.
+Separate read-only production catalogue checks confirmed camera3's two audio flags
+and seven static controls remain available. No audio, real expiry invalidation,
+profile mutation or rebuild. Physical endurance/full-duplex remain unvalidated.
+
 ## Camera3 audio rollout completed, 2026-10-19
 
 After CI39252686418 passed, the historical RTSP physical acceptance in
