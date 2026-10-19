@@ -1,5 +1,36 @@
 # Camera 3 control follow-up, 2026-10-16
 
+## Silent follow-up, 2026-10-19
+
+The latest permission allows camera 3 tests; the prior no-sound restriction remains
+in force. No siren, audio, microphone, orientation or night-mode command was sent.
+
+After a fresh production-owned capability catalogue check, the canonical dashboard
+white-light API reported verified OFF. A single reversible cycle then returned:
+
+| Request | HTTP | Verified value |
+| --- | --- | --- |
+| Initial GET | 200 | false |
+| PUT ON | 200 | true |
+| Independent GET | 200 | true |
+| Restore PUT OFF | 200 | false |
+| Final GET | 200 | false |
+
+The local operator now asserts exact boolean state and verification on each step,
+restoring the original state in `finally`; no automatic write retries. The cycle
+took 20.687s with a 48.7MiB peak and zero swap under a 192MiB/50%-CPU cap. No browser,
+build or service restart was needed. Health returned OK; app/go2rtc were running
+with zero restarts and no OOM flags. Physical light confirmation was requested and
+is still pending; successful API evidence alone does not establish visible output.
+Only camera 3 was targeted. This supersedes the earlier failed initial light check
+below, but not the pending physical/night-mode acceptance.
+
+Regression verification: `tests/test_white_light_correlation.py` and
+`tests/test_vendor_white_light.py` passed all 35 tests in a bounded process
+(90MiB peak, zero swap). No production code change was required for this cycle.
+
+## Historical October 16 test permissions
+
 Only camera 3 was targeted. The operator lifted the sound restriction and requested
 50% speaker volume. Keep that requested volume; no changes to cameras 1/2.
 

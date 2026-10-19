@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 camera3 floodlight strict dashboard-API cycle passed: OFF → ON → OFF,
+all five requests HTTP200/verified, including independent reads of ON and restored
+OFF. Production catalogue refreshed first; no direct SDK bypass or sound commands.
+20.687s,48.7MiB/no swap, bounded192MiB operator. Health OK, both containers running
+with zero restarts/no OOM. Physical observation awaits user confirmation; this does
+not certify UI interaction or long-term reliability. Cameras1/2 were not targeted.
+
 2026-10-18 orientation parsing hardened: unrelated scalar fields no longer become
 orientation. Exact multiFlip1/3, correlated preflight/readback and session-device
 check required. Ten regressions failed before fix;46 focused tests now pass98.1MiB/
