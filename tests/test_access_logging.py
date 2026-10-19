@@ -1,6 +1,8 @@
 """Check Uvicorn formatter compatibility without launching a server."""
 
 import logging
+import subprocess
+import sys
 
 from uvicorn.config import LOGGING_CONFIG
 from uvicorn.logging import AccessFormatter
@@ -32,3 +34,24 @@ def test_logging_config_is_isolated_and_filter_is_wired():
     assert result["loggers"]["uvicorn.access"]["filters"] == ["without_query"]
     assert result["filters"]["without_query"]["()"] is WithoutQuery
     assert "filters" not in LOGGING_CONFIG["loggers"]["uvicorn.access"]
+
+
+def test_audio_summary_enabled_without_enabling_driver_debug():
+    config = access_log_config()
+    name = "backend.app.drivers.yoosee.audio_timing"
+    assert config["loggers"][name] == {
+        "handlers": ["default"], "level": "INFO", "propagate": False,
+    }
+    assert name not in LOGGING_CONFIG["loggers"]
+    result = subprocess.run([sys.executable, "-c", """
+import logging
+from logging.config import dictConfig
+from backend.app.access_logging import access_log_config
+from backend.app.drivers.yoosee.audio_timing import DeliveryTiming
+dictConfig(access_log_config())
+DeliveryTiming().report('cam_0123456789abcdef01234567', elapsed=0,
+                        opened=False, released=True)
+logging.getLogger('backend.app.drivers.yoosee.p2p').info('HIDDEN_DRIVER_DETAIL')
+"""], capture_output=True, text=True, timeout=10, check=True)
+    assert result.stderr.count("rtsp_audio_timing") == 1
+    assert "HIDDEN_DRIVER_DETAIL" not in result.stderr + result.stdout

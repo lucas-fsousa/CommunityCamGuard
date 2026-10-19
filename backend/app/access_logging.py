@@ -26,4 +26,7 @@ def access_log_config() -> dict:
     config["loggers"]["backend.app.services.control_sessions"] = {
         "handlers": ["default"], "level": "INFO", "propagate": False,
     }
+    config["loggers"]["backend.app.drivers.yoosee.audio_timing"] = {
+        "handlers": ["default"], "level": "INFO", "propagate": False,
+    }
     return config

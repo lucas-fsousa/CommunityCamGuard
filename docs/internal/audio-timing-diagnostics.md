@@ -31,3 +31,9 @@ swap, plus Ruff. Synthetic tests cover buffering versus missed deadlines, identi
 sanitization, a successful ten-second session and failed watchdog refresh, each with
 one summary and preserved CLOSE behaviour. No camera I/O or sound. Source change
 requires the next app rebuild; physical timing correlation remains pending.
+
+Deployment preparation found that the bundled Uvicorn configuration did not enable
+INFO for this module. Added an explicit handler/INFO/no-propagation entry only for
+audio_timing; generic driver INFO/debug remains disabled. A fresh-process test using
+the actual logging configuration emits exactly one synthetic summary and suppresses
+an unrelated driver INFO message.18 focused tests pass126.1MiB/no swap. No camera I/O.
