@@ -1,5 +1,21 @@
 # Siren capability migration
 
+## Audio preflight hardening, 2026-10-19
+
+The RTSP backchannel previously checked whether the Public header contained the
+substring USER_CMD_SET. Synthetic replies announcing USER_CMD_SET_V2,
+X_USER_CMD_SET or USER_CMD_SET PLAY therefore incorrectly opened the media path.
+Three regression cases reproduced this before correction. The driver now splits
+the comma-delimited method list and requires an exact normalized token, preserving
+existing whitespace/case tolerance. Unknown or empty lists fail before OPEN/media;
+the probe socket is closed. Positive exact-method and whitespace tests pass.
+
+Sixteen focused backchannel/intercom/stream tests passed (87MiB peak, no swap),
+along with Ruff. PCM framing, prebuffering, pacing and watchdog timing are unchanged.
+No real camera sockets, audio, deployment or capability-profile changes occurred.
+This is a preflight correctness fix, not complete route-specific capability migration
+or a replacement for per-unit provenance. Running container rebuild remains pending.
+
 Status (2026-10-18): camera-3 strict two-second pulse physically confirmed (including
 stop), following the later authorized retest below. Runtime wiring deployed and exact-unit
 two-second profile/rollout activated; fresh HTTP catalogue accepted. No sound replay.

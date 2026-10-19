@@ -108,6 +108,43 @@ def test_rtsp_talkback_rejects_firmware_without_custom_method() -> None:
         )
 
 
+@pytest.mark.parametrize("public", [
+    "OPTIONS,USER_CMD_SET_V2", "OPTIONS,X_USER_CMD_SET", "USER_CMD_SET PLAY", "",
+])
+def test_rtsp_talkback_rejects_similar_method_without_opening(public: str) -> None:
+    class SimilarMethod(FakeRtspSession):
+        def request(self, method: str, uri: str, **kwargs: object) -> bytes:
+            self.requests.append((method, uri, kwargs))
+            return f"RTSP/1.0 200 OK\r\nPublic: {public}\r\n\r\n".encode()
+
+    FakeRtspSession.instances.clear()
+    with pytest.raises(talk.RtspBackchannelError, match="does not advertise"):
+        talk._send_chunks(_camera(), (bytes(640),), session_factory=SimilarMethod)
+    assert len(FakeRtspSession.instances) == 1
+    probe = FakeRtspSession.instances[0]
+    assert [request[0] for request in probe.requests] == ["DESCRIBE", "OPTIONS"]
+    assert probe.closed and not probe.frames
+
+
+@pytest.mark.parametrize("public", ["USER_CMD_SET", " OPTIONS, user_cmd_set , PLAY "])
+def test_rtsp_talkback_accepts_exact_method_with_whitespace(public: str) -> None:
+    class ExactMethod(FakeRtspSession):
+        def request(self, method: str, uri: str, **kwargs: object) -> bytes:
+            if method == "OPTIONS":
+                self.requests.append((method, uri, kwargs))
+                return f"RTSP/1.0 200 OK\r\nPublic: {public}\r\n\r\n".encode()
+            return super().request(method, uri, **kwargs)
+
+    FakeRtspSession.instances.clear()
+    result = talk._send_chunks(
+        _camera(), (bytes(640),), session_factory=ExactMethod,
+        clock=lambda: 0.0, sleep=lambda _seconds: None,
+    )
+    assert result.completed
+    assert len(FakeRtspSession.instances) == 2
+    assert all(session.closed for session in FakeRtspSession.instances)
+
+
 def test_rtsp_talkback_preloads_and_recovers_scheduler_delay_from_jitter_buffer() -> None:
     class LateClock:
         def __init__(self) -> None:

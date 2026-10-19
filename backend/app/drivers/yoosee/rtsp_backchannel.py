@@ -146,7 +146,10 @@ class RtspTalkSession:
                 f"camera rejected RTSP credentials ({rtsp.parse_status(response)})"
             )
         options = self._request("OPTIONS")
-        public = rtsp.parse_headers(options).get("public", "").upper()
+        public = {
+            method.strip().upper()
+            for method in rtsp.parse_headers(options).get("public", "").split(",")
+        }
         if rtsp.parse_status(options) != 200 or "USER_CMD_SET" not in public:
             raise RtspBackchannelError("camera does not advertise Yoosee RTSP talkback")
 

@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 RTSP audio preflight now requires an exact comma-delimited USER_CMD_SET
+method instead of a substring. Three synthetic false-positive cases reproduced
+before correction;16 focused tests pass87MiB/no swap. Rejects similar/combined
+method names before opening media, with probe cleanup verified. PCM/pacing unchanged,
+no camera traffic. Route-specific audio capability migration remains pending;
+this source fix is not yet rebuilt into the running container.
+
 2026-10-19 strict orientation cycle physically confirmed by user on camera3:
 inverted → normal → inverted, both canonical PUTs200/verified/changed=true and
 independent final property read confirmed restoration. Persistent diagnostics show
