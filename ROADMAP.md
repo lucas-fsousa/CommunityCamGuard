@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 strict orientation cycle physically confirmed by user on camera3:
+inverted → normal → inverted, both canonical PUTs200/verified/changed=true and
+independent final property read confirmed restoration. Persistent diagnostics show
+both operations started/confirmed. Operator14.065s,43.9MiB/no swap. No sound or
+other-camera commands. This completes the deployed strict parser's reversible-cycle
+acceptance; original October17 failure cause remains unproven.
+
 2026-10-19 camera3 floodlight strict dashboard-API cycle passed: OFF → ON → OFF,
 all five requests HTTP200/verified, including independent reads of ON and restored
 OFF. Production catalogue refreshed first; no direct SDK bypass or sound commands.

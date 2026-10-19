@@ -124,3 +124,21 @@ canonical PUT of that same value returned200, verified=true, changed=false: stri
 preflight passed without sending an orientation change.42.6MiB/no swap,4.796s. The
 observed state was preserved; no new inversion/restoration or audio was performed.
 This validates the deployed idempotent path, not a repeated strict physical cycle.
+
+## Strict reversible-cycle acceptance, 2026-10-19
+
+After fresh production catalogue verification, camera3's actual initial state was
+read as inverted. Canonical dashboard control PUTs performed inverted → normal →
+inverted, both HTTP200 with verified=true and changed=true. An independent final
+property read confirmed the original inverted state was restored. No write replay,
+sound command, browser, build or restart was used. Operator runtime14.065s,
+43.9MiB peak, zero swap under192MiB/50%-CPU limits.
+
+Persistent diagnostics at11:05UTC recorded distinct session-start/complete-confirmed
+pairs for both operations, without error categories. The user explicitly confirmed
+the video changed orientation and returned. This closes physical reversible-cycle
+acceptance for the deployed strict parser on camera3, not all-model certification,
+browser-click acceptance or proof of the original lost October17 incident's cause.
+
+Follow-up regression run passed25 tests in `test_orientation_correlation.py` and
+`test_control_diagnostics.py` (106.2MiB peak, zero swap). Service health remained OK.
