@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 camera3 audio migration deployed/activated: existing physical RTSP
+recorded-message and hold-to-speak proofs from ADR0008 imported with document digest,
+exact identity/firmware and separate operations. Seven prior operation/source records
+and alarm_voice rollout preserved. Only rtsp_pcm permitted; P2P remains unproven.
+Image4449dfe2d2a5 built with512MiB/no-extra-swap/half-CPU caps; app only recreated.
+Authenticated catalogue confirms both audio modes and existing controls. HealthOK,
+3online/3recording, MP4 ages4/1/4s, no OOM. No audio emitted or physical retest;
+other units retain legacy audio gates. CI83f76ae passed before deployment.
+
 2026-10-19 audio capability migration wiring implemented, not activated: exact-unit
 profiles distinguish audio_message/audio_stream and rtsp_pcm/p2p_amr. Support and
 send share the route policy; migrated audio cannot fall back to legacy grants for

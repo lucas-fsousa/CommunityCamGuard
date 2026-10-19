@@ -1,5 +1,32 @@
 # Siren capability migration
 
+## Camera3 audio rollout completed, 2026-10-19
+
+After CI39252686418 passed, the historical RTSP physical acceptance in
+[ADR0008](0008-reboot-and-two-way-audio-live-in-vendor-p2p.md#2026-09-01-amendment--proprietary-rtsp-talkback-recovered)
+was bound to camera3's exact existing identity/firmware using the document SHA-256
+and locator. Both audio_message and audio_stream have writable rtsp_pcm proofs;
+neither authorizes p2p_amr. Registration preserves all seven prior operations and
+their source references; rollout preserves alarm_voice. Fresh exact identity and
+enrollment association were checked before import. No other unit was migrated.
+
+Image4449dfe2d2a5 contains83f76ae; build used512MiB/no-extra-swap/half-CPU limits.
+Only app was recreated (19:24:43UTC). No go2rtc recreate command was issued; its
+observed start time was13:03:15UTC on October19, not the older October14 timestamp
+from prior deployments. Both services reported no OOM and zero restart counters.
+
+Import/post-registration route assertions passed63.6MiB/no swap. Read-only canonical
+HTTP catalogue confirmed audio_messages=true, audio_streams=true and all seven
+static controls (48MiB/no swap). Health/status/filesystem check confirmed all three
+units online/recording, newest nonemptyMP4 ages4/1/4seconds (42.5MiB/no swap).
+No media requests or audio/camera actions were sent; physical audio acceptance is
+reused from the documented historical tests, not claimed as a new live test.
+
+Remaining: separate proof/migration for other units and any P2P audio route,
+physical endurance/full-duplex checks when sound is permitted. Do not rerun the
+one-time local importer; its precondition deliberately expects the old seven-operation
+profile and refuses after successful migration.
+
 ## Audio migration wiring, 2026-10-19
 
 `audio_capabilities.py` isolates the route policy from transport. Existing durable
