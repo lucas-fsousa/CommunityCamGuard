@@ -100,3 +100,15 @@ mobile187.3MiB, no swap. Runs were sequential with384MiB/no-swap/half-CPU/128-ta
 the384MiB cap. No production login, streams, audio, camera commands or container
 restart occurred. This is desktop Chromium with mobile viewport, not physical
 Android/iOS certification. Source0b8dfb8 full CI39157076036 passed.
+
+## Orientation response hardening
+
+Offline regression exposed a separate correctness defect: the recursive parser could
+accept `t:1`, `nightViewMode:1`, or `brightness:3` as orientation when `multiFlip` was
+missing. It now accepts only exact integer `multiFlip`1/3 in the root or `setVal`
+map; unrelated/nested/scalar values remain unknown. Preflight and every confirmation
+read require correlation with the current request/session/device, and a mismatched
+session target is rejected before property I/O. Existing write timing/retries and
+capability grants are unchanged. Ten new regression cases failed before correction;
+46 focused tests passed afterward (98.1MiB/no swap). This is not proof of the cause
+of the lost October17 incident or the later pre-setter409.

@@ -75,7 +75,7 @@ def test_orientation_records_exact_stage_and_closes_socket(monkeypatch, sink, fa
     def session(*_):
         if failure == "session":
             raise P2PProbeError("private-token")
-        return object(), object(), 10
+        return object(), SimpleNamespace(device_id=7000000002), 10
     monkeypatch.setattr(orientation, "open_camera_session", session)
     reads = []
     def read(*_, **kw):

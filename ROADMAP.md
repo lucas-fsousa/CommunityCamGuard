@@ -1,5 +1,10 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-18 orientation parsing hardened: unrelated scalar fields no longer become
+orientation. Exact multiFlip1/3, correlated preflight/readback and session-device
+check required. Ten regressions failed before fix;46 focused tests now pass98.1MiB/
+no swap. No capability expansion or timing changes; original incident cause unproven.
+
 2026-10-18 control panel browser acceptance passed375×667 and1280×900. Fixed
 fixture synchronization for asynchronous catalogue loading; exactly one synthetic
 catalogue read per opening, five openings/run. Focus/permissions/session cleanup/

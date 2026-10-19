@@ -67,18 +67,13 @@ def parse_orientation_write_response(frame: bytes, message_id: int) -> int | Non
 def extract_orientation(value: object) -> int | None:
     """Extract only the selected model's documented normal/180-degree values."""
 
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value if value in ORIENTATION_VALUES.values() else None
-    if isinstance(value, dict):
-        direct = value.get("multiFlip")
-        if isinstance(direct, int) and not isinstance(direct, bool):
-            if direct in ORIENTATION_VALUES.values():
-                return direct
-        for nested in value.values():
-            candidate = extract_orientation(nested)
-            if candidate is not None:
-                return candidate
-    return None
+    if not isinstance(value, dict):
+        return None
+    fields = value.get("setVal", value)
+    if not isinstance(fields, dict):
+        return None
+    state = fields.get("multiFlip")
+    return state if type(state) is int and state in ORIENTATION_VALUES.values() else None
 
 
 def exchange_orientation_write(
@@ -133,6 +128,8 @@ def set_camera_orientation(
     try:
         sock.bind(("", 0))
         node, target, sequence = open_camera_session(sock, enrollment, bounded_timeout, deadline)
+        if str(target.device_id) != enrollment.device_id:
+            raise P2PProbeError("orientation session device identity mismatch")
         stage = "preflight"
         preflight = exchange_model_read(
             sock,
@@ -142,6 +139,7 @@ def set_camera_orientation(
             sequence,
             min(5.0, max(0.5, deadline - time.monotonic())),
             deadline=deadline,
+            require_correlated_response=True,
         )
         previous = extract_orientation(preflight.value)
         error = preflight.error_code
@@ -186,6 +184,7 @@ def set_camera_orientation(
                 min(2.0, max(0.5, deadline - time.monotonic())),
                 retries=1,
                 deadline=deadline,
+                require_correlated_response=True,
             )
             error = readback.error_code
             if readback.error_code == 0 and extract_orientation(readback.value) == requested:
