@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 RTSP method preflight fix deployed in image fc76427de9e2 after green
+CI for ab6dd09/df47062. Build capped512MiB/no additional swap/half CPU; only app
+recreated. Installed source hash matches workspace. Read-only acceptance: healthOK,
+3online/3recording, all latest nonemptyMP4 files2s old;59.9MiB/no swap probe.
+go2rtc retains October14 start time; no OOM flags or audio test. Live audio output
+on this build remains untested while sound restriction applies.
+
 2026-10-19 silent intercom watchdog regression: virtual ten-second session verifies
 OPEN at0/4/8s,1000 native packets, final drain and CLOSE; failed refresh aborts media
 and still closes the decoder/socket. Eleven backchannel tests pass82.2MiB/no swap.
@@ -10,7 +17,7 @@ method instead of a substring. Three synthetic false-positive cases reproduced
 before correction;16 focused tests pass87MiB/no swap. Rejects similar/combined
 method names before opening media, with probe cleanup verified. PCM/pacing unchanged,
 no camera traffic. Route-specific audio capability migration remains pending;
-this source fix is not yet rebuilt into the running container.
+deployment completed as recorded above.
 
 2026-10-19 strict orientation cycle physically confirmed by user on camera3:
 inverted → normal → inverted, both canonical PUTs200/verified/changed=true and

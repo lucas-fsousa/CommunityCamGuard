@@ -14,7 +14,7 @@ Sixteen focused backchannel/intercom/stream tests passed (87MiB peak, no swap),
 along with Ruff. PCM framing, prebuffering, pacing and watchdog timing are unchanged.
 No real camera sockets, audio, deployment or capability-profile changes occurred.
 This is a preflight correctness fix, not complete route-specific capability migration
-or a replacement for per-unit provenance. Running container rebuild remains pending.
+or a replacement for per-unit provenance. Deployment completed as recorded below.
 
 Additional silent watchdog coverage uses a virtual clock and synthetic RTSP peer:
 a ten-second message sends1000 native packets, refreshes OPEN at0/4/8 seconds,
@@ -22,6 +22,20 @@ drains until10s and closes. A rejected refresh aborts further packets but still
 sends CLOSE and closes sockets. All11 backchannel tests pass (82.2MiB,no swap).
 No real waiting/audio/camera contact; physical repeated-session and full-duplex
 acceptance remain pending. This adds tests only, with no watchdog timing change.
+
+### Deployment verification
+
+After successful CI39244025452 and39244133194, image fc76427de9e2 was built with
+512MiB/no-extra-swap/50%-CPU build-step limits. Only app was recreated at
+2026-10-19T12:10:43UTC. The running backchannel source SHA-256 matches the workspace
+(`d5eb23a10074a1f380e19fd33c5e04386e766cdef2d941898e9b4b2d5c0ff0f7`).
+go2rtc retained its October14 start time. Both containers reported no OOM and zero
+restart-counter increments (app recreation is separate from that counter).
+
+Read-only authenticated status and filesystem acceptance showed all three cameras
+online/recording, each with a nonempty MP4 modified2 seconds earlier. Probe peak
+59.9MiB/no swap,4.360s. No media requests, camera actions or sound tests; this verifies
+deployment/recording recovery, not new physical audio acceptance.
 
 Status (2026-10-18): camera-3 strict two-second pulse physically confirmed (including
 stop), following the later authorized retest below. Runtime wiring deployed and exact-unit
