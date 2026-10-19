@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 intercom diagnostics implemented: constant-memory per-session RTSP timing
+summary records successful socket writes, deadline misses, send duration and cleanup
+without PCM/credentials. Pacing/prebuffer unchanged.23 focused tests89.3MiB/no swap.
+See docs/internal/audio-timing-diagnostics.md. App rebuild and physical timing
+correlation remain pending; these measurements do not certify speaker underflow.
+
 2026-10-19 persisted audio lifecycle acceptance passed for message and streaming:
 exact expiry blocks dispatch, valid renewal restores it, failed collection and
 firmware change cannot reuse prior permissions. Real temporary SQLite profiles,

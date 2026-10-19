@@ -246,6 +246,10 @@ see [safe diagnostics](docs/internal/safe-stream-diagnostics.md). Orientation co
 diagnostics persist across container recreation in `data/logs/control-events.jsonl`
 (UTC, size-rotated to about 4 MiB total, without credentials or response payloads);
 see [scope and troubleshooting](docs/internal/orientation-diagnostics.md).
+Yoosee RTSP talkback emits one content-free `rtsp_audio_timing` summary per session
+in the app logs: packet count, send latency, nominal playback-deadline misses and
+decoder cleanup. These are server-side measurements, not proof of speaker underflow;
+see [audio timing diagnostics](docs/internal/audio-timing-diagnostics.md).
 Historical logs and
 bundles are not retroactively sanitized. After environment changes, recreate the app
 container; browser refresh does not reconfigure workers. Never publish `.env`,

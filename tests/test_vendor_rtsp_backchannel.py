@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import ClassVar
 
 import pytest
@@ -146,7 +147,8 @@ def test_rtsp_talkback_accepts_exact_method_with_whitespace(public: str) -> None
 
 
 @pytest.mark.parametrize("fail_refresh", [False, True])
-def test_rtsp_talkback_watchdog_and_cleanup_with_virtual_time(fail_refresh: bool) -> None:
+def test_rtsp_talkback_watchdog_and_cleanup_with_virtual_time(fail_refresh: bool, caplog) -> None:
+    caplog.set_level(logging.INFO, logger="backend.app.drivers.yoosee.audio_timing")
     now = [0.0]
     opens: list[float] = []
 
@@ -186,6 +188,12 @@ def test_rtsp_talkback_watchdog_and_cleanup_with_virtual_time(fail_refresh: bool
         assert len(media.frames) < 1000
     else:
         assert len(media.frames) == 1000
+    summaries = [record.getMessage() for record in caplog.records
+                 if record.name == "backend.app.drivers.yoosee.audio_timing"]
+    assert len(summaries) == 1
+    assert f"packets={len(media.frames)} " in summaries[0]
+    assert "opened=True released=True" in summaries[0]
+    assert "secret" not in summaries[0]
 
 
 def test_rtsp_talkback_preloads_and_recovers_scheduler_delay_from_jitter_buffer() -> None:

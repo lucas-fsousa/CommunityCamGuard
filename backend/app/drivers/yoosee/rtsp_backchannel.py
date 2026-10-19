@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from ...audio_format import PCM_FRAME_BYTES, PCM_FRAME_MS
 from ...discovery import rtsp
 from ..contracts import AudioMessageResult
+from .audio_timing import DeliveryTiming
 
 if TYPE_CHECKING:
     from ...db.registry import Camera
@@ -226,6 +227,8 @@ def _send_chunks(
     pending: list[bytes] = []
     playback_started: float | None = None
     sent_packets = 0
+    timing = DeliveryTiming()
+    operation_started = clock()
 
     def send_pending(*, preload: bool = False) -> None:
         nonlocal playback_started, sent_packets
@@ -239,7 +242,10 @@ def _send_chunks(
                 wait = deadline - clock()
                 if wait > 0:
                     sleep(wait)
+            send_started = clock()
             session.send_pcm(pending.pop(0))
+            timing.sent(started=send_started, finished=clock(),
+                        playback_deadline=playback_started + sent_packets * RTP_PACKET_SECONDS)
             sent_packets += 1
 
     try:
@@ -266,7 +272,11 @@ def _send_chunks(
             if wait > 0:
                 sleep(wait)
     finally:
-        released = session.close()
+        try:
+            released = session.close()
+        finally:
+            timing.report(camera.camera_id, elapsed=clock() - operation_started,
+                          opened=opened, released=released)
 
     if requested_frames == 0:
         raise ValueError("RTSP talkback requires at least one PCM frame")
