@@ -4,8 +4,10 @@
 all five requests HTTP200/verified, including independent reads of ON and restored
 OFF. Production catalogue refreshed first; no direct SDK bypass or sound commands.
 20.687s,48.7MiB/no swap, bounded192MiB operator. Health OK, both containers running
-with zero restarts/no OOM. Physical observation awaits user confirmation; this does
-not certify UI interaction or long-term reliability. Cameras1/2 were not targeted.
+with zero restarts/no OOM. User requested one repeat and confirmed physical output:
+repeat passed all five HTTP200/verified replies, restored OFF,22.334s/52.4MiB/no swap.
+Floodlight physically accepted on camera3 through the dashboard API; this does not
+certify UI interaction or long-term reliability. Cameras1/2 were not targeted.
 
 2026-10-18 orientation parsing hardened: unrelated scalar fields no longer become
 orientation. Exact multiFlip1/3, correlated preflight/readback and session-device

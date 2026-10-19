@@ -29,6 +29,13 @@ Regression verification: `tests/test_white_light_correlation.py` and
 `tests/test_vendor_white_light.py` passed all 35 tests in a bounded process
 (90MiB peak, zero swap). No production code change was required for this cycle.
 
+Physical acceptance completed: the user requested a repeat, then explicitly
+confirmed the observed light test. That single repeat again passed all five
+HTTP200/verified requests and restored OFF (22.334s,52.4MiB,no swap). Floodlight is
+therefore physically confirmed on camera3 via the canonical dashboard API. The
+pending observation above is resolved; browser interaction and other units were
+not tested. CI39241469797 for the initial report47486eb passed all jobs in1m10s.
+
 ## Historical October 16 test permissions
 
 Only camera 3 was targeted. The operator lifted the sound restriction and requested
