@@ -145,6 +145,49 @@ def test_rtsp_talkback_accepts_exact_method_with_whitespace(public: str) -> None
     assert all(session.closed for session in FakeRtspSession.instances)
 
 
+@pytest.mark.parametrize("fail_refresh", [False, True])
+def test_rtsp_talkback_watchdog_and_cleanup_with_virtual_time(fail_refresh: bool) -> None:
+    now = [0.0]
+    opens: list[float] = []
+
+    class WatchdogSession(FakeRtspSession):
+        def request(self, method: str, uri: str, **kwargs: object) -> bytes:
+            headers = kwargs.get("extra_headers")
+            if isinstance(headers, dict) and headers.get("AudioCtlCmd") == "OPEN":
+                opens.append(now[0])
+                if fail_refresh and len(opens) == 2:
+                    self.requests.append((method, uri, kwargs))
+                    return b"RTSP/1.0 500 Error\r\n\r\n"
+            return super().request(method, uri, **kwargs)
+
+    def advance(seconds: float) -> None:
+        now[0] += seconds
+
+    def send() -> talk.AudioMessageResult:
+        return talk._send_chunks(
+            _camera(), (bytes(640) for _ in range(500)),
+            session_factory=WatchdogSession, clock=lambda: now[0], sleep=advance,
+        )
+
+    FakeRtspSession.instances.clear()
+    if fail_refresh:
+        with pytest.raises(talk.RtspBackchannelError, match="rejected RTSP audio open"):
+            send()
+        assert len(opens) == 2
+    else:
+        result = send()
+        assert result.completed and result.duration_ms == 10_000
+        assert opens == pytest.approx([0.0, 4.0, 8.0], abs=0.011)
+        assert now[0] == pytest.approx(10.0)
+    probe, media = FakeRtspSession.instances
+    assert probe.closed and media.closed
+    assert media.requests[-1][2]["extra_headers"]["AudioCtlCmd"] == "CLOSE"
+    if fail_refresh:
+        assert len(media.frames) < 1000
+    else:
+        assert len(media.frames) == 1000
+
+
 def test_rtsp_talkback_preloads_and_recovers_scheduler_delay_from_jitter_buffer() -> None:
     class LateClock:
         def __init__(self) -> None:

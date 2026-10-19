@@ -1,5 +1,10 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 silent intercom watchdog regression: virtual ten-second session verifies
+OPEN at0/4/8s,1000 native packets, final drain and CLOSE; failed refresh aborts media
+and still closes the decoder/socket. Eleven backchannel tests pass82.2MiB/no swap.
+This is offline lifecycle coverage, not physical endurance/full-duplex acceptance.
+
 2026-10-19 RTSP audio preflight now requires an exact comma-delimited USER_CMD_SET
 method instead of a substring. Three synthetic false-positive cases reproduced
 before correction;16 focused tests pass87MiB/no swap. Rejects similar/combined

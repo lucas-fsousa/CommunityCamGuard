@@ -16,6 +16,13 @@ No real camera sockets, audio, deployment or capability-profile changes occurred
 This is a preflight correctness fix, not complete route-specific capability migration
 or a replacement for per-unit provenance. Running container rebuild remains pending.
 
+Additional silent watchdog coverage uses a virtual clock and synthetic RTSP peer:
+a ten-second message sends1000 native packets, refreshes OPEN at0/4/8 seconds,
+drains until10s and closes. A rejected refresh aborts further packets but still
+sends CLOSE and closes sockets. All11 backchannel tests pass (82.2MiB,no swap).
+No real waiting/audio/camera contact; physical repeated-session and full-duplex
+acceptance remain pending. This adds tests only, with no watchdog timing change.
+
 Status (2026-10-18): camera-3 strict two-second pulse physically confirmed (including
 stop), following the later authorized retest below. Runtime wiring deployed and exact-unit
 two-second profile/rollout activated; fresh HTTP catalogue accepted. No sound replay.
