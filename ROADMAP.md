@@ -4,6 +4,9 @@
 orientation. Exact multiFlip1/3, correlated preflight/readback and session-device
 check required. Ten regressions failed before fix;46 focused tests now pass98.1MiB/
 no swap. No capability expansion or timing changes; original incident cause unproven.
+Deployed d775ceb after green CI39189222426. Following an initial read502 and normal
+catalogue refresh, camera3 same-state PUT returned200 verified/changed=false at the
+observed inverted state (42.6MiB/no swap). No new orientation change; preserved state.
 
 2026-10-18 control panel browser acceptance passed375×667 and1280×900. Fixed
 fixture synchronization for asynchronous catalogue loading; exactly one synthetic

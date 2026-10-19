@@ -112,3 +112,15 @@ session target is rejected before property I/O. Existing write timing/retries an
 capability grants are unchanged. Ten new regression cases failed before correction;
 46 focused tests passed afterward (98.1MiB/no swap). This is not proof of the cause
 of the lost October17 incident or the later pre-setter409.
+
+Deployment: d775ceb passed full CI39189222426; image49c359d522b8 built under
+512MiB/no-extra-swap/half-CPU caps, only app recreated. First operator read returned
+502 and stopped before any orientation request. The capability snapshot was expired;
+normal catalogue refresh then confirmed all migrated static controls. This does not
+prove the expired snapshot caused the separate provisioning-read502.
+
+Subsequent camera3 read reported **inverted** (not the earlier normal state). A single
+canonical PUT of that same value returned200, verified=true, changed=false: strict
+preflight passed without sending an orientation change.42.6MiB/no swap,4.796s. The
+observed state was preserved; no new inversion/restoration or audio was performed.
+This validates the deployed idempotent path, not a repeated strict physical cycle.
