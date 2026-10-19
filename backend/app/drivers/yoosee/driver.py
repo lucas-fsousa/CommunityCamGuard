@@ -132,7 +132,7 @@ class YooseeDriver(CameraDriver):
         return audio.send(camera, pcm16le)
 
     def supports_audio_streams(self, camera: Camera) -> bool:
-        return audio.supported(camera)
+        return audio.supported(camera, streaming=True)
 
     def send_audio_stream(
         self, camera: Camera, pcm16le_chunks: Iterable[bytes]

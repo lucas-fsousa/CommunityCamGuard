@@ -1,5 +1,35 @@
 # Siren capability migration
 
+## Audio migration wiring, 2026-10-19
+
+`audio_capabilities.py` isolates the route policy from transport. Existing durable
+operation profiles can represent `audio_message` and `audio_stream` independently,
+with explicit `rtsp_pcm` and `p2p_amr` route options. Profile registration still
+requires a source digest/locator; no proofs are inferred from connection material.
+
+Explicitly selecting either audio operation in a unit's rollout moves both audio
+surfaces out of legacy authorization. An unselected/unproven operation fails closed.
+The policy requires exact enrollment association, current identity snapshot, matching
+profile/unit/firmware and writable route proof. Snapshot freshness is an identity
+prerequisite, not audio certification; the separate operation proof supplies that.
+Missing/expired snapshots request the existing bounded, read-only refresh worker.
+
+Both support predicates and actual send paths consult this policy. Rejection occurs
+before consuming microphone chunks. RTSP remains preferred only when proven and
+locally addressable; transport failure never replays audio through an unproven P2P
+fallback. PCM framing/pacing and existing unselected units remain unchanged.
+
+Validation:36 route/adapter/backchannel tests plus47 driver/architecture/intercom-API
+tests, at most111.8MiB/no swap across runs, Ruff clean. Includes real temporary SQLite
+profile/rollout interaction, firmware replacement, duplicate/read-only/missing proofs,
+unknown routes, expired identity and separate streaming permission. No real camera
+traffic, sound, profile import, rollout activation or deployment occurred.
+
+Remaining: audit and bind the existing physical recorded-message/hold-to-speak proofs
+to each exact unit's identity and RTSP route, preserve unrelated operation sources,
+then explicitly activate and verify catalogue/dispatch on camera3. Do not register
+P2P from RTSP success. Until activation, existing production audio gates remain legacy.
+
 ## Audio preflight hardening, 2026-10-19
 
 The RTSP backchannel previously checked whether the Public header contained the

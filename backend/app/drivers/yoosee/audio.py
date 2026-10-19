@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ...audio_format import downsample_to_8khz, duration_ms
 from ...db import p2p
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
-from . import rtsp_backchannel
+from . import audio_capabilities, rtsp_backchannel
 from .p2p import P2PProbeError, send_pcm_intercom
 from .p2p.intercom_stream import send_pcm_intercom_chunks
 
@@ -16,14 +16,28 @@ if TYPE_CHECKING:
     from ...db.registry import Camera
 
 
-def supported(camera: Camera) -> bool:
+def supported(camera: Camera, *, streaming: bool = False) -> bool:
+    routes = audio_capabilities.allowed_routes(
+        camera, audio_capabilities.STREAM if streaming else audio_capabilities.MESSAGE,
+    )
+    if routes is not None:
+        return bool(routes)
     return rtsp_backchannel.supported(camera) or bool(
         camera.camera_id and p2p.has_enrollment_for_camera(camera.camera_id)
     )
 
 
+def _use_rtsp(camera: Camera, operation: str) -> bool:
+    routes = audio_capabilities.allowed_routes(camera, operation)
+    if routes is not None:
+        if not routes:
+            raise ControlNotReady("camera audio has no currently validated route")
+        return audio_capabilities.RTSP in routes
+    return rtsp_backchannel.supported(camera)
+
+
 def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
-    if rtsp_backchannel.supported(camera):
+    if _use_rtsp(camera, audio_capabilities.MESSAGE):
         try:
             return rtsp_backchannel.send(camera, pcm16le)
         except (OSError, RuntimeError, ValueError) as exc:
@@ -52,7 +66,7 @@ def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
 def send_stream(camera: Camera, pcm16le_chunks: Iterable[bytes]) -> AudioMessageResult:
     """Consume one trusted bounded PCM iterator through a single direct route."""
 
-    if rtsp_backchannel.supported(camera):
+    if _use_rtsp(camera, audio_capabilities.STREAM):
         try:
             return rtsp_backchannel.send_stream(camera, pcm16le_chunks)
         except (OSError, RuntimeError, ValueError) as exc:

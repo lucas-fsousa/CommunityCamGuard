@@ -1,5 +1,14 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-19 audio capability migration wiring implemented, not activated: exact-unit
+profiles distinguish audio_message/audio_stream and rtsp_pcm/p2p_amr. Support and
+send share the route policy; migrated audio cannot fall back to legacy grants for
+an unproven operation or route. Fresh identity and writable provenance required.
+83 focused tests pass, including persisted profile/rollout integration, stale identity,
+firmware mismatch, no PCM consumption on denial and no replay on transport failure.
+No profile registration, camera traffic, build or production activation in this step.
+Next: bind existing per-unit physical RTSP proofs; P2P needs separate evidence.
+
 2026-10-19 RTSP method preflight fix deployed in image fc76427de9e2 after green
 CI for ab6dd09/df47062. Build capped512MiB/no additional swap/half CPU; only app
 recreated. Installed source hash matches workspace. Read-only acceptance: healthOK,
