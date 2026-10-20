@@ -22,6 +22,8 @@ ARM64 status: an experimental Android/Termux + Ubuntu/PRoot test recorded three
 cameras and delivered three 640×360 views, or one 1080p view. Three simultaneous
 1080p views did not pass the bounded test. Native Linux ARM64 Docker validation
 remains pending; see the [hardware checkpoint](docs/internal/arm64-termux-check.md).
+For the tested non-Docker approach, see the [experimental Termux installation guide](docs/public/termux.md),
+including performance limits and Android background-process caveats.
 
 | | |
 |---|---|
@@ -182,7 +184,8 @@ firewall.
 > password. (The app logs a warning when this happens.)
 
 Need the media engine binary? `go2rtc` is expected at `./bin/go2rtc` (Linux amd64 build from
-the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases)).
+the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases); use the Linux ARM64
+binary instead on aarch64 Ubuntu/PRoot).
 
 ### Configuration and access: current limits
 

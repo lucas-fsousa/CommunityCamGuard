@@ -1,5 +1,11 @@
 # ARM64 Android/Termux checkpoint
 
+2026-10-20 review: the owner requested public installation instructions for this
+non-Docker path. The bounded results below support an experimental guide, not a
+claim of three-HD or24/7 reliability. See [Termux setup](../public/termux.md).
+This review reused the recorded evidence; no new phone installation or media run
+was performed. Native Linux Compose validation is independent and deferred.
+
 Date: 2026-10-13. Tested source: `52e4ba5`. Experimental, bounded hardware test,
 not Linux ARM64 Docker homologation or a browser soak test.
 

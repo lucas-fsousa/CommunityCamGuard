@@ -1,5 +1,40 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+## Active priorities — revised by owner, 2026-10-20
+
+This section overrides the priorities and pending labels in the chronological history below.
+
+1. Finish camera3 audio acceptance with known spoken content: recorded message,
+   hold-to-speak, repeated bounded sessions and timing diagnostics. Sound tests are
+   authorized again. Physical intelligibility/stop confirmation is required.
+2. Native/proprietary streaming is the main development goal. Existing TCP probe
+   received/decoded video and confirmed cleanup; continuous shared-account ownership,
+   single-producer/fan-out integration and comparative stability remain unfinished.
+   Greater consistency than RTSP is a goal to measure, not an established result.
+3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
+   tested limits: three recordings + three reduced views or one HD view passed;
+   three simultaneous HD views failed. Native Linux Docker validation is separate,
+   not a prerequisite for documenting Termux. Long-running Android reliability remains open.
+4. Revalidate factory onboarding end to end on camera3: announce reset first,
+   then BLE Wi-Fi, account binding, RTSP credentials and dashboard registration.
+   Do not reset while audio/stream tests still need the current enrollment.
+5. Apply the tested audio409/501 correction472946a in the next planned deployment.
+
+Deferred by owner: LAN-only/DNS redirection, SD playback/download, and implementations
+for other brands without available hardware. Other-brand drivers are a community
+contribution path, not an active first-party testing commitment. No WAN-independence
+claim is made. Night IR remains a separate physical nighttime check.
+
+Historical entries below are evidence, not an instruction to repeat completed tests.
+
+2026-10-20 known-speech audio check: camera3 message and streamed10-second phrase
+both completed500 canonical frames/1000 native packets with confirmed cleanup at50%
+volume. Physical comparison requested; not yet an intelligibility pass. Old-sample
+stream attempt failed before the known-reference retest; cause unknown. Timing
+records12/32 late packets and126.8/268.8ms maximum lateness; no pacing adjustment.
+See docs/internal/audio-known-speech-acceptance.md. Experimental Termux installation
+guide added from the recorded ARM64 test, explicitly excluding three-HD/24x7 claims.
+
 2026-10-20 audio unavailability classification fixed: generic message/stream service
 now lets the driver explain absent support before defaulting to501. Exact managed
 writable audio proofs with unavailable prerequisites return409; unproven operations
