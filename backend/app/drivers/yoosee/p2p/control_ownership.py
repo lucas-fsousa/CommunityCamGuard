@@ -42,24 +42,34 @@ def block_uncertain_channel() -> None:
 
 
 @contextmanager
-def own_control_channel() -> Iterator[None]:
+def own_control_channel(*, wait: bool = True) -> Iterator[None]:
     """No retry: another login must not invalidate a route between START and STOP.
 
     Reentrant because native PTZ owns the channel across its one-shot preparation
     helper and subsequent motion. A conservative driver-wide lock also covers
     refreshed access IDs; it is not a queue of repeatable movement commands.
+    Background preparation uses wait=False: it must not queue behind an active
+    owner or signal contention that would drain a future persistent media owner.
+    Already waiting foreground callers take precedence over background admission.
     """
     global _waiters
+    if type(wait) is not bool:
+        raise ValueError("explicit channel wait policy required")
     depth = getattr(_local, "depth", 0)
-    if not depth:
+    if not wait:
+        # Only a nonblocking acquire may run under this bookkeeping lock.
         with _waiters_lock:
-            _waiters += 1
-    try:
-        acquired = _channel.acquire(timeout=WAIT_SECONDS)
-    finally:
+            acquired = False if not depth and _waiters else _channel.acquire(timeout=0)
+    else:
         if not depth:
             with _waiters_lock:
-                _waiters -= 1
+                _waiters += 1
+        try:
+            acquired = _channel.acquire(timeout=WAIT_SECONDS)
+        finally:
+            if not depth:
+                with _waiters_lock:
+                    _waiters -= 1
     if not acquired:
         raise ControlChannelBusy("another broker control operation is still running")
     _local.depth = depth + 1

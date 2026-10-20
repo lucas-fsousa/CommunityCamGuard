@@ -1,5 +1,9 @@
 # Camera3 known-speech acceptance — 2026-10-20
 
+Latest owner instruction: physical confirmation is deferred while away from home.
+Do not send further sound in this stage; the results below remain transport evidence,
+not an intelligibility acceptance. Factory reset/re-enrollment also awaits attendance.
+
 Sound tests were explicitly authorized again. Only camera3 was targeted; speaker
 volume was independently checked at50% before each attempt. No siren, reboot or
 reset was sent. Existing WSL services continued running.

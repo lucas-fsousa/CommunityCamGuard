@@ -6,7 +6,8 @@ This section overrides the priorities and pending labels in the chronological hi
 
 1. Finish camera3 audio acceptance with known spoken content: recorded message,
    hold-to-speak, repeated bounded sessions and timing diagnostics. Sound tests are
-   authorized again. Physical intelligibility/stop confirmation is required.
+   deferred while the owner is away (no further sound). Physical intelligibility/stop
+   confirmation is required; successful packet delivery is not an audible pass.
 2. Native/proprietary streaming is the main development goal. Existing TCP probe
    received/decoded video and confirmed cleanup; continuous shared-account ownership,
    single-producer/fan-out integration and comparative stability remain unfinished.
@@ -17,7 +18,7 @@ This section overrides the priorities and pending labels in the chronological hi
    not a prerequisite for documenting Termux. Long-running Android reliability remains open.
 4. Revalidate factory onboarding end to end on camera3: announce reset first,
    then BLE Wi-Fi, account binding, RTSP credentials and dashboard registration.
-   Do not reset while audio/stream tests still need the current enrollment.
+   Do not reset while the owner is away or tests still need the current enrollment.
 5. Apply the tested audio409/501 correction472946a in the next planned deployment.
 
 Deferred by owner: LAN-only/DNS redirection, SD playback/download, and implementations
@@ -26,6 +27,14 @@ contribution path, not an active first-party testing commitment. No WAN-independ
 claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
+
+2026-10-20 shared-account scheduling: PTZ background preparation now acquires the
+broker opportunistically, without queuing or raising foreground contention. It
+skips a busy owner and already waiting foreground requests before authentication;
+nested renewal retains the same reservation and uncertain cleanup still blocks
+admission.52 focused tests passed121.4MiB/no swap, no camera traffic. This removes
+a maintenance-induced drain trigger; it does not enable persistent native streaming.
+Account lifetime, single-reader media integration and comparative acceptance remain open.
 
 2026-10-20 known-speech audio check: camera3 message and streamed10-second phrase
 both completed500 canonical frames/1000 native packets with confirmed cleanup at50%

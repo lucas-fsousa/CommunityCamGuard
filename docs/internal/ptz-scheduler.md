@@ -355,6 +355,23 @@ or thread is introduced, and no production scheduler activates this lifecycle.
 cancellation, not a guarantee of FIFO fairness or a measured15s live latency SLA.
 Persistent lifetime, server-owned scheduling and physical validation remain open.
 
+## Background admission versus foreground demand (2026-10-20)
+
+Production PTZ warmup now uses `own_control_channel(wait=False)` before credential
+renewal/cache preparation. Unlike a foreground action, it neither waits behind an
+existing owner nor increments the contention count. Registered foreground waiters
+take precedence even if the underlying lock has just become free. Nested renewal
+remains reentrant under the same ownership; uncertain cleanup still blocks entry.
+A skipped warmup returns false and releases its preparation event normally.
+
+Previously background preparation used the same waiting path as user controls:
+a shared worker consuming the contention signal could consequently drain at every
+maintenance tick. This change removes that specific interference in the actual
+production warmup caller. It does not shorten existing authentication once started,
+promise FIFO fairness, extend token lifetime or activate the research worker.
+52 focused tests passed with121.4MiB peak/no swap, including a real competing thread
+that cannot authenticate or make the current owner yield. No camera traffic.
+
 Concurrency follow-up: a real competing thread now exercises the complete finite
 adapter, not a mocked contention predicate. It can enter only after socket close
 and cache unquiesce; an injected close failure instead makes it receive

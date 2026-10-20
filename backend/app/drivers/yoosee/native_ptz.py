@@ -85,7 +85,12 @@ def warm(camera: Camera, profile: PtzProfile) -> bool:
                 select=lambda route: select_target(route, current, profile.identity,
                     camera_id=camera.camera_id, direction=direction, reviewed=profile.directions))
 
-        return run_with_fresh_access(entry, prepare)
+        # Maintenance is opportunistic, not foreground demand. In particular it
+        # must not force a shared read/media owner to drain every warmup tick.
+        with own_control_channel(wait=False):
+            return run_with_fresh_access(entry, prepare)
+    except ControlChannelBusy:
+        return False
     except Exception as exc:
         # Fixed labels only: never emit vendor replies, tokens or arbitrary errors.
         reason = preparation_failure_reason(exc)

@@ -66,6 +66,41 @@ def test_interrupted_acquisition_does_not_leave_phantom_demand(monkeypatch):
     assert not module.control_channel_contended()
 
 
+def test_background_attempt_never_queues_or_signals_contention(monkeypatch):
+    calls = []
+    # Acquisition is under the bookkeeping lock; record its count directly.
+    class NonblockingLock:
+        def acquire(self, **kwargs):
+            calls.append((kwargs, module._waiters))
+            return False
+    monkeypatch.setattr(module, "_channel", NonblockingLock())
+    with pytest.raises(module.ControlChannelBusy):
+        with module.own_control_channel(wait=False): pytest.fail("busy")
+    assert calls == [({"timeout": 0}, 0)]
+    assert not module.control_channel_contended()
+
+
+def test_background_does_not_overtake_registered_foreground_waiter(monkeypatch):
+    class UnusedLock:
+        def acquire(self, **kwargs): pytest.fail("foreground takes precedence")
+    monkeypatch.setattr(module, "_channel", UnusedLock())
+    monkeypatch.setattr(module, "_waiters", 1)
+    with pytest.raises(module.ControlChannelBusy):
+        with module.own_control_channel(wait=False): pytest.fail("must not enter")
+    assert module._waiters == 1
+
+
+def test_background_ownership_is_reentrant_and_obeys_cleanup_barrier(monkeypatch):
+    with module.own_control_channel(wait=False):
+        with module.own_control_channel():
+            with module.own_control_channel(wait=False):
+                assert not module.control_channel_contended()
+    monkeypatch.setattr(module, "_cleanup_uncertain", True)
+    with pytest.raises(module.ControlChannelBusy, match="cleanup unconfirmed"):
+        with module.own_control_channel(wait=False): pytest.fail("unsafe")
+    assert module._local.depth == 0
+
+
 def test_shared_worker_drains_stop_before_yielding_to_waiter(monkeypatch):
     from tests.test_account_read_worker import worker as make_worker
     from tests.test_account_worker_ptz import SPEC, MotionSocket

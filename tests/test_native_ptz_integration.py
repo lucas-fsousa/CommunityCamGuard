@@ -77,6 +77,26 @@ def test_warm_skips_active_gesture(prepared):
         native_ptz._active.clear()
 
 
+def test_warm_skips_shared_owner_without_auth_or_contention(prepared, monkeypatch):
+    import threading
+
+    from backend.app.drivers.yoosee.p2p import control_ownership
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("busy background preparation must not authenticate")
+    monkeypatch.setattr(native_ptz, "run_with_fresh_access", forbidden)
+    results = []
+    with control_ownership.own_control_channel():
+        worker = threading.Thread(target=lambda: results.append(native_ptz.warm(CAMERA, PROFILE)))
+        worker.start()
+        worker.join(timeout=1)
+        assert not worker.is_alive()
+        assert not control_ownership.control_channel_contended()
+    assert results == [False]
+    assert not native_ptz._warming
+    assert prepared.runs == prepared.prepared == 0
+
+
 def test_other_camera_cannot_queue_a_gesture_on_the_shared_channel(prepared):
     native_ptz._active["another_camera"] = SimpleNamespace()
     try:
