@@ -372,6 +372,13 @@ promise FIFO fairness, extend token lifetime or activate the research worker.
 52 focused tests passed with121.4MiB peak/no swap, including a real competing thread
 that cannot authenticate or make the current owner yield. No camera traffic.
 
+Deployed6110502 after full CI39502934954 passed (54s), image a0f7fbece957,
+app started2026-10-20T21:46:52Z. Bounded512MiB/no-extra-swap/half-CPU build;
+only app recreated and go2rtc start preserved. Installed hashes match. Read-only
+acceptance:3online/3recording and nonempty MP4 files2s old (48.1MiB/no swap);
+camera3 catalogue retains audio modes and seven static controls (42.2MiB/no swap).
+No physical action or native media activation. This also deploys pending472946a.
+
 Concurrency follow-up: a real competing thread now exercises the complete finite
 adapter, not a mocked contention predicate. It can enter only after socket close
 and cache unquiesce; an injected close failure instead makes it receive

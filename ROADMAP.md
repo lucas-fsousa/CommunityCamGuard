@@ -19,7 +19,8 @@ This section overrides the priorities and pending labels in the chronological hi
 4. Revalidate factory onboarding end to end on camera3: announce reset first,
    then BLE Wi-Fi, account binding, RTSP credentials and dashboard registration.
    Do not reset while the owner is away or tests still need the current enrollment.
-5. Apply the tested audio409/501 correction472946a in the next planned deployment.
+5. Audio409/501 correction472946a deployed2026-10-20; no further deployment pending
+   for that fix. Physical audio acceptance remains deferred as above.
 
 Deferred by owner: LAN-only/DNS redirection, SD playback/download, and implementations
 for other brands without available hardware. Other-brand drivers are a community
@@ -35,6 +36,10 @@ nested renewal retains the same reservation and uncertain cleanup still blocks
 admission.52 focused tests passed121.4MiB/no swap, no camera traffic. This removes
 a maintenance-induced drain trigger; it does not enable persistent native streaming.
 Account lifetime, single-reader media integration and comparative acceptance remain open.
+Deployment complete after CI39502934954 passed: image a0f7fbece957 includes6110502
+and472946a. App only recreated, bounded512MiB/no-extra-swap/half-CPU build; go2rtc
+start unchanged. Source hashes match. Read-only checks:3online/3recording, newest
+MP4 files2s old, camera3 audio flags/seven controls preserved. No OOM or sound test.
 
 2026-10-20 known-speech audio check: camera3 message and streamed10-second phrase
 both completed500 canonical frames/1000 native packets with confirmed cleanup at50%
