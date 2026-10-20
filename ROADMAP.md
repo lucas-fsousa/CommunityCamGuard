@@ -1,5 +1,11 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-20 audio timing diagnostics deployed in image59ca813fb59c after green
+CI3f43324. Explicit INFO logger wiring fixed before deployment; only app recreated.
+Installed source hashes match. Read-only acceptance: healthOK,3online/3recording,
+all newestMP4 ages2s; camera3 audio flags and seven controls preserved. No OOM,
+go2rtc start unchanged. No audio emitted; physical timing correlation remains pending.
+
 2026-10-19 intercom diagnostics implemented: constant-memory per-session RTSP timing
 summary records successful socket writes, deadline misses, send duration and cleanup
 without PCM/credentials. Pacing/prebuffer unchanged.23 focused tests89.3MiB/no swap.

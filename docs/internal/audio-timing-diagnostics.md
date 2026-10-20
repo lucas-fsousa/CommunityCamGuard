@@ -32,6 +32,22 @@ sanitization, a successful ten-second session and failed watchdog refresh, each 
 one summary and preserved CLOSE behaviour. No camera I/O or sound. Source change
 requires the next app rebuild; physical timing correlation remains pending.
 
+## Deployment, 2026-10-20
+
+Image59ca813fb59c includes the instrumentation and explicit INFO logger configuration.
+Source3f43324 passed CI39333736881 before deployment. Only app was recreated at
+15:32:23UTC; go2rtc retained its October19 13:03:15UTC start. Both services reported
+no OOM and zero restart counters. The installed logging/timing source hashes match
+the workspace. A separate process inside the container checked the installed logging
+configuration: INFO enabled, one handler, no propagation. This is a configuration
+check, not an injected event or introspection of the running server's logger.
+
+Health/authenticated status/filesystem check passed: all three cameras online and
+recording, newest nonemptyMP4 files2s old (56MiB/no swap). Camera3's current catalogue
+preserves both audio modes and all seven static controls (43.4MiB/no swap for audio
+catalogue verification). No real audio, media request or camera action was sent.
+Physical timing correlation is still pending; the rebuild prerequisite is complete.
+
 Deployment preparation found that the bundled Uvicorn configuration did not enable
 INFO for this module. Added an explicit handler/INFO/no-propagation entry only for
 audio_timing; generic driver INFO/debug remains disabled. A fresh-process test using
