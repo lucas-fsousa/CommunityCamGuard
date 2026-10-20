@@ -1,5 +1,12 @@
 # ROADMAP — Community Cam Guard (CCG)
 
+2026-10-20 audio unavailability classification fixed: generic message/stream service
+now lets the driver explain absent support before defaulting to501. Exact managed
+writable audio proofs with unavailable prerequisites return409; unproven operations
+remain501. No permission grant, media consumption or automatic replay.60 focused
+tests134.4MiB/no swap, including persisted expiry through real service dispatch.
+Source change pending deployment; no camera action or profile change.
+
 2026-10-20 audio timing diagnostics deployed in image59ca813fb59c after green
 CI3f43324. Explicit INFO logger wiring fixed before deployment; only app recreated.
 Installed source hashes match. Read-only acceptance: healthOK,3online/3recording,

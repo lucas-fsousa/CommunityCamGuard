@@ -9,6 +9,8 @@ import time
 
 from ...db import p2p
 from ...db.registry import Camera
+from ..base import Unsupported
+from ..contracts import ControlNotReady
 from . import capability_profiles as profiles
 from . import capability_rollout as rollout
 from . import capability_snapshot_store as snapshots
@@ -19,6 +21,21 @@ STREAM = "audio_stream"
 OPERATIONS = frozenset({MESSAGE, STREAM})
 RTSP = "rtsp_pcm"
 P2P = "p2p_amr"
+
+
+def unavailable_audio(camera: Camera, operation: str) -> None:
+    """Explain denial without camera I/O, refreshing, granting or replaying audio."""
+    selected = rollout.selected(camera.camera_id) if camera.camera_id else None
+    if operation in OPERATIONS and selected is not None and operation in selected[1]:
+        identity = selected[0]
+        profile = profiles.load(camera_id=camera.camera_id, identity=identity, now=time.time())
+        if profile and profile.camera_id == camera.camera_id and profile.identity == identity:
+            proofs = {proof.key: proof for proof in profile.operations}
+            proof = proofs.get(operation)
+            if (len(proofs) == len(profile.operations) and proof is not None
+                    and proof.writable is True and {RTSP, P2P}.intersection(proof.options)):
+                raise ControlNotReady("validated camera audio is temporarily unavailable")
+    raise Unsupported(operation)
 
 
 def allowed_routes(camera: Camera, operation: str) -> frozenset[str] | None:

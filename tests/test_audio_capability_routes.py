@@ -35,6 +35,32 @@ def test_exact_message_proof_does_not_authorize_stream_or_p2p(managed):
     assert not audio.supported(CAMERA, streaming=True)
 
 
+def test_validated_audio_unavailability_is_temporary_without_io(monkeypatch, managed):
+    from backend.app.api.control_errors import control_failure
+    from backend.app.drivers.yoosee.capability_availability import unavailable_control
+    monkeypatch.setattr(policy.p2p, "get_enrollment_for_camera",
+                        lambda _: pytest.fail("explanation must not inspect credentials"))
+    with pytest.raises(ControlNotReady) as caught:
+        unavailable_control(CAMERA, policy.MESSAGE)
+    assert control_failure(caught.value).status_code == 409
+
+
+@pytest.mark.parametrize("case", ["unselected", "no_profile", "read_only"])
+def test_unproven_audio_remains_unsupported(monkeypatch, managed, case):
+    from backend.app.api.control_errors import control_failure
+    from backend.app.drivers.base import Unsupported
+    from backend.app.drivers.yoosee.capability_availability import unavailable_control
+    operation = policy.STREAM if case == "unselected" else policy.MESSAGE
+    if case == "no_profile":
+        monkeypatch.setattr(policy.profiles, "load", lambda **_: None)
+    if case == "read_only":
+        monkeypatch.setattr(policy.profiles, "load", lambda **_: replace(managed, operations=(
+            OperationProof(policy.MESSAGE, readable=True, options=frozenset({policy.RTSP})),)))
+    with pytest.raises(Unsupported) as caught:
+        unavailable_control(CAMERA, operation)
+    assert control_failure(caught.value).status_code == 501
+
+
 @pytest.mark.parametrize("kind", ["absent", "other_unit", "firmware", "readonly", "duplicate", "unknown_route"])
 def test_invalid_or_unproven_profile_denies_route(monkeypatch, managed, kind):
     profile = managed

@@ -126,7 +126,7 @@ class CameraDriver:
         """Release idle control sessions after the maintenance worker stops."""
 
     def unavailable_control(self, camera: Camera, key: str) -> None:
-        """Explain an absent descriptor; never authorize it or perform camera I/O.
+        """Explain an absent control/audio capability; never authorize it or perform I/O.
 
         Drivers may raise ControlNotReady for temporary missing evidence instead.
         """

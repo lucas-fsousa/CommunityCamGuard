@@ -115,6 +115,7 @@ def send_audio_message(camera_id: str, pcm16le: bytes) -> AudioMessageResult:
     with _exclusive(camera_id):
         driver = drivers.for_camera(camera)
         if not driver.supports_audio_messages(camera):
+            driver.unavailable_control(camera, "audio_message")
             raise drivers.Unsupported("audio_message")
         return driver.send_audio_message(camera, pcm16le)
 
@@ -139,5 +140,6 @@ def send_audio_stream(camera_id: str, pcm16le_chunks: Iterable[bytes]) -> AudioM
     with _exclusive(camera_id):
         driver = drivers.for_camera(camera)
         if not driver.supports_audio_streams(camera):
+            driver.unavailable_control(camera, "audio_stream")
             raise drivers.Unsupported("audio_stream")
         return driver.send_audio_stream(camera, _bounded_pcm_chunks(pcm16le_chunks))

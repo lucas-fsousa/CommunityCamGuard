@@ -11,6 +11,8 @@ from backend.app.drivers.yoosee import audio_capabilities as policy
 from backend.app.drivers.yoosee.capability_identity import CapabilityIdentity
 from backend.app.drivers.yoosee.capability_policy import OperationProof, ValidatedProfile
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
+from backend.app.drivers.yoosee.driver import YooseeDriver
+from backend.app.services import camera_controls
 
 
 @pytest.mark.parametrize("streaming", [False, True])
@@ -26,6 +28,8 @@ def test_persisted_expiry_refresh_and_firmware_lifecycle(monkeypatch, streaming)
                         lambda _: SimpleNamespace(device_id=identity.device_id))
     monkeypatch.setattr(capability_runtime, "request_refresh",
                         lambda *args: refreshes.append(args))
+    monkeypatch.setattr(camera_controls, "_camera", lambda _: camera)
+    monkeypatch.setattr(camera_controls.drivers, "for_camera", lambda _: YooseeDriver())
     profile = ValidatedProfile(camera.camera_id, identity, tuple(
         OperationProof(key, writable=True, options=frozenset({policy.RTSP}))
         for key in (policy.MESSAGE, policy.STREAM)))
@@ -48,8 +52,8 @@ def test_persisted_expiry_refresh_and_firmware_lifecycle(monkeypatch, streaming)
 
     def send():
         if streaming:
-            return audio.send_stream(camera, iter((bytes(640),)))
-        return audio.send(camera, bytes(640))
+            return camera_controls.send_audio_stream(camera.camera_id, iter((bytes(640),)))
+        return camera_controls.send_audio_message(camera.camera_id, bytes(640))
 
     publish(identity, 1010.0)
     assert audio.supported(camera, streaming=streaming)

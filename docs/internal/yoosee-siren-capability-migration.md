@@ -1,5 +1,27 @@
 # Siren capability migration
 
+## Audio denial classification, 2026-10-20
+
+The generic audio service previously converted every false support predicate into
+Unsupported before consulting the driver. Thus expired evidence for an already
+homologated audio operation was reported as501, despite being unavailable rather
+than proven unsupported. Message and stream dispatch now call the existing generic
+`unavailable_control` explanation hook; its default remains Unsupported.
+
+Yoosee explains an explicitly selected operation with an exact-unit/identity,
+nonduplicate writable route proof as ControlNotReady (public409). Unselected,
+missing or read-only proofs remain Unsupported (501). Explanation performs local
+metadata reads only, never credential inspection, camera I/O, refresh or replay.
+It does not authorize dispatch; the service still rejects even if a faulty hook
+returns normally. Generic services contain no Yoosee branching.
+
+Sixty focused service/API/policy/availability tests passed (134.4MiB/no swap), Ruff
+clean. The persisted expiry lifecycle test now exercises actual generic service
+dispatch for both audio modes, covering exact expiry, renewal, failed collection and
+firmware change without additional transport calls. Public projections409/501 are
+tested separately. No frontend redesign, new audio grant, real camera action,
+profile mutation or deployment in this step.
+
 ## Persisted lifecycle acceptance, 2026-10-19
 
 Both recorded-message and streaming paths now have an integrated test using actual

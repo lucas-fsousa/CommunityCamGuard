@@ -11,6 +11,11 @@ from .capability_evidence import EvidenceState
 
 
 def unavailable_control(camera: Camera, key: str) -> None:
+    from .audio_capabilities import OPERATIONS, unavailable_audio
+
+    if key in OPERATIONS:
+        unavailable_audio(camera, key)
+        raise Unsupported(key)
     selected = rollout.selected(camera.camera_id) if camera.camera_id else None
     if selected is not None and key in selected[1]:
         identity = selected[0]
