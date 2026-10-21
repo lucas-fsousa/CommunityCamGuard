@@ -226,3 +226,45 @@ def test_rtsp_talkback_preloads_and_recovers_scheduler_delay_from_jitter_buffer(
     # Ten 10 ms packets are sent immediately. The delayed wake-up is absorbed by that 100 ms
     # lead, so packets whose deadlines elapsed are grouped and only the final drain waits again.
     assert clock.sleeps == pytest.approx([0.010, 0.100])
+
+
+@pytest.mark.parametrize("fault", [None, "refresh", "write"])
+def test_timing_separates_refresh_from_media_write_and_preserves_close(fault):
+    now = [0.0]
+    class DelayedSession(FakeRtspSession):
+        def request(self, method, uri, **kwargs):
+            headers = kwargs.get("extra_headers") or {}
+            if headers.get("AudioCtlCmd") == "OPEN" and now[0] >= 4:
+                now[0] += 0.240
+                if fault == "refresh":
+                    raise OSError("refresh failure")
+            return super().request(method, uri, **kwargs)
+
+        def send_interleaved(self, channel, payload):
+            now[0] += 0.007
+            if fault == "write":
+                raise OSError("write failure")
+            super().send_interleaved(channel, payload)
+
+    FakeRtspSession.instances.clear()
+    stats = talk.DeliveryTiming()
+    session = talk.RtspTalkSession(_camera(), session_factory=DelayedSession,
+                                   clock=lambda: now[0], timing=stats)
+    session.open()
+    assert stats.refresh_calls == 0  # Initial OPEN is not a mid-audio refresh.
+    now[0] = 4.1
+    try:
+        if fault:
+            with pytest.raises(OSError):
+                session.send_pcm(bytes(320))
+        else:
+            session.send_pcm(bytes(320))
+    finally:
+        assert session.close()
+    assert stats.refresh_calls == 1
+    assert stats.refresh_failures == int(fault == "refresh")
+    assert stats.max_refresh_ms == pytest.approx(240)
+    assert stats.write_calls == int(fault != "refresh")
+    assert stats.write_failures == int(fault == "write")
+    assert stats.max_write_ms == pytest.approx(0 if fault == "refresh" else 7)
+    assert all(item.closed for item in FakeRtspSession.instances)

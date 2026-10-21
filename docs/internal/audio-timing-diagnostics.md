@@ -1,5 +1,23 @@
 # RTSP talkback timing diagnostics
 
+## Split refresh/write measurements
+
+Following physical acceptance of the recorded message and reported gaps in the
+paced stream, the summary now separates mid-audio watchdog refresh from media
+socket writes. `refresh_calls`, `refresh_failures`, `max_refresh_ms` measure only
+periodic OPEN requests, excluding initial OPEN/CLOSE. `write_calls`,
+`write_failures`, `max_write_ms` measure interleaved RTP writes, excluding refresh
+and packet packing. Both include failed-call duration via finally, without logging
+exception text. Existing `max_send_ms` retains its original successful combined
+call meaning; maxima may come from different packets and must not be subtracted.
+
+Synthetic tests inject240ms refresh and7ms write delays independently, including
+failure of either operation, and verify cleanup. This is constant-memory aggregate
+instrumentation, not a pacing/codec/prebuffer change. No extra socket/thread or
+camera request is introduced. It does not measure upstream waits or camera buffer
+occupancy. Requires deployment and one subsequent authorized audio test to identify
+the dominant real delay; the current gaps are NOT fixed or revalidated yet.
+
 The Yoosee driver logs one `rtsp_audio_timing` summary after each `_send_chunks`
 operation, including partial failure and cleanup. It stores only aggregate counters
 in memory. No PCM, credentials, native device ID, IP, URL, exception text or per-packet

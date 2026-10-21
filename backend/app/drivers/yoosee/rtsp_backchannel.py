@@ -73,6 +73,7 @@ class RtspTalkSession:
         *,
         session_factory: Callable[..., rtsp.RtspSession] = rtsp.RtspSession,
         clock: Callable[[], float] = time.monotonic,
+        timing: DeliveryTiming | None = None,
     ) -> None:
         if not supported(camera):
             raise RtspBackchannelError("camera has no usable local RTSP address")
@@ -81,6 +82,7 @@ class RtspTalkSession:
         self._session_factory = session_factory
         self._session = self._new_session()
         self._clock = clock
+        self._timing = timing
         self._challenge: bytes | None = None
         self._opened = False
         self._refresh_at = 0.0
@@ -167,7 +169,13 @@ class RtspTalkSession:
         if not self._opened:
             raise RtspBackchannelError("RTSP talkback is not open")
         if self._clock() >= self._refresh_at:
-            self._control("OPEN")
+            started, succeeded = self._clock(), False
+            try:
+                self._control("OPEN")
+                succeeded = True
+            finally:
+                if self._timing is not None:
+                    self._timing.refresh(started=started, finished=self._clock(), succeeded=succeeded)
             self._refresh_at = self._clock() + OPEN_REFRESH_SECONDS
         packet = pack_rtp(
             payload,
@@ -176,7 +184,13 @@ class RtspTalkSession:
             self._ssrc,
             marker=self._first_packet,
         )
-        self._session.send_interleaved(RTP_CHANNEL, packet)
+        started, succeeded = self._clock(), False
+        try:
+            self._session.send_interleaved(RTP_CHANNEL, packet)
+            succeeded = True
+        finally:
+            if self._timing is not None:
+                self._timing.write(started=started, finished=self._clock(), succeeded=succeeded)
         self._first_packet = False
         self._sequence = (self._sequence + 1) & 0xFFFF
         self._timestamp = (self._timestamp + RTP_TIMESTAMP_STEP) & 0xFFFFFFFF
@@ -219,7 +233,8 @@ def _send_chunks(
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> AudioMessageResult:
-    session = RtspTalkSession(camera, session_factory=session_factory, clock=clock)
+    timing = DeliveryTiming()
+    session = RtspTalkSession(camera, session_factory=session_factory, clock=clock, timing=timing)
     requested_frames = 0
     sent_frames = 0
     opened = False
@@ -227,7 +242,6 @@ def _send_chunks(
     pending: list[bytes] = []
     playback_started: float | None = None
     sent_packets = 0
-    timing = DeliveryTiming()
     operation_started = clock()
 
     def send_pending(*, preload: bool = False) -> None:

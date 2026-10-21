@@ -4,10 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-1. Finish camera3 audio acceptance with known spoken content: recorded message,
-   hold-to-speak, repeated bounded sessions and timing diagnostics. Sound tests are
-   deferred while the owner is away (no further sound). Physical intelligibility/stop
-   confirmation is required; successful packet delivery is not an audible pass.
+1. Camera3 known-reference recorded message physically accepted by the owner
+   (50% volume,10s, HTTP200 and confirmed release). Sound tests authorized again.
+   Paced stream was heard and stopped by itself, but owner reported intermittent
+   gaps: quality NOT accepted. Investigate send/refresh stalls before revalidation,
+   with separate refresh/write timing instrumentation now offline-tested (deployment
+   and a new authorized sample remain necessary),
+   then microphone/UI hold-to-speak where needed. Repeated-session stability is
+   separate; successful packet delivery alone is not an audible pass.
 2. Native/proprietary streaming is the main development goal. Existing TCP probe
    received/decoded video and confirmed cleanup; continuous shared-account ownership,
    single-producer/fan-out integration and comparative stability remain unfinished.
@@ -20,7 +24,8 @@ This section overrides the priorities and pending labels in the chronological hi
    then BLE Wi-Fi, account binding, RTSP credentials and dashboard registration.
    Do not reset while the owner is away or tests still need the current enrollment.
 5. Audio409/501 correction472946a deployed2026-10-20; no further deployment pending
-   for that fix. Physical audio acceptance remains deferred as above.
+   for that fix. Recorded-message physical acceptance passed; stream acceptance
+   remains separate as above.
 
 Deferred by owner: LAN-only/DNS redirection, SD playback/download, and implementations
 for other brands without available hardware. Other-brand drivers are a community
