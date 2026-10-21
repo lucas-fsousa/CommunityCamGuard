@@ -214,5 +214,7 @@ class AccountReadLifecycle:
                                    and not summary.socket_close_failed
                                    and (summary.media is None or not summary.media.opened
                                         or summary.media.broker_release)
+                                   and (summary.tcp is None or (summary.tcp.close_acknowledged
+                                        and not summary.tcp.socket_close_failed))
                                    and (summary.motion is None or not summary.motion.start_attempted
                                         or summary.motion.release_delivery_confirmed) else "blocked")

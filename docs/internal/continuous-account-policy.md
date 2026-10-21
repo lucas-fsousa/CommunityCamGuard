@@ -90,4 +90,5 @@ RTSP/dashboard paths remain unchanged. Do not schedule periodic restarts of it.
 
 Follow-up: [broker media-route integration](native-shared-media-route.md) now adds
 typed one-route OPEN/CLOSE on that same reader, with independent cleanup capacity.
-This does not yet attach the TCP video channel or enable simultaneous motion/media.
+The subsequent2026-10-21 step attaches a finite cooperative TCP/AV receiver internally;
+it still does not enable continuous video, browser delivery or simultaneous motion/media.

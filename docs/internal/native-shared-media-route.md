@@ -39,17 +39,47 @@ generation replacement denial. Existing finite TCP diagnostic and PTZ tests pass
 
 ## Explicit limits and next integration
 
-- No media TCP socket, pairing, AVCLOSE, decoding or dashboard delivery is attached
-  to this worker yet. A positive broker B9 is a transport receipt, **not** proof of
-  camera resource reclamation or media-channel shutdown.
+- The initial broker-only step did not attach a TCP channel. The2026-10-21 follow-up
+  below adds finite TCP reception/AVCLOSE, but no decoder/dashboard delivery.
+  A positive broker B9 remains a transport receipt, **not** proof of camera resource
+  reclamation or media-channel shutdown.
 - The bootstrap currently rejects combining media with motion admission. Reservation
   coexistence is tested, but concurrent PTZ/video operation is not certified.
 - This first route is single-use per generation. Multi-camera route admission still
   needs bounded per-device ownership and validated online-device binding.
-- Next attach the existing TCP/AV lifecycle without letting its receive loop read
-  the broker socket. Media AVCLOSE/TCP shutdown must precede broker route CLOSE;
-  consumer events and buffers must remain bounded. Then integrate the server source
-  scheduler/fallback and validate on camera3. Do not activate production from these
-  offline results alone.
+- Next add bounded consumer delivery, continuous-media lifetime and server source
+  scheduling/fallback, then validate on camera3. Do not activate production from
+  these offline results alone.
 
 No sound/light/other physical command was executed. Existing RTSP remains unchanged.
+
+## Cooperative TCP attachment — 2026-10-21
+
+Explicit internal `with_media_tcp=True` now attaches `CooperativeTcpMedia` after
+the broker reader receives the correlated relay advertisement. Default remains
+false; no production service, public setting or endpoint enables it. The TCP
+factory connects once (500ms socket timeout), sends one pairing request (200ms),
+and transfers exclusive ownership; failed opening closes its socket. Unconfirmed
+physical close raises beyond ordinary transport failure so replacement is blocked.
+
+The account loop drives one4096-byte TCP receive per iteration, with1ms read and
+20ms write timeouts and an overall200ms per-step I/O budget. Parsing remains
+bounded by the existing framer/AV limits; these are not OS scheduling guarantees.
+TCP never reads UDP and creates no thread or authentication. Records are counted
+and discarded, not queued, decoded, played or delivered to a browser. Existing
+SHORT measurement/observation/time/traffic limits remain: this is finite media
+reception on the shared reader, not yet continuous video.
+
+Normal completion and cancellation drain AVCLOSE for up to2seconds, physically
+close TCP, then request broker B9 and close UDP. Missing AVCLOSE receipt or failed
+TCP close blocks lifecycle replacement even when B9 succeeds. Early negotiation
+failure cannot fabricate an AVCLOSE receipt. TCP cleanup interruption still lets
+the worker attempt broker cleanup before propagating the failure. No reconnection,
+pairing retry or automatic fallback is introduced.
+
+141 focused tests passed in6.967s,90.5MiB peak/zero swap; Ruff/mypy passed. Real
+protocol fixtures exercise measurement, fragmented AV negotiation, parsed video/
+audio records and AVCLOSE while the same worker services encrypted identity reads.
+Normal and cancelled paths verify TCP physical close before B9; additional cases
+cover connect/pair failure, EOF, bad peer, missing AVCLOSE, uncertain physical close,
+and generation denial. No real network, camera command, build or restart was used.

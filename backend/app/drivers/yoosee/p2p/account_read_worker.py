@@ -14,6 +14,7 @@ from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
+from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .ptz_inbox import MotionTicket, PtzInbox
@@ -30,6 +31,7 @@ class WorkerSummary:
     socket_close_failed: bool
     motion: ScheduledPtzResult | None = None
     media: MediaRouteResult | None = None
+    tcp: TcpMediaResult | None = None
 
 
 class _Stop(Exception):
@@ -82,6 +84,7 @@ class AccountReadWorker:
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
             initial_motion: PtzSpec | None = None,
             initial_media: MediaRouteSpec | None = None,
+            with_media_tcp: bool = False,
             wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
         """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
 
@@ -112,12 +115,16 @@ class AccountReadWorker:
         maintenance = None
         motion: PtzScheduler | None = None
         media: MediaRouteJob | None = None
+        tcp: CooperativeTcpMedia | None = None
+        tcp_cleanup_error: BaseException | None = None
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         mixed = initial_motion is not None or self.motion_inbox is not None
         node = self._node
         try:
             assert node is not None
+            if type(with_media_tcp) is not bool or (with_media_tcp and initial_media is None):
+                raise ValueError("TCP media requires explicit typed route bootstrap")
             deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
                 acknowledge_messages=not mixed, policy=self._policy)
@@ -165,8 +172,19 @@ class AccountReadWorker:
             while True:
                 check()
                 if self._drain.is_set():
+                    if tcp is not None:
+                        raise _Stop("draining")
                     service(self._dispatcher.drain())
                 if media is not None:
+                    if with_media_tcp and media.endpoint is not None and tcp is None:
+                        assert initial_media is not None
+                        tcp = open_tcp_media(media, initial_media, clock=self._clock)
+                    if tcp is not None:
+                        tcp.step()
+                        if tcp.result is not None:
+                            raise _Stop("media_complete" if tcp.result.close_acknowledged
+                                        and not tcp.result.socket_close_failed
+                                        else "media_unconfirmed")
                     packet_media = media.next_packet()
                     if packet_media is not None:
                         try:
@@ -236,6 +254,11 @@ class AccountReadWorker:
             try:
                 if self.motion_inbox is not None:
                     self.motion_inbox.close()
+                if tcp is not None:
+                    try:
+                        tcp.finish()
+                    except BaseException as exc:
+                        tcp_cleanup_error = exc
                 self._dispatcher.close()
                 if media is not None and media.result is None:
                     assert node is not None
@@ -274,6 +297,9 @@ class AccountReadWorker:
                 finally:
                     with self._claim:
                         self._socket = None
+                    if tcp_cleanup_error is not None:
+                        raise tcp_cleanup_error
         return WorkerSummary(reason, sent, received, beats, close_failed,
                              motion.result if motion is not None else last_motion,
-                             media.result if media is not None else None)
+                             media.result if media is not None else None,
+                             tcp.result if tcp is not None else None)

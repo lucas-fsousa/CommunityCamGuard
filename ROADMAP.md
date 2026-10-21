@@ -29,6 +29,14 @@ claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-21 cooperative TCP/AV attached to internal shared account worker: one
+connect/pair, bounded steps alongside broker reads, finite protocol reception and
+AVCLOSE/TCP-close before B9. Missing AVCLOSE or failed TCP close blocks replacement.
+141 focused tests passed90.5MiB/no swap; Ruff/mypy passed. Records counted/discarded;
+continuous-media lifetime, bounded consumer delivery and source scheduling remain
+pending. No production activation, camera I/O, sound/light tests or rebuild. See
+docs/internal/native-shared-media-route.md, cooperative attachment section.
+
 2026-10-20 broker media route integrated into shared reader offline: typed single
 A4 OPEN/B9 CLOSE uses account sequences alongside reads/heartbeat; dedicated cleanup
 capacity, exact receipt matching, one-shot shutdown and blocked replacement on
