@@ -5,6 +5,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from ....media.hevc_recovery import HevcRecovery
+from .stream_protocol import V1EncodingHeader
 from .v1_receive import V1Record
 
 MAX_BYTES = 2 * 1024 * 1024
@@ -19,6 +20,7 @@ class VideoFrame:
     height: int
     epoch: int
     restart_decoder: bool
+    encoding: V1EncodingHeader = field(repr=False)
 
 
 class VideoDelivery:
@@ -34,6 +36,7 @@ class VideoDelivery:
         self._frames: deque[VideoFrame] = deque()
         self._bytes = 0
         self._dimensions: tuple[int, int] | None = None
+        self._encoding: V1EncodingHeader | None = None
         self._gate = HevcRecovery()
         self._closed = False
 
@@ -52,12 +55,14 @@ class VideoDelivery:
                         or not 0 < header.video_height <= 1080):
                     self._reset()
                     self._dimensions = None
+                    self._encoding = None
                     return
                 dimensions = (header.video_width, header.video_height)
                 if dimensions != self._dimensions:
                     self._reset()
                 self._dimensions = dimensions
-            if not record.video or self._dimensions is None:
+                self._encoding = header
+            if not record.video or self._dimensions is None or self._encoding is None:
                 return
             size = len(record.video)
             if size > MAX_BYTES:
@@ -74,7 +79,7 @@ class VideoDelivery:
                 self._frames.clear()
                 self._bytes = 0
             self._frames.append(VideoFrame(record.video, record.video_timestamp,
-                *self._dimensions, decision.epoch, decision.restart_decoder))
+                *self._dimensions, decision.epoch, decision.restart_decoder, self._encoding))
             self._bytes += size
 
     def take(self) -> VideoFrame | None:
@@ -101,3 +106,4 @@ class VideoDelivery:
             self._closed = True
             self._reset()
             self._dimensions = None
+            self._encoding = None

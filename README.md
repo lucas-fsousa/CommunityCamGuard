@@ -354,7 +354,10 @@ TCP/AV receiver passed a bounded camera3 physical test on2026-10-21:39 video and
 audio records, with media CLOSE and broker release confirmed. It still
 counts/discards records by default. An offline-tested optional video queue now
 hands off HEVC frames with bounded memory and keyframe recovery for a slow consumer;
-decoder integration and continuous delivery are not enabled in production. The deployed dashboard
+an opt-in diagnostic consumer now validates queued video through bounded decoding
+after source cleanup. A local synthetic HEVC frame passed; the shared-camera decode
+path still needs deployment and physical validation. Continuous delivery is not
+enabled in production. The deployed dashboard
 still uses the existing streaming path.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.

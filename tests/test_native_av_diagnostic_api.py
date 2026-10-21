@@ -74,6 +74,22 @@ def test_shared_tcp_rejects_incompatible_profile(setup):
     assert not calls
 
 
+def test_shared_decode_selected_only_by_server(setup, monkeypatch):
+    from backend.app.drivers.yoosee.p2p.account_read_worker import WorkerSummary
+    client, settings, calls = setup
+    settings.native_av_diagnostic_shared_tcp = True
+    settings.native_av_diagnostic_tcp_relay = True
+    settings.native_av_diagnostic_decode_video = True
+    decoded = []
+    def run(**kwargs):
+        decoded.append(kwargs)
+        return WorkerSummary("test", 1, 1, 0, False)
+    monkeypatch.setattr(api, "run_reviewed_shared_decode", run)
+    assert client.post(PATH).status_code == 200
+    assert decoded == [dict(camera_id=CAMERA, device_id="123")]
+    assert not calls and client.post(PATH).status_code == 409
+
+
 @pytest.mark.parametrize("platform", [None, 2])
 def test_returns_optional_platform_without_identifiers(setup, monkeypatch, platform):
     client, _, _ = setup

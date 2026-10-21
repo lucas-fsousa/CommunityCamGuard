@@ -9,10 +9,12 @@ from ..drivers.yoosee.p2p.account_read_connect import open_read_connection
 from ..drivers.yoosee.p2p.account_read_worker import AccountReadWorker, WorkerSummary
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
 from ..drivers.yoosee.p2p.media_route_job import MediaRouteSpec
+from ..drivers.yoosee.p2p.video_delivery import VideoDelivery
 from ..services.camera_controls import _exclusive
 
 
 def run_reviewed_shared_media(*, camera_id: str, device_id: str,
+                              video_delivery: VideoDelivery | None = None,
                               cancelled: Callable[[], bool] = lambda: False) -> WorkerSummary:
     """Trusted server-configured target only; one authentication, no retry.
 
@@ -38,7 +40,7 @@ def run_reviewed_shared_media(*, camera_id: str, device_id: str,
             spec = MediaRouteSpec(entry.access_id, target)
             transferred = True
             result = worker.run(connection.socket, initial_media=spec,
-                                with_media_tcp=True, cancelled=stop)
+                                with_media_tcp=True, cancelled=stop, video_delivery=video_delivery)
         finally:
             if not transferred:
                 connection.socket.close()

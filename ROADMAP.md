@@ -43,6 +43,15 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+Shared video queue consumer: optional protected diagnostic now collects one bounded
+HEVC epoch (<=2MiB/120frames) while the source runs, joins its consumer and decodes
+only after verified camera-route cleanup. Existing short/shared flags plus decode
+select it; disabled by default.70 focused tests passed135.5MiB/zero swap, Ruff/mypy
+passed. Real local64x64 HEVC frame traversed queue/consumer/ffprobe/strict ffmpeg
+decode (70.6MiB peak/no swap); not camera1080p acceptance. No deployment/restart
+while WSL available memory was about1GiB. Next deploy safely and validate shared
+camera3 decoding, then continuous media lifetime and ongoing decoder/remux output.
+
 Native video delivery: cooperative TCP worker now supports an optional single-consumer
 HEVC handoff capped at2MiB/64frames. Backlog overflow/discontinuity clears history and
 requires a fresh configured IDR, with decoder-restart epoch metadata. No audio retained;

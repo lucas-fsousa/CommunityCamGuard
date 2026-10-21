@@ -1,5 +1,36 @@
 # Broker media route on the shared account reader
 
+## Consumer and decoded diagnostic
+
+`VideoDeliverySample` is the first bounded consumer of this queue. One thread polls
+video while the short source is active; it retains <=2MiB/120 frames of one decoder
+epoch using the existing HEVC sample validator. VideoFrame now carries the actual
+validated encoding header, not reconstructed camera parameters. Audio is ignored.
+An epoch change, invalid sample, deadline or collector failure rejects acceptance
+and clears private sample data. Close requests stop, joins <=2s, then clears data;
+unconfirmed thread shutdown is an error, not a successful cleanup claim.
+
+`yoosee_shared_decode` wraps the existing same-process account-protected source.
+Only after verified TCP/B9 cleanup and consumer join does it invoke the existing
+sequential ffprobe/strict FFmpeg validation (one thread,512MiB address-space and
+10s CPU/15s wall cap per child, pipe-only/no audio output). It requires successful
+media completion, not just a nonempty sample. Caller finally closes queue/collector
+on source error, decode failure, cancellation or success. No frames are returned
+by HTTP, saved to disk or played. This is finite decoded evidence, not a continuous
+production decoder or browser stream. Unread source tail may be discarded; acceptance
+counts only sampled frames, not every source frame.
+
+The existing single-use local-primary diagnostic accepts shared+short+decode flags;
+platform-only/extended combinations remain rejected. No new public control/settings
+or default activation. Tools are checked before camera authentication.
+
+70 focused tests passed135.5MiB/zero swap; Ruff/mypy passed. One real locally generated
+64x64 HEVC frame (2437bytes) passed queue -> collector -> ffprobe -> strict ffmpeg,
+70.6MiB peak/no swap under a192MiB cgroup; no camera access. The encoder's initial
+256MiB virtual-address cap was insufficient;512MiB passed with the physical-memory
+cgroup unchanged. No WSL OOM/restart. Deployment/live shared decoding remains pending:
+available WSL memory was approximately1GiB, so no build or container restart was run.
+
 ## Bounded video consumer handoff
 
 The worker now accepts optional internal `video_delivery=VideoDelivery()` alongside
