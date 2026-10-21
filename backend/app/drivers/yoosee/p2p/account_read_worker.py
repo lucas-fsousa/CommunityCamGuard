@@ -14,6 +14,8 @@ from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
+from .media_route_cleanup import close_media_route
+from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
@@ -27,6 +29,7 @@ class WorkerSummary:
     heartbeat_responses: int
     socket_close_failed: bool
     motion: ScheduledPtzResult | None = None
+    media: MediaRouteResult | None = None
 
 
 class _Stop(Exception):
@@ -78,6 +81,7 @@ class AccountReadWorker:
 
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
             initial_motion: PtzSpec | None = None,
+            initial_media: MediaRouteSpec | None = None,
             wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
         """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
 
@@ -107,6 +111,7 @@ class AccountReadWorker:
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
+        media: MediaRouteJob | None = None
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         mixed = initial_motion is not None or self.motion_inbox is not None
@@ -116,6 +121,10 @@ class AccountReadWorker:
             deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
                 acknowledge_messages=not mixed, policy=self._policy)
+            if initial_media is not None:
+                if not isinstance(initial_media, MediaRouteSpec) or mixed:
+                    raise ValueError("typed media-only bootstrap required")
+                media = self._dispatcher.prepare_media(initial_media, output)
             if initial_motion is not None:
                 if not isinstance(initial_motion, PtzSpec) or self.motion_inbox is not None:
                     raise ValueError("typed motion specification required")
@@ -157,6 +166,14 @@ class AccountReadWorker:
                 check()
                 if self._drain.is_set():
                     service(self._dispatcher.drain())
+                if media is not None:
+                    packet_media = media.next_packet()
+                    if packet_media is not None:
+                        try:
+                            send(packet_media.wire, reserved=True)
+                        except BaseException:
+                            media.send_failed()
+                            raise
                 if self.motion_inbox is not None:
                     if motion is not None and motion.result is not None:
                         assert motion_ticket is not None
@@ -196,6 +213,8 @@ class AccountReadWorker:
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
+                    if media is not None:
+                        media.observe(plain, peer, generation=self._generation)
                     service(self._dispatcher.receive(plain, peer, generation=self._generation))
                     if motion is not None:
                         for packet in motion.observe(plain, peer, generation=self._generation):
@@ -218,6 +237,17 @@ class AccountReadWorker:
                 if self.motion_inbox is not None:
                     self.motion_inbox.close()
                 self._dispatcher.close()
+                if media is not None and media.result is None:
+                    assert node is not None
+                    try:
+                        media_sent, media_received = close_media_route(sock, node, media, output,
+                            generation=self._generation, clock=self._clock, wait=wait)
+                        sent += media_sent
+                        received += media_received
+                    finally:
+                        if maintenance is not None:
+                            maintenance.close()
+                        self._node = None
                 if motion is not None and motion.result is None:
                     assert node is not None
                     motion.cancel()
@@ -245,4 +275,5 @@ class AccountReadWorker:
                     with self._claim:
                         self._socket = None
         return WorkerSummary(reason, sent, received, beats, close_failed,
-                             motion.result if motion is not None else last_motion)
+                             motion.result if motion is not None else last_motion,
+                             media.result if media is not None else None)

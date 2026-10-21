@@ -1,10 +1,8 @@
 """One experimental native TCP route; caller holds camera and broker ownership."""
 
-import ipaddress
 import secrets
 import select
 import socket
-import struct
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -16,12 +14,11 @@ from .av_sample import AvVideoSample
 from .broker_maintenance import BrokerMaintenance
 from .camera_session import open_camera_session
 from .contracts import CallingAttempt, P2PProbeError
-from .crypto import gute_mode1_xor_checksum
 from .media_protocol import build_av_init
-from .mtp_relays import inspect_mtp_relay_advertisement
 from .mtp_tcp_av import TcpAvSession
 from .mtp_tcp_handshake import build_mtp_tcp_pair_request
 from .mtp_tcp_receive import TcpReception, receive_paired_av
+from .relay_selection import select_relay as select_relay
 from .rendezvous_protocol import build_calling_request
 from .rendezvous_session import close_device_route
 from .session_io import local_route_ip, receive_datagrams
@@ -34,21 +31,6 @@ class TcpRouteResult:
     reception: TcpReception
     broker_release: bool
     broker_messages: int
-
-
-def select_relay(frame: bytes, session_id: int, link_id: int) -> tuple[str, int] | None:
-    """Experimental IPv4 TCP policy; input must already be broker-decrypted."""
-    if len(frame) < 24 or gute_mode1_xor_checksum(frame) != struct.unpack_from("<I", frame, 16)[0]:
-        return None
-    advert = inspect_mtp_relay_advertisement(frame, expected_session_id=session_id,
-                                           expected_link_id=link_id)
-    if advert is None or any(entry.family != 4 for entry in advert.entries):
-        return None
-    # Opaque extension is not interpreted as an address, permission or platform.
-    for entry in advert.entries:
-        if entry.flags & 4 and entry.tcp_port and ipaddress.ip_address(entry.address).is_global:
-            return entry.address, entry.tcp_port
-    return None
 
 
 def probe_tcp_route(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,

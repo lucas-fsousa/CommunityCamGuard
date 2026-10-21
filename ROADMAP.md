@@ -29,6 +29,14 @@ claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-20 broker media route integrated into shared reader offline: typed single
+A4 OPEN/B9 CLOSE uses account sequences alongside reads/heartbeat; dedicated cleanup
+capacity, exact receipt matching, one-shot shutdown and blocked replacement on
+uncertain release.183 focused tests passed93.5MiB/no swap; Ruff/mypy passed. No
+media TCP attachment, production activation, camera commands or deployment. Next
+TCP/AV lifecycle attachment and bounded consumer delivery, then source scheduling.
+See docs/internal/native-shared-media-route.md; sound/light restriction preserved.
+
 2026-10-20 continuous account server adapter: one explicit read-only run under
 cache/account exclusion, fixed camera/device, no thread/login loop. Monitors server
 cancellation, foreground demand and registered credentials; confirmed close precedes

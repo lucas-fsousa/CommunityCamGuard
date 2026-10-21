@@ -11,6 +11,9 @@ routes sharing that reader, not another extension of a diagnostic timeout.
 The on-demand `SharedReadSession` adapter now implements guarded ownership,
 enrollment freshness, shutdown and foreground yielding with offline tests. It is
 not yet instantiated by a production source scheduler; media attachment remains open.
+The [broker-side media route](native-shared-media-route.md) now shares sequences
+and the sole reader, including reserved CLOSE cleanup. TCP/AV ownership, multiple
+routes and production source scheduling remain separate unfinished work.
 
 First implementation: [bounded transport-receipt correlator](broker-transaction-correlation.md)
 is now socket-free and offline-tested, including encrypted fragmented input.

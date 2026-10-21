@@ -87,3 +87,7 @@ connection closure. No live camera traffic, deployment or additional server work
 Next: attach the media-route lifecycle to this owner and connect it to server
 source scheduling. The adapter is not yet a live native video producer; existing
 RTSP/dashboard paths remain unchanged. Do not schedule periodic restarts of it.
+
+Follow-up: [broker media-route integration](native-shared-media-route.md) now adds
+typed one-route OPEN/CLOSE on that same reader, with independent cleanup capacity.
+This does not yet attach the TCP video channel or enable simultaneous motion/media.

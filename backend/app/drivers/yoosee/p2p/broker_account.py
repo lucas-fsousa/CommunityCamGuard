@@ -14,6 +14,7 @@ from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .model_protocol import build_model_read
 from .ptz_scheduler import PtzScheduler
 
@@ -63,6 +64,25 @@ class BrokerAccount:
         self._drain_deadline: float | None = None
         self._reason: Retirement | None = None
         self._ptz: PtzScheduler | None = None
+        self._media: MediaRouteJob | None = None
+
+    @property
+    def media_cleanup_pending(self) -> bool:
+        return self._media is not None and self._media.result is None
+
+    @property
+    def _media_release_uncertain(self) -> bool:
+        return (self._media is not None and self._media.result is not None
+                and self._media.result.opened and not self._media.result.broker_release)
+
+    def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
+        if self.state != "active" or self._deadline - self._clock() < 6 or self._media is not None:
+            raise ValueError("account not accepting media route")
+        assert self._node is not None
+        self._media = MediaRouteJob(self._node, self._source, output, spec,
+            generation=self._generation, local_ip=self._local[0], local_port=self._local[1],
+            clock=self._clock)
+        return self._media
 
     @property
     def motion_cleanup_pending(self) -> bool:
@@ -79,7 +99,7 @@ class BrokerAccount:
         Uses the SAME sequence source as reads/heartbeats; never a second login.
         """
         if (self.state != "active" or self._deadline - self._clock() < 4
-                or self.motion_cleanup_pending):
+                or self.motion_cleanup_pending or self._media_release_uncertain):
             raise ValueError("account not accepting PTZ")
         if (self._ptz is not None and self._ptz.result is not None
                 and self._ptz.result.start_attempted
@@ -98,7 +118,7 @@ class BrokerAccount:
         return "retired" if self._reason else "draining" if self._drain_deadline is not None else "active"
 
     def submit_read(self, device_id: int, path: str, timeout: float = 2.0) -> AccountRead:
-        if (self.state != "active" or self._clock() >= self._deadline
+        if (self.state != "active" or self._clock() >= self._deadline or self._media_release_uncertain
                 or (self._ptz is not None and self._ptz.result is not None
                     and self._ptz.result.start_attempted
                     and not self._ptz.result.release_delivery_confirmed)):
@@ -123,6 +143,8 @@ class BrokerAccount:
             return AccountEvents(retired=self._reason)
         if self._ptz is not None:
             self._ptz.cancel()
+        if self._media is not None:
+            self._media.cancel()
         self._reason = reason
         self._source.close()  # Block late deliveries before releasing consumer state.
         reads = self._reads.close()
@@ -137,6 +159,8 @@ class BrokerAccount:
     def _expire(self) -> AccountEvents:
         if self._reason is not None:
             return AccountEvents(retired=self._reason)
+        if self._media_release_uncertain:
+            return self.retire("transport")
         if (self._ptz is not None and self._ptz.result is not None
                 and self._ptz.result.start_attempted
                 and not self._ptz.result.release_delivery_confirmed):
@@ -150,7 +174,7 @@ class BrokerAccount:
             return AccountEvents(reads + tail.reads, (heartbeat,), retired=tail.retired)
         if self._drain_deadline is not None:
             empty = (not self._reads.pending_count and not self._heartbeat.pending_count
-                     and not self.motion_cleanup_pending)
+                     and not self.motion_cleanup_pending and not self.media_cleanup_pending)
             if empty or self._clock() >= self._drain_deadline:
                 tail = self.retire("drained" if empty else "drain_timeout")
                 return AccountEvents(reads + tail.reads, tail.heartbeats, retired=tail.retired)
@@ -198,4 +222,6 @@ class BrokerAccount:
             self._drain_deadline = self._clock() + 2
             if self._ptz is not None:
                 self._ptz.cancel()
+            if self._media is not None:
+                self._media.cancel()
         return self._expire()

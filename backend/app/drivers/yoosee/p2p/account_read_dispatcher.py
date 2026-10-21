@@ -11,6 +11,7 @@ from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .ptz_scheduler import PtzScheduler, PtzSpec
 
 
@@ -55,6 +56,9 @@ class AccountReadDispatcher:
         return self._account.prepare_ptz(output, access_id=spec.access_id,
             device_id=spec.device_id, direction=spec.direction,
             reviewed_directions=spec.reviewed_directions, duration=spec.duration)
+
+    def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
+        return self._account.prepare_media(spec, output)
 
     def _publish(self, events: AccountEvents) -> AccountEvents:
         for completion in events.reads:
