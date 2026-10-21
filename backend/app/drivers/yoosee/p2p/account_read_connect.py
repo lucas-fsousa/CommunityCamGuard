@@ -47,7 +47,7 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
             raise P2PProbeError("read connection online target mismatch")
         local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
         bounded.check()
-        connection = ReadConnection(node, bounded.sock, local_ip, local_port)
+        connection = ReadConnection(node, bounded.sock, local_ip, local_port, target)
         return connection
     except BaseException as exc:
         if sock is not None:

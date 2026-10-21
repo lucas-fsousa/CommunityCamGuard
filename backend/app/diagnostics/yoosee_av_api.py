@@ -15,6 +15,7 @@ from ..drivers.yoosee.p2p.control_ownership import ControlChannelBusy
 from ..services.camera_controls import CameraNotFound, ControlBusy
 from .local_operator import require_local_operator
 from .yoosee_av import run_reviewed_native_av
+from .yoosee_shared_media import run_reviewed_shared_media
 
 router = APIRouter(prefix="/api/internal/diagnostics", include_in_schema=False)
 _guard = threading.Lock()
@@ -37,6 +38,13 @@ def native_av(request: Request) -> dict:
             raise HTTPException(409, "diagnostic already attempted in this server process")
         request.app.state.native_av_diagnostic_used = True
     try:
+        if settings.native_av_diagnostic_shared_tcp:
+            if (not settings.native_av_diagnostic_tcp_relay
+                    or settings.native_av_diagnostic_decode_video
+                    or settings.native_av_diagnostic_platform_only
+                    or settings.native_av_diagnostic_tcp_profile != "short"):
+                raise ValueError("shared TCP diagnostic requires the short undecoded profile")
+            return asdict(run_reviewed_shared_media(camera_id=camera_id, device_id=device_id))
         result = run_reviewed_native_av(camera_id=camera_id, reviewed_camera_id=camera_id,
                                         reviewed_device_id=device_id,
                                         platform_only=settings.native_av_diagnostic_platform_only,

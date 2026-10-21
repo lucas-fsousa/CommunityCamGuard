@@ -29,6 +29,16 @@ claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-21 physical cooperative streaming acceptance on camera3: HTTP200,
+media_complete,39 video/62 audio records/one encoding header; AVCLOSE and broker
+B9 confirmed, TCP/UDP physical closes without error. One authentication under
+server account/cache exclusion, no audio output/light/movement. First attempt
+returned409 during startup; explicit diagnostic deployment then disabled PTZ
+background preparation temporarily, restoring it afterward. Diagnostic flags and
+targets restored disabled/empty. App image020039f4751d deployed with512MiB build
+limit; go2rtc unchanged. Next: bounded consumer delivery, continuous-media lifetime
+and source/fallback scheduling. This is NOT native dashboard playback acceptance.
+
 2026-10-21 cooperative TCP/AV attached to internal shared account worker: one
 connect/pair, bounded steps alongside broker reads, finite protocol reception and
 AVCLOSE/TCP-close before B9. Missing AVCLOSE or failed TCP close blocks replacement.

@@ -221,7 +221,10 @@ class AccountReadWorker:
                     check()
                     if self.mailbox.ready(item.ticket):
                         send(item.prepared.wire)
-                sock.settimeout(min(0.02 if mixed else 0.05, max(0.001, deadline - self._clock())))
+                # A 50ms idle UDP wait would cap the 4096-byte TCP pump near
+                # 80KiB/s and accumulate video latency despite a healthy relay.
+                interval = 0.001 if tcp is not None else 0.02 if mixed else 0.05
+                sock.settimeout(min(interval, max(0.001, deadline - self._clock())))
                 try:
                     wire, peer = sock.recvfrom(4097)
                 except TimeoutError:

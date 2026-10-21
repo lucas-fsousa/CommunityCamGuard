@@ -1,5 +1,38 @@
 # Broker media route on the shared account reader
 
+## Physical acceptance — 2026-10-21
+
+The opt-in, single-use `/api/internal/diagnostics/native-av` route now supports
+server-only `NATIVE_AV_DIAGNOSTIC_SHARED_TCP=true`, requiring TCP relay, short
+profile and no decoding/platform-only flags. Existing local-primary-auth boundary
+and fixed reviewed target remain mandatory; default is false. No public control
+or capability was enabled. `yoosee_shared_media.py` reserves the camera operation
+and quiesces the legacy account cache through cleanup, authenticates once, and
+binds media to the actual returned online target (now retained by ReadConnection).
+Unknown TCP/B9/socket cleanup poisons the legacy account reservation.
+
+An authorized camera3 run returned HTTP200/media_complete:39 video records,
+62 audio records,1 encoding header,13 sent/10 received broker datagrams.
+AVCLOSE and correlated B9 were confirmed, both physical sockets closed without
+error. No heartbeat occurred in this short window; it is not evidence of prolonged
+stability, audible quality or decoded display. Records were counted/discarded.
+No microphone output, light, motion or reset command was sent.
+
+First attempt returned409 (no media evidence); startup PTZ preparation was a
+possible contention source. The successful deployment explicitly disabled
+background preparation during the one-shot experiment. Afterward it restored
+preparation, disabled diagnostic flags and cleared targets. No automatic retry.
+Image020039f4751d built with512MiB/no-swap/half-CPU limit; only app recreated.
+The normal RTSP/go2rtc source was not changed.
+
+The pump now waits at most1ms for UDP while TCP is attached; the former50ms wait
+could cap4096-byte TCP steps around80KiB/s. Idle non-media behavior is unchanged.
+Focused adapter/API/connection/TCP tests:52 passed; pump regression subset37 passed.
+Peak test memory102MiB, zero swap. Ruff and targeted mypy passed.
+
+Next: bounded consumer delivery and continuous media lifetime, then source/fallback
+scheduling. Do not advertise production native playback from this finite test.
+
 2026-10-20 — offline-tested, no production caller, camera traffic or deployment.
 
 The account worker now accepts a trusted, typed `initial_media` bootstrap. It

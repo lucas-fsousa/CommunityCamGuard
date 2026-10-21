@@ -21,6 +21,7 @@ def setup(monkeypatch):
                                native_av_diagnostic_decode_video=False,
                                native_av_diagnostic_platform_only=False,
                                native_av_diagnostic_tcp_relay=False,
+                               native_av_diagnostic_shared_tcp=False,
                                native_av_diagnostic_tcp_profile="short",
                                native_av_diagnostic_camera_id=CAMERA,
                                native_av_diagnostic_device_id="123")
@@ -48,6 +49,29 @@ def test_single_use_fixed_target_and_safe_counts(setup):
     assert client.post(PATH).status_code == 409
     assert len(calls) == 1
     assert PATH not in client.get("/openapi.json").json()["paths"]
+
+
+def test_shared_tcp_is_server_selected_and_single_use(setup, monkeypatch):
+    from backend.app.drivers.yoosee.p2p.account_read_worker import WorkerSummary
+    client, settings, calls = setup
+    settings.native_av_diagnostic_shared_tcp = True
+    settings.native_av_diagnostic_tcp_relay = True
+    def run(**kwargs):
+        assert kwargs == dict(camera_id=CAMERA, device_id="123")
+        return WorkerSummary("media_complete", 1, 1, 0, False)
+    monkeypatch.setattr(api, "run_reviewed_shared_media", run)
+    assert client.post(PATH).json()["reason"] == "media_complete"
+    assert not calls
+    assert client.post(PATH).status_code == 409
+
+
+def test_shared_tcp_rejects_incompatible_profile(setup):
+    client, settings, calls = setup
+    settings.native_av_diagnostic_shared_tcp = True
+    settings.native_av_diagnostic_tcp_relay = True
+    settings.native_av_diagnostic_tcp_profile = "extended"
+    assert client.post(PATH).status_code == 409
+    assert not calls
 
 
 @pytest.mark.parametrize("platform", [None, 2])

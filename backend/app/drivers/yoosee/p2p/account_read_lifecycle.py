@@ -10,7 +10,7 @@ from .account_policy import AccountPolicy, validate_policy
 from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
-from .contracts import CertifiedNode
+from .contracts import CertifiedNode, OnlineDevice
 from .ptz_authority import PtzAuthority, PtzGrant
 from .ptz_inbox import MotionTicket
 from .ptz_scheduler import PtzSpec, ScheduledPtzResult
@@ -22,6 +22,7 @@ class ReadConnection:
     socket: ReadSocket = field(repr=False)
     local_ip: str = field(repr=False)
     local_port: int = field(repr=False)
+    target: OnlineDevice | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

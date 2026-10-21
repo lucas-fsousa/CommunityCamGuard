@@ -79,6 +79,12 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
         finally: now[0] -= 0.049  # Fast fragmented TCP; UDP polling also advances time.
     monkeypatch.setattr(tcp, "recv", fast_receive)
     original_udp_receive = udp.recvfrom
+    intervals = []
+    original_timeout = udp.settimeout
+    def timeout(seconds):
+        intervals.append(seconds)
+        original_timeout(seconds)
+    monkeypatch.setattr(udp, "settimeout", timeout)
     def receive(size):
         udp.now = now[0]
         try: return original_udp_receive(size)
@@ -111,6 +117,7 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
     assert owner.mailbox.take(ticket).status == "response"
     assert events == ["tcp_open", "tcp_close", "broker_close"]
     assert udp.opens == udp.closes == udp.closed == 1
+    assert 0.001 in intervals  # TCP must not be starved by the idle broker wait.
 
 
 @pytest.mark.parametrize("fault", [None, "connect", "pair", "close"])
