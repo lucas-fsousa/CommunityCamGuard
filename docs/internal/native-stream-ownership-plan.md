@@ -8,6 +8,9 @@ Latest2026-10-20: [continuous account lifetime](continuous-account-policy.md) is
 implemented and offline-tested through the lifecycle/reader. Default diagnostics
 remain finite. Next integration is server scheduling/enrollment freshness and media
 routes sharing that reader, not another extension of a diagnostic timeout.
+The on-demand `SharedReadSession` adapter now implements guarded ownership,
+enrollment freshness, shutdown and foreground yielding with offline tests. It is
+not yet instantiated by a production source scheduler; media attachment remains open.
 
 First implementation: [bounded transport-receipt correlator](broker-transaction-correlation.md)
 is now socket-free and offline-tested, including encrypted fragmented input.

@@ -342,6 +342,9 @@ An opt-in [continuous account policy](docs/internal/continuous-account-policy.md
 now passes an encrypted synthetic30-minute test with bounded traffic/memory and
 no repeated login. It is not activated in production and does not yet deliver
 native video to the dashboard.
+Its on-demand server adapter now checks enrollment changes and yields to foreground
+controls only after socket cleanup; this is offline-tested, not a production
+native-stream activation.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

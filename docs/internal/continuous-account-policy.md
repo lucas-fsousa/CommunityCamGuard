@@ -50,3 +50,40 @@ then attaching media routes to this same authenticated reader without a second
 login, then single-producer delivery/fallback and camera3 acceptance. Do not call
 it indefinitely under the legacy global lock without the cooperative handoff policy.
 Audio acceptance and factory reset remain deferred while the owner is away.
+
+## On-demand server ownership adapter
+
+`SharedReadSession` now runs the continuous lifecycle inside the existing PTZ-cache
+handoff and driver-wide account exclusion boundary. It creates no thread; its
+trusted caller owns the thread and must supply server shutdown/cancellation. Each
+instance permits exactly one run. Busy acquisition returns immediately without
+queuing, signaling foreground contention or automatically authenticating later.
+No production service or public API instantiates it yet.
+
+The adapter fixes a single camera/device target and exposes only identity-read
+submission/results. It does not admit motion, light, sound or arbitrary commands.
+It checks the registered enrollment before opening, then at most once per second,
+comparing credentials as well as timestamps/association. Deletion, replacement,
+database failure, explicit stop or shutdown causes retirement. Foreground control
+demand is checked on every pump iteration and during bounded authentication.
+Cache retirement, worker lifetime and confirmed physical close remain under the
+same reservation. Confirmed factory failure yields safely; uncertain close poisons
+the existing shared-channel barrier, blocking another login.
+
+The active-session database read joins camera and enrollment atomically, performs
+no schema initialization, sets SQLite query-only mode/50ms busy timeout and closes
+its connection explicitly. The polling interval is not a hard real-time revocation
+SLA: OS scheduling/file I/O may still delay it. The adapter deliberately does not
+hold the per-camera operation lock indefinitely, which would prevent foreground
+requests from reaching the account's contention signal.
+
+77 focused tests passed,107.1MiB/no swap; Ruff/mypy passed. Synthetic encrypted
+transport covers reads after the former deadline, shutdown, credential/association
+changes, database failures, bounded busy admission, factory cancellation and a
+real competing thread admitted only after physical close/cache unquiesce. Temporary
+SQLite tests verify registered-camera matching, query-only reads, lock failure and
+connection closure. No live camera traffic, deployment or additional server worker.
+
+Next: attach the media-route lifecycle to this owner and connect it to server
+source scheduling. The adapter is not yet a live native video producer; existing
+RTSP/dashboard paths remain unchanged. Do not schedule periodic restarts of it.

@@ -6,12 +6,51 @@ import pytest
 
 from backend.app.camera_identity import stable_camera_id
 from backend.app.config import get_settings
-from backend.app.db import p2p
+from backend.app.db import p2p, registry
 
 DEVICE_ID = "7000000001"
 ACCESS_TOKEN = bytes(range(64))
 DEV_TOKEN = "ab" * 64
 CAMERA_ID = stable_camera_id("mac", "aa:bb:cc:dd:ee:01")
+
+
+def test_registered_snapshot_requires_camera_and_reads_without_schema_writes(monkeypatch):
+    registry.init_db()
+    saved = p2p.upsert_enrollment(DEVICE_ID, access_id=1, access_token=ACCESS_TOKEN,
+                                  dev_token=DEV_TOKEN, camera_id=CAMERA_ID)
+    assert p2p.read_registered_enrollment(CAMERA_ID) is None
+    registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    original = p2p.connect
+    statements, connections = [], []
+    def connect():
+        conn = original()
+        conn.set_trace_callback(statements.append)
+        connections.append(conn)
+        return conn
+    monkeypatch.setattr(p2p, "connect", connect)
+    assert p2p.read_registered_enrollment(CAMERA_ID) == saved
+    assert len(connections) == 1
+    assert all(sql.startswith(("PRAGMA", "SELECT")) for sql in statements)
+    assert "PRAGMA busy_timeout=50" in statements
+    assert "PRAGMA query_only=ON" in statements
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        connections[0].execute("SELECT 1")
+    registry.delete_camera_by_id(CAMERA_ID)
+    assert p2p.read_registered_enrollment(CAMERA_ID) is None
+
+
+def test_registered_snapshot_reports_lock_failure_instead_of_stale_credentials():
+    registry.init_db()
+    registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    p2p.upsert_enrollment(DEVICE_ID, access_id=1, access_token=ACCESS_TOKEN, camera_id=CAMERA_ID)
+    conn = sqlite3.connect(get_settings().db_path)
+    try:
+        conn.execute("BEGIN EXCLUSIVE")
+        with pytest.raises(sqlite3.OperationalError, match="locked"):
+            p2p.read_registered_enrollment(CAMERA_ID)
+    finally:
+        conn.rollback()
+        conn.close()
 
 
 def test_enrollment_round_trip_is_encrypted_at_rest():

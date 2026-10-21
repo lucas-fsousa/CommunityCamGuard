@@ -29,6 +29,14 @@ claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-20 continuous account server adapter: one explicit read-only run under
+cache/account exclusion, fixed camera/device, no thread/login loop. Monitors server
+cancellation, foreground demand and registered credentials; confirmed close precedes
+handoff, uncertain cleanup blocks replacement. New atomic query-only enrollment
+snapshot avoids schema work and limits SQLite busy wait to50ms.77 focused tests
+passed107.1MiB/no swap; Ruff/mypy passed. No production activation, camera traffic,
+sound/light tests or rebuild. Native media attachment/source scheduling still pending.
+
 2026-10-20 continuous account lifetime implemented offline: explicit policy keeps
 one generation/socket beyond diagnostic time and cumulative-traffic limits using
 constant-space dual token buckets. Correlated heartbeat failure, bounded queues,

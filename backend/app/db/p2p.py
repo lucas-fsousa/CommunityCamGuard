@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -164,6 +166,10 @@ def get_enrollment(device_id: str) -> P2PEnrollment | None:
         ).fetchone()
     if row is None:
         return None
+    return _decode_enrollment(row)
+
+
+def _decode_enrollment(row: sqlite3.Row) -> P2PEnrollment | None:
     try:
         payload = json.loads(_decrypt(row["secret_enc"], label="P2P enrollment"))
         device_id, access_id, access_token, dev_token = _validate(
@@ -184,6 +190,26 @@ def get_enrollment(device_id: str) -> P2PEnrollment | None:
         row["updated_at"],
         row["camera_id"] or None,
     )
+
+
+def read_registered_enrollment(camera_id: str) -> P2PEnrollment | None:
+    """Atomic read for an active owner; no schema writes and <=50ms SQLite lock wait.
+
+    Server startup must already have initialized both tables. Missing schema or
+    lock failure propagates so the owner retires instead of using stale credentials.
+    Only a currently registered camera with the exact association is returned.
+    """
+    normalized = _normalize_camera_id(camera_id)
+    if normalized is None:
+        return None
+    with closing(connect()) as conn:
+        conn.execute("PRAGMA busy_timeout=50")
+        conn.execute("PRAGMA query_only=ON")
+        row = conn.execute(
+            "SELECT e.* FROM p2p_enrollments e JOIN cameras c ON c.camera_id=e.camera_id "
+            "WHERE e.camera_id=?", (normalized,),
+        ).fetchone()
+    return _decode_enrollment(row) if row is not None else None
 
 
 def get_enrollment_for_camera(camera_id: str) -> P2PEnrollment | None:

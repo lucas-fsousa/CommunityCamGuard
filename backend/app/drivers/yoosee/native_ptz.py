@@ -38,14 +38,14 @@ def close_idle() -> None:
 
 
 @contextmanager
-def reserve_read_handoff() -> Iterator[None]:
+def reserve_read_handoff(*, wait: bool = True) -> Iterator[None]:
     """Experimental owner boundary; not called by production maintenance yet.
 
     No competing legacy login during read-worker startup/run/physical close.
     Reject pending gestures/preparation instead of waiting for them under _guard.
     New gestures/warmups retain their existing broker reservation before any I/O.
     """
-    with own_control_channel():
+    with own_control_channel(wait=wait):
         with _guard:
             if _active or _warming:
                 raise ControlNotReady("PTZ must be idle before account handoff")
