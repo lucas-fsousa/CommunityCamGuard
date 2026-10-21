@@ -373,6 +373,8 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
             return ControlResult(
                 key=key,
                 value=night_result.mode,
+                previous_value=next((name for name, raw in NIGHT_VISION_VALUES.items()
+                                     if raw == night_result.previous_value), None),
                 changed=night_result.changed,
                 verified=night_result.verified,
                 transport_acknowledged=night_result.transport_acknowledged,

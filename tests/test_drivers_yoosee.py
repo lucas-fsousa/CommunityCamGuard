@@ -329,7 +329,8 @@ def test_speaker_volume_read_and_write_use_normalized_percent(monkeypatch):
     assert written.verified is True
 
 
-def test_night_vision_write_maps_only_the_legacy_semantic_mode(monkeypatch):
+@pytest.mark.parametrize("previous, expected", [(0, "automatic"), (1, "daytime"), (2, "night")])
+def test_night_vision_write_maps_only_the_legacy_semantic_mode(monkeypatch, previous, expected):
     camera = Camera(
         mac="aa:bb:cc:dd:ee:01",
         camera_id="cam_0123456789abcdef01234567",
@@ -351,7 +352,7 @@ def test_night_vision_write_maps_only_the_legacy_semantic_mode(monkeypatch):
 
     def fake_write(selected, mode):
         observed.append((selected.device_id, mode))
-        return P2PNightVisionWrite(selected.device_id, mode, 0, 2, True, True, 0, True)
+        return P2PNightVisionWrite(selected.device_id, mode, previous, 2, True, True, 0, True)
 
     monkeypatch.setattr(yoosee_controls, "set_camera_night_vision", fake_write)
 
@@ -359,7 +360,8 @@ def test_night_vision_write_maps_only_the_legacy_semantic_mode(monkeypatch):
 
     assert observed == [("7000000001", "night")]
     assert result.value == "night"
-    assert result.native_previous_value == 0
+    assert result.native_previous_value == previous
+    assert result.previous_value == expected
     assert result.native_requested_value == 2
     assert result.verified is True
 

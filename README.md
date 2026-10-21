@@ -303,6 +303,9 @@ Discovery, driver-independent camera IDs, go2rtc live view, 24/7 recording + ret
 pluggable drivers, capability probe, PTZ + listen-in audio, the recordings browser and the REST
 API are all **working**. Yoosee two-way audio is physically homologated on every current unit through
 the recovered LAN RTSP backchannel, including recorded messages and hold-to-speak from the browser.
+The latest [camera3 acceptance](docs/internal/audio-known-speech-acceptance.md)
+confirms recorded speech, paced streaming and browser hold-to-speak; one small
+initial stream gap remains a non-blocking improvement, not a gap-free playback claim.
 Still open: WAN-independent camera bootstrap/control, long-session intercom hardening, broader
 camera-family coverage for proprietary controls, native HEVC playback validation across desktop/mobile,
 broader settings, delegated-access mobile/proxy acceptance, security hardening, and S3 tiering.

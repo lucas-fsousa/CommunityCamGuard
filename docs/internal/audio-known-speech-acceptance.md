@@ -1,5 +1,16 @@
 # Camera3 known-speech acceptance — 2026-10-20
 
+## Current acceptance: passed with a startup-gap caveat
+
+The owner physically accepted the recorded message, then the split-timing stream
+retest: "audio teve um pequeno picote bem no inicio, mas o restante foi sem picotes.
+Teste OK!" The subsequent browser microphone/hold-to-speak check was also confirmed:
+"pressionar par falar funcionando OK". All three acceptance cases are complete.
+Keep the small initial stream gap as a non-blocking improvement. Do not infer
+gap-free playback, full-duplex or long-running reliability. No further camera
+command was issued to record these confirmations. Earlier failed/partial tests
+below are retained as historical evidence, not current acceptance blockers.
+
 Latest owner instruction: physical validations authorized again. The known-reference
 message was repeated on camera3 at50% volume: HTTP200, completed=true,
 duration_ms=10000, route_released=true. Operator peak44.1MiB/zero swap.
@@ -7,16 +18,16 @@ The initial invocation failed with HTTPStatusError before volume verification/au
 submission; status was not retained. A second explicit attempt completed as above.
 The owner confirmed the recorded message physically: "Validado ok, funcionou como
 esperado." Known-reference message acceptance is now passed, not just transport.
-Continuous speech, nighttime IR
-and reset/re-enrollment remain separate validations; no reset was sent.
+Nighttime IR and reset/re-enrollment remain separate validations; no reset was sent.
 
 Following message acceptance, the paced WebSocket stream was repeated with the
 same10-second reference and verified50% volume. First attempt returned409 on
 speaker_volume before audio submission. One explicit retry returned type=complete,
 completed=true, duration_ms=10000, route_released=true; operator peak44.4MiB,
 zero swap. The owner heard the audio, reported intermittent gaps and confirmed it
-stopped by itself. Stream delivery/stop are confirmed, but audible quality is NOT
-accepted. This test does not exercise browser microphone capture or the hold-button UI.
+stopped by itself. That attempt did not pass audible quality; the later accepted
+retest is documented below. This scripted test does not exercise browser microphone
+capture or the hold-button UI, which the owner subsequently checked separately.
 
 The retained runtime timing summary for the recent stream reports1000 packets,
 26 late packets,169.1ms maximum lateness,248.7ms maximum send-call duration,
@@ -54,6 +65,19 @@ No independent P2P session or unproven transport fallback was used.
 
 ## Results
 
+### Split-timing stream retest after dbd6cb4
+
+One authorized camera3 stream at verified50% volume completed10s and released
+the route. Operator peak52MiB/zero swap. Runtime summary:1000 packets,11 late,
+111.6ms maximum lateness,192.0ms maximum combined send,10734.5ms elapsed;
+2 refreshes/0 failures/max192.0ms;1000 writes/0 failures/max2.4ms.
+This identifies synchronous watchdog refresh as a measured long blocking operation
+in this run, exceeding the100ms nominal prebuffer. It does not prove that every
+audible gap comes from refresh or exclude upstream/scheduler delay. No timing or
+buffer adjustment was applied. The owner accepted this retest with one small initial
+gap and no further gaps. The measured refresh delay is not proof of the cause of
+that initial gap.
+
 | Known reference mode | Application result | Native packets | Late packets | Maximum lateness | Maximum send call | Released |
 | --- | --- | --- | --- | --- | --- | --- |
 | Message | HTTP200, completed,10s | 1000 | 12 | 126.8ms | 216.7ms | true |
@@ -64,7 +88,7 @@ under192MiB/50%-CPU limits. Reference generation used23.6MiB/no swap. These are
 server-side timing observations, not proof of actual speaker underflow or its cause.
 No pacing/buffer changes were made based on these measurements.
 
-Physical acceptance of the known-reference message is confirmed by the owner;
-the stream mode has audible gaps and needs correction/revalidation. No full-duplex, continuous soak,
+Physical acceptance of message, stream and browser hold-to-speak is confirmed by
+the owner, with the startup-gap caveat above. No full-duplex, continuous soak,
 or new all-model homologation is claimed. Reset/re-enrollment is a separate later
 test so it does not invalidate the current audio/native-stream test setup.
