@@ -355,8 +355,9 @@ audio records, with media CLOSE and broker release confirmed. It still
 counts/discards records by default. An offline-tested optional video queue now
 hands off HEVC frames with bounded memory and keyframe recovery for a slow consumer;
 an opt-in diagnostic consumer now validates queued video through bounded decoding
-after source cleanup. A local synthetic HEVC frame passed; the shared-camera decode
-path still needs deployment and physical validation. Continuous delivery is not
+after source cleanup. The shared-camera decode path also passed a bounded camera3
+test:37 HEVC frames decoded at1920x1080 with confirmed route/media shutdown.
+Continuous delivery is not
 enabled in production. The deployed dashboard
 still uses the existing streaming path.
 See `ROADMAP.md` and

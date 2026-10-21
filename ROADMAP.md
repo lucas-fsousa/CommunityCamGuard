@@ -43,6 +43,18 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-21 shared queue/consumer REAL camera3 decode PASSED: HTTP200/media_complete,
+37 native video records ->37 decoded HEVC frames at1920x1080,71392bytes,
+timestamp span3700000 raw ticks,0 pre-IDR discards. AVCLOSE/B9 confirmed, both
+sockets closed without error.59 incoming audio records counted, no audio output.
+Image80d13e3cdebc deployed app-only with512MiB/no-swap build cap after available
+memory recovered to~1.7GiB. Diagnostic/shared/decode flags disabled afterward,
+targets empty, PTZ warmup restored. Three cameras online/recording after deployment;
+no OOM reported by app/go2rtc. Operator peak100.1MiB (not decoder process peak).
+Next: continuous TCP/media lifetime and ongoing decoder/remux output, then native
+single-producer/fan-out integration/fallback. Do not repeat finite collection as
+a substitute for these remaining integrations. Dashboard remains RTSP.
+
 Shared video queue consumer: optional protected diagnostic now collects one bounded
 HEVC epoch (<=2MiB/120frames) while the source runs, joins its consumer and decodes
 only after verified camera-route cleanup. Existing short/shared flags plus decode

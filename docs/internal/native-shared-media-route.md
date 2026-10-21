@@ -1,5 +1,36 @@
 # Broker media route on the shared account reader
 
+## Shared consumer live decode acceptance — 2026-10-21
+
+Deployed image80d13e3cdebc, containing37924b2 and the bounded video handoff, after
+WSL available memory recovered to about1.7GiB. Build used512MiB memory/no swap and
+half-CPU limits; only app was recreated. One authenticated in-server camera3
+shared+short+decode diagnostic returned HTTP200:
+
+- Worker: media_complete,13 sent/10 received UDP datagrams,0 heartbeat responses
+  (short run, not a heartbeat endurance check).
+- TCP:37 video records,59 incoming audio records,1 encoding header; media ready,
+  AVCLOSE acknowledged and physical close succeeded.
+- Broker route: OPEN/CLOSE attempted, correlated B9 release confirmed; UDP closed.
+- Consumer/decoder:37 HEVC frames at1920x1080,71392 input bytes,3700000 raw timestamp
+  span ticks,0 pre-IDR discards. All37 received video records reached the decoded
+  sample in this run. This does not remove the queue's documented tail-drop policy.
+
+The FFmpeg validation ran after source cleanup/consumer join with existing process
+limits. No audio playback, sound/light/control actuation or camera reset. Operator
+runtime16.9s, peak100.1MiB/no swap; that cgroup measurement is the external operator,
+not a claim about Docker-hosted decoder peak memory. App/go2rtc reported OOM=false.
+The operator restored diagnostic/shared/decode flags=false, empty targets and
+control-session warmup=true; direct installed-settings verification confirmed it.
+All three cameras remained online and recording after deployment.
+
+This closes the finite shared-source -> queue -> consumer -> decoded HEVC acceptance
+step. It is NOT continuous playback, browser output, multi-consumer delivery or a
+long-running reliability result. Next extend TCP/media lifetime safely and add an
+ongoing decoder/remux consumer and production source scheduling/fallback. Existing
+RTSP recordings/dashboard remain unchanged. Historical pending-deploy notes below
+describe the earlier stage and are superseded for this bounded test only.
+
 ## Consumer and decoded diagnostic
 
 `VideoDeliverySample` is the first bounded consumer of this queue. One thread polls
