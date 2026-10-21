@@ -27,6 +27,7 @@
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
         "native_av_diagnostic_platform_only",
         "native_av_diagnostic_tcp_relay",
+        "native_av_diagnostic_shared_tcp",
         "native_av_diagnostic_tcp_profile",
         "native_av_diagnostic_camera_id", "native_av_diagnostic_device_id",
         "provisioning_ble_material_file", "provisioning_ble_material_max_age_seconds",
