@@ -1,4 +1,4 @@
-"""Finite exclusive encrypted socket pump; concurrent callers use only its mailbox."""
+"""Exclusive encrypted account pump; concurrent callers use only its mailbox."""
 
 import struct
 import threading
@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .access_protocol import build_mode2_response_ack
 from .account_output_budget import AccountOutputBudget, OutputExhausted
+from .account_policy import AccountPolicy, validate_policy
 from .account_read_dispatcher import AccountReadDispatcher
 from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
@@ -34,7 +35,11 @@ class _Stop(Exception):
 
 
 class AccountReadWorker:
-    """Run exactly once with a transferred socket, <=60 seconds, no auth/retries.
+    """Run exactly once with a transferred socket, no authentication/retries.
+
+    Default finite policy retains the60-second diagnostic. Explicit continuous
+    policy lives until cancellation, drain, heartbeat failure or a safety limit;
+    traffic allowances replenish but queued work and cleanup stay bounded.
 
     Creates no thread. The caller retains enrollment and exclusive shared-account
     reservations until run returns. Never supply a socket borrowed from PTZ/cache.
@@ -42,10 +47,14 @@ class AccountReadWorker:
     """
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
-                 clock: Callable[[], float] = time.monotonic, allow_motion: bool = False):
+                 clock: Callable[[], float] = time.monotonic, allow_motion: bool = False,
+                 policy: AccountPolicy = AccountPolicy.FINITE):
+        validate_policy(policy)
+        self._policy = policy
         if type(allow_motion) is not bool:
             raise ValueError("explicit motion admission flag required")
-        self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port, clock=clock)
+        self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port,
+                                                 clock=clock, policy=policy)
         self.mailbox = self._dispatcher.mailbox
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
@@ -93,7 +102,7 @@ class AccountReadWorker:
             return WorkerSummary("already_started", 0, 0, 0, failed)
 
         sent = received = beats = 0
-        output = AccountOutputBudget()
+        output = AccountOutputBudget(policy=self._policy, clock=self._clock)
         reason = "stopped"
         close_failed = False
         maintenance = None
@@ -104,9 +113,9 @@ class AccountReadWorker:
         node = self._node
         try:
             assert node is not None
-            deadline = self._clock() + 60
+            deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
-                acknowledge_messages=not mixed)
+                acknowledge_messages=not mixed, policy=self._policy)
             if initial_motion is not None:
                 if not isinstance(initial_motion, PtzSpec) or self.motion_inbox is not None:
                     raise ValueError("typed motion specification required")

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
+
+from .account_policy import AccountPolicy, TrafficBudget
+
 
 class OutputExhausted(ValueError):
     pass
@@ -10,25 +15,24 @@ class OutputExhausted(ValueError):
 class AccountOutputBudget:
     """Attempts consume capacity before transport I/O, with no refunds on failure."""
 
-    def __init__(self, packets: int = 512, octets: int = 1024 * 1024):
-        if (type(packets) is not int or not 1 <= packets <= 512
-                or type(octets) is not int or not 1 <= octets <= 1024 * 1024):
-            raise ValueError("invalid account output limits")
-        self._packets, self._octets = packets, octets
+    def __init__(self, packets: int = 512, octets: int = 1024 * 1024, *,
+                 policy: AccountPolicy = AccountPolicy.FINITE,
+                 clock: Callable[[], float] = time.monotonic):
+        self._traffic = TrafficBudget(packets, octets, policy=policy, clock=clock)
         self._ptz: PtzOutputReserve | None = None
 
     def charge(self, size: int) -> None:
         if type(size) is not int or not 0 < size <= 1024 * 1024:
             raise ValueError("invalid datagram size")
         reserved = self._ptz.remaining if self._ptz else 0
-        if self._packets - reserved < 1 or self._octets - reserved * 4096 < size:
-            raise OutputExhausted("account output budget exhausted")
-        self._packets -= 1
-        self._octets -= size
+        try:
+            self._traffic.charge(size, reserved=reserved)
+        except ValueError as exc:
+            raise OutputExhausted("account output budget exhausted") from exc
 
     def reserve_ptz(self) -> PtzOutputReserve:
         # One START, three identical RELEASE attempts and two receipt sends.
-        if self._ptz is not None or self._packets < 6 or self._octets < 6 * 4096:
+        if self._ptz is not None or not self._traffic.available(6, 6 * 4096):
             raise OutputExhausted("PTZ cleanup capacity unavailable")
         self._ptz = PtzOutputReserve(self)
         return self._ptz
@@ -54,9 +58,8 @@ class PtzOutputReserve:
         if (self._owner._ptz is not self or kind not in self._slots
                 or not self._slots[kind] or type(size) is not int or not 0 < size <= 4096):
             raise OutputExhausted("PTZ output reservation unavailable")
+        self._owner._traffic.charge(size)
         self._slots[kind] -= 1
-        self._owner._packets -= 1
-        self._owner._octets -= size
 
     def close(self) -> None:
         if self._owner._ptz is self:

@@ -8,6 +8,11 @@ authenticated socket to `run`; never lend a cached PTZ socket.
 
 ## Ownership and bounds
 
+2026-10-20: these time/cumulative limits describe the unchanged default `FINITE`
+policy. Explicit [continuous policy](continuous-account-policy.md) now supports
+heartbeat-maintained lifetime with replenishing bounded traffic allowances; it is
+offline-tested and not selected by any production or diagnostic caller.
+
 - One run per worker/generation; callers only use mailbox submit/cancel/take,
   stop or drain. A second run is rejected without touching the first account.
   Its separately supplied socket is closed; the currently active socket is never

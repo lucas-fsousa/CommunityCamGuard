@@ -29,6 +29,16 @@ claim is made. Night IR remains a separate physical nighttime check.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-20 continuous account lifetime implemented offline: explicit policy keeps
+one generation/socket beyond diagnostic time and cumulative-traffic limits using
+constant-space dual token buckets. Correlated heartbeat failure, bounded queues,
+PTZ STOP reserve and close-before-replacement remain enforced. Synthetic30-minute
+test passes >1500 reads/>3000 writes and >=35 heartbeats without login replacement.
+No production activation or camera I/O; scheduling/enrollment freshness, native
+media attachment and single-producer/fan-out remain pending. See
+docs/internal/continuous-account-policy.md. Audio/reset still deferred.
+223 focused regressions passed95.4MiB/no swap; Ruff/mypy passed. Not deployed.
+
 2026-10-20 shared-account scheduling: PTZ background preparation now acquires the
 broker opportunistically, without queuing or raising foreground contention. It
 skips a busy owner and already waiting foreground requests before authentication;

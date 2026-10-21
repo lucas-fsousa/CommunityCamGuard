@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .account_output_budget import AccountOutputBudget
+from .account_policy import AccountPolicy
 from .broker_account import AccountEvents, AccountRead, BrokerAccount, Retirement
 from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
@@ -34,9 +35,10 @@ class AccountReadDispatcher:
     """
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic,
+                 policy: AccountPolicy = AccountPolicy.FINITE):
         self.mailbox = BrokerMailbox(generation, clock=clock)
-        self._account = BrokerAccount(node, generation, local_ip, local_port, clock=clock)
+        self._account = BrokerAccount(node, generation, local_ip, local_port, clock=clock, policy=policy)
         self._clock = clock
         self._requests: dict[MailboxTicket, ReadRequest] = {}
         self._routes: dict[ReceiptTicket, MailboxTicket] = {}

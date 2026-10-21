@@ -1,4 +1,4 @@
-"""Experimental generation handoff around the finite identity-read worker."""
+"""Experimental account generation handoff; finite policy remains the default."""
 
 import threading
 import time
@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .account_policy import AccountPolicy, validate_policy
 from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
@@ -40,7 +41,10 @@ class AccountReadLifecycle:
     """
 
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
-                 motion_grants: tuple[PtzGrant, ...] = ()):
+                 motion_grants: tuple[PtzGrant, ...] = (),
+                 policy: AccountPolicy = AccountPolicy.FINITE):
+        validate_policy(policy)
+        self._policy = policy
         self._motion_authority = PtzAuthority(motion_grants)
         self._clock = clock
         self._lock = threading.Lock()
@@ -178,7 +182,8 @@ class AccountReadLifecycle:
             connection = connect(generation)
             worker = AccountReadWorker(connection.node, generation, connection.local_ip,
                                        connection.local_port, clock=self._clock,
-                                       allow_motion=self._motion_authority.enabled)
+                                       allow_motion=self._motion_authority.enabled,
+                                       policy=self._policy)
             tickets = tuple(worker.mailbox.submit(r.device_id, r.path, r.timeout) for r in reads)
             with self._lock:
                 self._worker = worker

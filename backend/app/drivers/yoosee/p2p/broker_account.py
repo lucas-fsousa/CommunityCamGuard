@@ -1,4 +1,4 @@
-"""Experimental finite account composition; single caller, no sockets or worker."""
+"""Experimental account composition; single caller, no sockets or worker."""
 
 import math
 import secrets
@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from .account_output_budget import AccountOutputBudget
+from .account_policy import AccountPolicy, TrafficBudget
 from .broker_heartbeat import BrokerHeartbeat, HeartbeatCompletion
 from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
@@ -35,7 +36,10 @@ class AccountEvents:
 
 
 class BrokerAccount:
-    """120-second research owner: eight reads plus one reserved heartbeat slot.
+    """Eight reads plus one reserved heartbeat slot; finite by default.
+
+    Explicit continuous policy removes the research120-second lifetime, not
+    heartbeat expiry, sequence exhaustion, input rate limits or bounded draining.
 
     Accepts complete, already-decrypted frames from the sole socket reader. That
     reader still owns cryptographic validation, fragment assembly and response
@@ -43,7 +47,9 @@ class BrokerAccount:
     """
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic,
+                 policy: AccountPolicy = AccountPolicy.FINITE):
+        self._input = TrafficBudget(policy=policy, clock=clock)
         self._source = BrokerSequences(node.session_id, generation, node.next_sequence)
         self._reads = BrokerReads(node.session_id, generation, node.next_sequence,
                                   sequences=self._source, clock=clock)
@@ -52,10 +58,10 @@ class BrokerAccount:
         self._generation, self._clock = generation, clock
         self._local = local_ip, local_port
         now = clock()
-        self._deadline, self._next_heartbeat = now + 120, now + 50
+        self._deadline = now + 120 if policy is AccountPolicy.FINITE else math.inf
+        self._next_heartbeat = now + 50
         self._drain_deadline: float | None = None
         self._reason: Retirement | None = None
-        self._messages = self._bytes = 0
         self._ptz: PtzScheduler | None = None
 
     @property
@@ -170,9 +176,11 @@ class BrokerAccount:
         if not isinstance(plain, bytes):
             tail = self.retire("input_budget")
             return AccountEvents(events.reads + tail.reads, tail.heartbeats, retired=tail.retired)
-        self._messages += 1
-        self._bytes += len(plain)
-        if self._messages > 512 or self._bytes > 1024 * 1024 or len(plain) > 4096:
+        try:
+            if len(plain) > 4096:
+                raise ValueError("oversized broker frame")
+            self._input.charge(len(plain))
+        except ValueError:
             tail = self.retire("input_budget")
             return AccountEvents(events.reads + tail.reads, tail.heartbeats, retired=tail.retired)
         if peer != self._node.address or type(generation) is not int or generation != self._generation:

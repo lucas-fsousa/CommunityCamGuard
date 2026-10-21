@@ -4,6 +4,11 @@ Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in
 [duration budgets](native-tcp-duration-budgets.md).
 
+Latest2026-10-20: [continuous account lifetime](continuous-account-policy.md) is
+implemented and offline-tested through the lifecycle/reader. Default diagnostics
+remain finite. Next integration is server scheduling/enrollment freshness and media
+routes sharing that reader, not another extension of a diagnostic timeout.
+
 First implementation: [bounded transport-receipt correlator](broker-transaction-correlation.md)
 is now socket-free and offline-tested, including encrypted fragmented input.
 It is not wired into production. Application responses need separate correlation

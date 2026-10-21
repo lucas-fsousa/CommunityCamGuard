@@ -6,6 +6,10 @@
 worker with a per-account generation coordinator. It does not implement login,
 renewal, a background thread, a new API or a new dashboard capability.
 
+2026-10-20: it also propagates explicit [continuous policy](continuous-account-policy.md)
+to the same sole reader. Finite remains the default; physical close/STOP requirements
+for replacement are unchanged. No production caller opts in.
+
 ## Contract
 
 An explicit `run(connect)` reserves the generation **before** calling the trusted

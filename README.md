@@ -338,6 +338,10 @@ A disabled, loopback-only operator check can now exercise that executor inside t
 server's account reservations, without enabling production native streaming.
 That worker check passed on camera3 with three identity responses, one heartbeat
 and clean socket closure; production account-cache migration remains pending.
+An opt-in [continuous account policy](docs/internal/continuous-account-policy.md)
+now passes an encrypted synthetic30-minute test with bounded traffic/memory and
+no repeated login. It is not activated in production and does not yet deliver
+native video to the dashboard.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

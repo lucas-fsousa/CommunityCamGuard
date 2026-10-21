@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable
 
 from .access_protocol import build_mode2_response_ack
+from .account_policy import AccountPolicy, TrafficBudget, validate_policy
 from .contracts import CertifiedNode
 from .resource_service_protocol import (
     FragmentReassembler,
@@ -39,18 +40,22 @@ class BrokerMaintenance:
         self._fragments = FragmentReassembler(max_groups=2)
         self.closed = False
         self.datagrams = self.received_bytes = self.messages = self.acknowledgements = 0
+        self._input = TrafficBudget(clock=clock)
 
     @classmethod
     def account_check(cls, node: CertifiedNode, *,
                       clock: Callable[[], float] = time.monotonic,
-                      acknowledge_messages: bool = True) -> BrokerMaintenance:
-        """Fixed 60-second read/heartbeat experiment; all traffic caps unchanged.
+                      acknowledge_messages: bool = True,
+                      policy: AccountPolicy = AccountPolicy.FINITE) -> BrokerMaintenance:
+        """Account receive path: finite60-second diagnostic unless opted in.
 
-        Not a streaming profile or general lifetime override. Existing native AV
-        users retain their original 15/28-second ceilings.
+        Continuous policy renews input capacity, not crypto/fragment limits.
+        Existing native AV users retain their original15/28-second ceilings.
         """
+        validate_policy(policy)
         owner = cls(node, clock=clock, acknowledge_messages=acknowledge_messages)
-        owner._deadline = clock() + 60
+        owner._deadline = clock() + 60 if policy is AccountPolicy.FINITE else float("inf")
+        owner._input = TrafficBudget(policy=policy, clock=clock)
         return owner
 
     def close(self) -> None:
@@ -65,9 +70,9 @@ class BrokerMaintenance:
         try:
             self.datagrams += 1
             self.received_bytes += len(wire)
-            if (self._clock() >= self._deadline or self.datagrams > 512
-                    or self.received_bytes > 1024 * 1024 or len(wire) > 4096):
+            if self._clock() >= self._deadline or len(wire) > 4096:
                 raise ValueError("broker maintenance budget exhausted")
+            self._input.charge(len(wire))
             node = self._node
             assert node is not None
             if peer != node.address:
