@@ -1,5 +1,35 @@
 # Broker media route on the shared account reader
 
+## Bounded video consumer handoff
+
+The worker now accepts optional internal `video_delivery=VideoDelivery()` alongside
+the explicit TCP bootstrap. The existing sole TCP reader feeds this handoff; no
+extra camera connection, authentication, thread or decoder process is created.
+One consumer polls `take()` for immutable video frames (payload omitted from repr),
+raw camera timestamps, dimensions and decoder-restart epoch. Audio is never retained.
+The handoff is not yet instantiated by the production service or dashboard.
+
+The queue is capped at2MiB/64frames, with a fixed HEVC <=1080p admission profile.
+No waiting for consumer capacity: overflow clears backlog and resets the HEVC gate.
+Only a fresh complete access unit containing VPS/SPS/PPS and IDR resumes delivery.
+Malformed frames, timestamp regression and changed dimensions/configuration cannot
+carry old dependent frames into a new decoder epoch. Slow-consumer loss is intentional;
+this is a live-view handoff, not an archival recording guarantee. Limits cover queue
+references, not data retained independently by a consumer or the TCP parser.
+
+The lock guards bounded local work only (no callbacks/I/O). Source shutdown,
+cancellation and failure retire the queue and clear frame references; normal finite
+completion also discards unread tail. A future decoder must consume while active,
+respect restart_decoder and close its own resources. This queue does not itself
+extend the finite TCP session lifetime, provide multi-consumer fan-out, decode,
+remux, resample or expose native media over HTTP. Those integration steps remain.
+
+44 focused offline tests passed with124.4MiB peak/zero swap. Protocol fixtures verify
+handoff invocation in the cooperative reader and queue retirement before legacy
+account release; tests cover overload by bytes/count, IDR recovery, malformed header,
+oversized payload, timestamp regression and terminal close. Ruff/mypy passed.
+No live camera command, build/restart or production-source switch in this step.
+
 ## Physical acceptance — 2026-10-21
 
 The opt-in, single-use `/api/internal/diagnostics/native-av` route now supports

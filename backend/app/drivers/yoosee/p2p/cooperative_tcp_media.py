@@ -12,6 +12,7 @@ from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .mtp_tcp_av import TcpAvSession
 from .mtp_tcp_handshake import build_mtp_tcp_pair_request
 from .mtp_tcp_receive import PairedSocket
+from .video_delivery import VideoDelivery
 
 
 class OwnedTcpSocket(PairedSocket, Protocol):
@@ -32,11 +33,13 @@ class CooperativeTcpMedia:
     """One bounded receive per step; no broker callbacks, threads or frame history.
 
     This retains the finite measurement window, not a continuous video source.
-    Records are counted/discarded; consumer delivery needs a separate bounded sink.
+    An optional bounded video handoff permits one consumer without blocking on it.
     """
 
     def __init__(self, sock: OwnedTcpSocket, peer: tuple[str, int], owner: TcpAvSession, *,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic,
+                 video: VideoDelivery | None = None):
+        self._delivery = video
         self._sock, self._peer, self._owner, self._clock = sock, peer, owner, clock
         self._deadline = clock() + owner.profile.budget.receive_seconds
         self._step_until = self._deadline
@@ -49,6 +52,8 @@ class CooperativeTcpMedia:
         if self.result is not None:
             return self.result
         confirmed = self._owner.close_acknowledged
+        if self._delivery is not None:
+            self._delivery.close()
         self._owner.close()
         failed = False
         try:
@@ -99,6 +104,8 @@ class CooperativeTcpMedia:
             for wire in batch.acknowledgements:
                 self._send(wire)
             for record in batch.records:
+                if self._delivery is not None:
+                    self._delivery.consume(record)
                 self._video += bool(record.video)
                 self._audio += len(record.audio)
                 self._headers += record.encoding is not None
@@ -131,7 +138,8 @@ class CooperativeTcpMedia:
 
 
 def open_tcp_media(job: MediaRouteJob, spec: MediaRouteSpec, *,
-                   clock: Callable[[], float] = time.monotonic) -> CooperativeTcpMedia:
+                   clock: Callable[[], float] = time.monotonic,
+                   video: VideoDelivery | None = None) -> CooperativeTcpMedia:
     """One reviewed endpoint, bounded connect/pair, no broker login or retry.
 
     Trusted worker owns the broker reservation. Failed opening closes its TCP
@@ -151,8 +159,10 @@ def open_tcp_media(job: MediaRouteJob, spec: MediaRouteSpec, *,
         owner = TcpAvSession(job.endpoint, job.attempt.link_id, job.attempt.call_id,
             job.attempt.cookie, source_id=spec.access_id, destination_id=spec.device.device_id,
             request_user_data=job.metadata, clock=clock)
-        return CooperativeTcpMedia(sock, job.endpoint, owner, clock=clock)
+        return CooperativeTcpMedia(sock, job.endpoint, owner, clock=clock, video=video)
     except BaseException:
+        if video is not None:
+            video.close()
         if owner is not None:
             owner.close()
         try:

@@ -352,7 +352,9 @@ The [broker media-route lifecycle](docs/internal/native-shared-media-route.md) n
 shares that reader and sequence namespace in offline tests. A finite cooperative
 TCP/AV receiver passed a bounded camera3 physical test on2026-10-21:39 video and62
 audio records, with media CLOSE and broker release confirmed. It still
-counts/discards records; continuous delivery is not enabled in production. The deployed dashboard
+counts/discards records by default. An offline-tested optional video queue now
+hands off HEVC frames with bounded memory and keyframe recovery for a slow consumer;
+decoder integration and continuous delivery are not enabled in production. The deployed dashboard
 still uses the existing streaming path.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.

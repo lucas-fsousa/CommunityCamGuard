@@ -20,6 +20,7 @@ from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
+from .video_delivery import VideoDelivery
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +86,7 @@ class AccountReadWorker:
             initial_motion: PtzSpec | None = None,
             initial_media: MediaRouteSpec | None = None,
             with_media_tcp: bool = False,
+            video_delivery: VideoDelivery | None = None,
             wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
         """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
 
@@ -125,6 +127,9 @@ class AccountReadWorker:
             assert node is not None
             if type(with_media_tcp) is not bool or (with_media_tcp and initial_media is None):
                 raise ValueError("TCP media requires explicit typed route bootstrap")
+            if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
+                                               or not with_media_tcp or video_delivery.closed):
+                raise ValueError("video delivery requires a fresh TCP media handoff")
             deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
                 acknowledge_messages=not mixed, policy=self._policy)
@@ -178,7 +183,11 @@ class AccountReadWorker:
                 if media is not None:
                     if with_media_tcp and media.endpoint is not None and tcp is None:
                         assert initial_media is not None
-                        tcp = open_tcp_media(media, initial_media, clock=self._clock)
+                        if video_delivery is None:
+                            tcp = open_tcp_media(media, initial_media, clock=self._clock)
+                        else:
+                            tcp = open_tcp_media(media, initial_media, clock=self._clock,
+                                                 video=video_delivery)
                     if tcp is not None:
                         tcp.step()
                         if tcp.result is not None:
@@ -298,6 +307,8 @@ class AccountReadWorker:
                 except OSError:
                     close_failed = True
                 finally:
+                    if isinstance(video_delivery, VideoDelivery):
+                        video_delivery.close()
                     with self._claim:
                         self._socket = None
                     if tcp_cleanup_error is not None:

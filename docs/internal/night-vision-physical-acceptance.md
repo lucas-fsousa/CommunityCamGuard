@@ -12,8 +12,10 @@ session. No new capability or change to optical mode semantics was introduced.
 Result: `daytime` returned HTTP200, previous=`automatic`, changed=true,
 verified=true. After10seconds the operator restored `automatic`, HTTP200 and
 verified=true. Operator runtime21.5s, peak43.4MiB/zero swap. Camera3 was left in
-its original automatic mode. Visual loss/recovery of IR visibility awaits the
-owner's confirmation; API verification alone does not prove an optical change.
+its original automatic mode. The owner subsequently tested manually and reported
+no effect on nighttime behavior, then deprioritized this feature. Their hypothesis
+that the white spotlight automatically disables IR remains unverified. No repeat
+was executed after that instruction. API verification is not optical acceptance.
 
 Driver regression tests cover previous automatic/daytime/night mappings:30 passed,
 111.4MiB/zero swap; Ruff passed. Build limited to512MiB/no swap/half CPU,

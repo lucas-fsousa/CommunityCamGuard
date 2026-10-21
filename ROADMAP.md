@@ -29,17 +29,27 @@ This section overrides the priorities and pending labels in the chronological hi
 Deferred by owner: LAN-only/DNS redirection, SD playback/download, and implementations
 for other brands without available hardware. Other-brand drivers are a community
 contribution path, not an active first-party testing commitment. No WAN-independence
-claim is made. Night IR remains a separate physical nighttime check.
+claim is made. Night IR is now low priority by owner decision: manual testing
+showed no visible effect. Automatic IR/white-light interaction is a hypothesis,
+not proven; no repeat requested and no optical acceptance claimed.
 
 Camera3 dark-room IR check: owner placed camera in darkness with IR active.
 Canonical API cycle automatic -> daytime (10s) -> automatic returned HTTP200 and
-verified=true for both writes. Visual confirmation pending; do not infer optical
-success from readback. Driver now projects the semantic previous night mode so
+verified=true for both writes. Owner's subsequent manual test showed no visible
+effect; do not infer optical success from readback. Driver projects the semantic previous night mode so
 operators can restore the actual configuration without exposing native integers.
 30 driver tests and Ruff passed; deployed image f317e9b6e8af, app-only recreation,
 three cameras online/recording afterward. No sound, white-light command or reset.
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
+
+Native video delivery: cooperative TCP worker now supports an optional single-consumer
+HEVC handoff capped at2MiB/64frames. Backlog overflow/discontinuity clears history and
+requires a fresh configured IDR, with decoder-restart epoch metadata. No audio retained;
+shutdown clears queue references.44 focused tests passed124.4MiB/zero swap; Ruff/mypy
+passed. Offline only, not deployed or enabled by production API. Next attach an actual
+decoder/remux consumer and continuous-media lifetime, then single-source/fan-out and
+fallback scheduling. Existing RTSP remains the production source.
 
 2026-10-21 physical cooperative streaming acceptance on camera3: HTTP200,
 media_complete,39 video/62 audio records/one encoding header; AVCLOSE and broker

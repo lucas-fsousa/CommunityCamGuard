@@ -6,6 +6,7 @@ from backend.app.drivers.yoosee.p2p import account_read_worker as worker_module
 from backend.app.drivers.yoosee.p2p import cooperative_tcp_media as module
 from backend.app.drivers.yoosee.p2p.cooperative_tcp_media import CooperativeTcpMedia
 from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from tests.test_account_media_route import SPEC, MediaSocket
 from tests.test_account_read_worker import submit
 from tests.test_broker_reads import NODE
@@ -40,6 +41,25 @@ def test_finite_pump_consumes_records_without_second_reader_or_history():
     assert owner.buffered_bytes == 0 and owner.closed
 
 
+def test_pump_delivers_records_to_bounded_video_handoff_and_retires_it(monkeypatch):
+    now = [1.0]
+    sock, owner = OwnedSocket(now), session(now)
+    delivery = VideoDelivery()
+    counts = [0, 0]
+    consume = delivery.consume
+    def observe(record):
+        counts[0] += bool(record.video)
+        counts[1] += record.encoding is not None
+        consume(record)
+    monkeypatch.setattr(delivery, "consume", observe)
+    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0], video=delivery)
+    while pump.result is None:
+        pump.step()
+    assert counts == [1, 1]
+    assert delivery.closed and delivery.buffered_bytes == 0 and delivery.take() is None
+    assert pump.result.close_acknowledged and sock.closed == 1
+
+
 def test_explicit_shutdown_drains_avclose_before_physical_close():
     now = [1.0]
     sock, owner = OwnedSocket(now), session(now)
@@ -55,7 +75,8 @@ def test_explicit_shutdown_drains_avclose_before_physical_close():
 def test_failure_is_terminal_and_close_is_not_retried(fault):
     now = [1.0]
     sock, owner = OwnedSocket(now, fault), session(now)
-    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0])
+    delivery = VideoDelivery()
+    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0], video=delivery)
     try:
         while pump.result is None: pump.step()
     except (OSError, ReceiveError):
@@ -63,6 +84,7 @@ def test_failure_is_terminal_and_close_is_not_retried(fault):
     result = pump.finish()
     assert sock.closed == 1 and owner.closed and owner.buffered_bytes == 0
     assert not result.close_acknowledged or result.socket_close_failed
+    assert delivery.closed and delivery.buffered_bytes == 0
 
 
 @pytest.mark.parametrize("cancel", [False, True])
@@ -72,7 +94,8 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
     tcp = OwnedSocket(now)
     events = []
     tcp_owner = session(now)
-    pump = CooperativeTcpMedia(tcp, PEER, tcp_owner, clock=lambda: now[0])
+    delivery = VideoDelivery()
+    pump = CooperativeTcpMedia(tcp, PEER, tcp_owner, clock=lambda: now[0], video=delivery)
     original_receive = tcp.recv
     def fast_receive(size):
         try: return original_receive(size)
@@ -92,6 +115,7 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
     monkeypatch.setattr(udp, "recvfrom", receive)
     def opening(job, spec, **kwargs):
         assert job.endpoint is not None and spec == SPEC
+        assert kwargs["video"] is delivery
         events.append("tcp_open")
         return pump
     monkeypatch.setattr(worker_module, "open_tcp_media", opening)
@@ -111,12 +135,14 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
     owner = worker_module.AccountReadWorker(NODE, 1, "192.0.2.1", 1234, clock=lambda: now[0])
     ticket = submit(owner)
     result = owner.run(udp, initial_media=SPEC, with_media_tcp=True,
+        video_delivery=delivery,
         cancelled=lambda: cancel and tcp_owner.ready, wait=lambda seconds: None)
     assert result.reason == ("stopped" if cancel else "media_complete")
     assert result.tcp.close_acknowledged and result.media.broker_release
     assert owner.mailbox.take(ticket).status == "response"
     assert events == ["tcp_open", "tcp_close", "broker_close"]
     assert udp.opens == udp.closes == udp.closed == 1
+    assert delivery.closed and delivery.buffered_bytes == 0
     assert 0.001 in intervals  # TCP must not be starved by the idle broker wait.
 
 
