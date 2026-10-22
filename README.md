@@ -372,6 +372,9 @@ The same opt-in path can now transcode HEVC into H.264/AVC fragmented MP4 throug
 a bounded output collector. A synthetic check decoded125 frames from the emitted
 fragments. Browser playback, audio, native-source scheduling and fallback remain
 unintegrated; no additional encoder runs in production.
+A bounded shared fragment ring is tested with two local consumers of one encoder;
+slow readers are disconnected independently. This is not yet an HTTP/WebSocket
+endpoint and does not replace the dashboard's existing authenticated media path.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

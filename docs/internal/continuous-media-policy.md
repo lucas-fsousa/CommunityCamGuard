@@ -123,7 +123,36 @@ frames at64x64 from these fragments. This run took4.5s,53.9MiB peak/zero swap un
 cancellation, not a measured network loss. This small fixture does not establish
 1080p resource cost, sustained firmware compatibility, browser support or latency.
 
-Next: server-owned source scheduling/shared-account coordination, one shared
-producer/fan-out with authorized browser delivery, audio/timestamps and safe RTSP
-fallback. The existing dashboard still uses go2rtc/RTSP. No public route, camera
-operation, build or deployment was added by this output stage.
+The existing dashboard still uses go2rtc/RTSP. No public route, camera operation,
+build or deployment was added by this output stage.
+
+## Shared fragment fan-out (internal, offline)
+
+`media/mp4_fanout.py` retains one initialization segment (<=256KiB) and up to8
+fragments under a combined2MiB cap. Up to16 subscriptions hold only sequence cursors,
+not copied media buffers. Publication never waits for readers: evicting unread
+fragments retires only lagging subscriptions with `SlowConsumerError`. New readers
+receive initialization then the newest completed keyframe fragment. This relies on
+the trusted local `frag_keyframe` muxer, not arbitrary externally supplied fragments.
+Each poll returns the existing immutable chunk reference. One short lock protects
+the ring/cursors, with no I/O or callbacks under that lock.
+
+The hub is single-epoch. Repeated init is an error, closes all subscriptions and
+clears retained bytes; a decoder restart requires a fresh hub. Explicit per-reader
+close frees its slot without changing the producer or other readers. Hub close
+invalidates every reader. Joining before a complete fragment is available fails
+without closing the producer. Invalid/oversized publication fails closed.
+
+The synthetic `--mp4` operator now passes output through this hub and two readers.
+It used one transcoder, delivered the same3748byte count to each reader, and decoded
+125 H264 frames from the first reader's concatenated stream after cleanup. The run
+took4.3s,45MiB/no swap with the same192MiB/half-CPU/30s external limits. Unit tests
+also exercise4500 fragments with16 readers, shared object identity, byte/count
+eviction, isolated cancellation, late join, capacity and epoch retirement.
+
+This does not implement authenticated browser delivery. A future endpoint must
+authorize each subscription, terminate it on revocation/expiry, bound pending
+transport writes and close it on disconnect. References retained by consumers are
+outside the ring's accounting. There is no public route and no per-browser encoder.
+Next: server-owned source lifecycle/shared-account coordination, authorized delivery,
+audio/timestamps and safe RTSP fallback, followed by separately authorized endurance.

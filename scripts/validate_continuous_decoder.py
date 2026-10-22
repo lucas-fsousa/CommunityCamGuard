@@ -15,6 +15,7 @@ from backend.app.drivers.yoosee.p2p.video_consumer import VideoConsumer
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from backend.app.media.fragmented_mp4 import MAX_BYTES, FragmentedMp4
 from backend.app.media.hevc_decoder import HevcDecoder
+from backend.app.media.mp4_fanout import Mp4Fanout, Subscription
 
 
 def main(*, mp4: bool = False) -> None:
@@ -32,6 +33,9 @@ def main(*, mp4: bool = False) -> None:
     decoders = []
     outputs: list[FragmentedMp4] = []
     captured = bytearray()
+    hub = Mp4Fanout()
+    readers: list[Subscription] = []
+    second_reader_bytes = 0
 
     def factory() -> HevcDecoder:
         output = FragmentedMp4() if mp4 else None
@@ -56,9 +60,17 @@ def main(*, mp4: bool = False) -> None:
             consumer.step()
             if outputs:
                 while (chunk := outputs[-1].take()) is not None:
-                    if len(captured) + len(chunk.data) > MAX_BYTES:
-                        raise RuntimeError("synthetic output sample exceeded budget")
-                    captured.extend(chunk.data)
+                    hub.publish(chunk)
+                    if not chunk.initialization and not readers:
+                        readers = [hub.subscribe(), hub.subscribe()]
+                for index, reader in enumerate(readers):
+                    while (chunk := reader.take()) is not None:
+                        if index == 0:
+                            if len(captured) + len(chunk.data) > MAX_BYTES:
+                                raise RuntimeError("synthetic output sample exceeded budget")
+                            captured.extend(chunk.data)
+                        else:
+                            second_reader_bytes += len(chunk.data)
             if sent == 150 and decoders and decoders[0].frames >= 100:
                 break
             time.sleep(0.002)
@@ -67,8 +79,13 @@ def main(*, mp4: bool = False) -> None:
         result = {"submitted_frames": sent, "decoded_before_eof": decoders[0].frames,
                   "decoder_instances": len(decoders), "access_unit_bytes": len(encoded.stdout)}
     finally:
-        consumer.close()
+        try:
+            consumer.close()
+        finally:
+            hub.close()
     if mp4:
+        if len(readers) != 2 or second_reader_bytes != len(captured):
+            raise RuntimeError("shared output readers disagreed")
         # Inspect only after encoder/transcoder cleanup, keeping one child at a time.
         probe = subprocess.run([
             "prlimit", "--as=536870912", "--cpu=5", "--nofile=64", "--",
@@ -85,7 +102,8 @@ def main(*, mp4: bool = False) -> None:
                 or streams[0]["width"] != 64 or streams[0]["height"] != 64
                 or int(streams[0]["nb_read_frames"]) < 50):
             raise RuntimeError("fragmented H264 output validation failed")
-        result.update(mp4_bytes=len(captured), mp4_decoded_frames=int(streams[0]["nb_read_frames"]))
+        result.update(mp4_bytes=len(captured), mp4_decoded_frames=int(streams[0]["nb_read_frames"]),
+                      shared_readers=len(readers), second_reader_bytes=second_reader_bytes)
     print(json.dumps(result))
 
 

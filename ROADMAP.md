@@ -43,6 +43,16 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 shared native output fan-out OFFLINE: one immutable init segment and
+bounded fragment ring shared across at most16 readers (2MiB total/eight fragments).
+Late join starts at the latest completed keyframe fragment; laggards are retired
+without stopping the producer or fast readers. Cancellation/epoch replacement
+invalidates subscriptions and releases retained output.4500-fragment/16-reader
+simulation stays bounded. Real synthetic output test: two readers each received
+3748bytes from one encoder;125 H264 frames decoded afterward,45MiB peak/no swap.
+Not an authenticated network endpoint: source supervision, transport-level resource
+bounds, per-subscription authorization/revocation and fallback remain pending.
+
 2026-10-22 native output stage OFFLINE: the ongoing consumer can now emit H.264/AVC
 yuv420p fragmented MP4 (same source dimensions) instead of discarding decoded video.
 One ffmpeg process per decoder epoch, separate bounded media/progress pipes, output
