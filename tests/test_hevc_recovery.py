@@ -56,7 +56,10 @@ def test_timestamp_regression_and_corruption_force_reacquisition():
 @pytest.mark.parametrize("frame", [b"", b"bad" + nal(1), bytes(MAX_ACCESS_UNIT + 1),
                                    nal(1) * 129, b"\x00\x00\x01\x02\x00\x80",
                                    b"\x00\x00\x01\x02\x09\x80", nal(1) + nal(1),
-                                   nal(1, b"\x01")])
+                                   nal(1, b"\x01")],
+                         ids=["empty", "bad-prefix", "oversized", "too-many-units",
+                              "invalid-temporal-id", "unsupported-layer", "two-pictures",
+                              "missing-first-slice"])
 def test_malformed_or_unbounded_access_units_are_rejected(frame):
     with pytest.raises(ValueError):
         inspect_access_unit(frame)

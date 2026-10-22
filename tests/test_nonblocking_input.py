@@ -60,7 +60,8 @@ def test_closed_decoder_retires_pending_bytes():
     assert writer.closed and writer.pending_bytes == 0
 
 
-@pytest.mark.parametrize("payload", [b"", b"x" * (MAX_PENDING_BYTES + 1), bytearray(b"x")])
+@pytest.mark.parametrize("payload", [b"", b"x" * (MAX_PENDING_BYTES + 1), bytearray(b"x")],
+                         ids=["empty", "oversized", "mutable"])
 def test_invalid_offer_retains_no_frame(pipe, payload):
     _, writer, _ = pipe
     with pytest.raises(ValueError):
