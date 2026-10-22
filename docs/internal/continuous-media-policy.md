@@ -43,3 +43,22 @@ still uses finite native diagnostics and RTSP for production. Next: ongoing
 decoder/remux consumer, server-owned continuous source lifecycle and safe fallback,
 then a separately authorized physical endurance test. Do not equate this policy
 with a completed native live-view integration or proven long-running firmware support.
+
+## Decoder input backpressure (offline)
+
+`media/nonblocking_input.py` supplies the transport-neutral decoder pipe writer.
+It owns the supplied descriptor, sets nonblocking mode and retains at most one
+immutable access unit (2MiB). Each caller-driven `pump()` attempts only one16KiB
+write. Busy `offer()` returns false: the caller must retain that frame or retire
+the epoch, never silently skip a dependent frame. Partial writes preserve order.
+The whole access unit has a one-second deadline (configurable up to5s); progress
+does not extend it. Full pipe returns immediately. Deadline, invalid clock or
+broken pipe closes the descriptor and releases pending bytes. Closing is idempotent.
+
+This does not spawn ffmpeg, manage decoder output, or connect to VideoDelivery yet.
+It is one component of the ongoing consumer, not a second live stream. The next
+integration must drain decoder output concurrently, replace decoder and input pipe
+on epoch changes, bound process resources and confirm shutdown before replacement.
+Pipe tests cover exact partial-write delivery, capacity backpressure, cancellation,
+broken readers, invalid clocks/payloads and4500 frames across15 virtual minutes.
+These bytes are not a video quality test. No camera access or deployment is needed.

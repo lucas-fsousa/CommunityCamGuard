@@ -364,6 +364,8 @@ An opt-in [continuous media policy](docs/internal/continuous-media-policy.md) no
 passes a15-minute simulated protocol run with bounded traffic and preserved idle/
 cleanup deadlines. Real-camera endurance and ongoing decoder/remux integration
 remain pending; the policy is not enabled by the public API.
+A bounded nonblocking decoder-input writer is also covered by local pipe tests;
+it is not yet connected to a continuous decoder or the dashboard.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

@@ -43,6 +43,12 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 ongoing decoder input: generic nonblocking pipe writer implemented with
+one2MiB access-unit bound,16KiB writes and absolute stall deadline; partial writes
+cannot interleave frames or block the account reader. Local pipe tests only.
+No decoder process or production connection added: epoch-aware consumer, bounded
+process/output lifecycle and native source/fallback integration remain pending.
+
 Continuous native media policy implemented offline: explicit internal enum preserves
 finite defaults; healthy continuous media no longer expires at finite observation/
 session/cumulative-traffic limits. Constant-space RX/TX/record-rate budgets replace
