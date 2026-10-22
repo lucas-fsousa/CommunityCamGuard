@@ -43,6 +43,15 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 ongoing HEVC validation consumer connected offline: VideoDelivery feeds
+one decoder per epoch through bounded nonblocking input. Replacement requires
+confirmed old-process retirement; slow input retains the next frame in the bounded
+queue. ffmpeg decodes to null (no display/audio/network/files), reports frame
+progress through bounded nonblocking output, and fails on startup/idle stalls.
+Synthetic150-frame run decoded147 before EOF with one process,102.9MiB/no swap.
+Not production-enabled: browser-compatible remux/output, server-owned scheduling,
+shared-account coordination/fallback and authorized endurance remain pending.
+
 2026-10-22 ongoing decoder input: generic nonblocking pipe writer implemented with
 one2MiB access-unit bound,16KiB writes and absolute stall deadline; partial writes
 cannot interleave frames or block the account reader. Local pipe tests only.

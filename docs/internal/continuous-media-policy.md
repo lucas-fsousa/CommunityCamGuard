@@ -55,10 +55,45 @@ The whole access unit has a one-second deadline (configurable up to5s); progress
 does not extend it. Full pipe returns immediately. Deadline, invalid clock or
 broken pipe closes the descriptor and releases pending bytes. Closing is idempotent.
 
-This does not spawn ffmpeg, manage decoder output, or connect to VideoDelivery yet.
-It is one component of the ongoing consumer, not a second live stream. The next
-integration must drain decoder output concurrently, replace decoder and input pipe
-on epoch changes, bound process resources and confirm shutdown before replacement.
+The writer itself does not spawn ffmpeg or manage decoder output. Its ongoing
+consumer integration is described below; it is not a second production live stream.
 Pipe tests cover exact partial-write delivery, capacity backpressure, cancellation,
 broken readers, invalid clocks/payloads and4500 frames across15 virtual minutes.
 These bytes are not a video quality test. No camera access or deployment is needed.
+
+## Ongoing queue-to-decoder validation
+
+`p2p/video_consumer.py` now feeds VideoDelivery into an injected decoder factory.
+It is caller-driven on a dedicated consumer, never inside the account/socket
+reader. No thread is started implicitly. While input is busy the next frame stays
+in the bounded queue. Epoch changes require a configured IDR, confirmed old decoder
+shutdown, then a fresh process/pipe. Failed creation, processing or shutdown closes
+the queue and fails closed; unconfirmed shutdown cannot start a replacement.
+Caller must close the consumer in a finally block. Source closure discards tail
+frames by design: this is live validation, not archival frame completeness.
+
+`media/hevc_decoder.py` is a generic real ffmpeg decoder with output discarded.
+It cannot play audio, display an image or access camera/network/file protocols.
+It uses512MiB address-space/nofile64 limits and one decode/filter thread. The
+external supervisor must supply a CPU/RSS quota: thread count is not a CPU quota,
+and this continuous process deliberately has no cumulative CPU-lifetime limit.
+Each step drains at most4096 progress bytes and writes at most16KiB input; retained
+progress is capped at8192 bytes. Only increasing decoded-frame counters refresh
+the5s progress deadline; startup permits15s. EOF/exit, malformed/regressing counters,
+backwards/nonfinite clock and input/progress stalls retire the process. Cancellation
+closes input, terminates/waits0.5s, then kills/waits0.5s if needed. Unknown exit
+confirmation propagates rather than allowing another process alongside it.
+
+Run `PYTHONPATH=. python scripts/validate_continuous_decoder.py` inside a resource-
+limited scope for the local synthetic check. On2026-10-22 it submitted150 identical
+configured64x64 HEVC IDRs and observed147 decoded frames **before EOF** using one
+decoder; encoder and decoder run sequentially, no temporary media files. It used
+102.9MiB peak/zero swap,4.5s wall time under192MiB RSS/no-swap/half-CPU/30s limits.
+The residual frames are not a loss claim: live cancellation deliberately discards
+the tail. This proves ongoing queue/input/decoder progress, not real firmware
+endurance, visual quality, timestamp synchronization or browser playback.
+
+Production RTSP and protected finite diagnostics are unchanged. Next steps are
+browser-compatible output/remux, server-owned source lifecycle/shared-account
+coordination and safe fallback. Do not turn on camera tests to repeat this offline
+milestone; physical endurance still requires separate authorization.

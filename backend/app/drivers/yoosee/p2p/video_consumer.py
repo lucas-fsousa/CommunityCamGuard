@@ -1,0 +1,65 @@
+"""Single-owner queue consumer with explicit decoder-epoch retirement.
+
+Caller owns the dedicated consumer loop and must close it on cancellation. No
+threads or camera connections are created here; this is not an account-loop task.
+"""
+
+from collections.abc import Callable
+from typing import Protocol
+
+from .video_delivery import VideoDelivery
+
+
+class Decoder(Protocol):
+    @property
+    def pending_bytes(self) -> int: ...
+    def offer(self, payload: bytes) -> bool: ...
+    def step(self) -> None: ...
+    def close(self) -> None: ...
+
+
+class VideoConsumer:
+    def __init__(self, delivery: VideoDelivery, *, factory: Callable[[], Decoder]):
+        self._delivery = delivery
+        self._factory = factory
+        self._decoder: Decoder | None = None
+        self._epoch: int | None = None
+        self.closed = False
+
+    def step(self) -> None:
+        if self.closed:
+            raise ValueError("video consumer closed")
+        try:
+            if self._delivery.closed:
+                self.close()
+                return
+            if self._decoder is not None:
+                self._decoder.step()
+                if self._decoder.pending_bytes:
+                    return
+            frame = self._delivery.take()
+            if frame is None:
+                return
+            if frame.epoch != self._epoch:
+                if not frame.restart_decoder:
+                    raise ValueError("missing decoder epoch boundary")
+                if self._decoder is not None:
+                    # Keep the reference until shutdown succeeds; no overlapping child.
+                    self._decoder.close()
+                    self._decoder = None
+                self._decoder = self._factory()
+                self._epoch = frame.epoch
+            elif frame.restart_decoder:
+                raise ValueError("repeated decoder epoch boundary")
+            if self._decoder is None or not self._decoder.offer(frame.payload):
+                raise ValueError("decoder refused access unit")
+        except Exception:
+            self.close()
+            raise
+
+    def close(self) -> None:
+        self.closed = True
+        self._delivery.close()
+        if self._decoder is not None:
+            self._decoder.close()
+            self._decoder = None
