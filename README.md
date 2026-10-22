@@ -368,6 +368,10 @@ A bounded nonblocking decoder-input writer now connects the native video queue t
 an opt-in ongoing HEVC decoder with discarded output. An offline synthetic run
 decoded147 frames before EOF using one process; this is not browser delivery or
 real-camera endurance validation. No public route enables this consumer.
+The same opt-in path can now transcode HEVC into H.264/AVC fragmented MP4 through
+a bounded output collector. A synthetic check decoded125 frames from the emitted
+fragments. Browser playback, audio, native-source scheduling and fallback remain
+unintegrated; no additional encoder runs in production.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

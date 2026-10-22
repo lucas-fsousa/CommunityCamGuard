@@ -43,6 +43,16 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 native output stage OFFLINE: the ongoing consumer can now emit H.264/AVC
+yuv420p fragmented MP4 (same source dimensions) instead of discarding decoded video.
+One ffmpeg process per decoder epoch, separate bounded media/progress pipes, output
+collector capped at2MiB/eight complete init-or-fragment pairs. Slow consumer fails
+closed rather than dropping dependent fragments. Synthetic150-frame check emitted
+3748bytes;125 frames decoded from completed fragments,53.9MiB peak/no swap.
+Not dashboard-enabled or browser-homologated. Native source supervision, shared
+fan-out, audio/timestamp handling and safe RTSP fallback remain required. This is
+transcoding, not a zero-cost codec-copy remux; do not add per-browser encoders.
+
 2026-10-22 ongoing HEVC validation consumer connected offline: VideoDelivery feeds
 one decoder per epoch through bounded nonblocking input. Replacement requires
 confirmed old-process retirement; slow input retains the next frame in the bounded

@@ -72,7 +72,7 @@ the queue and fails closed; unconfirmed shutdown cannot start a replacement.
 Caller must close the consumer in a finally block. Source closure discards tail
 frames by design: this is live validation, not archival frame completeness.
 
-`media/hevc_decoder.py` is a generic real ffmpeg decoder with output discarded.
+`media/hevc_decoder.py` defaults to a generic real ffmpeg decoder with output discarded.
 It cannot play audio, display an image or access camera/network/file protocols.
 It uses512MiB address-space/nofile64 limits and one decode/filter thread. The
 external supervisor must supply a CPU/RSS quota: thread count is not a CPU quota,
@@ -93,7 +93,37 @@ The residual frames are not a loss claim: live cancellation deliberately discard
 the tail. This proves ongoing queue/input/decoder progress, not real firmware
 endurance, visual quality, timestamp synchronization or browser playback.
 
-Production RTSP and protected finite diagnostics are unchanged. Next steps are
-browser-compatible output/remux, server-owned source lifecycle/shared-account
-coordination and safe fallback. Do not turn on camera tests to repeat this offline
-milestone; physical endurance still requires separate authorization.
+Production RTSP and protected finite diagnostics are unchanged. Physical endurance
+still requires separate authorization; do not repeat camera tests for this milestone.
+
+## Opt-in H.264 fragmented MP4 output
+
+Passing a fresh `FragmentedMp4` collector to `HevcDecoder` replaces null output with
+H.264 baseline/yuv420p encoding, ultrafast/zerolatency, GOP25 and no resizing. This
+is a transcode, not HEVC copy/remux. It uses the same process/input/cleanup lifecycle,
+not a second encoder. Progress moves to stderr (ffmpeg logging disabled); media
+stdout is read nonblockingly at most16KiB per step. Null-mode behavior is unchanged.
+No audio is encoded; the output is not yet a synchronized audiovisual stream.
+
+The thread-confined collector frames top-level ftyp+moov initialization and moof+mdat
+fragments. It caps combined partial/paired/queued bytes at2MiB and queued chunks at8.
+Unknown order, unbounded/extended box sizes, oversize data or a full queue fails
+closed, clearing retained bytes. Payloads are omitted from repr. This is a parser
+for our local muxer's framing, not a full validator for arbitrary MP4 internals.
+Each collector is claimed once; even an empty collector cannot be shared by two
+decoders or reused across epochs. Consumers must obtain the new initialization
+segment on replacement. Cancellation discards pending fragments, not archival flush.
+
+`PYTHONPATH=. python scripts/validate_continuous_decoder.py --mp4` runs the offline
+check under external resource limits. It generated150 synthetic64x64 HEVC IDRs,
+observed146 frames of transcoder progress before EOF, and collected3748bytes of
+completed MP4 output. After process cleanup, ffprobe decoded125 H.264/avc1/yuv420p
+frames at64x64 from these fragments. This run took4.5s,53.9MiB peak/zero swap under
+192MiB/no-swap/half-CPU/30s limits. Tail differences reflect GOP buffering and
+cancellation, not a measured network loss. This small fixture does not establish
+1080p resource cost, sustained firmware compatibility, browser support or latency.
+
+Next: server-owned source scheduling/shared-account coordination, one shared
+producer/fan-out with authorized browser delivery, audio/timestamps and safe RTSP
+fallback. The existing dashboard still uses go2rtc/RTSP. No public route, camera
+operation, build or deployment was added by this output stage.

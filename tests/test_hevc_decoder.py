@@ -4,18 +4,24 @@ import subprocess
 import pytest
 
 from backend.app.media import hevc_decoder as module
+from backend.app.media.fragmented_mp4 import FragmentedMp4
+from tests.test_fragmented_mp4 import box
 
 
-@pytest.fixture
-def decoder(monkeypatch):
+@pytest.fixture(params=[False, True], ids=["null", "h264-mp4"])
+def decoder(monkeypatch, request):
     input_read, input_write = os.pipe()
     output_read, output_write = os.pipe()
+    progress_read, progress_write = os.pipe() if request.param else (None, None)
     now = [0.0]
     calls = []
 
     class Process:
         stdin = os.fdopen(input_write, "wb", buffering=0)
         stdout = os.fdopen(output_read, "rb", buffering=0)
+        stderr = os.fdopen(progress_read, "rb", buffering=0) if progress_read is not None else None
+        output = FragmentedMp4() if request.param else None
+        media_write = output_write
         stopped = False
         stubborn = False
         killed = False
@@ -43,18 +49,24 @@ def decoder(monkeypatch):
         assert command[:4] == ["prlimit", "--as=536870912", "--nofile=64", "--"]
         assert "-xerror" in command and "-an" in command
         assert command[command.index("-protocol_whitelist") + 1] == "pipe"
-        assert kwargs["stderr"] == subprocess.DEVNULL
+        assert kwargs["stderr"] == (subprocess.PIPE if request.param else subprocess.DEVNULL)
+        if request.param:
+            assert command[-3:] == ["-f", "mp4", "pipe:1"]
+            assert "libx264" in command and "zerolatency" in command
+            assert "pipe:2" in command and "-c:a" not in command
         return process
 
     monkeypatch.setattr(module.shutil, "which", lambda _: "/test/tool")
     monkeypatch.setattr(module.subprocess, "Popen", popen)
-    instance = module.HevcDecoder(clock=lambda: now[0])
+    instance = module.HevcDecoder(clock=lambda: now[0], output=process.output)
     try:
-        yield instance, process, now, input_read, output_write, calls
+        yield instance, process, now, input_read, progress_write if request.param else output_write, calls
     finally:
         instance.close()
         os.close(input_read)
         os.close(output_write)
+        if progress_write is not None:
+            os.close(progress_write)
 
 
 def test_input_and_incremental_progress(decoder):
@@ -149,3 +161,48 @@ def test_cancel_reaps_child_once_and_closes_both_pipes(decoder):
     assert value.pending_bytes == 0
     assert process.stdin.closed and process.stdout.closed
     assert calls == ["terminate", "wait"]
+
+
+def test_media_bytes_are_separate_from_progress_and_retired_on_close(decoder):
+    value, process, _, _, write, _ = decoder
+    if process.output is None:
+        return
+    init = box(b"ftyp") + box(b"moov")
+    os.write(process.media_write, init)
+    os.write(write, b"frame=1\n")
+    value.step()
+    assert value.frames == 1 and process.output.take().data == init
+    value.close()
+    assert process.output.closed and process.stderr.closed
+
+
+def test_used_output_cannot_cross_decoder_epochs():
+    output = FragmentedMp4()
+    output.feed(box(b"ftyp") + box(b"moov"))
+    output.take()
+    assert output.buffered_bytes == 0
+    with pytest.raises(ValueError, match="fresh"):
+        module.HevcDecoder(output=output)
+
+
+def test_bad_media_output_retires_transcoder(decoder):
+    value, process, _, _, _, _ = decoder
+    if process.output is None:
+        return
+    os.write(process.media_write, box(b"mdat"))
+    with pytest.raises(ValueError, match="order"):
+        value.step()
+    assert process.stopped and process.output.closed
+
+
+def test_spawn_failure_retires_claimed_output(monkeypatch):
+    monkeypatch.setattr(module.shutil, "which", lambda _: "/test/tool")
+
+    def fail(*args, **kwargs):
+        raise OSError("spawn failed")
+
+    monkeypatch.setattr(module.subprocess, "Popen", fail)
+    output = FragmentedMp4()
+    with pytest.raises(OSError):
+        module.HevcDecoder(output=output)
+    assert output.closed
