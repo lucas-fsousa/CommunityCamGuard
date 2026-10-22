@@ -4,8 +4,10 @@ import pytest
 
 from backend.app.drivers.yoosee.p2p import account_read_worker as worker_module
 from backend.app.drivers.yoosee.p2p import cooperative_tcp_media as module
+from backend.app.drivers.yoosee.p2p.account_policy import AccountPolicy
 from backend.app.drivers.yoosee.p2p.cooperative_tcp_media import CooperativeTcpMedia
 from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+from backend.app.drivers.yoosee.p2p.media_policy import MediaPolicy
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from tests.test_account_media_route import SPEC, MediaSocket
 from tests.test_account_read_worker import submit
@@ -88,7 +90,8 @@ def test_failure_is_terminal_and_close_is_not_retried(fault):
 
 
 @pytest.mark.parametrize("cancel", [False, True])
-def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch, cancel):
+@pytest.mark.parametrize("continuous", [False, True])
+def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch, cancel, continuous):
     now = [1.0]
     udp = MediaSocket()
     tcp = OwnedSocket(now)
@@ -116,6 +119,8 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
     def opening(job, spec, **kwargs):
         assert job.endpoint is not None and spec == SPEC
         assert kwargs["video"] is delivery
+        if continuous:
+            assert kwargs["policy"] is MediaPolicy.CONTINUOUS
         events.append("tcp_open")
         return pump
     monkeypatch.setattr(worker_module, "open_tcp_media", opening)
@@ -132,10 +137,12 @@ def test_shared_worker_orders_avclose_tcp_close_then_broker_release(monkeypatch,
             events.append("broker_close")
         return original_send(wire, peer)
     monkeypatch.setattr(udp, "sendto", sending)
-    owner = worker_module.AccountReadWorker(NODE, 1, "192.0.2.1", 1234, clock=lambda: now[0])
+    owner = worker_module.AccountReadWorker(NODE, 1, "192.0.2.1", 1234, clock=lambda: now[0],
+        policy=AccountPolicy.CONTINUOUS if continuous else AccountPolicy.FINITE)
     ticket = submit(owner)
     result = owner.run(udp, initial_media=SPEC, with_media_tcp=True,
         video_delivery=delivery,
+        media_policy=MediaPolicy.CONTINUOUS if continuous else MediaPolicy.FINITE,
         cancelled=lambda: cancel and tcp_owner.ready, wait=lambda seconds: None)
     assert result.reason == ("stopped" if cancel else "media_complete")
     assert result.tcp.close_acknowledged and result.media.broker_release

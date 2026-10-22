@@ -12,6 +12,7 @@ from collections.abc import Callable
 from .av_control_send import ReliableAvControl
 from .av_receive import AvReceiveBatch, AvReceiver
 from .kcp_receive import ReceiveError
+from .media_policy import MediaPolicy, validate_media_policy
 
 
 class AvHandshake:
@@ -24,13 +25,15 @@ the same parser/decoder owner, but do not claim ready or present a live source y
 
     def __init__(self, peer: tuple[str, int], link_id: int, call_id: int, cookie: bytes, *,
                  request_user_data: bytes | None = None,
+                 policy: MediaPolicy = MediaPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic) -> None:
+        validate_media_policy(policy)
         self._clock, self._created = clock, clock()
         self._peer, self._link_id, self._call_id = peer, link_id, call_id
         self._init = ReliableAvControl(peer, link_id, call_id, action=1, clock=clock,
                                        request_user_data=request_user_data)
         self._receiver = AvReceiver(peer, link_id, call_id, cookie,
-                                    control_conv=link_id | 0x80000000, clock=clock)
+                                    control_conv=link_id | 0x80000000, clock=clock, policy=policy)
         self._start: ReliableAvControl | None = None
         self._finish: ReliableAvControl | None = None
         self.closed = False

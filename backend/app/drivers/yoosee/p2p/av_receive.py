@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from .av_pending import PendingAv
 from .kcp_receive import KcpReceiver, ReceiveError
+from .media_policy import MediaPolicy, validate_media_policy
 from .media_receive import MediaReceiver
 from .receive_lifecycle import ReceiveLifecycle
 from .stream_protocol import V1EncodingHeader, decrypt_media_tlv
@@ -39,7 +40,9 @@ class AvReceiver:
 
     def __init__(self, peer: tuple[str, int], conv: int, call_id: int, cookie: bytes, *,
                  control_conv: int | None = None,
+                 policy: MediaPolicy = MediaPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic) -> None:
+        validate_media_policy(policy)
         if type(call_id) is not int or not 0 <= call_id <= 0xFFFFFFFF:
             raise ValueError("invalid AV call identifier")
         if not isinstance(cookie, bytes) or len(cookie) != 8:
@@ -52,7 +55,7 @@ class AvReceiver:
                          if control_conv is not None else None)
         self._call_id = call_id
         self._cookie = cookie
-        self._transport = ReceiveLifecycle(peer, conv, clock=clock)
+        self._transport = ReceiveLifecycle(peer, conv, clock=clock, policy=policy)
         self._parser = V1Receiver()
         self._pending = PendingAv(clock)
         self._accepted = False

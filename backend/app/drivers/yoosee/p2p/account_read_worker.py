@@ -15,6 +15,7 @@ from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
+from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .ptz_inbox import MotionTicket, PtzInbox
@@ -87,6 +88,7 @@ class AccountReadWorker:
             initial_media: MediaRouteSpec | None = None,
             with_media_tcp: bool = False,
             video_delivery: VideoDelivery | None = None,
+            media_policy: MediaPolicy = MediaPolicy.FINITE,
             wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
         """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
 
@@ -125,6 +127,10 @@ class AccountReadWorker:
         node = self._node
         try:
             assert node is not None
+            validate_media_policy(media_policy)
+            if media_policy is MediaPolicy.CONTINUOUS and (
+                    not with_media_tcp or self._policy is not AccountPolicy.CONTINUOUS):
+                raise ValueError("continuous media requires a continuous account and TCP")
             if type(with_media_tcp) is not bool or (with_media_tcp and initial_media is None):
                 raise ValueError("TCP media requires explicit typed route bootstrap")
             if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
@@ -183,7 +189,10 @@ class AccountReadWorker:
                 if media is not None:
                     if with_media_tcp and media.endpoint is not None and tcp is None:
                         assert initial_media is not None
-                        if video_delivery is None:
+                        if media_policy is MediaPolicy.CONTINUOUS:
+                            tcp = open_tcp_media(media, initial_media, clock=self._clock,
+                                                 video=video_delivery, policy=media_policy)
+                        elif video_delivery is None:
                             tcp = open_tcp_media(media, initial_media, clock=self._clock)
                         else:
                             tcp = open_tcp_media(media, initial_media, clock=self._clock,

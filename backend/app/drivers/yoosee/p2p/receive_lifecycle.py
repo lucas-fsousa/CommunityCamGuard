@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 
 from .kcp_receive import KcpReceiver, ReceiveError
+from .media_policy import MediaPolicy, validate_media_policy
 from .media_receive import MediaReceiveBatch, MediaReceiver
 
 
@@ -25,7 +26,10 @@ This is one negotiated inbound conversation, not a multi-channel session manager
     def __init__(self, peer: tuple[str, int], conv: int, *,
                  initialization_timeout: float = 5.0, idle_timeout: float = 5.0,
                  lifetime: float = 30.0,
+                 policy: MediaPolicy = MediaPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic) -> None:
+        validate_media_policy(policy)
+        self._policy = policy
         for value, upper in ((initialization_timeout, 10), (idle_timeout, 10), (lifetime, 60)):
             if type(value) not in (float, int) or not 0.1 <= value <= upper:
                 raise ValueError("invalid receive lifecycle deadline")
@@ -57,7 +61,7 @@ This is one negotiated inbound conversation, not a multi-channel session manager
         try:
             self._media.receiver.expire()
             now = self._clock()
-            if now - self._started >= self._lifetime:
+            if self._policy is MediaPolicy.FINITE and now - self._started >= self._lifetime:
                 raise ReceiveError("receive lifetime exceeded")
             if self._phase == "initializing":
                 if now - self._started >= self._initialization_timeout:

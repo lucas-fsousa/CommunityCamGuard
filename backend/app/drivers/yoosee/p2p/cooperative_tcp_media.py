@@ -8,6 +8,7 @@ from typing import Protocol
 
 from .contracts import P2PProbeError
 from .kcp_receive import ReceiveError
+from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .mtp_tcp_av import TcpAvSession
 from .mtp_tcp_handshake import build_mtp_tcp_pair_request
@@ -82,6 +83,7 @@ class CooperativeTcpMedia:
                 raise ReceiveError("cooperative TCP peer mismatch")
             self._owner.poll()
             if (not self._closing and self._ready_at is not None and self._video
+                    and self._owner.policy is MediaPolicy.FINITE
                     and self._clock() - self._ready_at >= self._owner.profile.budget.observation_seconds):
                 self._begin_finish()
             for wire in self._owner.due():
@@ -101,6 +103,8 @@ class CooperativeTcpMedia:
             batch = self._owner.receive(data, self._peer)
             if self._owner.ready and self._ready_at is None:
                 self._ready_at = self._clock()
+                if self._owner.policy is MediaPolicy.CONTINUOUS:
+                    self._deadline = float("inf")  # Handshake/idle/assembly deadlines remain active.
             for wire in batch.acknowledgements:
                 self._send(wire)
             for record in batch.records:
@@ -139,12 +143,14 @@ class CooperativeTcpMedia:
 
 def open_tcp_media(job: MediaRouteJob, spec: MediaRouteSpec, *,
                    clock: Callable[[], float] = time.monotonic,
+                   policy: MediaPolicy = MediaPolicy.FINITE,
                    video: VideoDelivery | None = None) -> CooperativeTcpMedia:
     """One reviewed endpoint, bounded connect/pair, no broker login or retry.
 
     Trusted worker owns the broker reservation. Failed opening closes its TCP
     socket; unconfirmed physical close raises beyond ordinary transport failure.
     """
+    validate_media_policy(policy)
     if job.endpoint is None or job.result is not None:
         raise ValueError("media route has no live correlated endpoint")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -158,7 +164,7 @@ def open_tcp_media(job: MediaRouteJob, spec: MediaRouteSpec, *,
             timestamp_ms=int(clock() * 1000)))
         owner = TcpAvSession(job.endpoint, job.attempt.link_id, job.attempt.call_id,
             job.attempt.cookie, source_id=spec.access_id, destination_id=spec.device.device_id,
-            request_user_data=job.metadata, clock=clock)
+            request_user_data=job.metadata, clock=clock, policy=policy)
         return CooperativeTcpMedia(sock, job.endpoint, owner, clock=clock, video=video)
     except BaseException:
         if video is not None:

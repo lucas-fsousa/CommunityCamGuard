@@ -43,6 +43,15 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+Continuous native media policy implemented offline: explicit internal enum preserves
+finite defaults; healthy continuous media no longer expires at finite observation/
+session/cumulative-traffic limits. Constant-space RX/TX/record-rate budgets replace
+cumulative allowances; handshake, idle, assembly and cleanup bounds remain.15 virtual
+minutes/4500 encrypted media messages on one owner and graceful AVCLOSE passed.
+No physical sound/visual tests, camera requests, build or deployment. Next ongoing
+decoder/remux and server-owned source scheduling/fallback, then authorized endurance
+validation. See docs/internal/continuous-media-policy.md; not enabled in dashboard.
+
 2026-10-21 shared queue/consumer REAL camera3 decode PASSED: HTTP200/media_complete,
 37 native video records ->37 decoded HEVC frames at1920x1080,71392bytes,
 timestamp span3700000 raw ticks,0 pre-IDR discards. AVCLOSE/B9 confirmed, both

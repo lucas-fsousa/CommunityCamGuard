@@ -13,6 +13,7 @@ from typing import NoReturn
 from .av_handshake import AvHandshake
 from .av_receive import AvReceiveBatch
 from .kcp_receive import ReceiveError
+from .media_policy import MediaPolicy, MediaRateBudget, validate_media_policy
 from .mtp_tcp_ack import build_mtp_tcp_meter_ack, build_mtp_tcp_plain_meter_ack
 from .mtp_tcp_framing import MtpTcpFramer
 from .mtp_tcp_kcp import unwrap_tcp_relay_kcp, wrap_tcp_relay_kcp
@@ -37,7 +38,11 @@ class TcpAvSession:
                  *, source_id: int, destination_id: int,
                  request_user_data: bytes | None = None,
                  profile: TcpProfile = TcpProfile.SHORT,
+                 policy: MediaPolicy = MediaPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic) -> None:
+        validate_media_policy(policy)
+        self._policy = policy
+        self._traffic = MediaRateBudget(clock=clock)
         validate_profile(profile)
         self._profile = profile
         if type(link_id) is not int or not 0 < link_id <= 0xFFFFFF:
@@ -61,6 +66,10 @@ class TcpAvSession:
         self._measurement_sent = False
         self.closed = False
         self.received_bytes = self.sent_bytes = self.received_records = 0
+
+    @property
+    def policy(self) -> MediaPolicy:
+        return self._policy
 
     @property
     def profile(self) -> TcpProfile:
@@ -97,7 +106,14 @@ class TcpAvSession:
     def poll(self) -> None:
         if self.closed:
             raise ReceiveError("TCP AV session is closed")
-        if self._clock() - self._created >= (self.profile.budget.session_seconds if self.metered else 3):
+        if self.policy is MediaPolicy.CONTINUOUS:
+            try:
+                self._traffic.charge()  # Validate time during silence as well as input.
+            except ValueError:
+                self._fail("TCP AV media clock failed")
+        deadline = (self.profile.budget.session_seconds if self.policy is MediaPolicy.FINITE
+                    else float("inf")) if self.metered else 3
+        if self._clock() - self._created >= deadline:
             self._fail("TCP AV session deadline exceeded")
         try:
             if self._av is not None:
@@ -108,7 +124,12 @@ class TcpAvSession:
 
     def _account(self, wires: tuple[bytes, ...]) -> tuple[bytes, ...]:
         self.sent_bytes += sum(map(len, wires))
-        if self.sent_bytes > MAX_TX_BYTES * self.profile.budget.traffic_multiplier:
+        if self.policy is MediaPolicy.CONTINUOUS:
+            try:
+                self._traffic.charge(tx=sum(map(len, wires)))
+            except ValueError:
+                self._fail("TCP AV transmit rate exceeded")
+        elif self.sent_bytes > MAX_TX_BYTES * self.profile.budget.traffic_multiplier:
             self._fail("TCP AV transmit budget exceeded")
         return wires
 
@@ -138,7 +159,7 @@ class TcpAvSession:
                 and matches_mtp_tcp_measurement_ack(wire, **expected,
                     expected_sequence=1, expected_timestamp_ms=self._tick)):
             self._av = AvHandshake(self._peer, self._link, self._call, self._cookie,
-                                    request_user_data=self._user_data, clock=self._clock)
+                                    request_user_data=self._user_data, clock=self._clock, policy=self.policy)
             self._measurement = b""
             return None
         offset = 14 if wire[1] == 0xD0 else 6
@@ -155,14 +176,18 @@ class TcpAvSession:
             self._fail("TCP AV input must be bytes")
         try:
             self.received_bytes += len(data)
-            if self.received_bytes > MAX_RX_BYTES * self.profile.budget.traffic_multiplier:
+            if self.policy is MediaPolicy.CONTINUOUS:
+                self._traffic.charge(rx=len(data))
+            elif self.received_bytes > MAX_RX_BYTES * self.profile.budget.traffic_multiplier:
                 self._fail("TCP AV receive budget exceeded")
             acknowledgements: list[bytes] = []
             records: list[V1Record] = []
             unhandled = 0
             for wire in self._framer.feed(data):
                 self.received_records += 1
-                if self.received_records > MAX_RECORDS * self.profile.budget.traffic_multiplier:
+                if self.policy is MediaPolicy.CONTINUOUS:
+                    self._traffic.charge(records=1)
+                elif self.received_records > MAX_RECORDS * self.profile.budget.traffic_multiplier:
                     self._fail("TCP AV record budget exceeded")
                 if wire[1] & 0x80:
                     reply = self._meter(wire)

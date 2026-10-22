@@ -360,6 +360,10 @@ test:37 HEVC frames decoded at1920x1080 with confirmed route/media shutdown.
 Continuous delivery is not
 enabled in production. The deployed dashboard
 still uses the existing streaming path.
+An opt-in [continuous media policy](docs/internal/continuous-media-policy.md) now
+passes a15-minute simulated protocol run with bounded traffic and preserved idle/
+cleanup deadlines. Real-camera endurance and ongoing decoder/remux integration
+remain pending; the policy is not enabled by the public API.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
