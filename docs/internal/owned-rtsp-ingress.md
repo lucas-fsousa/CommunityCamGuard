@@ -119,3 +119,11 @@ dropped, a read-only filesystem and256MiB/0.5CPU limits. This is an image smoke
 test, not streaming/hardware acceptance; ARM64 image/worker behaviour remains open.
 No production image is rebuilt/restarted by that check. The current image running
 on the server does not gain this binary until an explicit rebuild.
+
+Packaging acceptance at commit `7a67f11`: both
+[CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40010187514)
+and [Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40010187533)
+passed. CI reported4863 Python tests passed and one skipped, followed by all Node
+contracts. Image built the real amd64 app container and completed the restricted
+import/listener/stop/reap smoke above. This verifies packaging and that local
+lifecycle, not live camera playback, ARM64 execution or production migration.

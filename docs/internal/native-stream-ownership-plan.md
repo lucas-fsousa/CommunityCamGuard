@@ -11,8 +11,9 @@ The historical integration notes below must not be read as a deployment claim.
 routes admitted sources through the existing player socket. The
 [recording-consumer gate](recording-ingress-retirement.md) can suspend one recorder
 and retains admission when cleanup is uncertain. Both have offline coverage;
-startup source scheduling, upstream retirement and durable source selection remain
-pending before production activation.
+startup source scheduling, verified legacy-ingress retirement and runtime source
+handoff remain pending before production activation. Durable intent is now stored
+as described below; it is not itself a physical retirement receipt.
 An [owned RTSP-only process boundary](owned-rtsp-ingress.md) now passes real-binary
 sharing/retirement/owner-death tests on loopback. Migrating existing direct-camera
 ingress remains separate work. Docker/CI now share a verified architecture-aware

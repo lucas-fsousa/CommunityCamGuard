@@ -21,8 +21,8 @@ This section overrides the priorities and pending labels in the chronological hi
    now routes admitted sources through it. Production handoff, source-selection
    UI, audio/timestamps and browser/endurance acceptance remain open.
    [Recording-consumer retirement](docs/internal/recording-ingress-retirement.md)
-   now has a bounded per-camera gate and confirmed child exit; go2rtc producer
-   retirement and durable source selection are still required before activation.
+   now has a bounded per-camera gate and confirmed child exit; existing go2rtc
+   producer retirement and runtime handoff are still required before activation.
    The [owned RTSP ingress boundary](docs/internal/owned-rtsp-ingress.md) now proves
    sharing/retirement/owner-crash cleanup with real go2rtc and loopback fixtures.
    [Durable intent](docs/internal/durable-source-policy.md) now guards config
