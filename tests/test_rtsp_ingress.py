@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock
+from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 from _rtsp_fixture import CameraFixture, describe
@@ -19,15 +20,16 @@ from backend.app.media.source_registry import SourceCleanupUnconfirmed, SourceUn
 
 CAMERA = "cam_" + "c" * 24
 BINARY = Path(__file__).parents[1] / "bin" / "go2rtc"
+STREAM = "ingress_" + "a" * 32
 
 
 def test_rtsp_only_config_has_no_api_exec_encoders_or_camera_backchannel():
-    config = json.loads(worker_config("rtsp://user:fake-password@127.0.0.1:9/synthetic"))
+    config = json.loads(worker_config("rtsp://user:fake-password@127.0.0.1:9/synthetic", stream_name=STREAM))
     assert config["app"]["modules"] == ["rtsp"]
     assert config["api"]["listen"] == config["webrtc"]["listen"] == ""
     assert config["rtsp"]["listen"] == "127.0.0.1:0"
     assert config["streams"] == {
-        "ingress": "rtsp://user:fake-password@127.0.0.1:9/synthetic#backchannel=0",
+        STREAM: "rtsp://user:fake-password@127.0.0.1:9/synthetic#backchannel=0",
     }
     assert not ({"preload", "publish", "ffmpeg", "exec"} & config.keys())
 
@@ -39,12 +41,19 @@ def test_rtsp_only_config_has_no_api_exec_encoders_or_camera_backchannel():
                               "template", "control-byte", "oversize"])
 def test_directives_and_noncanonical_sources_are_rejected(url):
     with pytest.raises(ValueError):
-        worker_config(url)
+        worker_config(url, stream_name=STREAM)
+
+
+@pytest.mark.parametrize("name", ["ingress", "ingress_" + "a" * 31, "ingress_" + "G" * 32,
+                                  "rtsp://127.0.0.1/live", "ingress_" + "a" * 32 + "#x"])
+def test_worker_stream_path_requires_a_bounded_generation(name):
+    with pytest.raises(ValueError, match="generation-specific"):
+        worker_config("rtsp://127.0.0.1:9/synthetic", stream_name=name)
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux memfd ownership")
 def test_private_config_is_sealed_and_cannot_be_modified_or_truncated():
-    data = worker_config("rtsp://127.0.0.1:9/synthetic")
+    data = worker_config("rtsp://127.0.0.1:9/synthetic", stream_name=STREAM)
     fd = sealed_config(data)
     try:
         assert os.fstat(fd).st_mode & 0o777 == 0o600
@@ -194,3 +203,36 @@ def test_real_worker_dies_with_its_owner_and_is_reaped_by_isolated_harness():
         env={"PATH": os.defpath, "PYTHONPATH": str(root)})
     assert len(result.stdout) < 4096
     assert json.loads(result.stdout) == {"worker_killed_on_owner_death": True, "worker_reaped": True}
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not BINARY.is_file(), reason="pinned Linux go2rtc fixture required")
+def test_stale_path_cannot_attach_to_replacement_even_if_its_address_is_reused():
+    with CameraFixture() as camera, ThreadPoolExecutor(max_workers=1) as pool:
+        old = OwnedRtspIngress(CAMERA, camera.url, binary=BINARY)
+        running = pool.submit(old.run, cancelled=lambda: False)
+        try:
+            old_url = wait_ready(old, running)
+            with describe(old_url):
+                assert camera.accepted == 1
+        finally:
+            old.stop()
+            assert running.result(timeout=6) == "stopped"
+        assert camera.closed.wait(2)
+
+        replacement = OwnedRtspIngress(CAMERA, camera.url, binary=BINARY)
+        running = pool.submit(replacement.run, cancelled=lambda: False)
+        try:
+            new_url = wait_ready(replacement, running)
+            new, previous = urlsplit(new_url), urlsplit(old_url)
+            assert new.path != previous.path
+            # Replay the old path against the new listener, simulating OS port
+            # reuse without reserving/probing a previously owned port.
+            stale = urlunsplit((new.scheme, new.netloc, previous.path, "", ""))
+            with pytest.raises(AssertionError):
+                describe(stale)
+            assert camera.accepted == 1
+            with describe(new_url):
+                assert camera.accepted == 2 and camera.peak == 1
+        finally:
+            replacement.stop()
+            assert running.result(timeout=6) == "stopped"

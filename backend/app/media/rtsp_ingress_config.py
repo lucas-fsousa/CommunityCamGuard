@@ -3,12 +3,15 @@
 import fcntl
 import json
 import os
+import re
 from urllib.parse import urlsplit
 
 MAX_CONFIG_BYTES = 16384
 
 
-def worker_config(source_url: str) -> bytes:
+def worker_config(source_url: str, *, stream_name: str) -> bytes:
+    if type(stream_name) is not str or not re.fullmatch(r"ingress_[0-9a-f]{32}", stream_name):
+        raise ValueError("generation-specific worker stream name required")
     if (type(source_url) is not str or not 1 <= len(source_url) <= 4096
             or not source_url.isascii() or any(ord(c) <= 32 or ord(c) == 127 for c in source_url)
             or any(c in source_url for c in "#{}\\")):
@@ -25,7 +28,7 @@ def worker_config(source_url: str) -> bytes:
         "api": {"listen": ""},
         "webrtc": {"listen": ""},
         "rtsp": {"listen": "127.0.0.1:0"},
-        "streams": {"ingress": source_url + "#backchannel=0"},
+        "streams": {stream_name: source_url + "#backchannel=0"},
         "log": {"level": "disabled"},
     }
     data = json.dumps(config, separators=(",", ":")).encode("ascii")

@@ -5,6 +5,7 @@ ingress and own admission. No encoder, browser delivery or fallback starts here.
 """
 
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -26,7 +27,10 @@ class OwnedRtspIngress:
         if type(camera_id) is not str or not valid_camera_id(camera_id):
             raise ValueError("public camera ID required")
         self.camera_id = camera_id
-        self._config = worker_config(source_url)
+        # Never reuse a path across worker generations: an old hub retry hitting
+        # a recycled ephemeral port must not attach to somebody else's ingress.
+        self._stream = "ingress_" + secrets.token_hex(16)
+        self._config = worker_config(source_url, stream_name=self._stream)
         self._binary = binary.resolve()
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -121,7 +125,7 @@ class OwnedRtspIngress:
                 port = self._listener(process)
                 if port is not None:
                     with self._lock:
-                        self._url = f"rtsp://127.0.0.1:{port}/ingress"
+                        self._url = f"rtsp://127.0.0.1:{port}/{self._stream}"
                     break
                 if time.monotonic() >= deadline:
                     raise SourceUnavailable("RTSP worker listener unavailable")

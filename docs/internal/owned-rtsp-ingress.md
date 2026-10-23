@@ -21,6 +21,10 @@ disabled. The worker forwards media without starting an encoder.
 
 The source is lazy: listener readiness does not connect to a camera. Consumers
 share the worker's existing producer. Construction itself performs no source I/O.
+Each worker generation now exposes a distinct random128-bit stream path, not a
+fixed `/ingress` alias. If the OS later recycles its ephemeral port, an old hub
+retry cannot accidentally attach to the replacement generation's stream. This
+is generation isolation, not RTSP authentication; the boundary remains loopback.
 The coordinator must own camera admission before calling `run`; this component
 alone does not prevent a second object or the old shared hub from opening another
 ingress. It is not a `ManagedSource` MSE adapter and must not be inserted directly
@@ -80,6 +84,12 @@ Real-process tests confirm:
    server or pytest process's global child-reaping behaviour.
 4. Cancellation errors and uncertain waits cannot silently lose an owned child;
    unexpected public/extra listeners or oversized procfs inspection fail closed.
+5. Replaying an old generation's path against a replacement listener is rejected
+   without opening its upstream. The correct new path connects normally. This
+   simulates address reuse without reserving/probing a previously owned port.
+
+Generation-isolation follow-up:28 worker/socket cases passed under192MiB/50%CPU,
+peak99.1MiB with zero swap; all upstreams were metadata-only loopback fixtures.
 
 The fixture emits no audio or video frames and uses only127.0.0.1. The expanded
 ownership/gate test run peaked at105.7MiB with zero swap, under a192MiB cgroup and
