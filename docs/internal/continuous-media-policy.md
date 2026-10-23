@@ -213,3 +213,45 @@ browser delivery with expiry/revocation, transport write budgets, audio/timestam
 handling and RTSP fallback remain pending. External RSS/CPU quotas are mandatory
 before production use. No camera operation, build, deployment or browser test was
 performed for this integration.
+
+## Driver-neutral source admission registry
+
+`media/source_registry.py` now provides caller-owned, thread-safe admission by
+stable public camera ID and driver-provided resource domain. It knows no native
+device IDs, brands, MAC matching or credentials. `NativeVideoSource.admission_domain`
+declares the Yoosee driver's current global shared-control exclusion; using a
+different domain for each camera would incorrectly bypass that constraint.
+
+Reservation occurs before the lazy factory. Duplicate cameras, occupied domains,
+shutdown and capacity exhaustion fail without calling the factory. Capacity defaults
+to1 and is explicitly bounded to32; blocked reservations consume capacity, preventing
+unbounded failure history. Independent domains can run together within capacity.
+No worker thread, source login, decoder or background retry is created by the registry.
+The caller owns the run thread and its resource quotas.
+
+`stop()` only latches cancellation; it does not close a socket, invoke driver code
+under the registry lock or release a reservation. The source's run loop must honor
+cancellation and finish its owned resources. A normal return certifies completed
+cleanup and releases admission; any exception after reservation leaves camera and
+domain blocked. There is no optimistic reset. Constructor failures are conservative
+too: factories must be lazy, and unknown partial construction cannot be retried.
+`begin_shutdown()` rejects new admission and signals every owner even if another
+entry is blocked. It is not a join: the caller must still await its run threads.
+
+Subscription delegates to the admitted source outside the registry lock. Registry
+state `running` is not a claim that the first frame is ready; source readiness and
+subscription invalidation remain enforced by NativeVideoSource. The registry is
+not an authentication boundary and does not grant camera capabilities.
+
+Offline tests cover competing camera/domain reservations, cancellation during a
+factory, confirmed-close-before-replacement, independent domains, bounded blocked
+entries and shutdown with failures. Integration tests wrap the actual native source
+owner around fake session/codec adapters: two subscribers share one decoder and an
+unknown decoder close blocks another camera in the same domain. No camera access.
+
+The registry is not instantiated by startup/public routes, and existing go2rtc/RTSP
+ingress is not registered yet. Thus this does not implement or authorize automatic
+fallback. Next integrate source selection with the existing ingress: retire and
+confirm the old source before admitting the replacement, never add a native producer
+alongside RTSP for the same camera. Then wire authorized browser delivery, quota/
+expiry/revocation handling, audio/timestamps and separately authorized endurance.

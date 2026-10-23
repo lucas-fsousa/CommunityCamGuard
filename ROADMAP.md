@@ -43,6 +43,18 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 generic source admission implemented OFFLINE: SourceRegistry reserves a
+public camera ID plus a driver-provided resource domain before calling a lazy
+factory. Default capacity1, bounded configurable capacity<=32; blocked entries count
+toward the limit. Stop is a cancellation signal, not early release. Only a normal
+run return certifying cleanup releases admission; exceptions block replacement.
+Yoosee declares its existing global shared-control domain; core has no brand/MAC/
+credential logic. Tests cover actual NativeVideoSource orchestration with fake
+session/codec, shared consumers, cleanup faults and duplicate admission.
+Still not connected to app startup, routes or existing RTSP/go2rtc ownership.
+Next switching must retire the old camera ingress before starting another; do not
+enable a parallel native producer beside the current RTSP feed.
+
 2026-10-22 native source orchestration implemented OFFLINE: explicit single-run
 NativeVideoSource owns shared P2P session, bounded delivery, one consumer thread,
 one decoder per epoch and shared MP4 hub. Consumer faults stop the account; stop

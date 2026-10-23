@@ -382,6 +382,10 @@ An explicit single-run source adapter now owns the session, consumer thread and
 shared fragment output together, with cancellation and confirmed-shutdown barriers.
 It remains internal: server admission/scheduling, authenticated delivery and fallback
 must be integrated before enabling it for dashboard use.
+A driver-neutral admission registry now prevents duplicate public-camera sources
+and conflicting driver resource domains. Stop keeps the reservation until cleanup
+is confirmed; unknown cleanup blocks replacement. The running RTSP/go2rtc service
+is not yet registered here, so no production source switching is enabled.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

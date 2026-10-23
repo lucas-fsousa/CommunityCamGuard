@@ -25,6 +25,10 @@ class NativeVideoResult:
 
 
 class NativeVideoSource:
+    # Current driver exclusion is global, even across different cameras/accounts.
+    # The generic registry must not derive an independent domain per camera.
+    admission_domain = "yoosee/shared-control"
+
     def __init__(self, camera_id: str, device_id: str):
         self._session = SharedReadSession(camera_id, device_id)
         self._delivery = VideoDelivery()

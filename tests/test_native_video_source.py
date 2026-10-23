@@ -10,6 +10,7 @@ from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_he
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
 from backend.app.media.mp4_fanout import StreamClosedError
+from backend.app.media.source_registry import SourceRegistry, SourceUnavailable
 from tests.test_captured_media import header
 from tests.test_fragmented_mp4 import box
 from tests.test_hevc_recovery import idr
@@ -172,3 +173,47 @@ def test_cancellation_callback_fault_before_start_retires_queue(setup):
     with pytest.raises(RuntimeError, match="cancel failure"):
         source.run(cancelled=fail)
     assert source._delivery.closed and not decoders and not calls
+
+
+def test_registry_drives_native_owner_without_per_reader_sources(setup):
+    source, offered, decoders, _, calls = setup
+    registry = SourceRegistry()
+    camera_id = "cam_" + "a" * 24
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(registry.run, camera_id, domain=source.admission_domain,
+                             factory=lambda: source, cancelled=lambda: False)
+        try:
+            assert offered.wait(2)
+            for _ in range(100):
+                try:
+                    first = registry.subscribe(camera_id)
+                    break
+                except StreamClosedError:
+                    threading.Event().wait(0.002)
+            else:
+                pytest.fail("source never became ready")
+            second = registry.subscribe(camera_id)
+            assert first.take() is second.take()
+            assert first.take() is second.take()
+        finally:
+            registry.stop(camera_id)
+        assert future.result(timeout=3).reason == "stopped"
+    assert registry.state(camera_id) == "idle"
+    assert len(decoders) == 1 and decoders[0].closed
+    assert calls == ["account", "account_closed"]
+    with pytest.raises(StreamClosedError):
+        first.take()
+
+
+def test_native_cleanup_uncertainty_blocks_registry_replacement(setup):
+    source, offered, _, failure, _ = setup
+    registry = SourceRegistry(capacity=2)
+    camera_id = "cam_" + "a" * 24
+    failure[0] = "close"
+    with pytest.raises(module.P2PProbeError, match="shutdown unconfirmed"):
+        registry.run(camera_id, domain=source.admission_domain, factory=lambda: source,
+                     cancelled=offered.is_set)
+    assert registry.state(camera_id) == "blocked"
+    with pytest.raises(SourceUnavailable):
+        registry.run("cam_" + "b" * 24, domain=source.admission_domain,
+                     factory=lambda: pytest.fail("unsafe replacement"), cancelled=lambda: False)
