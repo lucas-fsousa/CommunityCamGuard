@@ -27,7 +27,17 @@ The local deployment `b-a84862f46bfb` includes the restricted temporary-session 
 path. It accepts only registered HD/web sources and rechecks key validity
 during delivery; arbitrary sources and WebRTC negotiation are denied for temporary
 sessions. Public delegated login is active, with per-key grants.
-Primary/legacy behavior is unchanged. See [activation and rollout](../internal/delegated-access-activation.md).
+See [activation and rollout](../internal/delegated-access-activation.md).
+
+Source-admission hardening (code, not yet deployed): primary sessions now accept
+only exact registered `{camera_id}`, `{camera_id}_hd` or `{camera_id}_web` aliases,
+with exactly one `src` query parameter. Arbitrary URLs/producer expressions,
+unknown IDs, nested suffixes and extra/duplicate parameters are rejected. Temporary
+sessions retain HD/web-only MSE restrictions. Both legacy paths require active
+legacy intent and retain its revision; source changes, camera removal or storage
+failure invalidate the open channel during periodic session checks. Legacy
+recovery returns409 for nonlegacy/transitioning/blocked intent. This is not a
+physical RTSP/WebRTC retirement receipt or an atomic source-switch operation.
 
 ## Authentication
 

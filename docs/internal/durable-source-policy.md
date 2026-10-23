@@ -50,14 +50,27 @@ the coordinator must still suspend/drain them explicitly.
 
 ## Scope remaining
 
-These guards protect newly generated configuration and new recording consumers.
-They do not modify a running go2rtc stream object, close existing browser sockets,
-prevent all external clients from bypassing the dashboard, serialize all runtime
-reload callbacks, or prove physical old-source closure. Browser-session migration,
-runtime owned-source bindings, the actual coordinator and controlled migration of
-the old shared ingress are still pending. Native audio/recording integration and
-hardware acceptance are also separate. Production startup still activates no
-native sources or owned RTSP workers.
+`media/browser_ingress.py` now binds legacy browser admission to the configured
+opaque ID and exact durable selection revision. The primary proxy accepts only
+base/HD/web aliases and a single `src` parameter; the temporary bridge retains its
+HD/web-only MSE protocol. Neither accepts arbitrary producer URLs. Nonlegacy,
+transitioning/blocked or corrupt intent rejects new legacy viewers. The existing
+session watcher checks both authority and this lease: a revision change, removed
+camera or database failure closes signaling/MSE and awaits its upstream/task
+cleanup. Returning to legacy under a later revision does not revive old leases.
+Legacy recovery holds a policy snapshot through its hub request and returns409
+instead of invoking recovery for nonlegacy intent.
+
+This polling guard is not atomic with upstream connection establishment: a viewer
+admitted just before a committed transition can still reach the hub before its
+next check. The future coordinator must gate admission and await drains before
+retirement/replacement. A WebRTC peer may survive closure of its signaling socket.
+These guards do not modify a running go2rtc source, retire independent WebRTC
+peers, prevent all external clients from bypassing the dashboard, serialize all
+runtime reload callbacks, or prove physical old-source closure. Runtime bindings,
+the actual coordinator and controlled migration of the old shared ingress remain
+pending. Native audio/recording and hardware acceptance are also separate. These
+browser changes are not deployed; startup still activates no native/owned source.
 
 ## Evidence
 
@@ -73,3 +86,8 @@ under a192MiB/50%-CPU scope. All process creation in these policy cases is mocke
 See the separately tested [owned ingress](owned-rtsp-ingress.md) for real local
 socket retirement and [recording gate](recording-ingress-retirement.md) for the
 in-memory consumer hold.
+
+Browser guard evidence:54 focused alias/lease/primary-proxy/session cases passed
+at144.2MiB/no swap;117 temporary/native/recovery/auth-inventory/origin/redaction
+regressions passed at150.1MiB/no swap. Mypy325 modules and Ruff passed. Upstreams
+were synthetic in-memory sockets; no camera, media process or deployment occurred.

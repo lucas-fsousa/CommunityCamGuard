@@ -5,10 +5,11 @@ import asyncio
 import threading
 from types import SimpleNamespace
 
-from starlette.datastructures import URL, Headers
+from starlette.datastructures import URL, Headers, QueryParams
 from starlette.websockets import WebSocketState
 
 from backend.app.api import media as media_routes
+from backend.app.db import registry
 
 
 class _Upstream:
@@ -37,11 +38,11 @@ class _Upstream:
 
 
 class _Browser:
-    def __init__(self) -> None:
+    def __init__(self, source: str) -> None:
         self.cookies = {media_routes.COOKIE_NAME: "test-token"}
         self.headers = Headers({"host": "testserver"})
         self.url = URL("ws://testserver/api/go2rtc/ws")
-        self.query_params = {"src": "cam_test_hd"}
+        self.query_params = QueryParams({"src": source})
         self.application_state = WebSocketState.CONNECTING
         self._messages = iter((
             {"type": "websocket.receive", "text": '{"type":"webrtc/offer","value":"test"}'},
@@ -65,6 +66,8 @@ class _Browser:
 
 
 def test_ws_proxy_cancels_and_awaits_upstream_reader_on_browser_disconnect(monkeypatch):
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:03")
     upstream = _Upstream()
     urls: list[str] = []
 
@@ -80,8 +83,8 @@ def test_ws_proxy_cancels_and_awaits_upstream_reader_on_browser_disconnect(monke
         lambda: SimpleNamespace(go2rtc_api="http://go2rtc:1984"),
     )
 
-    asyncio.run(media_routes.go2rtc_ws(_Browser()))
+    asyncio.run(media_routes.go2rtc_ws(_Browser(camera.camera_id + "_hd")))
 
-    assert urls and urls[0].endswith("/api/ws?src=cam_test_hd")
+    assert urls and urls[0].endswith("/api/ws?src=" + camera.camera_id + "_hd")
     assert upstream.sent == ['{"type":"webrtc/offer","value":"test"}']
     assert upstream.reader_cancelled.wait(timeout=1)

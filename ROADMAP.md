@@ -31,6 +31,10 @@ This section overrides the priorities and pending labels in the chronological hi
    sources are not activated by startup.
    Docker/CI now share pinned amd64/arm64 worker packaging with SHA256 verification;
    this does not complete ARM64 Docker or owned-worker hardware acceptance.
+   Legacy browser admission now rejects unregistered/arbitrary sources and binds
+   primary/temporary viewers to a durable revision. Open signaling/MSE channels
+   close on revision changes; legacy recovery rejects nonlegacy intent. WebRTC
+   peer retirement and atomic handoff are still separate; not deployed yet.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

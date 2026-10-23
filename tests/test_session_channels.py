@@ -4,12 +4,13 @@ import asyncio
 import threading
 
 import pytest
-from starlette.datastructures import URL, Headers
+from starlette.datastructures import URL, Headers, QueryParams
 from starlette.websockets import WebSocketState
 
 from backend.app import auth, session_channels
 from backend.app.api import intercom, media
 from backend.app.camera_identity import stable_camera_id
+from backend.app.db import registry
 from backend.app.drivers.contracts import AudioMessageResult
 
 
@@ -19,7 +20,7 @@ class Socket:
         self.headers = Headers({"host": "testserver"})
         self.url = URL("ws://testserver/api/go2rtc/ws")
         self.cookies = {auth.COOKIE_NAME: auth.issue_token()}
-        self.query_params = {"src": "synthetic"}
+        self.query_params = QueryParams({"src": stable_camera_id("mac", "aa:bb:cc:dd:ee:03") + "_hd"})
         self.closed = []
         self.accepted = False
 
@@ -200,6 +201,8 @@ def test_close_helper_preserves_parent_cancellation():
 
 
 def test_media_expired_session_closes_upstream_and_both_pumps(monkeypatch):
+    registry.init_db()
+    registry.upsert_camera("aa:bb:cc:dd:ee:03")
     socket = Socket()
     cleaned = []
     valid = [True]
@@ -227,6 +230,8 @@ def test_media_expired_session_closes_upstream_and_both_pumps(monkeypatch):
 
 
 def test_media_rechecks_real_cookie_expiry(monkeypatch):
+    registry.init_db()
+    registry.upsert_camera("aa:bb:cc:dd:ee:03")
     from itsdangerous import TimestampSigner
     now = [1000000]
     monkeypatch.setattr(TimestampSigner, "get_timestamp", lambda _: now[0])

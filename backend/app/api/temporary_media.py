@@ -1,11 +1,10 @@
 """Restricted MSE-only media bridge for staged temporary sessions.
 
 Never forward arbitrary source URLs, binary uploads or WebRTC/HLS negotiation.
-The normal primary/legacy proxy remains separate and unchanged.
+The primary proxy is separate; both bind legacy admission to durable source intent.
 """
 
 import asyncio
-import re
 from urllib.parse import quote
 
 import websockets
@@ -13,34 +12,32 @@ from starlette.websockets import WebSocket, WebSocketState
 
 from .. import auth
 from ..config import get_settings
-from ..db import registry
+from ..media.browser_ingress import admit_legacy, camera_for_source
 from ..media.mse_protocol import mse_request
 from ..origin_policy import browser_origin_allowed
 from ..session_channels import close_channel, run_guarded
 
-_SOURCE = re.compile(r"(cam_[0-9a-f]{24})_(hd|web)")
-
 
 async def serve_temporary_media(socket: WebSocket, token: str) -> None:
     src = socket.query_params.get("src", "")
-    match = _SOURCE.fullmatch(src)
-    if (not match or list(socket.query_params.multi_items()) != [("src", src)]
+    camera_id = camera_for_source(src, allow_base=False)
+    if (camera_id is None or list(socket.query_params.multi_items()) != [("src", src)]
             or not browser_origin_allowed(socket)):
         await socket.close(code=1008)
         return
 
-    camera_id = match[1]
-    def valid() -> bool:
-        return auth.verify_permission_token(token, "live") and registry.get_camera_by_id(camera_id) is not None
+    def admission():
+        return admit_legacy(camera_id) if auth.verify_permission_token(token, "live") else None
 
     try:
-        allowed = await asyncio.wait_for(asyncio.to_thread(valid), 5)
+        viewer = await asyncio.wait_for(asyncio.to_thread(admission), 5)
     except Exception:
-        allowed = False
-    if not allowed:
+        viewer = None
+    if viewer is None:
         await socket.close(code=1008)
         return
-    await run_guarded(socket, token, lambda: _bridge(socket, src), lambda _: valid())
+    await run_guarded(socket, token, lambda: _bridge(socket, src),
+                      lambda _: auth.verify_permission_token(token, "live") and viewer.valid())
 
 
 async def _bridge(socket: WebSocket, src: str) -> None:

@@ -405,8 +405,12 @@ An [owned RTSP ingress worker](docs/internal/owned-rtsp-ingress.md) now supplies
 verified process/socket retirement boundary, tested with real go2rtc and loopback
 fixtures, including server-owner crashes. A
 [durable source-intent guard](docs/internal/durable-source-policy.md) now protects
-config regeneration and recorder admission across restarts. Production still uses
-its current shared hub; runtime bindings/migration and hardware acceptance remain.
+config regeneration and recorder admission across restarts. Legacy browser
+admission also checks the configured public ID and current source revision;
+open signaling/MSE sessions are revalidated, and recovery rejects transitioning
+sources. This does not drain an independently negotiated WebRTC peer. Production
+still uses its current shared hub; runtime bindings/migration and hardware
+acceptance remain. These new guards require an explicit deployment.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

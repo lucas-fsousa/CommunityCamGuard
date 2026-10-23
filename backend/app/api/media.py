@@ -18,7 +18,9 @@ from ..auth import COOKIE_NAME, require_auth, token_principal
 from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
+from ..db import source_policy
 from ..media import quality
+from ..media.browser_ingress import admit_legacy, camera_for_source
 from ..media.diagnostic_fields import public_metrics
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
@@ -140,8 +142,11 @@ def media_recover(camera_id: str, request: Request) -> dict:
     media = getattr(request.app.state, "media", None)
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
-    if not media.release_live_producers(camera.camera_id):
-        raise HTTPException(status_code=502, detail="local stream recovery failed")
+    with source_policy.snapshot((camera.camera_id,)) as selections:
+        if not selections[camera.camera_id].permits_legacy_rtsp:
+            raise HTTPException(status_code=409, detail="camera source is not available for legacy recovery")
+        if not media.release_live_producers(camera.camera_id):
+            raise HTTPException(status_code=502, detail="local stream recovery failed")
     return {"ok": True}
 
 
@@ -153,7 +158,10 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
         await websocket.close(code=1008)
         return
     source = websocket.query_params.get("src", "")
-    camera_id = source.removesuffix("_hd").removesuffix("_web")
+    camera_id = camera_for_source(source)
+    if camera_id is None or list(websocket.query_params.multi_items()) != [("src", source)]:
+        await close_channel(websocket, 1008)
+        return
     if camera_id in claimed_sources(websocket):
         await serve_native_video(websocket, camera_id, source=source)
         return
@@ -165,8 +173,15 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
             return
         await websocket.close(code=1008)
         return
+    try:
+        viewer = await asyncio.wait_for(asyncio.to_thread(admit_legacy, camera_id), 5)
+    except Exception:
+        viewer = None
+    if viewer is None:
+        await close_channel(websocket, 1013)
+        return
     await run_guarded(websocket, websocket.cookies.get(COOKIE_NAME) or "",
-                      lambda: _proxy_media(websocket), verify_token)
+                      lambda: _proxy_media(websocket), lambda token: verify_token(token) and viewer.valid())
 
 
 async def _proxy_media(websocket: WebSocket) -> None:
