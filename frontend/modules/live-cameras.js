@@ -112,7 +112,7 @@ function camBar(cam) {
   const actions = el("span", { className: "bar-actions" });
   if (caps.ptz && allowed("ptz")) actions.append(el("span", { className: "ptz-slot" }, ptzControls(cam)));
   if (allowed("live")) {
-    if (cam.has_quality_variants) actions.append(qualityControls(cam));
+    if (cam.has_quality_variants && !state.nativeSources?.includes(cam.id)) actions.append(qualityControls(cam));
     actions.append(zoomControls(cam), reload);
   }
   actions.append(cameraControls(cam, {

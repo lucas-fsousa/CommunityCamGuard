@@ -253,5 +253,9 @@ The registry is not instantiated by startup/public routes, and existing go2rtc/R
 ingress is not registered yet. Thus this does not implement or authorize automatic
 fallback. Next integrate source selection with the existing ingress: retire and
 confirm the old source before admitting the replacement, never add a native producer
-alongside RTSP for the same camera. Then wire authorized browser delivery, quota/
-expiry/revocation handling, audio/timestamps and separately authorized endurance.
+alongside RTSP for the same camera. The
+[authenticated native WebSocket adapter](native-media-delivery.md) now implements
+bounded per-reader delivery and expiry/revocation with isolated ASGI tests.
+It consumes only an explicitly admitted registry; startup does not activate it.
+Source handoff, browser acceptance, audio/timestamps and separately authorized
+endurance remain pending.

@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocketState
 from backend.app import access_keys, auth, session_channels
 from backend.app.api import media, temporary_media
 from backend.app.db import registry
+from backend.app.media.mse_protocol import CODECS
 
 REQUEST = '{"type":"mse","value":"avc1.640029,mp4a.40.2,opus"}'
 
@@ -246,8 +247,8 @@ def test_camera_removal_invalidates_open_stream(env, monkeypatch):
 def test_codec_contract_matches_bundled_player():
     from pathlib import Path
     source = (Path(__file__).parents[1] / "frontend/video-rtc.js").read_text()
-    for codec in temporary_media._CODECS:
+    for codec in CODECS:
         assert f"'{codec}'" in source
     assert json.loads(temporary_media.mse_request(json.dumps({
-        "type": "mse", "value": ",".join(sorted(temporary_media._CODECS)),
+        "type": "mse", "value": ",".join(sorted(CODECS)),
     })))["type"] == "mse"

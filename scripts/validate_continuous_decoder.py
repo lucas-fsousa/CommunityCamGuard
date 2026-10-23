@@ -15,6 +15,7 @@ from backend.app.drivers.yoosee.p2p.video_consumer import VideoConsumer
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from backend.app.media.fragmented_mp4 import MAX_BYTES, FragmentedMp4
 from backend.app.media.hevc_decoder import HevcDecoder
+from backend.app.media.mp4_codec import h264_mime
 from backend.app.media.mp4_fanout import Mp4Fanout, Subscription
 
 
@@ -36,6 +37,7 @@ def main(*, mp4: bool = False) -> None:
     hub = Mp4Fanout()
     readers: list[Subscription] = []
     second_reader_bytes = 0
+    mime, codec_level = "", 0
 
     def factory() -> HevcDecoder:
         output = FragmentedMp4() if mp4 else None
@@ -60,6 +62,8 @@ def main(*, mp4: bool = False) -> None:
             consumer.step()
             if outputs:
                 while (chunk := outputs[-1].take()) is not None:
+                    if chunk.initialization:
+                        mime, codec_level = h264_mime(chunk.data)
                     hub.publish(chunk)
                     if not chunk.initialization and not readers:
                         readers = [hub.subscribe(), hub.subscribe()]
@@ -91,7 +95,7 @@ def main(*, mp4: bool = False) -> None:
             "prlimit", "--as=536870912", "--cpu=5", "--nofile=64", "--",
             "ffprobe", "-v", "error", "-protocol_whitelist", "pipe", "-threads", "1",
             "-i", "pipe:0", "-select_streams", "v:0", "-count_frames",
-            "-show_entries", "stream=codec_name,codec_tag_string,pix_fmt,width,height,nb_read_frames",
+            "-show_entries", "stream=codec_name,codec_tag_string,pix_fmt,width,height,level,nb_read_frames",
             "-of", "json"], input=captured, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, timeout=10, check=True)
         if len(probe.stdout) > 4096:
@@ -100,10 +104,12 @@ def main(*, mp4: bool = False) -> None:
         if (len(streams) != 1 or streams[0]["codec_name"] != "h264"
                 or streams[0]["codec_tag_string"] != "avc1" or streams[0]["pix_fmt"] != "yuv420p"
                 or streams[0]["width"] != 64 or streams[0]["height"] != 64
+                or streams[0]["level"] != codec_level
                 or int(streams[0]["nb_read_frames"]) < 50):
             raise RuntimeError("fragmented H264 output validation failed")
         result.update(mp4_bytes=len(captured), mp4_decoded_frames=int(streams[0]["nb_read_frames"]),
-                      shared_readers=len(readers), second_reader_bytes=second_reader_bytes)
+                      shared_readers=len(readers), second_reader_bytes=second_reader_bytes,
+                      mse_mime=mime, h264_level=codec_level)
     print(json.dumps(result))
 
 

@@ -24,6 +24,7 @@ from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
 from ..session_channels import close_channel, run_guarded
+from .native_media import claimed_sources, serve_native_video
 from .temporary_media import serve_temporary_media
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -53,6 +54,7 @@ def media_streams(request: Request) -> dict:
         "live_quality": settings.live_quality,
         "quality_levels": list(quality.LEVELS),
         "live_hwaccel": settings.live_hwaccel,
+        "native_sources": list(claimed_sources(request)),
     }
 
 
@@ -61,7 +63,10 @@ def media_activity(request: Request) -> dict:
     """Return per-stream video-packet liveness for the browser freeze watchdog."""
 
     media = getattr(request.app.state, "media", None)
-    return media.stream_activity() if media else {}
+    activity = media.stream_activity() if media else {}
+    native = set(claimed_sources(request))
+    return {sid: value for sid, value in activity.items()
+            if sid.removesuffix("_hd").removesuffix("_web") not in native}
 
 
 _MEDIA_CLIENT_EVENTS = {
@@ -96,7 +101,8 @@ def media_client_event(body: MediaClientEventIn, request: Request) -> dict:
     event["at"] = datetime.now(UTC).isoformat(timespec="milliseconds")
     media = getattr(request.app.state, "media", None)
     try:
-        activity = media.stream_activity().get(body.stream) if media else None
+        activity = (media.stream_activity().get(body.stream)
+                    if media and camera.camera_id not in claimed_sources(request) else None)
     except Exception:  # diagnostics must never interfere with live playback
         activity = None
     if isinstance(activity, dict):
@@ -127,6 +133,10 @@ def media_recover(camera_id: str, request: Request) -> dict:
         camera = None
     if camera is None:
         raise HTTPException(status_code=404, detail="camera not found")
+    if camera.camera_id in claimed_sources(request):
+        # Native recovery replaces the reader only; never restart legacy producers
+        # or release the shared native source because one viewer requests recovery.
+        return {"ok": True}
     media = getattr(request.app.state, "media", None)
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
@@ -141,6 +151,11 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
 
     if not browser_origin_allowed(websocket):
         await websocket.close(code=1008)
+        return
+    source = websocket.query_params.get("src", "")
+    camera_id = source.removesuffix("_hd").removesuffix("_web")
+    if camera_id in claimed_sources(websocket):
+        await serve_native_video(websocket, camera_id, source=source)
         return
     if not verify_token(websocket.cookies.get(COOKIE_NAME) or ""):
         token = websocket.cookies.get(COOKIE_NAME) or ""

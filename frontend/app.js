@@ -155,6 +155,7 @@ async function boot() {
     if (epoch !== sessionGeneration) return;
     state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
     state.gridHdMax = media.grid_hd_max_cameras ?? 0;
+    state.nativeSources = Array.isArray(media.native_sources) ? media.native_sources : [];
     await Promise.all([
       state.authentication !== "temporary" || state.permissions.length ? loadCameras() : Promise.resolve(render()),
       loadStorage(), state.authentication !== "temporary" ? loadProvisioningStatus() : Promise.resolve(),

@@ -10,6 +10,19 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
 
 ## Live-media authorization
 
+Experimental native delivery: `/api/media/native/{camera_id}/ws` requires the
+normal session cookie, allowed dashboard origin and `live` grant. It consumes
+only an already-admitted shared source; opening this socket cannot activate a
+camera or start an encoder. Current startup does not supply native sources and
+therefore declines with1013. The dashboard continues to use its existing media
+path. See the [delivery contract](../internal/native-media-delivery.md) for the
+bounded video-only MSE protocol and remaining activation requirements.
+When an internal source registry is explicitly supplied, the existing
+`/api/go2rtc/ws?src={camera_id}_hd`/`_web` aliases also use that native source.
+Its stopping/blocked reservation prevents fallback through that alias. The media
+manifest lists reserved native IDs under `native_sources`; current native output
+has one full-resolution video quality. Runtime activation remains pending.
+
 The local deployment `b-a84862f46bfb` includes the restricted temporary-session MSE
 path. It accepts only registered HD/web sources and rechecks key validity
 during delivery; arbitrary sources and WebRTC negotiation are denied for temporary

@@ -15,6 +15,11 @@ This section overrides the priorities and pending labels in the chronological hi
    received/decoded video and confirmed cleanup; continuous shared-account ownership,
    single-producer/fan-out integration and comparative stability remain unfinished.
    Greater consistency than RTSP is a goal to measure, not an established result.
+   Internal continuous ownership, source admission and fanout are now offline-tested.
+   [Authenticated WebSocket delivery](docs/internal/native-media-delivery.md)
+   adds bounded writes and per-reader revocation, and the existing player socket
+   now routes admitted sources through it. Production handoff, source-selection
+   UI, audio/timestamps and browser/endurance acceptance remain open.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

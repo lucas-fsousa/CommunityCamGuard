@@ -62,6 +62,15 @@ class SourceRegistry:
             entry = self._entries.get(camera_id)
             return entry.phase if entry is not None else "idle"
 
+    def camera_ids(self) -> tuple[str, ...]:
+        """Snapshot all reservations, including stopping/uncertain cleanup.
+
+        Delivery must not reopen an old ingress merely because a native source
+        is temporarily unready or its cleanup has not been confirmed.
+        """
+        with self._lock:
+            return tuple(self._entries)
+
     def run(self, camera_id: str, *, domain: str,
             factory: Callable[[], ManagedSource], cancelled: Callable[[], bool]) -> object:
         self._validate(camera_id)

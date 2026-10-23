@@ -28,6 +28,7 @@ from .api.discovery import router as discovery_router
 from .api.intercom import router as intercom_router
 from .api.intercom import stream_router as intercom_stream_router
 from .api.media import router as media_router
+from .api.native_media import router as native_media_router
 from .api.onboarding import router as onboarding_router
 from .api.provisioning import router as provisioning_router
 from .api.provisioning_account import router as provisioning_account_router
@@ -169,6 +170,7 @@ app.include_router(intercom_stream_router)
 app.include_router(vendor_controls_router)
 app.include_router(recordings_router)
 app.include_router(media_router)
+app.include_router(native_media_router)
 app.include_router(cameras_router)
 app.include_router(discovery_router)
 app.include_router(storage_router)

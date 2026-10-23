@@ -370,17 +370,17 @@ decoded147 frames before EOF using one process; this is not browser delivery or
 real-camera endurance validation. No public route enables this consumer.
 The same opt-in path can now transcode HEVC into H.264/AVC fragmented MP4 through
 a bounded output collector. A synthetic check decoded125 frames from the emitted
-fragments. Browser playback, audio, native-source scheduling and fallback remain
-unintegrated; no additional encoder runs in production.
+fragments. Browser acceptance, audio, production source scheduling and fallback
+remain pending; no additional encoder runs in production.
 A bounded shared fragment ring is tested with two local consumers of one encoder;
-slow readers are disconnected independently. This is not yet an HTTP/WebSocket
-endpoint and does not replace the dashboard's existing authenticated media path.
+slow readers are disconnected independently. The authenticated WebSocket adapter
+now consumes this ring; production source activation remains pending.
 The driver can explicitly admit continuous media through its shared-account lifecycle,
 yielding to foreground controls and retaining cleanup barriers. This internal path
 is not started by production services or enabled through a dashboard setting.
 An explicit single-run source adapter now owns the session, consumer thread and
 shared fragment output together, with cancellation and confirmed-shutdown barriers.
-It remains internal: server admission/scheduling, authenticated delivery and fallback
+It remains inactive at startup: production source scheduling and safe fallback
 must be integrated before enabling it for dashboard use.
 A driver-neutral admission registry now prevents duplicate public-camera sources
 and conflicting driver resource domains. Stop keeps the reservation until cleanup
@@ -390,6 +390,11 @@ The installed go2rtc API cannot certify source retirement merely by deleting its
 stream entry. [The handoff audit](docs/internal/go2rtc-source-retirement.md)
 documents the consumer/connection barriers required before native activation;
 no global restart or parallel camera connection workaround is enabled.
+An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
+now serves an explicitly admitted source with bounded writes and per-viewer
+revocation. The existing player socket routes admitted native sources through this
+adapter, including primary and temporary sessions. Startup does not activate a
+native source; production switching and browser acceptance remain pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 
