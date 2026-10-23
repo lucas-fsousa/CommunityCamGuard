@@ -23,6 +23,10 @@ This section overrides the priorities and pending labels in the chronological hi
    [Recording-consumer retirement](docs/internal/recording-ingress-retirement.md)
    now has a bounded per-camera gate and confirmed child exit; go2rtc producer
    retirement and durable source selection are still required before activation.
+   The [owned RTSP ingress boundary](docs/internal/owned-rtsp-ingress.md) now proves
+   sharing/retirement/owner-crash cleanup with real go2rtc and loopback fixtures.
+   Production still needs migration from shared direct-camera ingress, durable
+   selection and consumer gating; this component is not activated by startup.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

@@ -41,8 +41,11 @@ Before enabling native selection/fallback:
 5. Test delayed/failed retirement and concurrent recorder/viewer reconnection
    offline before any explicitly authorized camera-3 deployment.
 
-An owned per-camera ingress boundary or an upstream scoped retirement mechanism
-needs evaluation. No automatic DELETE/restart workaround was introduced.
+The [owned RTSP ingress boundary](owned-rtsp-ingress.md) is now implemented and
+verified with real go2rtc1.9.14 against loopback fixtures. RTSP-only workers can
+provide a per-camera process/socket retirement receipt. Production still uses the
+old shared direct-camera sources, so controlled migration, durable selection and
+consumer gating remain necessary. No DELETE/restart workaround was introduced.
 
 The [recording-consumer gate](recording-ingress-retirement.md) now implements
 per-camera admission suspension and confirmed recording-child cleanup. Resync and

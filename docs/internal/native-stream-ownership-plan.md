@@ -13,6 +13,9 @@ routes admitted sources through the existing player socket. The
 and retains admission when cleanup is uncertain. Both have offline coverage;
 startup source scheduling, upstream retirement and durable source selection remain
 pending before production activation.
+An [owned RTSP-only process boundary](owned-rtsp-ingress.md) now passes real-binary
+sharing/retirement/owner-death tests on loopback. Migrating existing direct-camera
+ingress, packaging the worker and persisting selection remain separate work.
 
 Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in
