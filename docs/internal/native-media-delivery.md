@@ -4,6 +4,11 @@ Status: implemented and tested with isolated ASGI clients and synthetic video.
 Production source scheduling and safe source switching remain pending. No live
 camera session, production deployment or browser rendering test was performed.
 
+The explicit WebSocket route-auth inventory reviews this endpoint's delegation
+to `serve_native_video`, including its `live` grant, origin check and continuing
+session guard. The first CI run caught the missing inventory entry; the reviewed
+gate is now included rather than exempting new WebSocket wrappers generally.
+
 ## Delivery contract
 
 `/api/media/native/{camera_id}/ws` accepts only an opaque configured camera ID,

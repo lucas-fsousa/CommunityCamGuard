@@ -7,11 +7,13 @@ from fastapi import APIRouter
 from fastapi.routing import APIRoute, APIWebSocketRoute
 
 from backend.app import auth, main
+from backend.app.api import native_media
 from backend.app.diagnostics.local_operator import require_local_operator
 
 PUBLIC_HTTP = {("/api/login", "POST"), ("/api/logout", "POST"), ("/api/me", "GET"),
                ("/health", "GET"), ("/api/build", "GET")}
-SOCKETS = {"/api/go2rtc/ws", "/api/cameras/{camera_id}/intercom/stream"}
+SOCKETS = {"/api/go2rtc/ws", "/api/cameras/{camera_id}/intercom/stream",
+           "/api/media/native/{camera_id}/ws"}
 
 
 def routes():
@@ -57,7 +59,15 @@ def test_websocket_exceptions_remain_explicit():
     for route in routes():
         if isinstance(route, APIWebSocketRoute):
             source = inspect.getsource(route.endpoint)
-            assert "verify_token(" in source and "browser_origin_allowed(" in source
+            if route.endpoint is native_media.native_video:
+                # Explicit reviewed delegation; do not exempt arbitrary wrappers.
+                assert "await serve_native_video(socket, camera_id)" in source
+                gate = inspect.getsource(native_media.serve_native_video)
+                assert 'auth.verify_permission_token(token, "live")' in gate
+                assert "browser_origin_allowed(socket)" in gate
+                assert "run_guarded(" in gate
+            else:
+                assert "verify_token(" in source and "browser_origin_allowed(" in source
 
 
 def test_diagnostic_wrapper_retains_authentication_before_local_checks():
