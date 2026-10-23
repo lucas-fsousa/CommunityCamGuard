@@ -41,7 +41,7 @@ from .api.storage import router as storage_router
 from .api.vendor_controls import router as vendor_controls_router
 from .config import get_settings
 from .control_diagnostics import configure as configure_control_diagnostics
-from .db import p2p, registry
+from .db import p2p, registry, source_policy
 from .diagnostics.yoosee_av_api import router as native_av_diagnostic_router
 from .diagnostics.yoosee_broker_reads_api import router as broker_read_diagnostic_router
 from .frontend_build import build_version
@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_control_diagnostics(settings.db_path.parent / "logs")
     registry.init_db()
+    source_policy.init_db()
     p2p.init_db()
     drivers.init_onboarding()
 

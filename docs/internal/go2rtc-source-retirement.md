@@ -47,6 +47,11 @@ provide a per-camera process/socket retirement receipt. Production still uses th
 old shared direct-camera sources, so controlled migration, durable selection and
 consumer gating remain necessary. No DELETE/restart workaround was introduced.
 
+[Durable source intent](durable-source-policy.md) now prevents config regeneration
+and fresh recorder instances from restoring a selected-away direct camera URL.
+The live coordinator, runtime bindings and old-consumer migration remain pending;
+persisting a choice alone never certifies physical retirement.
+
 The [recording-consumer gate](recording-ingress-retirement.md) now implements
 per-camera admission suspension and confirmed recording-child cleanup. Resync and
 storage recovery cannot release that hold. This is part of item1 above; it does

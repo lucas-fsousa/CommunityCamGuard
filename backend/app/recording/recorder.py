@@ -36,7 +36,7 @@ from pathlib import Path
 
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
-from ..db import connect, registry
+from ..db import connect, registry, source_policy
 from ..media import go2rtc
 from .ingress_gate import RecordingIngressGate
 from .process_lifecycle import RecorderCleanupUnconfirmed, retire_process
@@ -251,6 +251,11 @@ class Recorder:
     def _spawn_locked(self, camera_id: str) -> None:
         if self._paused or self.ingress.held_locked(camera_id):
             return
+        with source_policy.snapshot((camera_id,)) as selections:
+            if selections[camera_id].permits_legacy_rtsp:
+                self._spawn_legacy_locked(camera_id)
+
+    def _spawn_legacy_locked(self, camera_id: str) -> None:
         proc = self._procs.get(camera_id)
         if proc is not None:
             if proc.poll() is None:

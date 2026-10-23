@@ -396,8 +396,10 @@ child cleanup retains ownership; global storage pause also survives resync.
 This internal gate does not close the upstream go2rtc camera connection.
 An [owned RTSP ingress worker](docs/internal/owned-rtsp-ingress.md) now supplies a
 verified process/socket retirement boundary, tested with real go2rtc and loopback
-fixtures, including server-owner crashes. Production still uses its current shared
-hub; migration, durable source selection and platform/camera acceptance remain.
+fixtures, including server-owner crashes. A
+[durable source-intent guard](docs/internal/durable-source-policy.md) now protects
+config regeneration and recorder admission across restarts. Production still uses
+its current shared hub; runtime bindings/migration and hardware acceptance remain.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

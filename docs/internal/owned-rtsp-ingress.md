@@ -88,9 +88,11 @@ ownership/gate test run peaked at105.7MiB with zero swap, under a192MiB cgroup a
 ## Remaining integration
 
 The old shared go2rtc process still pulls production camera URLs directly. This
-new receipt applies only to an ingress started inside this boundary. Before live
-selection/fallback, implement durable source policy, gate existing/new consumers,
-and migrate the old ingress under a controlled procedure with verified retirement.
+new receipt applies only to an ingress started inside this boundary. A
+[durable intent guard](durable-source-policy.md) now protects config regeneration
+and new recording admission. Before live selection/fallback, finish runtime
+bindings/browser gating and migrate the old ingress under a controlled procedure
+with verified retirement.
 Recorder suspension is already available through `Recorder.ingress`; native MSE
 delivery is separately implemented. Existing hub config/address recovery must use
 the selected owned loopback source rather than restore the camera URL. Native

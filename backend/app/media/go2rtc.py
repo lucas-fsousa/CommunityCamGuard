@@ -19,12 +19,13 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
-from ..db import registry
+from ..db import registry, source_policy
 from ..db.registry import Camera
 from . import quality
 from .config_file import write_private_config
@@ -85,7 +86,8 @@ def webrtc_page_url(camera_id: str) -> str:
     return f"{get_settings().go2rtc_api.rstrip('/')}/webrtc.html?src={stream_id(camera_id)}"
 
 
-def build_config(cameras: list[Camera] | None = None) -> dict:
+def build_config(cameras: list[Camera] | None = None, *,
+                 selections: Mapping[str, source_policy.Selection] | None = None) -> dict:
     """Build the go2rtc config dict from the registry (or a supplied camera list).
 
     All listeners bind the loopback host (``go2rtc_host``) on the 32xx range — nothing on
@@ -94,11 +96,15 @@ def build_config(cameras: list[Camera] | None = None) -> dict:
     s = get_settings()
     if cameras is None:
         cameras = registry.list_cameras()
+    if selections is None:
+        selections = source_policy.read_for(cam.camera_id for cam in cameras if cam.rtsp_url)
     streams: dict[str, str | list[str]] = {}
     for cam in cameras:
         url = cam.rtsp_url
         if not url:
             continue
+        if not selections[cam.camera_id].permits_legacy_rtsp:
+            continue  # do not resurrect a retired camera URL during resync/recovery
         sid = stream_id(cam.camera_id)
         streams[sid] = url
         # --- browser-facing variants ----------------------------------------------------
@@ -215,14 +221,21 @@ class Go2rtc:
 
     # --- config -------------------------------------------------------------------
     def write_config(self, cameras: list[Camera] | None = None) -> Path:
-        write_private_config(self.config_path, json.dumps(build_config(cameras), indent=2))
+        self._write_config(cameras)
         return self.config_path
 
     def write_config_if_changed(self, cameras: list[Camera] | None = None) -> bool:
         """Write the generated config only when its complete content changed."""
 
-        rendered = json.dumps(build_config(cameras), indent=2)
-        return write_private_config(self.config_path, rendered, only_if_changed=True)
+        return self._write_config(cameras, only_if_changed=True)
+
+    def _write_config(self, cameras: list[Camera] | None, *, only_if_changed: bool = False) -> bool:
+        cameras = registry.list_cameras() if cameras is None else cameras
+        # Keep the policy read lock through the actual file mutation: a transition
+        # cannot commit before a concurrently generated old config finishes writing.
+        with source_policy.snapshot(cam.camera_id for cam in cameras if cam.rtsp_url) as selections:
+            rendered = json.dumps(build_config(cameras, selections=selections), indent=2)
+            return write_private_config(self.config_path, rendered, only_if_changed=only_if_changed)
 
     # --- process ------------------------------------------------------------------
     def is_running(self) -> bool:
