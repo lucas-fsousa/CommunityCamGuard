@@ -20,7 +20,7 @@ from ..auth import verify_intercom_token as verify_token
 from ..drivers import ControlNotReady, ControlOperationError, Unsupported
 from ..origin_policy import browser_origin_allowed
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
-from ..session_channels import run_guarded
+from ..session_channels import close_channel, run_guarded
 from .control_errors import control_failure
 from .local_only import require_local_request, require_local_websocket
 
@@ -307,7 +307,4 @@ async def _stream_audio(websocket: WebSocket, camera_id: str, stop: threading.Ev
                     {"type": "error", "detail": "camera audio stream failed"},
                 )
         if websocket.application_state != WebSocketState.DISCONNECTED:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
+            await close_channel(websocket)

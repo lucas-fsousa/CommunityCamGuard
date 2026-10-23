@@ -15,6 +15,14 @@ CHECK_TIMEOUT = 5.0
 CLOSE_TIMEOUT = 1.0
 
 
+async def close_channel(websocket: WebSocket, code: int = 1000) -> None:
+    """Bound cooperative ASGI close, including close from cancelled work's finally."""
+    try:
+        await asyncio.wait_for(websocket.close(code=code), CLOSE_TIMEOUT)
+    except Exception:
+        pass
+
+
 async def wait_until_invalid(token: str, verify: Callable[[str], bool]) -> None:
     while True:
         await asyncio.sleep(CHECK_INTERVAL)
@@ -45,12 +53,7 @@ async def run_guarded(
                 on_cancel()
             work.cancel()
             if websocket.application_state != WebSocketState.DISCONNECTED:
-                try:
-                    # A stalled ASGI/network close must not retain the guard
-                    # indefinitely after authority has already been revoked.
-                    await asyncio.wait_for(websocket.close(code=1008), CLOSE_TIMEOUT)
-                except Exception:
-                    pass
+                await close_channel(websocket, 1008)
         else:
             await work  # Preserve operation errors for the caller's normal handling.
     finally:

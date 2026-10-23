@@ -127,6 +127,33 @@ def test_operation_failure_propagates_without_leaking_guard():
     asyncio.run(run())
 
 
+def test_cancelled_operation_finally_also_has_bounded_close(monkeypatch):
+    cleaned = []
+
+    class StalledSocket(Socket):
+        async def close(self, code=1000):
+            await asyncio.Future()
+
+    socket = StalledSocket()
+    monkeypatch.setattr(session_channels, "CLOSE_TIMEOUT", 0.01)
+
+    async def operation():
+        await socket.accept()
+        try:
+            await asyncio.Future()
+        finally:
+            await session_channels.close_channel(socket)
+            cleaned.append(True)
+
+    async def run():
+        await asyncio.wait_for(session_channels.run_guarded(
+            socket, "opaque", operation, lambda _: False), 1)
+        assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
+    asyncio.run(run())
+    assert cleaned == [True]
+
+
 def test_parent_cancellation_reaps_guard_and_operation():
     cleaned = []
     async def run():
@@ -143,6 +170,31 @@ def test_parent_cancellation_reaps_guard_and_operation():
         with pytest.raises(asyncio.CancelledError):
             await task
         assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    asyncio.run(run())
+    assert cleaned == [True]
+
+
+def test_close_helper_preserves_parent_cancellation():
+    cleaned = []
+
+    async def run():
+        started = asyncio.Event()
+
+        class StalledSocket(Socket):
+            async def close(self, code=1000):
+                started.set()
+                try:
+                    await asyncio.Future()
+                finally:
+                    cleaned.append(True)
+
+        task = asyncio.create_task(session_channels.close_channel(StalledSocket()))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
     asyncio.run(run())
     assert cleaned == [True]
 

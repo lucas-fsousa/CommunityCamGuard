@@ -10,13 +10,13 @@ import re
 from urllib.parse import quote
 
 import websockets
-from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
+from starlette.websockets import WebSocket, WebSocketState
 
 from .. import auth
 from ..config import get_settings
 from ..db import registry
 from ..origin_policy import browser_origin_allowed
-from ..session_channels import run_guarded
+from ..session_channels import close_channel, run_guarded
 
 _SOURCE = re.compile(r"(cam_[0-9a-f]{24})_(hd|web)")
 _CODECS = frozenset({"avc1.640029", "avc1.64002A", "avc1.640033", "hvc1.1.6.L153.B0",
@@ -104,18 +104,10 @@ async def _bridge(socket: WebSocket, src: str) -> None:
                 await asyncio.gather(*tasks, return_exceptions=True)
     except (ValueError, TimeoutError):
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await _close(socket, 1008)
+            await close_channel(socket, 1008)
     except Exception:
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await _close(socket, 1011)
+            await close_channel(socket, 1011)
     finally:
         if socket.application_state != WebSocketState.DISCONNECTED:
-            await _close(socket)
-
-
-async def _close(socket: WebSocket, code: int = 1000) -> None:
-    """A peer disappearing during teardown isn't an application failure."""
-    try:
-        await socket.close(code=code)
-    except (WebSocketDisconnect, OSError):
-        pass
+            await close_channel(socket)

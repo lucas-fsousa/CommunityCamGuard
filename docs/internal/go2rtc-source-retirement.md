@@ -52,3 +52,9 @@ cooperative ASGI close stalled on transport cannot retain the guard indefinitely
 Tests cover blocked/failed close and verify task cleanup. This bounds the close
 await, not arbitrary cancellation-resistant application code or physical camera
 teardown; it is not a substitute for the ingress retirement barrier above.
+
+2026-10-23 follow-up: the same bounded helper is used by the primary media proxy,
+temporary-access MSE bridge and intercom finalizers. Bounding only the guard's
+close was insufficient: a cancelled operation could itself wait forever in its
+own final close while the guard awaited task cleanup. Regression tests cover this
+second close and preserve parent cancellation without leaking child tasks.

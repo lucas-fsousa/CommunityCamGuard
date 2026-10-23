@@ -23,7 +23,7 @@ from ..media.diagnostic_fields import public_metrics
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
-from ..session_channels import run_guarded
+from ..session_channels import close_channel, run_guarded
 from .temporary_media import serve_temporary_media
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -199,10 +199,7 @@ async def _proxy_media(websocket: WebSocket) -> None:
         log.debug("go2rtc ws proxy ended error_type=%s", type(exc).__name__)
     finally:
         if websocket.application_state != WebSocketState.DISCONNECTED:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
+            await close_channel(websocket)
 
 
 @router.post("/media/restart", dependencies=[Depends(require_auth)])
