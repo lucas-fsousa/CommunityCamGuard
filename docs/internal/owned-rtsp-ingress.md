@@ -97,6 +97,25 @@ Recorder suspension is already available through `Recorder.ingress`; native MSE
 delivery is separately implemented. Existing hub config/address recovery must use
 the selected owned loopback source rather than restore the camera URL. Native
 audio/recording integration and real-camera acceptance also remain pending.
-The app image does not yet bundle a worker binary; CI's fixture download is not a
-runtime install. Deployment must supply a trusted, architecture-matching binary
-before enabling this boundary.
+
+## Artifact packaging
+
+`build_tools/install_go2rtc.py` is now shared by Docker builds and CI. It selects
+the official pinned1.9.14 amd64/arm64 artifact, streams it within a32MiB byte budget,
+checks SHA256 and publishes a verified executable atomically. Different existing
+files and output symlinks are not overwritten; normal failures clean temporary
+files. A matching executable is reused without downloading it again.
+
+The ARM64 artifact is `go2rtc_linux_arm64`, official SHA256
+`359fabade8a7a51e81a55fe6df6b0ef81764a5e1d63179577534eaaa71904b50`.
+Both digests are from the [pinned upstream release](https://github.com/AlexxIT/go2rtc/releases/tag/v1.9.14).
+The Dockerfile uses `TARGETARCH` and supplies `/app/bin/go2rtc`; a non-BuildKit
+build can use the build container's detected architecture. No Go toolchain/native
+compilation or persistent supervisor package is added.
+
+The path-filtered Image workflow builds the amd64 app image on GitHub and checks
+imports plus the owned worker lifecycle with network disabled, all capabilities
+dropped, a read-only filesystem and256MiB/0.5CPU limits. This is an image smoke
+test, not streaming/hardware acceptance; ARM64 image/worker behaviour remains open.
+No production image is rebuilt/restarted by that check. The current image running
+on the server does not gain this binary until an explicit rebuild.

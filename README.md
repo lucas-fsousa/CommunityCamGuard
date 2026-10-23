@@ -154,6 +154,11 @@ docker compose up -d --build
 # The frontend is bind-mounted (live edits); rebuild the app image after backend changes.
 ```
 
+The app image includes a checksum-verified go2rtc1.9.14 worker binary for Linux
+amd64/arm64. Existing deployments still use the separate media-hub service; the
+bundled binary does not enable owned/native source selection automatically.
+ARM64 Docker and the new worker's ARM64 runtime acceptance remain pending.
+
 Or run it directly with Python (spawns/owns the go2rtc binary itself):
 
 ```bash
@@ -183,9 +188,11 @@ firewall.
 > stored passwords undecryptable — streams then fail to authenticate and you must re-enter each
 > password. (The app logs a warning when this happens.)
 
-Need the media engine binary? `go2rtc` is expected at `./bin/go2rtc` (Linux amd64 build from
-the [go2rtc releases](https://github.com/AlexxIT/go2rtc/releases); use the Linux ARM64
-binary instead on aarch64 Ubuntu/PRoot).
+For a Linux source checkout, install the pinned media engine at `./bin/go2rtc` with
+`python build_tools/install_go2rtc.py --output bin/go2rtc`. It detects amd64/arm64
+and verifies the official release digest. It refuses to overwrite a different
+existing binary. The [experimental Termux guide](docs/public/termux.md) also retains
+the manually verified ARM64 installation recipe.
 
 ### Configuration and access: current limits
 

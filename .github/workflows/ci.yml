@@ -23,16 +23,11 @@ jobs:
           scripts/browser_cdp.py scripts/check_browser_session.py
           scripts/check_browser_media.py
           scripts/check_public_channels.py scripts/channel_media_probe.py
+          build_tools/install_go2rtc.py
       - name: Type-check (mypy)
         run: mypy backend/app
       - name: Pinned go2rtc fixture for owned RTSP ingress
-        run: |
-          mkdir -p bin
-          curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 \
-            https://github.com/AlexxIT/go2rtc/releases/download/v1.9.14/go2rtc_linux_amd64 \
-            --output bin/go2rtc
-          printf '%s  %s\n' '32d616af226bd731678ffde328b94cfb94e30339bfefc469cfb76323144615a6' 'bin/go2rtc' | sha256sum --check --status
-          chmod 755 bin/go2rtc
+        run: python build_tools/install_go2rtc.py --arch amd64 --output bin/go2rtc
       - name: Test (pytest)
         timeout-minutes: 10
         # Print the active test and dump thread stacks for a stalled test. The

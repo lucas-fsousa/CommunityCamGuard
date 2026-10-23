@@ -60,6 +60,12 @@ nano .env
 
 Set a unique strong `DASHBOARD_SECRET_KEY` before adding cameras. Keep
 `GO2RTC_BIN=./bin/go2rtc`, `MANAGE_GO2RTC=true` and `AUTOSTART_SERVICES=true`.
+
+Source checkouts also offer `python build_tools/install_go2rtc.py --arch arm64 --output bin/go2rtc`,
+using the same pinned artifact/digest as the manual recipe above. The phone's prior
+acceptance used the manual installation; it does not validate the new owned-ingress
+worker's memfd/parent-death behaviour under PRoot.
+
 For an initial media-only test, set `CONTROL_SESSION_WARMUP=false`, as in the phone
 experiment. Choose recording retention/storage limits that fit the phone; footage
 can quickly exhaust internal storage. Do not publish `.env` or database backups.

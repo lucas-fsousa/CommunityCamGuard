@@ -15,7 +15,8 @@ startup source scheduling, upstream retirement and durable source selection rema
 pending before production activation.
 An [owned RTSP-only process boundary](owned-rtsp-ingress.md) now passes real-binary
 sharing/retirement/owner-death tests on loopback. Migrating existing direct-camera
-ingress and packaging the worker remain separate work.
+ingress remains separate work. Docker/CI now share a verified architecture-aware
+worker installer; actual ARM64 worker/runtime acceptance remains open.
 [Durable source intent](durable-source-policy.md) now guards config writes and
 recorder admission; runtime bindings and the live handoff coordinator are pending.
 

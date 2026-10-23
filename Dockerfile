@@ -9,6 +9,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+ARG TARGETARCH
+# The owned RTSP boundary needs a direct native binary, not a shell wrapper or
+# another container. Verify a pinned architecture-specific artifact once per build.
+COPY build_tools/install_go2rtc.py /tmp/install_go2rtc.py
+RUN python /tmp/install_go2rtc.py --arch "${TARGETARCH}" --output /app/bin/go2rtc \
+    && rm /tmp/install_go2rtc.py
 # Documentation/source edits must not invalidate the dependency installation.
 COPY pyproject.toml ./
 RUN python -c 'import tomllib; data=tomllib.load(open("pyproject.toml", "rb")); print("\n".join(data["project"]["dependencies"] + data["build-system"]["requires"]))' \

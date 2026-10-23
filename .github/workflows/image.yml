@@ -1,0 +1,65 @@
+name: Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - pyproject.toml
+      - backend/**
+      - frontend/**
+      - build_tools/**
+      - .github/workflows/image.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - pyproject.toml
+      - backend/**
+      - frontend/**
+      - build_tools/**
+      - .github/workflows/image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build app image (amd64)
+        run: docker build --tag ccg-image-smoke:ci .
+      - name: Import and owned-ingress smoke without network or camera access
+        run: |
+          docker run --rm -i --network none --read-only --cap-drop ALL \
+            --memory 256m --memory-swap 256m --cpus 0.5 --pids-limit 64 \
+            --env AUTOSTART_SERVICES=false --env PYTHONDONTWRITEBYTECODE=1 \
+            --entrypoint python ccg-image-smoke:ci - <<'PY'
+          import time
+          from concurrent.futures import ThreadPoolExecutor
+          from pathlib import Path
+          import backend.app.main
+          from backend.app.media.rtsp_ingress import OwnedRtspIngress
+
+          worker = OwnedRtspIngress("cam_" + "e" * 24,
+                                    "rtsp://127.0.0.1:9/synthetic",
+                                    binary=Path("/app/bin/go2rtc"))
+          with ThreadPoolExecutor(max_workers=1) as pool:
+              future = pool.submit(worker.run, cancelled=lambda: False)
+              try:
+                  deadline = time.monotonic() + 6
+                  while worker.restream_url is None and not future.done() and time.monotonic() < deadline:
+                      time.sleep(0.02)
+                  if future.done():
+                      future.result()
+                  assert worker.restream_url is not None
+              finally:
+                  worker.stop()
+                  assert future.result(timeout=6) == "stopped"
+          assert worker.pid is None
+          print("App imports and owned RTSP lifecycle passed in the image")
+          PY

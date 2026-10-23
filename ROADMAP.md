@@ -29,6 +29,8 @@ This section overrides the priorities and pending labels in the chronological hi
    regeneration and new recorder admission. Production still needs runtime
    bindings, browser gating and controlled shared-ingress migration; owned/native
    sources are not activated by startup.
+   Docker/CI now share pinned amd64/arm64 worker packaging with SHA256 verification;
+   this does not complete ARM64 Docker or owned-worker hardware acceptance.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,
