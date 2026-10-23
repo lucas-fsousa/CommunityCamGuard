@@ -58,3 +58,9 @@ temporary-access MSE bridge and intercom finalizers. Bounding only the guard's
 close was insufficient: a cancelled operation could itself wait forever in its
 own final close while the guard awaited task cleanup. Regression tests cover this
 second close and preserve parent cancellation without leaking child tasks.
+
+Managed-process follow-up: `Go2rtc.stop()` now waits after escalating to `kill`.
+It retains the process handle and propagates a failed termination wait, preventing
+that managed restart from immediately spawning a replacement. This only confirms
+the owned parent was reaped. It does not certify child FFmpeg retirement, external
+container closure, or per-camera retirement; the handoff blocker above remains.

@@ -240,6 +240,11 @@ class Go2rtc:
         )
 
     def stop(self) -> None:
+        """Reap the owned parent before dropping its handle or allowing restart.
+
+        This is not proof that external go2rtc producers or descendants retired.
+        A failed wait keeps the handle and propagates to abort managed restart.
+        """
         if self._proc is None:
             return
         self._proc.terminate()
@@ -247,6 +252,7 @@ class Go2rtc:
             self._proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self._proc.kill()
+            self._proc.wait(timeout=5)
         self._proc = None
 
     def reload_external(self) -> bool:
