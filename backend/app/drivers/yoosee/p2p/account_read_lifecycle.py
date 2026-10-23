@@ -11,9 +11,12 @@ from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode, OnlineDevice
+from .media_policy import MediaPolicy
+from .media_route_job import MediaRouteSpec
 from .ptz_authority import PtzAuthority, PtzGrant
 from .ptz_inbox import MotionTicket
 from .ptz_scheduler import PtzSpec, ScheduledPtzResult
+from .video_delivery import VideoDelivery
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,8 +159,24 @@ class AccountReadLifecycle:
         del validation
         return self._run(connect, reads, cancelled)
 
+    def run_media(self, connect: Callable[[int], ReadConnection], *,
+                  media: Callable[[ReadConnection], MediaRouteSpec],
+                  delivery: VideoDelivery,
+                  cancelled: Callable[[], bool]) -> WorkerSummary:
+        """Explicit continuous media on the same account/sole reader, no motion.
+
+        The driver builds its exact-device route from the authenticated connection.
+        Caller owns the decoder thread; the worker only hands off bounded frames.
+        """
+        if (self._policy is not AccountPolicy.CONTINUOUS or self._motion_authority.enabled
+                or not isinstance(delivery, VideoDelivery) or delivery.closed):
+            raise ValueError("continuous media-only account and fresh delivery required")
+        return self._run(connect, (), cancelled, media=media, delivery=delivery).worker
+
     def _run(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...],
-             cancelled: Callable[[], bool]) -> ReadBatchSummary:
+             cancelled: Callable[[], bool], *,
+             media: Callable[[ReadConnection], MediaRouteSpec] | None = None,
+             delivery: VideoDelivery | None = None) -> ReadBatchSummary:
         """Claim before auth; permit replacement only after verified physical close.
 
         No I/O under the lifecycle lock. Old results are retained only until the
@@ -185,6 +204,9 @@ class AccountReadLifecycle:
                                        connection.local_port, clock=self._clock,
                                        allow_motion=self._motion_authority.enabled,
                                        policy=self._policy)
+            spec = media(connection) if media is not None else None
+            if media is not None and not isinstance(spec, MediaRouteSpec):
+                raise ValueError("typed authenticated media route required")
             tickets = tuple(worker.mailbox.submit(r.device_id, r.path, r.timeout) for r in reads)
             with self._lock:
                 self._worker = worker
@@ -197,7 +219,12 @@ class AccountReadLifecycle:
                 else:
                     self._state = "active"
             transferred = True
-            summary = worker.run(connection.socket, cancelled=cancelled)
+            if media is None:
+                summary = worker.run(connection.socket, cancelled=cancelled)
+            else:
+                summary = worker.run(connection.socket, cancelled=cancelled,
+                                     initial_media=spec, with_media_tcp=True,
+                                     video_delivery=delivery, media_policy=MediaPolicy.CONTINUOUS)
             return ReadBatchSummary(summary, tuple(worker.mailbox.take(t) for t in tickets))
         finally:
             try:
@@ -219,3 +246,5 @@ class AccountReadLifecycle:
                                         and not summary.tcp.socket_close_failed))
                                    and (summary.motion is None or not summary.motion.start_attempted
                                         or summary.motion.release_delivery_confirmed) else "blocked")
+                if delivery is not None:
+                    delivery.close()

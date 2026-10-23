@@ -1,7 +1,8 @@
 """On-demand continuous read session under the server's legacy exclusion boundary.
 
-Not a periodic warmup, public endpoint or production media source. The server
-supplies its shutdown predicate and owns the calling thread. No actions admitted.
+Not a periodic warmup or public endpoint. The server supplies its shutdown
+predicate and owns the calling thread. Optional media requires an explicit bounded
+delivery queue; controls/motion are not admitted and no decoder runs on this thread.
 """
 
 import threading
@@ -14,11 +15,13 @@ from ..contracts import ControlNotReady
 from .native_ptz import reserve_read_handoff
 from .p2p.account_policy import AccountPolicy
 from .p2p.account_read_connect import ReadConnectFailure, open_read_connection
-from .p2p.account_read_lifecycle import AccountReadLifecycle
+from .p2p.account_read_lifecycle import AccountReadLifecycle, ReadConnection
 from .p2p.account_read_worker import WorkerSummary
 from .p2p.broker_mailbox import MailboxTicket, ReadOutcome
 from .p2p.contracts import P2PProbeError
 from .p2p.control_ownership import ControlChannelBusy, control_channel_contended
+from .p2p.media_route_job import MediaRouteSpec
+from .p2p.video_delivery import VideoDelivery
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,20 +62,29 @@ class SharedReadSession:
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
         return self._lifecycle.take(ticket)
 
-    def run(self, *, cancelled: Callable[[], bool]) -> SharedReadResult:
+    def run(self, *, cancelled: Callable[[], bool],
+            video_delivery: VideoDelivery | None = None) -> SharedReadResult:
+        if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
+                                           or video_delivery.closed):
+            raise ValueError("fresh media delivery required")
         with self._claim:
             if self._started:
                 raise ValueError("shared read session already started")
             self._started = True
-        if self._stop.is_set() or cancelled():
-            return SharedReadResult("stopped")
         try:
-            with reserve_read_handoff(wait=False):
-                return self._run_owned(cancelled)
-        except (ControlChannelBusy, ControlNotReady):
-            return SharedReadResult("busy")
+            if self._stop.is_set() or cancelled():
+                return SharedReadResult("stopped")
+            try:
+                with reserve_read_handoff(wait=False):
+                    return self._run_owned(cancelled, video_delivery)
+            except (ControlChannelBusy, ControlNotReady):
+                return SharedReadResult("busy")
+        finally:
+            if video_delivery is not None:
+                video_delivery.close()
 
-    def _run_owned(self, cancelled: Callable[[], bool]) -> SharedReadResult:
+    def _run_owned(self, cancelled: Callable[[], bool],
+                   delivery: VideoDelivery | None) -> SharedReadResult:
         try:
             entry = p2p.read_registered_enrollment(self._camera_id)
         except Exception:
@@ -89,6 +101,8 @@ class SharedReadSession:
                 return True
             if self._stop.is_set() or cancelled():
                 reason = "stopped"
+            elif delivery is not None and delivery.closed:
+                reason = "consumer_closed"
             elif control_channel_contended():
                 reason = "contended"
             elif self._clock() >= next_check:
@@ -104,12 +118,25 @@ class SharedReadSession:
 
         if should_yield():
             return SharedReadResult(reason or "stopped")
+
+        def connect(_: int) -> ReadConnection:
+            return open_read_connection(entry, camera_id=self._camera_id,
+                                        device_id=self._device_id, cancelled=should_yield)
+
+        def media(connection: ReadConnection) -> MediaRouteSpec:
+            target = connection.target
+            if target is None or str(target.device_id) != self._device_id or not target.status:
+                raise ValueError("shared media authenticated target mismatch")
+            return MediaRouteSpec(entry.access_id, target)
+
         try:
-            result = self._lifecycle.run(lambda _: open_read_connection(entry,
-                camera_id=self._camera_id, device_id=self._device_id,
-                cancelled=should_yield), cancelled=should_yield)
+            if delivery is None:
+                result = self._lifecycle.run(connect, cancelled=should_yield)
+            else:
+                result = self._lifecycle.run_media(connect, media=media, delivery=delivery,
+                                                   cancelled=should_yield)
         except ReadConnectFailure:
             return SharedReadResult(reason or "connection")
-        if result.socket_close_failed:
-            raise P2PProbeError("shared read socket cleanup unconfirmed")
+        if self._lifecycle.state == "blocked":
+            raise P2PProbeError("shared read/media cleanup unconfirmed")
         return SharedReadResult(reason or result.reason, result)

@@ -43,6 +43,13 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 driver continuous media admission connected to the shared-account lifecycle.
+Explicit queue opt-in, authenticated exact-device route, one UDP reader/TCP pump,
+no motion or parallel authentication. Stop/contention/enrollment change/consumer
+closure yield cleanly; TCP/B9/UDP cleanup uncertainty blocks legacy reauthentication.
+47 focused encrypted-fixture tests passed,92.9MiB/no swap; no camera I/O/deployment.
+Remaining: consumer/source orchestration, authenticated browser delivery and fallback.
+
 2026-10-22 shared native output fan-out OFFLINE: one immutable init segment and
 bounded fragment ring shared across at most16 readers (2MiB total/eight fragments).
 Late join starts at the latest completed keyframe fragment; laggards are retired

@@ -375,6 +375,9 @@ unintegrated; no additional encoder runs in production.
 A bounded shared fragment ring is tested with two local consumers of one encoder;
 slow readers are disconnected independently. This is not yet an HTTP/WebSocket
 endpoint and does not replace the dashboard's existing authenticated media path.
+The driver can explicitly admit continuous media through its shared-account lifecycle,
+yielding to foreground controls and retaining cleanup barriers. This internal path
+is not started by production services or enabled through a dashboard setting.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

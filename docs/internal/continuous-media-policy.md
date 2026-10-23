@@ -156,3 +156,29 @@ transport writes and close it on disconnect. References retained by consumers ar
 outside the ring's accounting. There is no public route and no per-browser encoder.
 Next: server-owned source lifecycle/shared-account coordination, authorized delivery,
 audio/timestamps and safe RTSP fallback, followed by separately authorized endurance.
+
+## Driver-owned continuous media admission
+
+`SharedReadSession.run(video_delivery=...)` now explicitly selects continuous media
+through `AccountReadLifecycle.run_media`. Default identity-only runs are unchanged.
+The route is constructed from the freshly authenticated exact online device and
+registered enrollment, not from a browser-supplied native target. Account and media
+policies are both CONTINUOUS; motion admission is rejected on this lifecycle.
+The same account worker owns UDP, media-route sequencing and the cooperative TCP
+pump. No decoder runs on that reader and no second authentication is started.
+
+The driver retains the legacy nonwaiting handoff reservation through AV CLOSE,
+physical TCP close, broker B9 release and physical UDP close. Foreground contention,
+explicit cancellation, credential/enrollment change and consumer queue closure all
+yield the session without automatic reconnect. Media cleanup uncertainty now checks
+the full lifecycle barrier, not only UDP close; missing TCP/B9 receipts or physical
+close failure blocks subsequent legacy authentication. Early cancellation/busy/
+enrollment failures retire the supplied queue. Rejected concurrent lifecycle runs
+do not close an active generation's queue.
+
+47 focused tests passed under192MiB/no-swap/half-CPU limits (92.9MiB peak). These use
+real protocol state machines over deterministic encrypted socket fixtures, not
+cameras: continuous policy/queue propagation, yield reasons, cleanup ordering and
+all four cleanup fault barriers passed. Targeted mypy passed at104.8MiB/no swap.
+This admits media into the server-owned account lifecycle but does not yet start
+the consumer, expose browser subscriptions or enable production source switching.
