@@ -1,5 +1,12 @@
 # Native stream ownership integration plan — 2026-10-11
 
+2026-10-22 update: continuous media, bounded MP4 fanout and generic source admission
+are now internally implemented/offline-tested; see
+[continuous media policy](continuous-media-policy.md). Production switching remains
+blocked on [verified go2rtc ingress retirement](go2rtc-source-retirement.md).
+Deleting a stream through the installed API does not certify physical closure.
+The historical integration notes below must not be read as a deployment claim.
+
 Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in
 [duration budgets](native-tcp-duration-budgets.md).

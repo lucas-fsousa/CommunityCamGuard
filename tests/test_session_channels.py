@@ -82,6 +82,41 @@ def test_normal_completion_does_not_close_as_unauthorized():
     assert socket.closed == []
 
 
+@pytest.mark.parametrize("close_failure", ["blocked", "error"])
+def test_revocation_reaps_tasks_even_when_socket_close_fails(monkeypatch, close_failure):
+    cleaned = []
+    close_cleaned = []
+
+    class BrokenCloseSocket(Socket):
+        async def close(self, code=1000):
+            self.closed.append(code)
+            try:
+                if close_failure == "error":
+                    raise OSError("transport unavailable")
+                await asyncio.Future()
+            finally:
+                close_cleaned.append(True)
+
+    socket = BrokenCloseSocket()
+    monkeypatch.setattr(session_channels, "CLOSE_TIMEOUT", 0.01)
+
+    async def operation():
+        await socket.accept()
+        try:
+            await asyncio.Future()
+        finally:
+            cleaned.append(True)
+
+    async def run():
+        await asyncio.wait_for(session_channels.run_guarded(
+            socket, "opaque", operation, lambda _: False), 1)
+        assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
+    asyncio.run(run())
+    assert socket.closed == [1008]
+    assert cleaned == close_cleaned == [True]
+
+
 def test_operation_failure_propagates_without_leaking_guard():
     async def operation():
         raise ValueError("operation failed")

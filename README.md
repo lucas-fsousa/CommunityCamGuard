@@ -386,6 +386,10 @@ A driver-neutral admission registry now prevents duplicate public-camera sources
 and conflicting driver resource domains. Stop keeps the reservation until cleanup
 is confirmed; unknown cleanup blocks replacement. The running RTSP/go2rtc service
 is not yet registered here, so no production source switching is enabled.
+The installed go2rtc API cannot certify source retirement merely by deleting its
+stream entry. [The handoff audit](docs/internal/go2rtc-source-retirement.md)
+documents the consumer/connection barriers required before native activation;
+no global restart or parallel camera connection workaround is enabled.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

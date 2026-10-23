@@ -12,6 +12,7 @@ from starlette.websockets import WebSocket, WebSocketState
 
 CHECK_INTERVAL = 1.0
 CHECK_TIMEOUT = 5.0
+CLOSE_TIMEOUT = 1.0
 
 
 async def wait_until_invalid(token: str, verify: Callable[[str], bool]) -> None:
@@ -45,7 +46,9 @@ async def run_guarded(
             work.cancel()
             if websocket.application_state != WebSocketState.DISCONNECTED:
                 try:
-                    await websocket.close(code=1008)
+                    # A stalled ASGI/network close must not retain the guard
+                    # indefinitely after authority has already been revoked.
+                    await asyncio.wait_for(websocket.close(code=1008), CLOSE_TIMEOUT)
                 except Exception:
                     pass
         else:

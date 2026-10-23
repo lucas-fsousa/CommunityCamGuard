@@ -2016,5 +2016,13 @@ an unknown creation outcome after a lost response and never retries creation or
 revokes by non-unique label. Node UI and isolated ASGI regression coverage added;
 see [activation/operations](docs/internal/delegated-access-activation.md).
 
+2026-10-22 source-switch audit: installed go2rtc 1.9.14 DELETE only removes the
+stream/config entry; it is not a physical producer-retirement receipt. Native
+activation/fallback must first gate consumers and prove scoped ingress closure,
+including config regeneration. Production is unchanged; see
+[retirement audit](docs/internal/go2rtc-source-retirement.md). Independently,
+revoked-session WebSocket close now has a one-second deadline with blocked/error
+transport regression tests; cancellation still stops the associated work first.
+
 _Convention: when an item is done, mark it `done` and move the technical detail/rationale into an ADR
 under `docs/internal/`._
