@@ -378,6 +378,10 @@ endpoint and does not replace the dashboard's existing authenticated media path.
 The driver can explicitly admit continuous media through its shared-account lifecycle,
 yielding to foreground controls and retaining cleanup barriers. This internal path
 is not started by production services or enabled through a dashboard setting.
+An explicit single-run source adapter now owns the session, consumer thread and
+shared fragment output together, with cancellation and confirmed-shutdown barriers.
+It remains internal: server admission/scheduling, authenticated delivery and fallback
+must be integrated before enabling it for dashboard use.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

@@ -182,3 +182,34 @@ cameras: continuous policy/queue propagation, yield reasons, cleanup ordering an
 all four cleanup fault barriers passed. Targeted mypy passed at104.8MiB/no swap.
 This admits media into the server-owned account lifecycle but does not yet start
 the consumer, expose browser subscriptions or enable production source switching.
+
+## Explicit source ownership adapter
+
+`drivers/yoosee/native_video_source.py` now composes these components in one explicit,
+single-run object. The caller owns `run()` and resource quotas; a single dedicated
+consumer thread owns VideoConsumer, ffmpeg and FragmentedMp4. The account thread
+never decodes video. Epoch changes retire the previous hub and decoder before new
+output is exposed. Internal subscriptions share that hub; no encoder is created
+when a consumer subscribes.
+
+Stop/cancellation closes delivery, asks the account lifecycle to stop and invalidates
+all subscriptions. A consumer failure stops the account and reports only a safe
+reason, not exception payloads. Account exceptions propagate after consumer teardown.
+The owner joins the consumer with a2s bound; unknown thread or decoder termination
+raises `P2PProbeError`, preventing a successful-cleanup report. The source cannot run
+twice and performs no automatic login retry. The legacy account barrier still covers
+TCP/broker/UDP cleanup; the consumer owns no camera socket. A supervisor must not
+replace a source after an unconfirmed-cleanup error.
+
+Offline orchestration tests use fake sessions/codecs and structural video fixtures
+to check two shared subscribers, stop-before-start, cancellation callback faults,
+account/consumer failures, uncertain decoder/thread shutdown and single-run guards.
+They complement the separately tested actual encrypted worker and local ffmpeg
+pipelines, not a claim that the full source has been exercised against a camera.
+
+This adapter is not started by application startup or a public route. Server-wide
+source registry/admission (including cross-camera account constraints), authenticated
+browser delivery with expiry/revocation, transport write budgets, audio/timestamp
+handling and RTSP fallback remain pending. External RSS/CPU quotas are mandatory
+before production use. No camera operation, build, deployment or browser test was
+performed for this integration.

@@ -43,6 +43,15 @@ three cameras online/recording afterward. No sound, white-light command or reset
 
 Historical entries below are evidence, not an instruction to repeat completed tests.
 
+2026-10-22 native source orchestration implemented OFFLINE: explicit single-run
+NativeVideoSource owns shared P2P session, bounded delivery, one consumer thread,
+one decoder per epoch and shared MP4 hub. Consumer faults stop the account; stop
+invalidates subscriptions and joins the consumer before success. Unconfirmed child
+or thread shutdown raises, never silently retries. Tests use fake codecs/session
+plus separate encrypted protocol fixtures; no live camera or production activation.
+Remaining: server-wide source admission/scheduling, authorized transport delivery,
+audio/timestamp handling and safe RTSP fallback, then authorized endurance tests.
+
 2026-10-22 driver continuous media admission connected to the shared-account lifecycle.
 Explicit queue opt-in, authenticated exact-device route, one UDP reader/TCP pump,
 no motion or parallel authentication. Stop/contention/enrollment change/consumer
