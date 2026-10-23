@@ -54,6 +54,7 @@ class StorageMonitor:
         self.resume_percent = s.storage_resume_percent if resume_percent is None else resume_percent
         self.interval = s.storage_check_seconds if interval is None else interval
         self._paused_by_full = False
+        self._pause_pending = False
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -78,14 +79,16 @@ class StorageMonitor:
     def check(self) -> StorageState:
         """Evaluate once and apply the full/resume policy to the recorder."""
         _, _, _, pct = self._used_percent()
-        if not self._paused_by_full and pct >= self.full_percent:
+        if self._pause_pending or (not self._paused_by_full and pct >= self.full_percent):
             self._paused_by_full = True
+            self._pause_pending = True
             if self.recorder is not None:
                 self.recorder.pause()
+            self._pause_pending = False
         elif self._paused_by_full and pct <= self.resume_percent:
-            self._paused_by_full = False
             if self.recorder is not None:
                 self.recorder.resume()
+            self._paused_by_full = False
         return self.state()
 
     # --- background loop ----------------------------------------------------------

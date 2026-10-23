@@ -12,7 +12,7 @@ Custom Uvicorn launchers must retain ``--no-proxy-headers``.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -108,13 +108,11 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        control_sessions.stop()
-        address_recovery.stop()
-        warmer.stop()
-        retention.stop()
-        storage.stop()
-        rec.stop()
-        media.stop()
+        # Attempt every cleanup even if one recorder cannot confirm termination.
+        # ExitStack preserves failure propagation while running callbacks in reverse.
+        with ExitStack() as cleanup:
+            for service in (media, rec, storage, retention, warmer, address_recovery, control_sessions):
+                cleanup.callback(service.stop)
 
 
 # Interactive API docs live at /api/docs (Swagger) and /api/redoc; the raw schema at

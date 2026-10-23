@@ -38,6 +38,8 @@ from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import connect, registry
 from ..media import go2rtc
+from .ingress_gate import RecordingIngressGate
+from .process_lifecycle import RecorderCleanupUnconfirmed, retire_process
 
 log = logging.getLogger(__name__)
 
@@ -153,6 +155,8 @@ class Recorder:
         self._cameras: dict[str, registry.Camera] = {}
         self._paused = False
         self._lock = threading.Lock()
+        self.ingress = RecordingIngressGate(lock=self._lock, retire=self._retire_locked,
+                                           has_process=lambda camera_id: camera_id in self._procs)
         self._stop = threading.Event()
         self._maint: threading.Thread | None = None
 
@@ -191,7 +195,6 @@ class Recorder:
             cameras = registry.list_cameras()
         new_cameras = {c.camera_id: c for c in cameras if c.rtsp_url and c.camera_id}
         camera_ids = list(new_cameras)
-        self._paused = False
         self._ensure_dirs(camera_ids)
         with self._lock:
             self._cameras = new_cameras
@@ -200,14 +203,7 @@ class Recorder:
             for camera_id in [
                 key for key in self._procs if key not in self._cameras
             ]:
-                proc = self._procs[camera_id]
-                if proc.poll() is None:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                self._forget(camera_id)
+                self._retire_locked(camera_id)
             for camera_id in camera_ids:
                 self._spawn_locked(camera_id)
 
@@ -220,14 +216,19 @@ class Recorder:
     def pause(self) -> None:
         """Stop writing to disk (go2rtc keeps streaming); resumes via :meth:`resume`."""
         with self._lock:
-            if self._paused:
+            if self._paused and not self._procs:
                 return
             self._paused = True
             self._terminate_all_locked()
 
     def resume(self) -> None:
         """Allow recording again; the maintenance loop respawns the ffmpeg processes."""
-        self._paused = False
+        with self._lock:
+            # A failed pause may still own a child. Finish that cleanup before
+            # maintenance can admit its replacement, even if disk space recovered.
+            if self._paused and self._procs:
+                self._terminate_all_locked()
+            self._paused = False
 
     @property
     def paused(self) -> bool:
@@ -248,6 +249,8 @@ class Recorder:
         self._retry_at.pop(camera_id, None)
 
     def _spawn_locked(self, camera_id: str) -> None:
+        if self._paused or self.ingress.held_locked(camera_id):
+            return
         proc = self._procs.get(camera_id)
         if proc is not None:
             if proc.poll() is None:
@@ -271,6 +274,12 @@ class Recorder:
         self._procs[camera_id] = self._spawn(camera_id)
         self._spawned_at[camera_id] = time.monotonic()
 
+    def _retire_locked(self, camera_id: str) -> None:
+        process = self._procs.get(camera_id)
+        if process is not None:
+            retire_process(process)
+        self._forget(camera_id)
+
     def _watchdog_locked(self) -> None:
         """Kill any ffmpeg whose memory has run away before it can OOM the host."""
         for camera_id, proc in list(self._procs.items()):
@@ -281,11 +290,13 @@ class Recorder:
                 continue
             log.error("recorder ffmpeg for %s ballooned to %d MB — killing it",
                       camera_id, rss // (1024 * 1024))
-            proc.kill()
             try:
+                proc.kill()
                 proc.wait(timeout=5)  # reap it here; we drop the handle below
-            except subprocess.TimeoutExpired:
-                pass
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                log.error("recorder termination unconfirmed camera_id=%s error_type=%s",
+                          camera_id, type(exc).__name__)
+                continue  # retain ownership; no replacement while this child is alive
             # Book it as a failure right here (the process is gone from _procs, so
             # _spawn_locked will not see the exit) so repeated balloons back off.
             self._procs.pop(camera_id, None)
@@ -367,18 +378,22 @@ class Recorder:
         self._index(list_all=True)  # catch the final segments
 
     def _terminate_all_locked(self) -> None:
-        for proc in self._procs.values():
-            if proc.poll() is None:
-                proc.terminate()
-        for proc in self._procs.values():
+        failed = False
+        for camera_id, proc in list(self._procs.items()):
             try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+                retire_process(proc)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                failed = True
+                log.error("recorder termination unconfirmed camera_id=%s error_type=%s",
+                          camera_id, type(exc).__name__)
+            else:
+                self._forget(camera_id)
         # A deliberate stop is not a failure: clear the backoff so resume() restarts at once.
         # Covers IDs that are only *pending* a respawn too — those hold no entry in _procs.
-        for camera_id in {*self._procs, *self._fails, *self._retry_at, *self._spawned_at}:
+        for camera_id in ({*self._fails, *self._retry_at, *self._spawned_at} - self._procs.keys()):
             self._forget(camera_id)
+        if failed:
+            raise RecorderCleanupUnconfirmed("one or more recording processes did not confirm exit")
 
     def is_recording(self, camera_id: str) -> bool:
         proc = self._procs.get(camera_id)

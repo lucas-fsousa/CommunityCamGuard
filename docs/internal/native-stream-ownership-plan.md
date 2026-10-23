@@ -7,6 +7,13 @@ blocked on [verified go2rtc ingress retirement](go2rtc-source-retirement.md).
 Deleting a stream through the installed API does not certify physical closure.
 The historical integration notes below must not be read as a deployment claim.
 
+2026-10-23: [authenticated native MSE delivery](native-media-delivery.md) now
+routes admitted sources through the existing player socket. The
+[recording-consumer gate](recording-ingress-retirement.md) can suspend one recorder
+and retains admission when cleanup is uncertain. Both have offline coverage;
+startup source scheduling, upstream retirement and durable source selection remain
+pending before production activation.
+
 Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in
 [duration budgets](native-tcp-duration-budgets.md).

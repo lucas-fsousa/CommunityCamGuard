@@ -390,6 +390,10 @@ The installed go2rtc API cannot certify source retirement merely by deleting its
 stream entry. [The handoff audit](docs/internal/go2rtc-source-retirement.md)
 documents the consumer/connection barriers required before native activation;
 no global restart or parallel camera connection workaround is enabled.
+The [recording-consumer gate](docs/internal/recording-ingress-retirement.md) can
+suspend one recorder across registry resync without pausing the others. Failed
+child cleanup retains ownership; global storage pause also survives resync.
+This internal gate does not close the upstream go2rtc camera connection.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

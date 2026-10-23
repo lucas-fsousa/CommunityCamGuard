@@ -44,6 +44,11 @@ Before enabling native selection/fallback:
 An owned per-camera ingress boundary or an upstream scoped retirement mechanism
 needs evaluation. No automatic DELETE/restart workaround was introduced.
 
+The [recording-consumer gate](recording-ingress-retirement.md) now implements
+per-camera admission suspension and confirmed recording-child cleanup. Resync and
+storage recovery cannot release that hold. This is part of item1 above; it does
+not certify closure of the upstream go2rtc producer or complete the other items.
+
 ## Independent session cleanup fix
 
 `session_channels.run_guarded` already cancels media/intercom work on revoked or

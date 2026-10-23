@@ -1,9 +1,11 @@
 """Cover main.py's service-startup orchestration (the lifespan autostart block), which the other
 main tests skip by running with AUTOSTART_SERVICES=false. Services are faked so nothing real spawns.
 """
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import config, main
+from backend.app.recording.process_lifecycle import RecorderCleanupUnconfirmed
 
 
 def _fake_service(name, events):
@@ -41,6 +43,7 @@ def _patch_services(monkeypatch, events):
     monkeypatch.setattr(main, "RetentionCleaner", _fake_service("retention", events))
     monkeypatch.setattr(main, "Warmer", _fake_service("warmer", events))
     monkeypatch.setattr(main, "ControlSessions", _fake_service("controls", events))
+    monkeypatch.setattr(main, "AddressRecovery", _fake_service("recovery", events))
 
 
 def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
@@ -85,3 +88,24 @@ def test_lifespan_external_go2rtc_syncs_without_spawning(monkeypatch):
     assert "media.write_config" not in events and "media.reload_external" not in events
     assert "media.start" not in events
     config.get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("failure", ["controls", "rec", "media"])
+def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch, failure):
+    events = []
+    _patch_services(monkeypatch, events)
+
+    class Failed(_fake_service(failure, events)):
+        def stop(self):
+            events.append(f"{failure}.stop")
+            raise RecorderCleanupUnconfirmed("synthetic cleanup unconfirmed")
+
+    attribute = {"controls": "ControlSessions", "rec": "Recorder", "media": "Go2rtc"}[failure]
+    monkeypatch.setattr(main, attribute, Failed)
+    with pytest.raises(RecorderCleanupUnconfirmed):
+        with TestClient(main.app):
+            pass
+    assert [event for event in events if event.endswith(".stop")] == [
+        "controls.stop", "recovery.stop", "warmer.stop", "retention.stop",
+        "storage.stop", "rec.stop", "media.stop",
+    ]
