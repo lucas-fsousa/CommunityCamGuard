@@ -12,7 +12,7 @@ from starlette.websockets import WebSocket, WebSocketState
 
 from .. import auth
 from ..config import get_settings
-from ..media.browser_ingress import admit_legacy, camera_for_source
+from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.mse_protocol import mse_request
 from ..origin_policy import browser_origin_allowed
 from ..session_channels import close_channel, run_guarded
@@ -27,7 +27,9 @@ async def serve_temporary_media(socket: WebSocket, token: str) -> None:
         return
 
     def admission():
-        return admit_legacy(camera_id) if auth.verify_permission_token(token, "live") else None
+        state = getattr(getattr(socket, "app", None), "state", None)
+        bindings = getattr(getattr(state, "media", None), "owned_ingress", None)
+        return admit_hub(camera_id, bindings) if auth.verify_permission_token(token, "live") else None
 
     try:
         viewer = await asyncio.wait_for(asyncio.to_thread(admission), 5)

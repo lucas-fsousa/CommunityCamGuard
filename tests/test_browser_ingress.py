@@ -2,6 +2,7 @@
 
 import asyncio
 import sqlite3
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -13,7 +14,9 @@ from starlette.websockets import WebSocketDisconnect
 from backend.app import access_keys, auth, session_channels
 from backend.app.api import media
 from backend.app.db import registry, source_policy
-from backend.app.media.browser_ingress import admit_legacy, camera_for_source
+from backend.app.media.browser_ingress import admit_hub, camera_for_source
+from backend.app.media.owned_bindings import OwnedIngressBindings
+from backend.app.media.rtsp_ingress import OwnedRtspIngress
 
 
 @pytest.fixture
@@ -37,16 +40,16 @@ def test_urls_and_noncanonical_aliases_never_resolve(camera, source):
 
 
 def test_revision_change_invalidates_viewer_even_after_return_to_legacy(camera):
-    viewer = admit_legacy(camera.camera_id)
+    viewer = admit_hub(camera.camera_id)
     assert viewer is not None and viewer.valid()
     pending = source_policy.begin_change(camera.camera_id, "legacy_rtsp", expected_revision=0)
-    assert not viewer.valid() and admit_legacy(camera.camera_id) is None
+    assert not viewer.valid() and admit_hub(camera.camera_id) is None
     source_policy.activate(camera.camera_id, expected_revision=pending.revision)
     assert not viewer.valid()
-    fresh = admit_legacy(camera.camera_id)
+    fresh = admit_hub(camera.camera_id)
     assert fresh is not None and fresh.valid()
     registry.delete_camera_by_id(camera.camera_id)
-    assert not fresh.valid() and admit_legacy(camera.camera_id) is None
+    assert not fresh.valid() and admit_hub(camera.camera_id) is None
 
 
 @pytest.fixture(params=["primary", "temporary"])
@@ -137,3 +140,29 @@ def test_recovery_during_transition_never_calls_legacy_hub(camera):
         media.media_recover(camera.camera_id, request)
     assert caught.value.status_code == 409
     release.assert_not_called()
+
+
+def test_owned_binding_withdrawal_closes_open_viewer_without_policy_change(browser):
+    client, camera, connections, closed = browser
+    pending = source_policy.begin_change(camera.camera_id, "owned_rtsp", expected_revision=0)
+    source_policy.activate(camera.camera_id, expected_revision=pending.revision)
+    worker = OwnedRtspIngress(camera.camera_id, "rtsp://127.0.0.1:9/synthetic", binary=Path(__file__))
+    worker._process = Mock(pid=12345)
+    worker._url = "rtsp://127.0.0.1:12345/ingress_" + "a" * 32
+    bindings = OwnedIngressBindings()
+    bindings.attach(worker)
+    release = Mock(return_value=True)
+    engine = SimpleNamespace(owned_ingress=bindings, release_live_producers=release)
+    client.app.state.media = engine
+    assert media.media_recover(camera.camera_id, SimpleNamespace(app=client.app)) == {"ok": True}
+    assert release.call_count == 1
+    with client.websocket_connect(f"/api/go2rtc/ws?src={camera.camera_id}_hd") as socket:
+        socket.send_text('{"type":"mse","value":"avc1.640029"}')
+        assert socket.receive_bytes() == b"synthetic MP4 data"
+        bindings.withdraw(camera.camera_id)
+        with pytest.raises(WebSocketDisconnect):
+            socket.receive_bytes()
+    assert len(connections) == 1 and closed
+    with pytest.raises(HTTPException) as caught:
+        media.media_recover(camera.camera_id, SimpleNamespace(app=client.app))
+    assert caught.value.status_code == 409 and release.call_count == 1

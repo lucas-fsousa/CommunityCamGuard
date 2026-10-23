@@ -38,6 +38,7 @@ from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import connect, registry, source_policy
 from ..media import go2rtc
+from ..media.owned_bindings import OwnedIngressBindings
 from .ingress_gate import RecordingIngressGate
 from .process_lifecycle import RecorderCleanupUnconfirmed, retire_process
 
@@ -141,11 +142,13 @@ def _now() -> str:
 class Recorder:
     """Runs and supervises the per-camera recording ffmpeg processes."""
 
-    def __init__(self, segment_seconds: int | None = None, maint_interval: float = 5.0) -> None:
+    def __init__(self, segment_seconds: int | None = None, maint_interval: float = 5.0, *,
+                 owned_ingress: OwnedIngressBindings | None = None) -> None:
         settings = get_settings()
         self.root = Path(settings.recordings_dir)
         self.segment_seconds = segment_seconds or settings.segment_seconds
         self.maint_interval = maint_interval
+        self.owned_ingress = owned_ingress
         self._procs: dict[str, subprocess.Popen] = {}
         self._spawned_at: dict[str, float] = {}   # monotonic start time, for the health check
         self._fails: dict[str, int] = {}          # consecutive short-lived runs, drives backoff
@@ -252,10 +255,15 @@ class Recorder:
         if self._paused or self.ingress.held_locked(camera_id):
             return
         with source_policy.snapshot((camera_id,)) as selections:
-            if selections[camera_id].permits_legacy_rtsp:
-                self._spawn_legacy_locked(camera_id)
+            selection = selections[camera_id]
+            if selection.permits_legacy_rtsp:
+                self._spawn_hub_locked(camera_id)
+            elif self.owned_ingress is not None:
+                with self.owned_ingress.admission(camera_id, selection) as owned:
+                    if owned is not None:
+                        self._spawn_hub_locked(camera_id)
 
-    def _spawn_legacy_locked(self, camera_id: str) -> None:
+    def _spawn_hub_locked(self, camera_id: str) -> None:
         proc = self._procs.get(camera_id)
         if proc is not None:
             if proc.poll() is None:

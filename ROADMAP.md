@@ -26,8 +26,8 @@ This section overrides the priorities and pending labels in the chronological hi
    The [owned RTSP ingress boundary](docs/internal/owned-rtsp-ingress.md) now proves
    sharing/retirement/owner-crash cleanup with real go2rtc and loopback fixtures.
    [Durable intent](docs/internal/durable-source-policy.md) now guards config
-   regeneration and new recorder admission. Production still needs runtime
-   bindings, browser gating and controlled shared-ingress migration; owned/native
+   regeneration and new recorder admission. Production still needs atomic browser
+   gating/drain and controlled shared-ingress migration; owned/native
    sources are not activated by startup.
    Docker/CI now share pinned amd64/arm64 worker packaging with SHA256 verification;
    this does not complete ARM64 Docker or owned-worker hardware acceptance.
@@ -35,6 +35,10 @@ This section overrides the priorities and pending labels in the chronological hi
    primary/temporary viewers to a durable revision. Open signaling/MSE channels
    close on revision changes; legacy recovery rejects nonlegacy intent. WebRTC
    peer retirement and atomic handoff are still separate; not deployed yet.
+   [Owned runtime bindings](docs/internal/owned-runtime-bindings.md) now connect
+   explicitly supplied workers to hub config, recorder and player admission, keyed
+   by revision/generation. Withdrawal retains ownership until reap; missing runtime
+   state never restores the camera URL. No automatic activation or coordinator yet.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

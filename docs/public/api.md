@@ -33,10 +33,11 @@ Source-admission hardening (code, not yet deployed): primary sessions now accept
 only exact registered `{camera_id}`, `{camera_id}_hd` or `{camera_id}_web` aliases,
 with exactly one `src` query parameter. Arbitrary URLs/producer expressions,
 unknown IDs, nested suffixes and extra/duplicate parameters are rejected. Temporary
-sessions retain HD/web-only MSE restrictions. Both legacy paths require active
-legacy intent and retain its revision; source changes, camera removal or storage
+sessions retain HD/web-only MSE restrictions. Both hub paths require active legacy
+intent or active owned intent with an explicitly shared ready runtime binding,
+retaining the revision and binding identity; source changes, camera removal or storage
 failure invalidate the open channel during periodic session checks. Legacy
-recovery returns409 for nonlegacy/transitioning/blocked intent. This is not a
+recovery returns409 for unavailable/transitioning/blocked hub intent. This is not a
 physical RTSP/WebRTC retirement receipt or an atomic source-switch operation.
 
 ## Authentication

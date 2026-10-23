@@ -19,7 +19,9 @@ sharing/retirement/owner-death tests on loopback. Migrating existing direct-came
 ingress remains separate work. Docker/CI now share a verified architecture-aware
 worker installer; actual ARM64 worker/runtime acceptance remains open.
 [Durable source intent](durable-source-policy.md) now guards config writes and
-recorder admission; runtime bindings and the live handoff coordinator are pending.
+recorder admission. [Runtime bindings](owned-runtime-bindings.md) now connect ready
+owned workers to hub/recorder/browser consumers; the live handoff coordinator,
+atomic admission/drain and controlled legacy migration are pending.
 
 Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in

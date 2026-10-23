@@ -31,9 +31,10 @@ activating the next one. Calling a database method does not perform those action
 
 The go2rtc renderer includes direct camera URLs only for active `legacy_rtsp`
 selections. Transitioning, blocked, native and owned selections omit the base and
-both quality variants. An active `owned_rtsp` selection is deliberately unavailable
-until runtime loopback bindings are integrated; it never falls back to the camera
-URL merely because a worker binding is missing.
+both quality variants. Active `owned_rtsp` now uses a matching ready
+[runtime binding](owned-runtime-bindings.md), when explicitly supplied. Missing,
+withdrawn or wrong-revision bindings omit the source; they never restore its camera
+URL. Startup does not supply a registry or activate an owned worker.
 
 `Go2rtc.write_config`/`write_config_if_changed` retain a policy read transaction
 through rendering and the actual private-file write. A concurrent transition
@@ -41,25 +42,27 @@ writer therefore cannot return committed while an earlier policy snapshot is
 still writing the old camera URL. A standalone `build_config` result is just a
 snapshot; publishing it independently must preserve the same read/apply barrier.
 
-The recorder checks the policy during every new legacy admission, retaining the
+The recorder checks the policy during every new hub admission, retaining the
 read transaction until the child is tracked. It still honours the in-memory
 `Recorder.ingress` gate and global storage pause. A fresh Recorder or an address/
 registry resync cannot admit the old consumer just because an in-memory hold was
 lost. Existing recording children are not terminated by merely writing intent;
-the coordinator must still suspend/drain them explicitly.
+the coordinator must still suspend/drain them explicitly. Owned admission also
+requires the explicitly shared ready runtime binding; input remains the hub base.
 
 ## Scope remaining
 
 `media/browser_ingress.py` now binds legacy browser admission to the configured
 opaque ID and exact durable selection revision. The primary proxy accepts only
 base/HD/web aliases and a single `src` parameter; the temporary bridge retains its
-HD/web-only MSE protocol. Neither accepts arbitrary producer URLs. Nonlegacy,
-transitioning/blocked or corrupt intent rejects new legacy viewers. The existing
+HD/web-only MSE protocol. Neither accepts arbitrary producer URLs. Transitioning/
+blocked, corrupt or native intent rejects hub viewers; owned intent additionally
+requires its runtime binding. The existing
 session watcher checks both authority and this lease: a revision change, removed
 camera or database failure closes signaling/MSE and awaits its upstream/task
 cleanup. Returning to legacy under a later revision does not revive old leases.
 Legacy recovery holds a policy snapshot through its hub request and returns409
-instead of invoking recovery for nonlegacy intent.
+instead of invoking recovery for an unavailable hub source.
 
 This polling guard is not atomic with upstream connection establishment: a viewer
 admitted just before a committed transition can still reach the hub before its
@@ -67,8 +70,8 @@ next check. The future coordinator must gate admission and await drains before
 retirement/replacement. A WebRTC peer may survive closure of its signaling socket.
 These guards do not modify a running go2rtc source, retire independent WebRTC
 peers, prevent all external clients from bypassing the dashboard, serialize all
-runtime reload callbacks, or prove physical old-source closure. Runtime bindings,
-the actual coordinator and controlled migration of the old shared ingress remain
+runtime reload callbacks, or prove physical old-source closure. The actual
+coordinator and controlled migration of the old shared ingress remain
 pending. Native audio/recording and hardware acceptance are also separate. These
 browser changes are not deployed; startup still activates no native/owned source.
 

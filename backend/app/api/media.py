@@ -7,6 +7,7 @@ import json
 import logging
 import urllib.parse
 from collections import deque
+from contextlib import nullcontext
 from datetime import UTC, datetime
 
 import websockets
@@ -20,8 +21,9 @@ from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import source_policy
 from ..media import quality
-from ..media.browser_ingress import admit_legacy, camera_for_source
+from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.diagnostic_fields import public_metrics
+from ..media.owned_bindings import OwnedIngressBindings
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
@@ -143,10 +145,14 @@ def media_recover(camera_id: str, request: Request) -> dict:
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
     with source_policy.snapshot((camera.camera_id,)) as selections:
-        if not selections[camera.camera_id].permits_legacy_rtsp:
-            raise HTTPException(status_code=409, detail="camera source is not available for legacy recovery")
-        if not media.release_live_producers(camera.camera_id):
-            raise HTTPException(status_code=502, detail="local stream recovery failed")
+        selection = selections[camera.camera_id]
+        bindings = getattr(media, "owned_ingress", None)
+        with (bindings.admission(camera.camera_id, selection) if isinstance(bindings, OwnedIngressBindings)
+              else nullcontext(None)) as owned:
+            if not selection.permits_legacy_rtsp and owned is None:
+                raise HTTPException(status_code=409, detail="camera source is not available for hub recovery")
+            if not media.release_live_producers(camera.camera_id):
+                raise HTTPException(status_code=502, detail="local stream recovery failed")
     return {"ok": True}
 
 
@@ -174,7 +180,9 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
         await websocket.close(code=1008)
         return
     try:
-        viewer = await asyncio.wait_for(asyncio.to_thread(admit_legacy, camera_id), 5)
+        state = getattr(getattr(websocket, "app", None), "state", None)
+        bindings = getattr(getattr(state, "media", None), "owned_ingress", None)
+        viewer = await asyncio.wait_for(asyncio.to_thread(admit_hub, camera_id, bindings), 5)
     except Exception:
         viewer = None
     if viewer is None:

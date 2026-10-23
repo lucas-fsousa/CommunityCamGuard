@@ -20,6 +20,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
+from contextlib import nullcontext
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
@@ -29,6 +30,7 @@ from ..db import registry, source_policy
 from ..db.registry import Camera
 from . import quality
 from .config_file import write_private_config
+from .owned_bindings import BoundIngress, OwnedIngressBindings
 
 
 def stream_id(camera_id: str) -> str:
@@ -87,7 +89,8 @@ def webrtc_page_url(camera_id: str) -> str:
 
 
 def build_config(cameras: list[Camera] | None = None, *,
-                 selections: Mapping[str, source_policy.Selection] | None = None) -> dict:
+                 selections: Mapping[str, source_policy.Selection] | None = None,
+                 owned_sources: Mapping[str, BoundIngress] | None = None) -> dict:
     """Build the go2rtc config dict from the registry (or a supplied camera list).
 
     All listeners bind the loopback host (``go2rtc_host``) on the 32xx range — nothing on
@@ -103,8 +106,12 @@ def build_config(cameras: list[Camera] | None = None, *,
         url = cam.rtsp_url
         if not url:
             continue
-        if not selections[cam.camera_id].permits_legacy_rtsp:
-            continue  # do not resurrect a retired camera URL during resync/recovery
+        selection = selections[cam.camera_id]
+        if not selection.permits_legacy_rtsp:
+            binding = owned_sources.get(cam.camera_id) if owned_sources is not None else None
+            if (binding is None or not binding.matches(cam.camera_id, selection)
+                    or (url := binding.url) is None):
+                continue  # missing/withdrawn/stale binding never restores the camera URL
         sid = stream_id(cam.camera_id)
         streams[sid] = url
         # --- browser-facing variants ----------------------------------------------------
@@ -207,11 +214,12 @@ class Go2rtc:
     """Owns the go2rtc process lifecycle and config file."""
 
     def __init__(self, bin_path: Path | None = None, config_path: Path | None = None,
-                 manage: bool | None = None) -> None:
+                 manage: bool | None = None, *, owned_ingress: OwnedIngressBindings | None = None) -> None:
         settings = get_settings()
         self.bin = Path(bin_path or settings.go2rtc_bin)
         self.config_path = Path(config_path or settings.go2rtc_config)
         self.api = settings.go2rtc_api.rstrip("/")
+        self.owned_ingress = owned_ingress
         # Whether we own the go2rtc process. False when go2rtc runs as its own container
         # (compose): we only regenerate its config and ask it to reload — never spawn a binary.
         self.manage = settings.manage_go2rtc if manage is None else manage
@@ -233,8 +241,10 @@ class Go2rtc:
         cameras = registry.list_cameras() if cameras is None else cameras
         # Keep the policy read lock through the actual file mutation: a transition
         # cannot commit before a concurrently generated old config finishes writing.
-        with source_policy.snapshot(cam.camera_id for cam in cameras if cam.rtsp_url) as selections:
-            rendered = json.dumps(build_config(cameras, selections=selections), indent=2)
+        with (source_policy.snapshot(cam.camera_id for cam in cameras if cam.rtsp_url) as selections,
+              self.owned_ingress.snapshot() if self.owned_ingress is not None else nullcontext(None) as bindings):
+            rendered = json.dumps(build_config(cameras, selections=selections,
+                                              owned_sources=bindings), indent=2)
             return write_private_config(self.config_path, rendered, only_if_changed=only_if_changed)
 
     # --- process ------------------------------------------------------------------

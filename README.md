@@ -409,8 +409,11 @@ config regeneration and recorder admission across restarts. Legacy browser
 admission also checks the configured public ID and current source revision;
 open signaling/MSE sessions are revalidated, and recovery rejects transitioning
 sources. This does not drain an independently negotiated WebRTC peer. Production
-still uses its current shared hub; runtime bindings/migration and hardware
-acceptance remain. These new guards require an explicit deployment.
+still uses its current shared hub. [Owned runtime bindings](docs/internal/owned-runtime-bindings.md)
+now connect an explicitly supplied ready worker to the renderer, recording admission
+and player guards without direct-camera fallback. The handoff coordinator, first
+migration and hardware acceptance remain; these paths require explicit deployment
+and are not auto-activated.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this
