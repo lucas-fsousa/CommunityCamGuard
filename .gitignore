@@ -28,6 +28,7 @@ recordings/
 data/
 *.db
 *.sqlite3
+*.source-owner.lock
 
 # Media engine binary (downloaded via scripts/bootstrap)
 go2rtc

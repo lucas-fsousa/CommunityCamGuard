@@ -24,6 +24,7 @@ htmlcov/
 **/*.db
 **/*.sqlite
 **/*.sqlite3
+**/*.source-owner.lock
 **/*.bak
 **/*.old
 data/

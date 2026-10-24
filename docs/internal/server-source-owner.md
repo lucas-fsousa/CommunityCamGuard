@@ -76,3 +76,10 @@ Final focused owner/lifetime/background/restart group:54 passed at136.2MiB,
 zero swap under192MiB/50%-CPU limits. Another59 service/recording/lifespan
 regressions passed at133MiB and28 native/owned/auth/handoff regressions at141.1MiB
 (groups overlap). Ruff and mypy343 source files passed.
+
+At commit `009ff6a`, [CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40119668270)
+passed5071 Python tests (one skipped), frontend contracts, lint and typing.
+[Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40119668229)
+passed the amd64 build and restricted worker smoke. Runtime lock markers are
+excluded from Git and Docker build context. No Windows/ARM64 kernel acceptance
+or automatic source restoration is implied by these results.
