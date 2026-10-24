@@ -57,3 +57,12 @@ Failure cases cover drain timeout, recorder cleanup, Future wait, unreaped child
 binding discard and failure to persist a blocked phase. They return no receipt and
 reject another retirement through the latched instance. Independent-camera policy
 and admission are preserved. Fake process handles never send an OS signal.
+
+The expanded58-case retirement/native/recording/persistence run passed at150.7MiB
+with zero swap. Native direct/alias sockets drain their readers without stopping
+the shared source, then resume against that same owner. At commit `fe077a1`,
+[CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40043825688)
+passed4949 Python tests (one skipped), type/lint and all frontend contracts;
+[Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40043825648)
+passed the amd64 build and restricted worker smoke. Neither workflow deploys or
+establishes camera/native-playback acceptance.

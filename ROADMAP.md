@@ -38,7 +38,8 @@ This section overrides the priorities and pending labels in the chronological hi
    [Owned runtime bindings](docs/internal/owned-runtime-bindings.md) now connect
    explicitly supplied workers to hub config, recorder and player admission, keyed
    by revision/generation. Withdrawal retains ownership until reap; missing runtime
-   state never restores the camera URL. No automatic activation or coordinator yet.
+   state never restores the camera URL. No automatic activation; the retirement
+   coordinator milestone is described below.
    [Registered browser-operation drain](docs/internal/viewer-session-drain.md) now
    gates/counts primary, temporary and native sockets plus recovery. Failed drains
    retain holds; other IDs remain admitted. It is not peer/upstream retirement.

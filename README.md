@@ -411,7 +411,7 @@ open signaling/MSE sessions are revalidated, and recovery rejects transitioning
 sources. This does not drain an independently negotiated WebRTC peer. Production
 still uses its current shared hub. [Owned runtime bindings](docs/internal/owned-runtime-bindings.md)
 now connect an explicitly supplied ready worker to the renderer, recording admission
-and player guards without direct-camera fallback. The handoff coordinator, first
+and player guards without direct-camera fallback. Target activation, first
 migration and hardware acceptance remain; these paths require explicit deployment
 and are not auto-activated.
 An app-owned [browser admission/drain barrier](docs/internal/viewer-session-drain.md)
