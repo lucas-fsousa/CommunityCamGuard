@@ -332,6 +332,13 @@ def test_closed_preparation_can_never_submit_a_late_source_job(retired):
     offer = NativeSourceOffer(camera.camera_id, "test/shared", Mock(), lambda: True)
     session = PreparedNative(offer=offer, selection=receipt.selection, sources=SourceRegistry(), viewers=viewers)
     session.close()
+    viewers.resume(camera.camera_id)
+    replacement_viewer = viewers.admit(camera.camera_id)
+    try:
+        session.close()  # stale confirmed close must not cancel a later generation
+        assert not viewers.is_suspended(camera.camera_id) and not replacement_viewer.cancelled.is_set()
+    finally:
+        viewers.release(replacement_viewer)
     executor = Mock()
     with pytest.raises(SourceUnavailable):
         session.launch(executor)

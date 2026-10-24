@@ -17,6 +17,8 @@ class PreparedNative:
         self.offer, self.selection = offer, selection
         self._sources, self._viewers = sources, viewers
         self._lock = threading.Lock()
+        self._closing = threading.Lock()
+        self._closed = False
         self._stop = threading.Event()
         self._clock = clock
         self._next_check = 0.0  # source-run thread confined; never query DB per frame
@@ -76,7 +78,8 @@ class PreparedNative:
         # Future callbacks run after SourceRegistry.run has returned/raised.
         # Serialize with publication so a finished source cannot reopen the gate.
         with self._lock:
-            self._block_locked()
+            if not self._closed:
+                self._block_locked()
 
     def publish(self, apply_routes: Callable[[], None]) -> None:
         with self._lock:
@@ -92,7 +95,13 @@ class PreparedNative:
 
     def close(self) -> None:
         """No fallback/resume. Caller must await this, retaining handle on failure."""
+        with self._closing:
+            self._close()
+
+    def _close(self) -> None:
         with self._lock:
+            if self._closed:
+                return  # an old receipt must not re-hold a later camera generation
             self._block_locked()
         if self.completion is not None:
             try:
@@ -104,3 +113,5 @@ class PreparedNative:
             except Exception:
                 raise SourceCleanupUnconfirmed("native owner retirement unconfirmed") from None
         self._viewers.suspend(self.offer.camera_id)
+        with self._lock:
+            self._closed = True

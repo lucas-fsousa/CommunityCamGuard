@@ -70,6 +70,9 @@ It never reopens a gate after another thread reports failure.
 Future and drains registered consumers. Unconfirmed cleanup retains the handle and
 registry reservation. Activation errors similarly cancel/await before propagating;
 no automatic fallback, consumer resume or optimistic reset is provided.
+Confirmed close is serialized/idempotent; repeated cleanup or a delayed completion
+callback cannot re-hold a newer generation's viewers. Failed close retains ownership
+and may be retried, never marked closed optimistically.
 
 **Recording stays suspended:** this is experimental video delivery. Native audio,
 recording timestamps and archival input are not integrated yet. Releasing the old
