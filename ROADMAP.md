@@ -42,6 +42,10 @@ This section overrides the priorities and pending labels in the chronological hi
    [Registered browser-operation drain](docs/internal/viewer-session-drain.md) now
    gates/counts primary, temporary and native sockets plus recovery. Failed drains
    retain holds; other IDs remain admitted. It is not peer/upstream retirement.
+   The [owned retirement half of handoff](docs/internal/owned-ingress-retirement.md)
+   now joins consumer drain, transition CAS and worker wait/reap before reporting
+   retirement. Failures latch and block replacement. Driver-aware target activation,
+   reconciliation exclusion and first legacy migration remain; no camera switched.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

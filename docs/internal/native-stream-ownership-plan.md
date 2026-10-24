@@ -22,6 +22,10 @@ worker installer; actual ARM64 worker/runtime acceptance remains open.
 recorder admission. [Runtime bindings](owned-runtime-bindings.md) now connect ready
 owned workers to hub/recorder/browser consumers; the live handoff coordinator,
 atomic admission/drain and controlled legacy migration are pending.
+The [owned retirement coordinator](owned-ingress-retirement.md) now composes the
+registered-viewer gate, recording hold, transition intent and verified owned reap.
+It leaves holds/transition in place; target preparation/publication and legacy
+migration still cannot be inferred from that receipt.
 
 Status: code-path audit and proposed migration, not a production source or a new
 capability grant. Ten-second camera-3 reception is validated separately in

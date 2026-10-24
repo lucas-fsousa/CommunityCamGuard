@@ -417,6 +417,9 @@ and are not auto-activated.
 An app-owned [browser admission/drain barrier](docs/internal/viewer-session-drain.md)
 now tracks signaling/MSE and recovery operations until cleanup; it does not certify
 retirement of independent WebRTC peers or the upstream camera connection.
+The [owned retirement coordinator](docs/internal/owned-ingress-retirement.md)
+now combines consumer holds, durable transition and verified worker reap; target
+activation and the first shared-hub migration remain unimplemented and disabled.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

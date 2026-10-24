@@ -16,6 +16,7 @@ from backend.app.db import registry
 from backend.app.media.fragmented_mp4 import Mp4Chunk
 from backend.app.media.mp4_fanout import Mp4Fanout
 from backend.app.media.source_registry import SourceRegistry
+from backend.app.media.viewer_gate import ViewerGate
 
 REQUEST = '{"type":"mse","value":"avc1.640029,mp4a.40.2"}'
 
@@ -154,6 +155,29 @@ def test_missing_scheduler_cannot_start_source_from_websocket(env):
             f"/api/media/native/{camera.camera_id}/ws"):
         pytest.fail("unconfigured native source accepted")
     assert caught.value.code == 1013 and source.hub.reader_count == 0
+
+
+@pytest.mark.parametrize("path_kind", ["native", "alias"])
+def test_drain_releases_native_readers_without_stopping_shared_source(env, path_kind):
+    client, camera, source, sources, app, _finished = env
+    gate = ViewerGate()
+    app.state.viewer_sessions = gate
+    path = (f"/api/media/native/{camera.camera_id}/ws" if path_kind == "native"
+            else f"/api/go2rtc/ws?src={camera.camera_id}_hd")
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with client.websocket_connect(path) as socket:
+            start(socket)
+            drain = pool.submit(gate.suspend, camera.camera_id, timeout=2)
+            with pytest.raises(WebSocketDisconnect):
+                socket.receive_bytes()
+            drain.result(timeout=2)
+            assert source.hub.reader_count == 0
+    assert sources.state(camera.camera_id) == "running" and not source.cleanup.is_set()
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect(path):
+        pytest.fail("Held native source admitted a viewer")
+    gate.resume(camera.camera_id)
+    with client.websocket_connect(path) as socket:
+        start(socket)
 
 
 @pytest.mark.parametrize("suffix", ["", "_hd", "_web"])
