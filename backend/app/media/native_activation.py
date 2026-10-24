@@ -39,14 +39,22 @@ class NativeActivation:
         self._executor, self._apply_routes = executor, apply_routes
         self._claim = threading.Lock()
         self._used = False
+        self._cancel = threading.Event()
         self.session: PreparedNative | None = None  # retain ownership even after failure
+
+    def request_stop(self) -> None:
+        """Shutdown may race with preparation, including before a session exists."""
+        self._cancel.set()
+        session = self.session
+        if session is not None:
+            session.request_stop()
 
     def start(self, receipt: RetiredIngress, offer: NativeSourceOffer, *,
               ready_timeout: float = 5.0) -> PreparedNative:
         if (isinstance(ready_timeout, bool) or not math.isfinite(ready_timeout)
                 or not 0 < ready_timeout <= 30):
             raise ValueError("bounded native preparation timeout required")
-        if (offer.camera_id != receipt.camera_id or receipt.selection.mode != "native"
+        if (self._cancel.is_set() or offer.camera_id != receipt.camera_id or receipt.selection.mode != "native"
                 or receipt.selection.phase != "transition" or offer.valid() is not True):
             raise SourceUnavailable("reviewed native target required")
         with self._claim:
@@ -58,9 +66,13 @@ class NativeActivation:
                                      viewers=self._retirement.viewer_gate)
             self.session = session
             try:
+                if self._cancel.is_set():
+                    session.request_stop()
                 future = session.launch(self._executor)
                 deadline = time.monotonic() + ready_timeout
                 while not future.done():
+                    if self._cancel.is_set():
+                        raise SourceUnavailable("native preparation cancelled")
                     if ready_video(self._sources, offer.camera_id, session.owner):
                         session.publish(self._apply_routes)
                         return session

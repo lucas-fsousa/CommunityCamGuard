@@ -13,11 +13,11 @@ UI (or scripts) against these endpoints — the bundled dashboard is just one co
 Experimental native delivery: `/api/media/native/{camera_id}/ws` requires the
 normal session cookie, allowed dashboard origin and `live` grant. It consumes
 only an already-admitted shared source; opening this socket cannot activate a
-camera or start an encoder. Current startup does not supply native sources and
-therefore declines with1013. The dashboard continues to use its existing media
+camera or start an encoder. Current startup owns an empty native registry and
+therefore declines unclaimed IDs with1013. The dashboard continues to use its existing media
 path. See the [delivery contract](../internal/native-media-delivery.md) for the
 bounded video-only MSE protocol and remaining activation requirements.
-When an internal source registry is explicitly supplied, the existing
+When an internal source is explicitly admitted, the existing
 `/api/go2rtc/ws?src={camera_id}_hd`/`_web` aliases also use that native source.
 Its stopping/blocked reservation prevents fallback through that alias. The media
 manifest lists reserved native IDs under `native_sources`; current native output
@@ -27,6 +27,9 @@ An internal [native activation adapter](../internal/native-source-activation.md)
 now prepares a reviewed driver source only after verified owned-ingress retirement.
 It adds no activation endpoint or browser override; normal startup still supplies
 no native source. Its experimental output is video-only, with recording held.
+The [server-owned runtime](../internal/native-runtime-lifecycle.md) now retains
+explicit activations and shuts them down off the ASGI loop. It does not schedule
+sources or restore persisted native intent on startup.
 
 Hub mutations are now [serialized with handoff stages](../internal/media-reconciliation-exclusion.md)
 in code. Registry CRUD remains durable/best-effort: a busy or unhealthy media

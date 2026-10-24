@@ -1,7 +1,7 @@
 """Authenticated delivery of an already-admitted shared source, never a startup API.
 
-No default registry or driver factory: server-owned scheduling must explicitly
-provide app.state.native_sources after resolving production ingress ownership.
+Startup provides an empty server-owned registry, never a driver factory or source.
+Explicit activation still requires resolving production ingress ownership.
 """
 
 import asyncio
@@ -61,7 +61,7 @@ async def serve_native_video(socket: WebSocket, camera_id: str, *, source: str |
         await close_channel(socket, 1008)
         return
     sources = getattr(socket.app.state, "native_sources", None)
-    if not isinstance(sources, SourceRegistry):
+    if not isinstance(sources, SourceRegistry) or camera_id not in sources.camera_ids():
         await close_channel(socket, 1013)
         return
     await run_viewer(socket, camera_id, token, lambda: _stream(socket, sources, camera_id), lambda _: valid())

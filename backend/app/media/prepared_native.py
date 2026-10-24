@@ -1,14 +1,34 @@
 """Owned native run, evidence heartbeat and fail-closed publication/cleanup."""
 
+import math
 import threading
 import time
-from collections.abc import Callable
+from _thread import LockType
+from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
+from contextlib import contextmanager
 
 from ..db import source_policy
 from .source_offer import NativeSourceOffer
 from .source_registry import SourceCleanupUnconfirmed, SourceRegistry, SourceUnavailable
 from .viewer_gate import ViewerGate
+
+
+def _remaining(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise SourceCleanupUnconfirmed("native cleanup deadline exceeded")
+    return remaining
+
+
+@contextmanager
+def _locked_until(lock: LockType, deadline: float) -> Iterator[None]:
+    if not lock.acquire(timeout=_remaining(deadline)):
+        raise SourceCleanupUnconfirmed("native cleanup lock unavailable")
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 class PreparedNative:
@@ -23,11 +43,16 @@ class PreparedNative:
         self._clock = clock
         self._next_check = 0.0  # source-run thread confined; never query DB per frame
         self.owner = object()  # registry generation, not a browser/vendor token
+        self._constructed = threading.Event()
         self._completion: Future | None = None
 
     @property
     def completion(self) -> Future | None:
         return self._completion
+
+    def request_stop(self) -> None:
+        """Nonblocking signal, not a cleanup receipt."""
+        self._stop.set()
 
     def cancelled(self) -> bool:
         if self._stop.is_set():
@@ -46,6 +71,7 @@ class PreparedNative:
     def construct(self):
         if self._stop.is_set() or self.offer.valid() is not True:
             raise SourceUnavailable("native source evidence unavailable")
+        self._constructed.set()
         return self.offer.factory()
 
     def launch(self, executor: Executor) -> Future:
@@ -89,17 +115,21 @@ class PreparedNative:
             self.selection = source_policy.activate(self.offer.camera_id,
                                                     expected_revision=self.selection.revision)
             apply_routes()  # trusted bounded server publication, never a client command
-            if self.completion.done() or self.offer.valid() is not True:
+            if self._stop.is_set() or self.completion.done() or self.offer.valid() is not True:
                 raise SourceUnavailable("native source ended during publication")
             self._viewers.resume(self.offer.camera_id)
 
-    def close(self) -> None:
+    def close(self, *, timeout: float = 15.0) -> None:
         """No fallback/resume. Caller must await this, retaining handle on failure."""
-        with self._closing:
-            self._close()
+        if isinstance(timeout, bool) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+            raise ValueError("bounded native cleanup timeout required")
+        self.request_stop()
+        deadline = time.monotonic() + timeout
+        with _locked_until(self._closing, deadline):
+            self._close(deadline)
 
-    def _close(self) -> None:
-        with self._lock:
+    def _close(self, deadline: float) -> None:
+        with _locked_until(self._lock, deadline):
             if self._closed:
                 return  # an old receipt must not re-hold a later camera generation
             self._block_locked()
@@ -109,9 +139,11 @@ class PreparedNative:
             except SourceCleanupUnconfirmed:
                 pass  # still await the actual owner; its reservation remains blocked
             try:
-                self.completion.result(timeout=6)
+                if not self.completion.cancelled():
+                    self.completion.result(timeout=min(6.0, _remaining(deadline)))
             except Exception:
-                raise SourceCleanupUnconfirmed("native owner retirement unconfirmed") from None
-        self._viewers.suspend(self.offer.camera_id)
-        with self._lock:
+                if self._constructed.is_set() or self._sources.owns(self.offer.camera_id, self.owner):
+                    raise SourceCleanupUnconfirmed("native owner retirement unconfirmed") from None
+        self._viewers.suspend(self.offer.camera_id, timeout=min(8.0, _remaining(deadline)))
+        with _locked_until(self._lock, deadline):
             self._closed = True

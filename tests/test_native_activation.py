@@ -10,6 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 from _native_fixture import FRAGMENT, INIT
+from _native_runtime_fixture import SyntheticSource, retired_native_transition
 from _rtsp_fixture import CameraFixture, describe
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,66 +20,20 @@ from backend.app.api import media
 from backend.app.db import registry, source_policy
 from backend.app.media.fragmented_mp4 import Mp4Chunk
 from backend.app.media.go2rtc import Go2rtc
-from backend.app.media.mp4_fanout import Mp4Fanout
 from backend.app.media.native_activation import NativeActivation
 from backend.app.media.owned_bindings import OwnedIngressBindings
 from backend.app.media.owned_retirement import OwnedRetirementCoordinator, OwnedRun
 from backend.app.media.prepared_native import PreparedNative
 from backend.app.media.rtsp_ingress import OwnedRtspIngress
 from backend.app.media.source_offer import NativeSourceOffer
-from backend.app.media.source_registry import (
-    SourceCleanupUnconfirmed,
-    SourceRegistry,
-    SourceUnavailable,
-)
+from backend.app.media.source_registry import SourceRegistry, SourceUnavailable
 from backend.app.media.viewer_gate import ViewerGate
 from backend.app.recording.ingress_gate import RecordingIngressGate
 
 
-class SyntheticSource:
-    def __init__(self, *, ready=True, invalid=False, cleanup_error=False):
-        self.hub = Mp4Fanout()
-        if ready:
-            self.hub.publish(Mp4Chunk(True, b"invalid MP4" if invalid else INIT))
-            self.hub.publish(Mp4Chunk(False, FRAGMENT))
-        self.finish = threading.Event()
-        self.entered = threading.Event()
-        self.closed = threading.Event()
-        self.cleanup_error = cleanup_error
-
-    def run(self, *, cancelled):
-        self.entered.set()
-        try:
-            while not self.finish.wait(0.002):
-                if cancelled():
-                    return "stopped"
-        finally:
-            self.hub.close()
-            self.closed.set()
-            if self.cleanup_error:
-                raise SourceCleanupUnconfirmed("synthetic cleanup uncertainty")
-
-    def subscribe(self):
-        return self.hub.subscribe()
-
-
 @pytest.fixture
 def retired():
-    registry.init_db()
-    camera = registry.upsert_camera("aa:bb:cc:dd:ee:03")
-    pending = source_policy.begin_change(camera.camera_id, "owned_rtsp", expected_revision=0)
-    selected = source_policy.activate(camera.camera_id, expected_revision=pending.revision)
-    bindings, viewers = OwnedIngressBindings(), ViewerGate()
-    recordings = RecordingIngressGate(lock=threading.Lock(), retire=lambda _: None, has_process=lambda _: False)
-    coordinator = OwnedRetirementCoordinator(viewers=viewers, recordings=recordings, bindings=bindings)
-    old = OwnedRtspIngress(camera.camera_id, "rtsp://127.0.0.1:9/synthetic", binary=Path(__file__))
-    old._process = Mock(pid=12345)
-    old._url = "rtsp://127.0.0.1:12345/ingress_" + "a" * 32
-    bindings.attach(old)
-    done = Mock(spec=Future)
-    done.result.side_effect = lambda **kwargs: setattr(old, "_process", None)
-    receipt = coordinator.retire(OwnedRun(old, done), target_mode="native", expected_revision=selected.revision)
-    return camera, coordinator, receipt, viewers, recordings
+    return retired_native_transition()
 
 
 def test_prepares_once_then_publishes_only_ready_native_video(retired):
@@ -344,6 +299,21 @@ def test_closed_preparation_can_never_submit_a_late_source_job(retired):
     with pytest.raises(SourceUnavailable):
         session.launch(executor)
     executor.submit.assert_not_called()
+
+
+def test_stop_during_publication_cannot_resume_viewers_before_run_finishes(retired):
+    camera, _retirement, receipt, viewers, _recordings = retired
+    offer = NativeSourceOffer(camera.camera_id, "test/shared", Mock(), lambda: True)
+    session = PreparedNative(offer=offer, selection=receipt.selection, sources=SourceRegistry(), viewers=viewers)
+    pending = Future()
+    session._completion = pending
+    try:
+        with pytest.raises(SourceUnavailable):
+            session.publish(session.request_stop)
+        assert viewers.is_drained(camera.camera_id) and not pending.done()
+    finally:
+        pending.set_result("stopped")
+        session.close()
 
 
 def test_shared_hub_guard_covers_preparation_and_reentrant_route_publication(retired, tmp_path):

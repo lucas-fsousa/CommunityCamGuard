@@ -12,6 +12,7 @@ Custom Uvicorn launchers must retain ``--no-proxy-headers``.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
@@ -47,6 +48,7 @@ from .diagnostics.yoosee_broker_reads_api import router as broker_read_diagnosti
 from .frontend_build import build_version
 from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
+from .media.native_runtime import NativeSourceRuntime
 from .media.viewer_gate import ViewerGate
 from .recording.playback import Warmer
 from .recording.playback_logging import configure as configure_playback_logging
@@ -69,6 +71,8 @@ async def lifespan(app: FastAPI):
     drivers.init_onboarding()
 
     media = Go2rtc()
+    viewers = ViewerGate()
+    native_runtime = NativeSourceRuntime(viewers=viewers)
     rec = Recorder()
     storage = StorageMonitor(rec)
     retention = RetentionCleaner()
@@ -76,7 +80,9 @@ async def lifespan(app: FastAPI):
     address_recovery = AddressRecovery(media, rec)
     control_sessions = ControlSessions()
     app.state.media = media
-    app.state.viewer_sessions = ViewerGate()
+    app.state.viewer_sessions = viewers
+    app.state.native_runtime = native_runtime
+    app.state.native_sources = native_runtime.sources
     app.state.rec = rec
     app.state.storage = storage
     app.state.retention = retention
@@ -113,9 +119,12 @@ async def lifespan(app: FastAPI):
     finally:
         # Attempt every cleanup even if one recorder cannot confirm termination.
         # ExitStack preserves failure propagation while running callbacks in reverse.
-        with ExitStack() as cleanup:
-            for service in (media, rec, storage, retention, warmer, address_recovery, control_sessions):
-                cleanup.callback(service.stop)
+        def stop_services():
+            with ExitStack() as cleanup:
+                for service in (media, rec, native_runtime, storage, retention, warmer, address_recovery, control_sessions):
+                    cleanup.callback(service.stop)
+        # Draining registered sockets requires the ASGI loop to remain runnable.
+        await asyncio.to_thread(stop_services)
 
 
 # Interactive API docs live at /api/docs (Swagger) and /api/redoc; the raw schema at

@@ -77,8 +77,11 @@ confirmed that service running; no stop/restart/pull was performed. The tag is
 rather than assume that tag is a reproducible version.
 
 Stopping that shared container is not a camera3-only operation. Before the first
-migration, finish the server lifecycle ownership of prepared runs/executors and
-the restore/recovery policy, then plan retirement of all affected hub consumers
+migration, finish the owned-RTSP lifecycle and restore/recovery policy, then plan
+retirement of all affected hub consumers
 and verify namespace/process closure. Do not give the app a Docker daemon socket
 or treat `/api/restart`/stream deletion as that proof. This change does not provide
 an unattended legacy-migration command or imply a maintenance window was approved.
+The [native runtime lifecycle](native-runtime-lifecycle.md) now owns explicit
+native preparations/executors and shutdown, but does not own legacy hub migration,
+automatically restore sources, or adopt externally prepared owned-RTSP workers.

@@ -433,6 +433,10 @@ now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this
 adapter, including primary and temporary sessions. Startup does not activate a
 native source; production switching and browser acceptance remain pending.
+The [native runtime lifecycle](docs/internal/native-runtime-lifecycle.md) now
+retains explicit activations before preparation, bounds source workers and joins
+them during shutdown without blocking the ASGI loop. Startup remains idle for
+native media: no automatic restoration, camera connection or production switch.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

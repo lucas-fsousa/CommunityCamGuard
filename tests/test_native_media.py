@@ -93,7 +93,7 @@ def start(ws):
 
 
 def test_two_viewers_share_source_and_one_disconnect_does_not_stop_other(env):
-    client, camera, source, sources, _app, _finished = env
+    client, camera, source, sources, _app, finished = env
     path = f"/api/media/native/{camera.camera_id}/ws"
     with client.websocket_connect(path) as first:
         start(first)
@@ -104,11 +104,19 @@ def test_two_viewers_share_source_and_one_disconnect_does_not_stop_other(env):
             first.send_text(REQUEST)
             with pytest.raises(WebSocketDisconnect) as caught:
                 first.receive_bytes()
-            assert caught.value.code == 1008
+            assert caught.value.code == 1008 and finished.wait(1)
             source.hub.publish(Mp4Chunk(False, FRAGMENT + b"next"))
             assert second.receive_bytes() == FRAGMENT + b"next"
             assert source.hub.reader_count == 1
             assert sources.state(camera.camera_id) == "running"
+            # Wait for ASGI cleanup before TestClient cancels its context. A
+            # received frame alone does not mean the handler has finished.
+            finished.clear()
+            second.send_text(REQUEST)
+            with pytest.raises(WebSocketDisconnect) as caught:
+                second.receive_bytes()
+            assert caught.value.code == 1008 and finished.wait(1)
+            assert source.hub.reader_count == 0
 
 
 @pytest.mark.parametrize("reason", ["no-cookie", "no-live", "origin", "unknown-camera", "query"])
@@ -133,9 +141,13 @@ def test_denied_connections_never_subscribe(env, reason):
     assert source.hub.reader_count == 0
 
 
-def test_missing_scheduler_cannot_start_source_from_websocket(env):
+@pytest.mark.parametrize("registry_present", [False, True])
+def test_missing_scheduler_cannot_start_source_from_websocket(env, registry_present):
     client, camera, source, _sources, app, _finished = env
-    del app.state.native_sources
+    if registry_present:
+        app.state.native_sources = SourceRegistry()
+    else:
+        del app.state.native_sources
     with pytest.raises(WebSocketDisconnect) as caught, client.websocket_connect(
             f"/api/media/native/{camera.camera_id}/ws"):
         pytest.fail("unconfigured native source accepted")

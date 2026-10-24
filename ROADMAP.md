@@ -61,6 +61,12 @@ This section overrides the priorities and pending labels in the chronological hi
    default wiring, bounded acquisition and safe recovery lock order. Deferred
    application uses the existing worker, retains requests arriving during apply
    and respects shutdown/storage pause. No production migration or restart.
+   [Native runtime lifespan ownership](docs/internal/native-runtime-lifecycle.md)
+   now retains explicit activations before submission, bounds lazy workers/queue,
+   closes admission and joins source threads off the ASGI loop during shutdown.
+   Cancellation races and uncertain cleanup retain ownership/fail closed. Startup
+   remains native-idle; owned-RTSP lifetime, restore/recovery orchestration and
+   first legacy migration remain required before production switching.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

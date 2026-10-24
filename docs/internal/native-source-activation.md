@@ -1,7 +1,9 @@
 # Explicit post-retirement native activation — 2026-10-23
 
 Status: driver offers, preparation, readiness, publication and failure cleanup are
-implemented and offline/loopback-tested. No source-selection API, startup service,
+implemented and offline/loopback-tested. A subsequent
+[server-owned runtime](native-runtime-lifecycle.md) retains explicit activations;
+startup creates an empty registry, not a source. No source-selection API,
 dashboard switch, production deployment or real-camera activation was added.
 The first legacy shared-hub migration remains separate.
 
@@ -35,7 +37,7 @@ while querying an offer; its representation excludes factory, domain and validat
    recording holds. It consumes the receipt once; an equivalent serialized/copy
    object cannot replay it. There are at most32 outstanding receipts.
 2. `NativeActivation` submits one owned run to a caller-supplied executor. The
-   caller supplies thread/resource quotas; no per-client or default worker is made.
+   server runtime supplies lazy bounded source workers; no per-client worker is made.
    `SourceRegistry` reserves camera and driver domain before the lazy factory.
 3. Readiness borrows the shared output, checks baseline H264 MP4 initialization
    and a completed fragment, then closes that temporary reader. No second camera
@@ -44,7 +46,8 @@ while querying an offer; its representation excludes factory, domain and validat
 4. Under the prepared-run lock, revalidate evidence, CAS the policy active, invoke
    the trusted server's route/config publication callback, recheck evidence/run
    liveness, then release browser admission. The server must publish the same source
-   registry into its native delivery path; there is no implicit process-global one.
+   registry into its native delivery path; lifespan now wires that initially empty
+   registry. There is no implicit process-global one.
 
 Source submission and Future tracking are atomic with cleanup. Closing before
 submission prevents a late job; closing during submission waits until the handle
@@ -73,6 +76,10 @@ no automatic fallback, consumer resume or optimistic reset is provided.
 Confirmed close is serialized/idempotent; repeated cleanup or a delayed completion
 callback cannot re-hold a newer generation's viewers. Failed close retains ownership
 and may be retried, never marked closed optimistically.
+Cancellation before a factory runs is a known resource-free outcome only when
+this owner has no registry reservation. Cleanup uses finite lock/Future/drain
+waits; it does not preempt arbitrary driver callbacks or database I/O. Runtime
+shutdown also joins the actual source threads, including completion callbacks.
 
 The current Yoosee shared session deliberately yields to foreground control demand.
 That can end a native run; this adapter handles completion by blocking, not by

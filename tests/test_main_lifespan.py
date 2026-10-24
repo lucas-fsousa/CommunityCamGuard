@@ -1,10 +1,15 @@
 """Cover main.py's service-startup orchestration (the lifespan autostart block), which the other
 main tests skip by running with AUTOSTART_SERVICES=false. Services are faked so nothing real spawns.
 """
+import asyncio
+import threading
+
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import config, main
+from backend.app.media.native_runtime import NativeSourceRuntime
+from backend.app.media.source_registry import SourceRegistry
 from backend.app.recording.process_lifecycle import RecorderCleanupUnconfirmed
 
 
@@ -44,6 +49,10 @@ def _patch_services(monkeypatch, events):
     monkeypatch.setattr(main, "Warmer", _fake_service("warmer", events))
     monkeypatch.setattr(main, "ControlSessions", _fake_service("controls", events))
     monkeypatch.setattr(main, "AddressRecovery", _fake_service("recovery", events))
+    class Native(_fake_service("native", events)):
+        def __init__(self, *args, **kwargs):
+            self.sources = SourceRegistry()
+    monkeypatch.setattr(main, "NativeSourceRuntime", Native)
 
 
 def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
@@ -59,7 +68,7 @@ def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
     for svc in ("rec", "storage", "retention", "warmer", "controls"):
         assert f"{svc}.start" in events
     # cleanly stopped on shutdown
-    for svc in ("controls", "warmer", "retention", "storage", "rec", "media"):
+    for svc in ("controls", "warmer", "retention", "storage", "native", "rec", "media"):
         assert f"{svc}.stop" in events
     config.get_settings.cache_clear()
 
@@ -90,22 +99,65 @@ def test_lifespan_external_go2rtc_syncs_without_spawning(monkeypatch):
     config.get_settings.cache_clear()
 
 
-@pytest.mark.parametrize("failure", ["controls", "rec", "media"])
+@pytest.mark.parametrize("failure", ["controls", "native", "rec", "media"])
 def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch, failure):
     events = []
     _patch_services(monkeypatch, events)
 
     class Failed(_fake_service(failure, events)):
+        def __init__(self, *args, **kwargs):
+            self.sources = SourceRegistry()
         def stop(self):
             events.append(f"{failure}.stop")
             raise RecorderCleanupUnconfirmed("synthetic cleanup unconfirmed")
 
-    attribute = {"controls": "ControlSessions", "rec": "Recorder", "media": "Go2rtc"}[failure]
+    attribute = {"controls": "ControlSessions", "native": "NativeSourceRuntime",
+                 "rec": "Recorder", "media": "Go2rtc"}[failure]
     monkeypatch.setattr(main, attribute, Failed)
     with pytest.raises(RecorderCleanupUnconfirmed):
         with TestClient(main.app):
             pass
     assert [event for event in events if event.endswith(".stop")] == [
         "controls.stop", "recovery.stop", "warmer.stop", "retention.stop",
-        "storage.stop", "rec.stop", "media.stop",
+        "storage.stop", "native.stop", "rec.stop", "media.stop",
     ]
+
+
+def test_native_runtime_stays_idle_and_is_replaced_on_a_new_lifespan(monkeypatch):
+    _patch_services(monkeypatch, [])
+    monkeypatch.setattr(main, "NativeSourceRuntime", NativeSourceRuntime)
+    with TestClient(main.app):
+        first = main.app.state.native_runtime
+        assert main.app.state.native_sources is first.sources
+        assert first.sources.camera_ids() == () and not first._executor._threads
+    assert first._stopped
+    with TestClient(main.app):
+        second = main.app.state.native_runtime
+        assert second is not first and not second._executor._threads
+    assert second._stopped
+
+
+def test_shutdown_keeps_asgi_loop_runnable_while_source_cleanup_waits(monkeypatch):
+    _patch_services(monkeypatch, [])
+    stopping, loop_ran = threading.Event(), threading.Event()
+    loop_thread = []
+    class Native:
+        def __init__(self, *args, **kwargs):
+            self.sources = SourceRegistry()
+        def stop(self):
+            assert threading.get_ident() != loop_thread[0]
+            stopping.set()
+            assert loop_ran.wait(1)
+    monkeypatch.setattr(main, "NativeSourceRuntime", Native)
+    async def run():
+        loop_thread.append(threading.get_ident())
+        async def witness():
+            while not stopping.is_set():
+                await asyncio.sleep(0.001)
+            loop_ran.set()
+        witness_task = asyncio.create_task(witness())
+        async with main.lifespan(main.app):
+            pass
+        await witness_task
+    asyncio.run(run())
+    assert loop_ran.is_set()

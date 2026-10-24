@@ -72,6 +72,13 @@ class SourceRegistry:
         with self._lock:
             return tuple(self._entries)
 
+    def owns(self, camera_id: str, owner: object) -> bool:
+        """Include blocked reservations; absence alone is not a cleanup receipt."""
+        self._validate(camera_id)
+        with self._lock:
+            entry = self._entries.get(camera_id)
+            return entry is not None and entry.owner is owner
+
     def run(self, camera_id: str, *, domain: str,
             factory: Callable[[], ManagedSource], cancelled: Callable[[], bool],
             owner: object | None = None) -> object:
