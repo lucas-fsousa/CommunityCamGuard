@@ -63,3 +63,22 @@ unhealthy state without scanning, and cancel deferred work before it restarts a 
 Existing stream, recorder, auth and DHCP identity/credential checks remain covered.
 Focused tests ran under192MiB/no-swap/50%-CPU scopes; no real hub HTTP or physical
 camera commands were issued. Startup still activates no native/owned source.
+
+At commit `355921a`, [CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40070392610)
+and [Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40070392599)
+passed, including the real amd64 image build and restricted worker smoke.
+
+## Next deployment boundary
+
+The checked compose topology uses one separate `ccg-go2rtc` container for the hub,
+with host networking but its default private PID namespace. A read-only inspection
+confirmed that service running; no stop/restart/pull was performed. The tag is
+`alexxit/go2rtc:latest`, so a future migration must identify the exact running image
+rather than assume that tag is a reproducible version.
+
+Stopping that shared container is not a camera3-only operation. Before the first
+migration, finish the server lifecycle ownership of prepared runs/executors and
+the restore/recovery policy, then plan retirement of all affected hub consumers
+and verify namespace/process closure. Do not give the app a Docker daemon socket
+or treat `/api/restart`/stream deletion as that proof. This change does not provide
+an unattended legacy-migration command or imply a maintenance window was approved.
