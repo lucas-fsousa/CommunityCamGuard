@@ -15,7 +15,8 @@ from ..config import get_settings
 from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.mse_protocol import mse_request
 from ..origin_policy import browser_origin_allowed
-from ..session_channels import close_channel, run_guarded
+from ..session_channels import close_channel
+from .viewer_sessions import run_viewer
 
 
 async def serve_temporary_media(socket: WebSocket, token: str) -> None:
@@ -38,7 +39,7 @@ async def serve_temporary_media(socket: WebSocket, token: str) -> None:
     if viewer is None:
         await socket.close(code=1008)
         return
-    await run_guarded(socket, token, lambda: _bridge(socket, src),
+    await run_viewer(socket, camera_id, token, lambda: _bridge(socket, src),
                       lambda _: auth.verify_permission_token(token, "live") and viewer.valid())
 
 

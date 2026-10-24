@@ -39,6 +39,9 @@ This section overrides the priorities and pending labels in the chronological hi
    explicitly supplied workers to hub config, recorder and player admission, keyed
    by revision/generation. Withdrawal retains ownership until reap; missing runtime
    state never restores the camera URL. No automatic activation or coordinator yet.
+   [Registered browser-operation drain](docs/internal/viewer-session-drain.md) now
+   gates/counts primary, temporary and native sockets plus recovery. Failed drains
+   retain holds; other IDs remain admitted. It is not peer/upstream retirement.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

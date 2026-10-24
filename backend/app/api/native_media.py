@@ -19,7 +19,8 @@ from ..media.mp4_fanout import StreamClosedError, Subscription
 from ..media.mse_protocol import mse_request
 from ..media.source_registry import SourceRegistry, SourceUnavailable
 from ..origin_policy import browser_origin_allowed
-from ..session_channels import close_channel, run_guarded
+from ..session_channels import close_channel
+from .viewer_sessions import run_viewer
 
 router = APIRouter(prefix="/api/media/native", tags=["media"])
 WRITE_TIMEOUT = 2.0
@@ -63,7 +64,7 @@ async def serve_native_video(socket: WebSocket, camera_id: str, *, source: str |
     if not isinstance(sources, SourceRegistry):
         await close_channel(socket, 1013)
         return
-    await run_guarded(socket, token, lambda: _stream(socket, sources, camera_id), lambda _: valid())
+    await run_viewer(socket, camera_id, token, lambda: _stream(socket, sources, camera_id), lambda _: valid())
 
 
 async def _deliver(socket: WebSocket, reader: Subscription, max_level: int) -> None:

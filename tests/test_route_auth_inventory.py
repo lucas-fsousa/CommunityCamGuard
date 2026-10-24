@@ -65,7 +65,7 @@ def test_websocket_exceptions_remain_explicit():
                 gate = inspect.getsource(native_media.serve_native_video)
                 assert 'auth.verify_permission_token(token, "live")' in gate
                 assert "browser_origin_allowed(socket)" in gate
-                assert "run_guarded(" in gate
+                assert "run_viewer(" in gate
             else:
                 assert "verify_token(" in source and "browser_origin_allowed(" in source
 

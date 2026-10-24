@@ -2,6 +2,7 @@
 
 import asyncio
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -17,6 +18,7 @@ from backend.app.db import registry, source_policy
 from backend.app.media.browser_ingress import admit_hub, camera_for_source
 from backend.app.media.owned_bindings import OwnedIngressBindings
 from backend.app.media.rtsp_ingress import OwnedRtspIngress
+from backend.app.media.viewer_gate import ViewerGate
 
 
 @pytest.fixture
@@ -166,3 +168,30 @@ def test_owned_binding_withdrawal_closes_open_viewer_without_policy_change(brows
     with pytest.raises(HTTPException) as caught:
         media.media_recover(camera.camera_id, SimpleNamespace(app=client.app))
     assert caught.value.status_code == 409 and release.call_count == 1
+
+
+def test_coordinator_drain_waits_for_primary_or_temporary_upstream_cleanup(browser):
+    client, camera, connections, closed = browser
+    gate = ViewerGate()
+    client.app.state.viewer_sessions = gate
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with client.websocket_connect(f"/api/go2rtc/ws?src={camera.camera_id}_hd") as socket:
+            socket.send_text('{"type":"mse","value":"avc1.640029"}')
+            assert socket.receive_bytes() == b"synthetic MP4 data"
+            drain = pool.submit(gate.suspend, camera.camera_id, timeout=2)
+            with pytest.raises(WebSocketDisconnect):
+                socket.receive_bytes()
+            drain.result(timeout=2)
+            assert closed
+    assert source_policy.read_for((camera.camera_id,))[camera.camera_id].permits_legacy_rtsp
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect(
+            f"/api/go2rtc/ws?src={camera.camera_id}_hd"):
+        raise AssertionError("A draining camera admitted another viewer")
+    with pytest.raises(HTTPException) as caught:
+        media.media_recover(camera.camera_id, SimpleNamespace(app=client.app))
+    assert caught.value.status_code == 409 and len(connections) == 1
+    gate.resume(camera.camera_id)
+    with client.websocket_connect(f"/api/go2rtc/ws?src={camera.camera_id}_hd") as socket:
+        socket.send_text('{"type":"mse","value":"avc1.640029"}')
+        assert socket.receive_bytes() == b"synthetic MP4 data"
+    assert len(connections) == 2

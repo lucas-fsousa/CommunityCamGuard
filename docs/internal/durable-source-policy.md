@@ -66,7 +66,9 @@ instead of invoking recovery for an unavailable hub source.
 
 This polling guard is not atomic with upstream connection establishment: a viewer
 admitted just before a committed transition can still reach the hub before its
-next check. The future coordinator must gate admission and await drains before
+next check. The app-owned [viewer gate](viewer-session-drain.md) can now close
+admission and await registered-operation cleanup. The future coordinator must
+actually use that gate and await drains before
 retirement/replacement. A WebRTC peer may survive closure of its signaling socket.
 These guards do not modify a running go2rtc source, retire independent WebRTC
 peers, prevent all external clients from bypassing the dashboard, serialize all

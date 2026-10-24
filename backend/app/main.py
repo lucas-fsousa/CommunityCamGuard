@@ -47,6 +47,7 @@ from .diagnostics.yoosee_broker_reads_api import router as broker_read_diagnosti
 from .frontend_build import build_version
 from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
+from .media.viewer_gate import ViewerGate
 from .recording.playback import Warmer
 from .recording.playback_logging import configure as configure_playback_logging
 from .recording.recorder import Recorder
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
     address_recovery = AddressRecovery(media, rec)
     control_sessions = ControlSessions()
     app.state.media = media
+    app.state.viewer_sessions = ViewerGate()
     app.state.rec = rec
     app.state.storage = storage
     app.state.retention = retention

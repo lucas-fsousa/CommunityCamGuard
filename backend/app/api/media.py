@@ -24,12 +24,14 @@ from ..media import quality
 from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.diagnostic_fields import public_metrics
 from ..media.owned_bindings import OwnedIngressBindings
+from ..media.source_registry import SourceUnavailable
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
-from ..session_channels import close_channel, run_guarded
+from ..session_channels import close_channel
 from .native_media import claimed_sources, serve_native_video
 from .temporary_media import serve_temporary_media
+from .viewer_sessions import media_operation, run_viewer
 
 router = APIRouter(prefix="/api", tags=["media"])
 log = logging.getLogger(__name__)
@@ -137,21 +139,29 @@ def media_recover(camera_id: str, request: Request) -> dict:
         camera = None
     if camera is None:
         raise HTTPException(status_code=404, detail="camera not found")
-    if camera.camera_id in claimed_sources(request):
+    try:
+        with media_operation(request, camera.camera_id):
+            return _recover_media(camera.camera_id, request)
+    except SourceUnavailable:
+        raise HTTPException(status_code=409, detail="camera media admission unavailable") from None
+
+
+def _recover_media(camera_id: str, request: Request) -> dict:
+    if camera_id in claimed_sources(request):
         # Native recovery replaces the reader only; never restart legacy producers
         # or release the shared native source because one viewer requests recovery.
         return {"ok": True}
     media = getattr(request.app.state, "media", None)
     if media is None:
         raise HTTPException(status_code=503, detail="media engine not running")
-    with source_policy.snapshot((camera.camera_id,)) as selections:
-        selection = selections[camera.camera_id]
+    with source_policy.snapshot((camera_id,)) as selections:
+        selection = selections[camera_id]
         bindings = getattr(media, "owned_ingress", None)
-        with (bindings.admission(camera.camera_id, selection) if isinstance(bindings, OwnedIngressBindings)
+        with (bindings.admission(camera_id, selection) if isinstance(bindings, OwnedIngressBindings)
               else nullcontext(None)) as owned:
             if not selection.permits_legacy_rtsp and owned is None:
                 raise HTTPException(status_code=409, detail="camera source is not available for hub recovery")
-            if not media.release_live_producers(camera.camera_id):
+            if not media.release_live_producers(camera_id):
                 raise HTTPException(status_code=502, detail="local stream recovery failed")
     return {"ok": True}
 
@@ -188,7 +198,7 @@ async def go2rtc_ws(websocket: WebSocket) -> None:
     if viewer is None:
         await close_channel(websocket, 1013)
         return
-    await run_guarded(websocket, websocket.cookies.get(COOKIE_NAME) or "",
+    await run_viewer(websocket, camera_id, websocket.cookies.get(COOKIE_NAME) or "",
                       lambda: _proxy_media(websocket), lambda token: verify_token(token) and viewer.valid())
 
 

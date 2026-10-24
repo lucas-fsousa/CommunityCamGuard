@@ -414,6 +414,9 @@ now connect an explicitly supplied ready worker to the renderer, recording admis
 and player guards without direct-camera fallback. The handoff coordinator, first
 migration and hardware acceptance remain; these paths require explicit deployment
 and are not auto-activated.
+An app-owned [browser admission/drain barrier](docs/internal/viewer-session-drain.md)
+now tracks signaling/MSE and recovery operations until cleanup; it does not certify
+retirement of independent WebRTC peers or the upstream camera connection.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

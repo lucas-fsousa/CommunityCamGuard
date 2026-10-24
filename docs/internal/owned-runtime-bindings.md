@@ -49,7 +49,8 @@ binding is a substitute for authentication: the RTSP boundary remains loopback.
 
 Supplying the optional runtime registry is not an activation procedure. Startup
 does not create it. The future coordinator must own per-camera/driver admission,
-gate and drain consumers, physically retire the previous upstream, prepare the
+use the [viewer gate](viewer-session-drain.md) and recording holds to gate/drain
+consumers, physically retire the previous upstream, prepare the
 new worker, commit owned selection, attach the ready worker, apply the matching
 hub config and only then release consumers. Old shared go2rtc ingress needs a
 controlled first migration; an API DELETE still does not certify physical close.
