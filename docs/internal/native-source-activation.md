@@ -74,6 +74,11 @@ Confirmed close is serialized/idempotent; repeated cleanup or a delayed completi
 callback cannot re-hold a newer generation's viewers. Failed close retains ownership
 and may be retried, never marked closed optimistically.
 
+The current Yoosee shared session deliberately yields to foreground control demand.
+That can end a native run; this adapter handles completion by blocking, not by
+silently reopening/authenticating it. Coordinated resumption after foreground work
+must be validated/implemented before replacing the production RTSP experience.
+
 **Recording stays suspended:** this is experimental video delivery. Native audio,
 recording timestamps and archival input are not integrated yet. Releasing the old
 RTSP recorder against a missing hub source would be incorrect. None of these paths
@@ -96,3 +101,9 @@ legacy migration, actual reviewed native-video records for the tested enrollment
 real native browser/endurance acceptance, audio/recording integration and ARM64
 acceptance of this new lifecycle. No new HTTP route permits uploading proof or
 passing a source factory.
+
+At commit `4830015`, both
+[CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40046885943)
+and [Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40046886022)
+passed. The code's amd64 image builds and its restricted worker smoke passes;
+this is not an ARM64 or physical native-camera acceptance claim.

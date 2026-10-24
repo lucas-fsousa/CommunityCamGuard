@@ -54,6 +54,8 @@ This section overrides the priorities and pending labels in the chronological hi
    admission. Recording remains held; no native audio/archive integration or
    production rollout. Reconciliation exclusion, first legacy migration, reviewed
    native-video records and real browser/endurance acceptance remain.
+   Current driver foreground yielding may terminate native viewing; coordinated
+   resumption remains part of production orchestration, not an automatic login retry.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,
