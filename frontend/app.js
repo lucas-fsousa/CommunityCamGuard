@@ -11,6 +11,7 @@ import {
   setPlayersLive,
   STALL_POLL_MS,
   syncCameraStatusDots,
+  updateMediaSources,
 } from "ccg/live";
 import {
   configureCameraManagement,
@@ -151,11 +152,11 @@ async function boot() {
     showDash();
     applySessionAccess(me);
     sessionWatch.start();
-    const media = allowed("live") ? await api("/media/streams") : {};
+    const media = allowed("live") ? await api("/media/streams", { cache: "no-store" }) : {};
     if (epoch !== sessionGeneration) return;
     state.go2rtc = (media.go2rtc_api || "").replace(/\/$/, "");
     state.gridHdMax = media.grid_hd_max_cameras ?? 0;
-    state.nativeSources = Array.isArray(media.native_sources) ? media.native_sources : [];
+    updateMediaSources(media);
     await Promise.all([
       state.authentication !== "temporary" || state.permissions.length ? loadCameras() : Promise.resolve(render()),
       loadStorage(), state.authentication !== "temporary" ? loadProvisioningStatus() : Promise.resolve(),

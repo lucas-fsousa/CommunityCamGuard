@@ -12,6 +12,7 @@ export const svgIcon = (id) => `<svg class="icon"><use href="#${id}" /></svg>`;
 export const state = {
   go2rtc: "",
   nativeSources: [],
+  sourceStates: {},
   gridHdMax: 0,
   cameras: [],
   view: "grid",
@@ -42,6 +43,7 @@ export function endSession() {
   state.authentication = null;
   state.permissions = [];
   state.nativeSources = [];
+  state.sourceStates = {};
 }
 
 export function onUnauthorized(handler) {

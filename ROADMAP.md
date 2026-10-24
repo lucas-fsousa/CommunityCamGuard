@@ -73,6 +73,12 @@ This section overrides the priorities and pending labels in the chronological hi
    consumers. Old completion/cleanup cannot hold or remove a newer generation.
    Worker/thread shutdown and owned-to-synthetic-native handoff are loopback/offline
    tested. No first legacy migration, automatic restoration or dashboard switch.
+   [Restart availability reporting](docs/internal/media-source-recovery.md) now
+   exposes a read-only per-camera intent/runtime snapshot on the existing media
+   manifest. Unavailable sources show a localized placeholder, not endless player
+   reconnects; refresh rechecks metadata without starting/restoring a camera.
+   Missing/blocked state is not cleared and no direct-RTSP fallback is inferred.
+   Verified source restoration itself remains pending.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

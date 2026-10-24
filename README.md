@@ -441,6 +441,10 @@ The [explicit owned-RTSP runtime](docs/internal/owned-runtime-lifecycle.md) now
 shares empty bindings with hub/recorder and retains/reaps its submitted workers.
 Replacement requires a verified owned-retirement receipt, readiness and route
 publication before releasing consumers. The first legacy migration remains open.
+The [source recovery snapshot](docs/internal/media-source-recovery.md) now
+distinguishes hub health from missing native/owned sessions after restart. The
+dashboard avoids reconnect loops for known unavailable sources and rechecks their
+state on refresh; this does not automatically restore a source or fall back to RTSP.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

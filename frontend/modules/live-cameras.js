@@ -165,6 +165,11 @@ function streamFor(cam) {
 
 function camFrame(cam) {
   if (!allowed("live")) return suspendedFrame();
+  const source = state.sourceStates?.[cam.id];
+  if (source?.available === false) {
+    return el("div", { className: "frame source-unavailable", role: "status",
+      textContent: t(source.status === "transition" ? "cam.sourceChanging" : "cam.sourceRecovery") });
+  }
   const sid = streamFor(cam);
   const frame = el("cam-player", { className: "frame" });
   frame.dataset.src = sid;   // so a view switch can tell if it must reconnect
@@ -172,6 +177,12 @@ function camFrame(cam) {
   frame.src = wsFor(sid);    // VideoRTC .src setter kicks off the WebSocket/WebRTC connect
   applyZoom(cam.mac, frame);   // a rebuilt frame (restart / resume) keeps its zoom
   return frame;
+}
+
+export function updateMediaSources(media) {
+  state.nativeSources = Array.isArray(media.native_sources) ? media.native_sources : [];
+  state.sourceStates = media.source_states && typeof media.source_states === "object"
+    && !Array.isArray(media.source_states) ? media.source_states : {};
 }
 
 function reportMediaEvent(cam, frame, detail) {
@@ -329,6 +340,20 @@ async function refreshPlayer(cameraId, btn, restartProducer = false) {
   if (!t || !cam) return;
   if (btn) { btn.disabled = true; btn.classList.add("spin"); }
   try {
+    const knownSource = state.sourceStates?.[cam.id];
+    if (knownSource && (knownSource.available === false || knownSource.mode !== "legacy_rtsp")) {
+      // Recheck admission before recovery; never POST recovery/restart a missing
+      // server-owned source. A durable row alone cannot recreate its session.
+      try { updateMediaSources(await api("/media/streams", { cache: "no-store" })); }
+      catch (error) {
+        console.warn("[stream recovery] source status unavailable", error);
+        return; // never turn a failed metadata check into a producer restart
+      }
+      if (knownSource.available === false || state.sourceStates?.[cam.id]?.available === false) {
+        replacePlayerFrame(t.el, cam);
+        return;
+      }
+    }
     if (restartProducer) {
       const old = t.el.firstChild;
       // Detach before waiting for server-side release. No preload should resurrect an unused

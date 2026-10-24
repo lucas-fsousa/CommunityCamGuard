@@ -18,6 +18,9 @@ initially empty registry and bounded lazy source executor, with off-ASGI shutdow
 No automatic source restoration, first shared-hub migration or physical/browser
 native acceptance is claimed. Historical milestones below retain their original
 scope; these newer checkpoints supersede earlier missing-lifecycle statements.
+The [restart availability report](media-source-recovery.md) now distinguishes
+persisted intent from live sessions and prevents known-unavailable dashboard
+sources from entering a player reconnect loop. It does not restore sources.
 
 Native relay RE (experimental, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).

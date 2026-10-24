@@ -216,6 +216,7 @@ header {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
   display: flex; flex-direction: column; min-height: 0; position: relative;
 }
+.cam .frame.source-unavailable { display: flex; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box; text-align: center; color: var(--muted); font-size: .85rem; }
 .cam .frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: #000; display: block; object-fit: contain;
   transform-origin: center center; will-change: transform; }
 /* Digital zoom scales the iframe, which does not re-layout: .cam clips the overflow at the tile

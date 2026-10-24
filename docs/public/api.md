@@ -33,6 +33,13 @@ sources or restore persisted native intent on startup.
 The [owned RTSP runtime](../internal/owned-runtime-lifecycle.md) similarly owns
 explicit replacement runs and empty hub/recorder bindings. It adds no HTTP
 activation route, does not migrate the legacy hub and does not restore sources.
+`GET /api/media/streams` also includes `source_states`, keyed by opaque camera ID,
+with `{mode, phase, revision, status, available}`. This read-only snapshot reports
+missing runtime/blocked/transition/conflict states independently of hub `healthy`.
+`available` means local route admission, not decoded-video health. Source-status
+read errors return503; temporary access still requires the existing `live` grant.
+The dashboard uses unavailable placeholders and rechecks metadata on player
+refresh; it cannot restore a session. See [recovery semantics](../internal/media-source-recovery.md).
 
 Hub mutations are now [serialized with handoff stages](../internal/media-reconciliation-exclusion.md)
 in code. Registry CRUD remains durable/best-effort: a busy or unhealthy media

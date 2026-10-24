@@ -58,6 +58,7 @@ function watchHarness() {
       () => response.promise);
     core.onUnauthorized(() => unauthorized++);
     core.state.canManage = true;
+    core.state.sourceStates = { cam_old: { available: false } };
     core.onSessionEnd(() => { throw new Error("one broken cleanup must not block others"); });
     core.onSessionEnd(() => closed++);
     const request = core.api("/cameras");
@@ -65,6 +66,7 @@ function watchHarness() {
     core.endSession(); json.resolve([]);
     await assert.rejects(request, { name: "AbortError" });
     assert.equal(closed, 1); assert.equal(core.state.canManage, false);
+    assert.deepEqual(core.state.sourceStates, {});
     core.endSession(); assert.equal(closed, 1); assert.equal(unauthorized, 0);
   }
   {

@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 from backend.app import auth, config, runtime_settings
 from backend.app.api import media, settings
+from backend.app.db import registry
 from backend.app.db import runtime_settings as store
 from backend.app.recording import playback
 
@@ -110,9 +111,10 @@ def test_form_posts_and_extra_envelope_fields_rejected(client):
 
 
 def test_consumers_observe_override_without_restarting_services(monkeypatch, tmp_path):
+    registry.init_db()
     runtime_settings.update(runtime_settings.Update(revision=0, changes={"grid_hd_max_cameras": 3, "playback_cache_mb": 1}))
     request = Request({"type": "http", "app": FastAPI()})
-    assert media.media_streams(request)["grid_hd_max_cameras"] == 3
+    assert media.media_streams(request, media.Response())["grid_hd_max_cameras"] == 3
     cache = tmp_path / "cache"
     cache.mkdir()
     derived = cache / "old.mp4"

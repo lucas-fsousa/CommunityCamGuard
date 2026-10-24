@@ -11,7 +11,7 @@ from contextlib import nullcontext
 from datetime import UTC, datetime
 
 import websockets
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
@@ -19,13 +19,14 @@ from ..auth import COOKIE_NAME, require_auth, token_principal
 from ..auth import verify_channel_token as verify_token
 from ..camera_identity import valid_camera_id
 from ..config import get_settings
-from ..db import source_policy
+from ..db import registry, source_policy
 from ..media import quality
 from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.diagnostic_fields import public_metrics
 from ..media.owned_bindings import OwnedIngressBindings
 from ..media.reconciliation import mutation_scope
-from ..media.source_registry import SourceUnavailable
+from ..media.source_registry import SourceRegistry, SourceUnavailable
+from ..media.source_status import describe_sources
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
 from ..services.camera_runtime import resolve_camera, resync_services
@@ -50,8 +51,18 @@ class MediaClientEventIn(BaseModel):
 
 
 @router.get("/media/streams", dependencies=[Depends(require_auth)])
-def media_streams(request: Request) -> dict:
+def media_streams(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
     media = getattr(request.app.state, "media", None)
+    owned = getattr(media, "owned_ingress", None)
+    native = getattr(request.app.state, "native_sources", None)
+    try:
+        states = describe_sources((camera.camera_id for camera in registry.list_cameras()),
+                                  owned=owned if isinstance(owned, OwnedIngressBindings) else None,
+                                  native=native if isinstance(native, SourceRegistry) else None)
+    except Exception:
+        raise HTTPException(status_code=503, detail="camera source status unavailable",
+                            headers={"Cache-Control": "no-store"}) from None
     healthy = bool(media and media.wait_healthy(timeout=1))
     settings = get_settings()
     return {
@@ -62,6 +73,7 @@ def media_streams(request: Request) -> dict:
         "quality_levels": list(quality.LEVELS),
         "live_hwaccel": settings.live_hwaccel,
         "native_sources": list(claimed_sources(request)),
+        "source_states": states,
     }
 
 

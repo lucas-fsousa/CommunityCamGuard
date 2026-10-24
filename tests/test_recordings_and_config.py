@@ -159,11 +159,12 @@ def test_recordings_endpoint_rejects_invalid_camera_id():
 def test_media_streams_reports_quality(monkeypatch):
     from types import SimpleNamespace
 
+    registry.init_db()
     # media_streams reads request.app.state.media; None -> not healthy, no hardware needed.
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=None)))
     monkeypatch.setenv("LIVE_QUALITY", "high")
     config.get_settings.cache_clear()
-    out = media_routes.media_streams(req)
+    out = media_routes.media_streams(req, media_routes.Response())
     assert out["live_quality"] == "high"
     assert out["quality_levels"] == list(quality.LEVELS)
     assert out["healthy"] is False

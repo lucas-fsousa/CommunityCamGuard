@@ -69,6 +69,61 @@ function load(file, bindings, exported) {
 }
 const controlWidgets = load("camera-control-actions.js", { el, api, t }, "controlWidgets");
 {
+  const localState = { cameras: [], sourceStates: {}, nativeSources: [] };
+  const [frame, update] = load("live-cameras.js", {
+    document: { addEventListener() {} }, state: localState, el, t, allowed: () => true,
+    localStorage: { getItem: () => "sharp" },
+  }, "[camFrame, updateMediaSources]");
+  const camera = { id: "cam_test", mac: "synthetic", hd_stream_id: "cam_test_hd" };
+  for (const status of ["runtime_missing", "blocked", "transition", "runtime_conflict"]) {
+    update({ source_states: { cam_test: { status, available: false } } });
+    const placeholder = frame(camera);
+    assert.equal(placeholder.tagName, "div");
+    assert.equal(placeholder.role, "status");
+    assert.equal(placeholder.textContent, status === "transition" ? "cam.sourceChanging" : "cam.sourceRecovery");
+    assert.equal(placeholder.src, undefined); // no custom element/socket/reconnect timer
+  }
+  update({ native_sources: [camera.id], source_states: { cam_test: { status: "running", available: true } } });
+  assert.equal(frame(camera).src, "/api/go2rtc/ws?src=cam_test_hd");
+  update({}); // compatibility with servers predating the optional field
+  assert.equal(frame(camera).tagName, "cam-player");
+  assert.deepEqual(localState.nativeSources, []);
+  console.log("Source recovery placeholder contracts passed");
+}
+(async () => {
+  const camera = { id: "cam_recovery", mac: "test", hd_stream_id: "cam_recovery_hd" };
+  const localState = { cameras: [camera], authentication: "primary", sourceStates: {
+    cam_recovery: { mode: "native", status: "runtime_missing", available: false },
+  } };
+  const calls = [];
+  const warnings = [];
+  let manifest = { source_states: localState.sourceStates };
+  let fail = false;
+  const [refresh, tiles] = load("live-cameras.js", {
+    document: { addEventListener() {} }, state: localState, el, t, allowed: () => true,
+    console: { warn: (...args) => warnings.push(args) },
+    localStorage: { getItem: () => "sharp" },
+    api: async (...args) => { calls.push(args); if (fail) throw Error("metadata unavailable"); return manifest; },
+  }, "[refreshPlayer, tiles]");
+  const tile = { firstChild: el("div") };
+  function replace(node) { tile.firstChild = node; node.replaceWith = replace; }
+  tile.firstChild.replaceWith = replace;
+  tiles.set(camera.mac, { el: tile });
+  await refresh(camera.id, null, true);
+  assert.equal(tile.firstChild.tagName, "div");
+  manifest = { source_states: { cam_recovery: { mode: "native", status: "running", available: true } } };
+  await refresh(camera.id, null, true);
+  assert.equal(tile.firstChild.src, "/api/go2rtc/ws?src=cam_recovery_hd");
+  fail = true;
+  const current = tile.firstChild;
+  await refresh(camera.id, null, true);
+  assert.equal(tile.firstChild, current); // failed read cannot restart a producer
+  assert.equal(calls.length, 3);
+  assert.equal(warnings.length, 1);
+  assert.ok(calls.every(([url, options]) => url === "/media/streams" && options.cache === "no-store" && !options.method));
+  console.log("Source recovery refresh uses metadata-only requests");
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+{
   const selected = [];
   const ptzControls = load("live-cameras.js", {
     document: { addEventListener() {} },

@@ -79,6 +79,12 @@ class SourceRegistry:
             entry = self._entries.get(camera_id)
             return entry is not None and entry.owner is owner
 
+    def states(self) -> dict[str, str]:
+        """Metadata only: no subscriptions, worker handles, domains or credentials."""
+        with self._lock:
+            return {camera_id: "stopping" if self._closed and entry.phase != "blocked" else entry.phase
+                    for camera_id, entry in self._entries.items()}
+
     def run(self, camera_id: str, *, domain: str,
             factory: Callable[[], ManagedSource], cancelled: Callable[[], bool],
             owner: object | None = None) -> object:
