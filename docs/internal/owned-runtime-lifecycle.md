@@ -85,6 +85,21 @@ Focused groups of48 lifecycle/activation,80 binding/retirement/browser and38
 owned/recording/reconciliation cases passed at167.4/155.3/125.6MiB respectively,
 all without swap (groups overlap). Ruff and mypy (339 source files) also passed.
 
+A further22 runtime/lifespan/integration tests passed at127.3MiB with zero swap.
+`tests/test_media_runtime_handoff.py` exercises the full server-owned chain: real
+owned RTSP child with two loopback metadata consumers, confirmed retire/reap before
+the synthetic native factory, authenticated delivery through the existing dashboard
+socket, and old-runtime shutdown without disturbing native admission. One old
+fixture connection and one native factory are used; recordings remain held for
+video-only native output. Structural MP4 delivery is not decoded browser playback.
+
+At implementation commit `1c3c81e`,
+[CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40096468137)
+passed5026 Python tests (one skipped), frontend contracts, lint and typing.
+[Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40096468092)
+passed the amd64 build and restricted no-network worker smoke. The full-chain
+test above was added afterward; its separate focused run passed as recorded.
+
 Remaining: controlled first shared-hub migration, restart/restore orchestration,
 foreground-control/native resumption, reviewed per-device native evidence, native
 audio/archive and physical browser/endurance/ARM64 acceptance. This stage does not
