@@ -37,6 +37,11 @@ class RecordingIngressGate:
         with self._lock:
             return camera_id in self._held
 
+    def is_retired(self, camera_id: str) -> bool:
+        self._validate(camera_id)
+        with self._lock:
+            return self._held.get(camera_id) is True and not self._has_process(camera_id)
+
     def suspend(self, camera_id: str) -> None:
         self._validate(camera_id)
         with self._lock:

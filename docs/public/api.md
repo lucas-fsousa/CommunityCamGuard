@@ -21,7 +21,12 @@ When an internal source registry is explicitly supplied, the existing
 `/api/go2rtc/ws?src={camera_id}_hd`/`_web` aliases also use that native source.
 Its stopping/blocked reservation prevents fallback through that alias. The media
 manifest lists reserved native IDs under `native_sources`; current native output
-has one full-resolution video quality. Runtime activation remains pending.
+has one full-resolution video quality. Production runtime activation remains disabled.
+
+An internal [native activation adapter](../internal/native-source-activation.md)
+now prepares a reviewed driver source only after verified owned-ingress retirement.
+It adds no activation endpoint or browser override; normal startup still supplies
+no native source. Its experimental output is video-only, with recording held.
 
 The local deployment `b-a84862f46bfb` includes the restricted temporary-session MSE
 path. It accepts only registered HD/web sources and rechecks key validity

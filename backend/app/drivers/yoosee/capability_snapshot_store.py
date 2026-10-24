@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from contextlib import closing
 from dataclasses import asdict
 
 from ...db import connect
@@ -115,7 +116,7 @@ def _load(*, camera_id: str, identity: CapabilityIdentity,
           now: float) -> dict[str, EvidenceState] | None:
     if not _time(now):
         return None
-    with connect() as conn:
+    with closing(connect()) as conn:
         conn.execute(_SCHEMA)
         row = conn.execute(
             """SELECT evidence FROM yoosee_capability_snapshots

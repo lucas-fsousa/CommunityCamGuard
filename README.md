@@ -411,15 +411,19 @@ open signaling/MSE sessions are revalidated, and recovery rejects transitioning
 sources. This does not drain an independently negotiated WebRTC peer. Production
 still uses its current shared hub. [Owned runtime bindings](docs/internal/owned-runtime-bindings.md)
 now connect an explicitly supplied ready worker to the renderer, recording admission
-and player guards without direct-camera fallback. Target activation, first
-migration and hardware acceptance remain; these paths require explicit deployment
+and player guards without direct-camera fallback. First migration and hardware
+acceptance remain; these paths require explicit deployment
 and are not auto-activated.
 An app-owned [browser admission/drain barrier](docs/internal/viewer-session-drain.md)
 now tracks signaling/MSE and recovery operations until cleanup; it does not certify
 retirement of independent WebRTC peers or the upstream camera connection.
 The [owned retirement coordinator](docs/internal/owned-ingress-retirement.md)
-now combines consumer holds, durable transition and verified worker reap; target
-activation and the first shared-hub migration remain unimplemented and disabled.
+now combines consumer holds, durable transition and verified worker reap.
+[Explicit native activation](docs/internal/native-source-activation.md) now consumes
+that retirement once, resolves a driver offer, waits for shared MP4 readiness and
+publishes before releasing viewers. It is experimental video-only: recording
+remains held. First shared-hub migration is still unimplemented; startup activates
+neither path and no production native-video rollout is claimed.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

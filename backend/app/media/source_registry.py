@@ -30,6 +30,7 @@ class ManagedSource(Protocol):
 @dataclass(eq=False)
 class _Entry:
     domain: str = field(repr=False)
+    owner: object = field(default_factory=object, repr=False)
     stop: threading.Event = field(default_factory=threading.Event, repr=False)
     source: ManagedSource | None = field(default=None, repr=False)
     phase: str = "starting"
@@ -72,7 +73,8 @@ class SourceRegistry:
             return tuple(self._entries)
 
     def run(self, camera_id: str, *, domain: str,
-            factory: Callable[[], ManagedSource], cancelled: Callable[[], bool]) -> object:
+            factory: Callable[[], ManagedSource], cancelled: Callable[[], bool],
+            owner: object | None = None) -> object:
         self._validate(camera_id)
         if (type(domain) is not str or not 1 <= len(domain) <= 128
                 or not domain.isascii() or any(ord(c) < 33 or ord(c) > 126 for c in domain)):
@@ -85,7 +87,7 @@ class SourceRegistry:
             if (camera_id in self._entries or len(self._entries) >= self._capacity
                     or any(entry.domain == domain for entry in self._entries.values())):
                 raise SourceUnavailable("source or driver resource already reserved")
-            entry = _Entry(domain)
+            entry = _Entry(domain, owner=owner if owner is not None else object())
             self._entries[camera_id] = entry
         confirmed = False
         try:
@@ -106,22 +108,23 @@ class SourceRegistry:
                 else:
                     entry.phase = "blocked"
 
-    def subscribe(self, camera_id: str) -> Subscription:
+    def subscribe(self, camera_id: str, *, owner: object | None = None) -> Subscription:
         self._validate(camera_id)
         with self._lock:
             entry = self._entries.get(camera_id)
-            if self._closed or entry is None or entry.phase != "running" or entry.source is None:
+            if (self._closed or entry is None or entry.phase != "running" or entry.source is None
+                    or (owner is not None and entry.owner is not owner)):
                 raise SourceUnavailable("source is not accepting readers")
             source = entry.source
         # Source owns readiness and invalidates subscriptions during teardown.
         return source.subscribe()
 
-    def stop(self, camera_id: str) -> bool:
+    def stop(self, camera_id: str, *, owner: object | None = None) -> bool:
         """Signal only; reservation persists until run() has confirmed cleanup."""
         self._validate(camera_id)
         with self._lock:
             entry = self._entries.get(camera_id)
-            if entry is None:
+            if entry is None or (owner is not None and entry.owner is not owner):
                 return False
             if entry.phase == "blocked":
                 raise SourceCleanupUnconfirmed("source cleanup already uncertain")

@@ -36,3 +36,10 @@ brand. Registration is one entry in the ordered `DRIVERS` tuple (most-specific f
 - The former `discovery/profiles.py` and `discovery/capabilities.py` were removed — drivers supersede
   both. Shipped: `yoosee` (full ONVIF PTZ + device info), plus `dahua`/`hikvision`/`xiongmai`/`generic`
   (discovery today; controls are a one-method add once the hardware is tested).
+
+2026-10-23 native-media extension: `native_media_offer(camera)` is optional and
+defaults to `None`. A supported driver supplies a lazy factory, an opaque resource
+domain and local per-device evidence validation. Generic orchestration does not
+interpret vendor/model identity or treat enrollment as a feature grant. See
+[explicit native activation](native-source-activation.md); no startup rollout or
+new public activation endpoint is implied.

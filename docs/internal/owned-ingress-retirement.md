@@ -1,9 +1,10 @@
 # Owned-ingress retirement coordinator — 2026-10-23
 
 Status: the **retirement half** of source handoff is implemented and loopback-
-tested. It is not invoked by startup or an API. Target preparation/activation,
-driver capability admission and first migration from the legacy shared hub remain
-open. No production source or policy changed.
+tested. It is not invoked by startup or an API. Explicit native target preparation/
+activation now follows through [driver offers and readiness](native-source-activation.md).
+First migration from the legacy shared hub remains open. No production source or
+policy changed.
 
 `media/owned_retirement.py` takes a trusted `OwnedRun`: the exact bound worker and
 its caller-owned completion Future. The run thread must span worker lifetime, as
@@ -23,11 +24,16 @@ For one configured, active owned source, retirement proceeds in this order:
 
 This result reports local retirement, not a driver capability grant, an externally
 supplied activation credential or proof of firmware TEARDOWN. No replacement is
-constructed, no policy is marked active and no consumers resume. New-source
+constructed by retirement itself, no policy is marked active and no consumers resume. New-source
 preparation must check the actual driver's device support, reserve its resource
 domain, install the matching hub/native route and establish cleanup ownership
 before committing activation and releasing consumers. Native audio/recording and
 endurance acceptance remain separate.
+
+The coordinator now retains at most32 issued receipts. Its internal `claim`
+consumes the exact object once after checking current policy and confirmed holds;
+a reconstructed report is not a preparation permit. The native activation adapter
+uses that claim, not a client-provided success flag or stream deletion.
 
 ## Failure behaviour
 

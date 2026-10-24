@@ -49,6 +49,24 @@ class ViewerGate:
         with self._condition:
             return camera_id in self._holds
 
+    def is_drained(self, camera_id: str) -> bool:
+        self._validate(camera_id)
+        with self._condition:
+            return (self._holds.get(camera_id) == "drained"
+                    and not any(lease.camera_id == camera_id for lease in self._leases))
+
+    def hold(self, camera_id: str) -> None:
+        """Nonblocking failure latch; no drain receipt or implicit resume."""
+        self._validate(camera_id)
+        with self._condition:
+            if camera_id not in self._holds:
+                if len(self._holds) >= 32:
+                    raise SourceUnavailable("viewer suspension capacity reached")
+                self._holds[camera_id] = "blocked"
+            for lease in self._leases:
+                if lease.camera_id == camera_id:
+                    lease.cancelled.set()
+
     def suspend(self, camera_id: str, *, timeout: float = 8.0) -> None:
         """Blocking coordinator-thread operation, NEVER run on the ASGI loop.
 

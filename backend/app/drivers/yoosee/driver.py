@@ -27,6 +27,7 @@ from . import audio, controls
 
 if TYPE_CHECKING:
     from ...db.registry import Camera
+    from ...media.source_offer import NativeSourceOffer
     from ..onboarding import OnboardingPort
 
 
@@ -35,6 +36,12 @@ class YooseeDriver(CameraDriver):
     label = "Yoosee / generic HiSilicon (ONVIF port 5000)"
     rtsp_paths = ("/onvif1", "/onvif2", "/11", "/12", "/live.sdp", "/0", "/1")
     transport = "udp"
+
+    def native_media_offer(self, camera: Camera) -> NativeSourceOffer | None:
+        from .native_media_offer import offer
+
+        return offer(camera)
+
     def onboarding(self) -> OnboardingPort:
         from .onboarding import ONBOARDING
 

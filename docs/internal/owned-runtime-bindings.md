@@ -49,8 +49,8 @@ binding is a substitute for authentication: the RTSP boundary remains loopback.
 
 Supplying the optional runtime registry is not an activation procedure. Startup
 does not create it. The [retirement coordinator](owned-ingress-retirement.md) now
-composes consumer holds and physical owned-worker retirement. The remaining target
-activation must own per-camera/driver admission,
+composes consumer holds and physical owned-worker retirement. The explicit
+[native activation adapter](native-source-activation.md) now owns per-camera/driver admission,
 use the [viewer gate](viewer-session-drain.md) and recording holds to gate/drain
 consumers, physically retire the previous upstream, prepare the
 new worker, commit owned selection, attach the ready worker, apply the matching

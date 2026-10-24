@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from dataclasses import asdict
 
 from ...db import connect
@@ -34,7 +35,7 @@ def activate(profile: ValidatedProfile, *, resource_controls: frozenset[str] = f
 
 
 def selected(camera_id: str) -> tuple[CapabilityIdentity, frozenset[str]] | None:
-    with connect() as conn:
+    with closing(connect()) as conn:
         conn.execute(_SCHEMA)
         row = conn.execute(
             "SELECT identity, controls FROM yoosee_capability_rollout WHERE camera_id=?",

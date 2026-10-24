@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from _native_fixture import FRAGMENT, INIT
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect, WebSocketState
@@ -19,22 +20,6 @@ from backend.app.media.source_registry import SourceRegistry
 from backend.app.media.viewer_gate import ViewerGate
 
 REQUEST = '{"type":"mse","value":"avc1.640029,mp4a.40.2"}'
-
-
-def box(kind, payload):
-    return (len(payload) + 8).to_bytes(4, "big") + kind + payload
-
-
-def initialization():
-    config = box(b"avcC", b"\x01\x42\xc0\x1e\xff\xe1\x00")
-    value = b"\0\0\0\0\0\0\0\1" + box(b"avc1", bytes(78) + config)
-    for kind in (b"stsd", b"stbl", b"minf", b"mdia", b"trak", b"moov"):
-        value = box(kind, value)
-    return box(b"ftyp", b"isom") + value
-
-
-INIT = initialization()
-FRAGMENT = box(b"moof", b"sequence") + box(b"mdat", b"private-video")
 
 
 class Source:

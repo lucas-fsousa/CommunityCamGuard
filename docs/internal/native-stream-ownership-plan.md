@@ -20,11 +20,13 @@ ingress remains separate work. Docker/CI now share a verified architecture-aware
 worker installer; actual ARM64 worker/runtime acceptance remains open.
 [Durable source intent](durable-source-policy.md) now guards config writes and
 recorder admission. [Runtime bindings](owned-runtime-bindings.md) now connect ready
-owned workers to hub/recorder/browser consumers; target activation, runtime
+owned workers to hub/recorder/browser consumers. Explicit native target activation
+is now [implemented/offline-tested](native-source-activation.md); runtime
 reconciliation exclusion and controlled legacy migration are pending.
 The [owned retirement coordinator](owned-ingress-retirement.md) now composes the
 registered-viewer gate, recording hold, transition intent and verified owned reap.
-It leaves holds/transition in place; target preparation/publication and legacy
+It leaves holds/transition in place; the native activation adapter consumes that
+receipt once, verifies a driver offer and ready output before publication. Legacy
 migration still cannot be inferred from that receipt.
 
 Status: code-path audit and proposed migration, not a production source or a new

@@ -37,6 +37,7 @@ from .contracts import (
 
 if TYPE_CHECKING:
     from ..db.registry import Camera
+    from ..media.source_offer import NativeSourceOffer
     from .onboarding import OnboardingPort
 
 
@@ -117,6 +118,10 @@ class CameraDriver:
     label: str = "Generic RTSP"
     rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
     transport: str = "auto"  # media-layer hint: auto | tcp | udp
+
+    def native_media_offer(self, camera: Camera) -> NativeSourceOffer | None:
+        """Optional per-device reviewed video source; no camera I/O or brand-wide grant."""
+        return None
 
     def maintain_control_session(self, camera: Camera) -> bool:
         """Optional read-only, bounded session preparation. Never actuate hardware."""

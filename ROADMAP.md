@@ -12,8 +12,9 @@ This section overrides the priorities and pending labels in the chronological hi
    but does not prove the cause of the initial gap. Continuous soak and full-duplex
    remain outside this acceptance. No further sound test needed for this milestone.
 2. Native/proprietary streaming is the main development goal. Existing TCP probe
-   received/decoded video and confirmed cleanup; continuous shared-account ownership,
-   single-producer/fan-out integration and comparative stability remain unfinished.
+   received/decoded video and confirmed cleanup. Continuous shared-account ownership
+   and single-producer/fan-out are internally tested; production integration and
+   comparative stability remain unfinished.
    Greater consistency than RTSP is a goal to measure, not an established result.
    Internal continuous ownership, source admission and fanout are now offline-tested.
    [Authenticated WebSocket delivery](docs/internal/native-media-delivery.md)
@@ -45,8 +46,14 @@ This section overrides the priorities and pending labels in the chronological hi
    retain holds; other IDs remain admitted. It is not peer/upstream retirement.
    The [owned retirement half of handoff](docs/internal/owned-ingress-retirement.md)
    now joins consumer drain, transition CAS and worker wait/reap before reporting
-   retirement. Failures latch and block replacement. Driver-aware target activation,
-   reconciliation exclusion and first legacy migration remain; no camera switched.
+   retirement. Failures latch and block replacement.
+   [Explicit native preparation/activation](docs/internal/native-source-activation.md)
+   now consumes an authentic retirement once, uses a per-device driver offer,
+   reserves its domain, verifies shared MP4 readiness and publishes before releasing
+   viewers. Owner tokens isolate competing runs and source completion recloses
+   admission. Recording remains held; no native audio/archive integration or
+   production rollout. Reconciliation exclusion, first legacy migration, reviewed
+   native-video records and real browser/endurance acceptance remain.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

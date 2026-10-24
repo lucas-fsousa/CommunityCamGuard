@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from contextlib import closing
 from dataclasses import asdict
 
 from ...db import connect
@@ -90,7 +91,7 @@ def load(*, camera_id: str, identity: CapabilityIdentity, now: float) -> Validat
     """Load only exact identity/current rules; future-dated reviews are not trusted."""
     if type(now) not in (int, float) or not math.isfinite(now):
         return None
-    with connect() as conn:
+    with closing(connect()) as conn:
         conn.execute(_SCHEMA)
         row = conn.execute(
             """SELECT operations FROM yoosee_operation_profiles
