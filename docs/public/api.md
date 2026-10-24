@@ -28,6 +28,12 @@ now prepares a reviewed driver source only after verified owned-ingress retireme
 It adds no activation endpoint or browser override; normal startup still supplies
 no native source. Its experimental output is video-only, with recording held.
 
+Hub mutations are now [serialized with handoff stages](../internal/media-reconciliation-exclusion.md)
+in code. Registry CRUD remains durable/best-effort: a busy or unhealthy media
+application is deferred to the existing recovery worker. An accepted registry
+change is not an immediate stream-health guarantee. No new activation endpoint
+or cross-process ownership claim is introduced.
+
 The local deployment `b-a84862f46bfb` includes the restricted temporary-session MSE
 path. It accepts only registered HD/web sources and rechecks key validity
 during delivery; arbitrary sources and WebRTC negotiation are denied for temporary

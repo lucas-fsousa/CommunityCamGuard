@@ -48,8 +48,10 @@ replacement. Interruptions retain failure state and are re-raised.
 Preflight failures do not mutate policy or signal a process. Budget validation is
 also preflight. No direct-camera legacy source can obtain this worker receipt:
 deleting its name from the old shared go2rtc registry is still insufficient. The
-first shared-ingress migration and runtime reconciliation exclusion need a separate
-controlled procedure, not a global restart hidden inside this coordinator.
+first shared-ingress migration still needs a controlled procedure, not a global
+restart hidden inside this coordinator. [Runtime reconciliation exclusion](media-reconciliation-exclusion.md)
+now serializes the owned stages with their shared hub; it does not replace the
+missing legacy physical-retirement receipt.
 
 ## Evidence
 

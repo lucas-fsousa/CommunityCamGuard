@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from ..db import source_policy
 from ..recording.ingress_gate import RecordingIngressGate
 from .owned_bindings import OwnedIngressBindings
+from .reconciliation import ReconciliationGuard, serialized_mutation
 from .rtsp_ingress import OwnedRtspIngress
 from .source_registry import SourceCleanupUnconfirmed, SourceUnavailable
 from .viewer_gate import ViewerGate
@@ -34,10 +35,13 @@ class RetiredIngress:
 
 class OwnedRetirementCoordinator:
     def __init__(self, *, viewers: ViewerGate, recordings: RecordingIngressGate,
-                 bindings: OwnedIngressBindings):
+                 bindings: OwnedIngressBindings, reconciliation: ReconciliationGuard | None = None):
         self._viewers = viewers
         self._recordings = recordings
         self._bindings = bindings
+        if reconciliation is not None and reconciliation is not bindings.reconciliation:
+            raise ValueError("handoff and owned bindings must share the hub reconciliation guard")
+        self.reconciliation = bindings.reconciliation
         self._operation = threading.Lock()
         self._failed: OwnedRun | None = None  # retain owned handles on uncertainty
         self._receipts: dict[str, RetiredIngress] = {}
@@ -49,6 +53,11 @@ class OwnedRetirementCoordinator:
     @contextmanager
     def claim(self, receipt: RetiredIngress) -> Iterator[None]:
         """One-use internal preparation permit, never accept serialized receipts."""
+        with self.reconciliation.exclusive(), self._claim_receipt(receipt):
+            yield
+
+    @contextmanager
+    def _claim_receipt(self, receipt: RetiredIngress) -> Iterator[None]:
         if not self._operation.acquire(blocking=False):
             raise SourceUnavailable("source handoff already in progress")
         try:
@@ -62,6 +71,7 @@ class OwnedRetirementCoordinator:
         finally:
             self._operation.release()
 
+    @serialized_mutation
     def retire(self, running: OwnedRun, *, target_mode: str, expected_revision: int,
                drain_timeout: float = 8.0) -> RetiredIngress:
         if target_mode not in {"native", "owned_rtsp"}:

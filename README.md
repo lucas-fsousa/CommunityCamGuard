@@ -424,6 +424,10 @@ that retirement once, resolves a driver offer, waits for shared MP4 readiness an
 publishes before releasing viewers. It is experimental video-only: recording
 remains held. First shared-hub migration is still unimplemented; startup activates
 neither path and no production native-video rollout is claimed.
+The [hub reconciliation guard](docs/internal/media-reconciliation-exclusion.md)
+now excludes concurrent restart/config application during owned retirement and
+native preparation. Deferred registry changes retry on the existing recovery
+worker rather than being dropped; this is not the first legacy-ingress migration.
 An [authenticated native WebSocket delivery path](docs/internal/native-media-delivery.md)
 now serves an explicitly admitted source with bounded writes and per-viewer
 revocation. The existing player socket routes admitted native sources through this

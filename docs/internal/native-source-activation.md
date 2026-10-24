@@ -96,7 +96,10 @@ tests is synthetic structural MP4, **not decodable camera footage or physical
 playback acceptance**. Another102 routing/source/lifecycle regressions passed at
 149.7MiB, and27 evidence-store regressions passed at126.2MiB, all with zero swap.
 
-Still required: deployment orchestration/reconciliation exclusion, controlled first
+The [shared reconciliation guard](media-reconciliation-exclusion.md) now spans
+preparation/publication and hub mutation, including reentrant config publication.
+
+Still required: deployment orchestration, controlled first
 legacy migration, actual reviewed native-video records for the tested enrollment,
 real native browser/endurance acceptance, audio/recording integration and ARM64
 acceptance of this new lifecycle. No new HTTP route permits uploading proof or

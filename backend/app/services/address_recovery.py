@@ -11,6 +11,7 @@ from ..config import get_settings
 from ..db import registry
 from ..discovery.address_refresh import find_addresses
 from ..media.go2rtc import stream_id
+from ..media.reconciliation import mutation_scope
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,12 @@ class AddressRecovery:
         self._thread: threading.Thread | None = None
         self._missing: dict[str, int] = {}
         self._next_scan = 0.0
-        self._pending_apply = False
+        self._pending_apply = threading.Event()
+        self._applying = threading.Lock()
+
+    def request_apply(self) -> None:
+        """Coalesce deferred registry/config changes into the existing worker."""
+        self._pending_apply.set()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -46,19 +52,40 @@ class AddressRecovery:
             except Exception as exc:
                 log.warning("DHCP recovery failed error_type=%s", type(exc).__name__)
 
-    def _apply(self) -> None:
+    def _apply(self) -> bool:
         # Batch all changed addresses into the existing media reconciliation path.
         # External reload failure must remain pending even though DB/config are durable.
-        self.media.restart()
-        if not self.media.wait_healthy(timeout=6):
-            raise RuntimeError("media unavailable after address refresh")
-        if not self.recorder.paused:
-            self.recorder.start()
-        self._pending_apply = False
+        with mutation_scope(self.media):
+            if self._stop.is_set():
+                return False
+            self.media.restart()
+            if not self.media.wait_healthy(timeout=6):
+                raise RuntimeError("media unavailable after address refresh")
+            if self._stop.is_set():
+                return False  # never revive a recorder after service shutdown
+            if not self.recorder.paused:
+                self.recorder.start()
+            return True
+
+    def _apply_pending(self) -> None:
+        if not self._applying.acquire(blocking=False):
+            return
+        try:
+            if not self._pending_apply.is_set():
+                return
+            self._pending_apply.clear()  # requests during apply remain set for next tick
+            try:
+                if not self._apply():
+                    self._pending_apply.set()
+            except Exception:
+                self._pending_apply.set()
+                raise
+        finally:
+            self._applying.release()
 
     def tick(self) -> None:
-        if self._pending_apply:
-            self._apply()
+        if self._pending_apply.is_set():
+            self._apply_pending()
             return
         cameras = registry.list_cameras()
         online = self.media.stream_online()
@@ -80,8 +107,8 @@ class AddressRecovery:
         for cam in missing:
             ip = found.get(cam.mac.lower())
             if ip and ip != cam.last_ip and registry.refresh_address(cam, ip):
-                self._pending_apply = True
+                self.request_apply()
                 log.warning("DHCP address updated camera=%s old_ip=%s new_ip=%s",
                             cam.camera_id, cam.last_ip, ip)
-        if self._pending_apply:
-            self._apply()
+        if self._pending_apply.is_set():
+            self._apply_pending()

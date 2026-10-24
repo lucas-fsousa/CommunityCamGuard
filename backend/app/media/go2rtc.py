@@ -31,6 +31,7 @@ from ..db.registry import Camera
 from . import quality
 from .config_file import write_private_config
 from .owned_bindings import BoundIngress, OwnedIngressBindings
+from .reconciliation import ReconciliationGuard, serialized_mutation
 
 
 def stream_id(camera_id: str) -> str:
@@ -220,6 +221,7 @@ class Go2rtc:
         self.config_path = Path(config_path or settings.go2rtc_config)
         self.api = settings.go2rtc_api.rstrip("/")
         self.owned_ingress = owned_ingress
+        self.reconciliation = owned_ingress.reconciliation if owned_ingress is not None else ReconciliationGuard()
         # Whether we own the go2rtc process. False when go2rtc runs as its own container
         # (compose): we only regenerate its config and ask it to reload — never spawn a binary.
         self.manage = settings.manage_go2rtc if manage is None else manage
@@ -228,10 +230,12 @@ class Go2rtc:
         self._packet_progress: dict[str, tuple[int, float]] = {}
 
     # --- config -------------------------------------------------------------------
+    @serialized_mutation
     def write_config(self, cameras: list[Camera] | None = None) -> Path:
         self._write_config(cameras)
         return self.config_path
 
+    @serialized_mutation
     def write_config_if_changed(self, cameras: list[Camera] | None = None) -> bool:
         """Write the generated config only when its complete content changed."""
 
@@ -251,6 +255,7 @@ class Go2rtc:
     def is_running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
+    @serialized_mutation
     def start(self, cameras: list[Camera] | None = None) -> None:
         if self.is_running():
             return
@@ -262,6 +267,7 @@ class Go2rtc:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
+    @serialized_mutation
     def stop(self) -> None:
         """Reap the owned parent before dropping its handle or allowing restart.
 
@@ -278,6 +284,7 @@ class Go2rtc:
             self._proc.wait(timeout=5)
         self._proc = None
 
+    @serialized_mutation
     def reload_external(self) -> bool:
         """Ask an externally-managed go2rtc to restart so it re-reads the fresh config file.
 
@@ -297,6 +304,7 @@ class Go2rtc:
         except (urllib.error.URLError, OSError):
             return False
 
+    @serialized_mutation
     def ensure_external_config(self, cameras: list[Camera] | None = None) -> bool:
         """Apply changed config, avoiding a destructive no-op restart at app startup.
 
@@ -309,6 +317,7 @@ class Go2rtc:
             return self.reload_external()
         return self.wait_healthy(timeout=5)
 
+    @serialized_mutation
     def restart(self, cameras: list[Camera] | None = None) -> None:
         """Apply registry changes. go2rtc has no clean hot-reload of a changed config file.
 
@@ -384,6 +393,7 @@ class Go2rtc:
                 self._packet_progress.pop(sid, None)
         return online
 
+    @serialized_mutation
     def release_live_producers(self, camera_id: str, *, disconnect_grace: float = 2.0) -> bool:
         """Allow detached live producers to stop, without pinning a replacement.
 

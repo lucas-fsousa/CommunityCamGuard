@@ -24,6 +24,7 @@ from ..media import quality
 from ..media.browser_ingress import admit_hub, camera_for_source
 from ..media.diagnostic_fields import public_metrics
 from ..media.owned_bindings import OwnedIngressBindings
+from ..media.reconciliation import mutation_scope
 from ..media.source_registry import SourceUnavailable
 from ..origin_policy import browser_origin_allowed
 from ..runtime_settings import grid_hd_limit
@@ -139,8 +140,11 @@ def media_recover(camera_id: str, request: Request) -> dict:
         camera = None
     if camera is None:
         raise HTTPException(status_code=404, detail="camera not found")
+    engine = getattr(request.app.state, "media", None)
     try:
-        with media_operation(request, camera.camera_id):
+        # Acquire before registering a counted operation: a handoff holding this
+        # guard must never wait for a recovery lease that is waiting on the guard.
+        with mutation_scope(engine), media_operation(request, camera.camera_id):
             return _recover_media(camera.camera_id, request)
     except SourceUnavailable:
         raise HTTPException(status_code=409, detail="camera media admission unavailable") from None

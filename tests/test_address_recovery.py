@@ -75,7 +75,7 @@ def test_reload_failure_retried_without_scan_and_pause_preserved(monkeypatch):
     with pytest.raises(RuntimeError):
         recovery.tick()
     recovery.tick()
-    assert not recovery._pending_apply
+    assert not recovery._pending_apply.is_set()
     lookup.assert_called_once()
     rec.start.assert_not_called()
 

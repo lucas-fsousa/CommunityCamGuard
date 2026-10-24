@@ -11,6 +11,7 @@ import pytest
 from _rtsp_fixture import CameraFixture, describe
 
 from backend.app.db import registry, source_policy
+from backend.app.media.go2rtc import Go2rtc
 from backend.app.media.owned_bindings import OwnedIngressBindings
 from backend.app.media.owned_retirement import OwnedRetirementCoordinator, OwnedRun
 from backend.app.media.rtsp_ingress import OwnedRtspIngress
@@ -153,3 +154,32 @@ def test_real_coordinator_reaps_owned_ingress_before_replacement_can_connect(env
             completion.result(timeout=6)
             if consumer is not None:
                 consumer.close()
+
+
+def test_shared_hub_guard_excludes_config_apply_until_owned_retirement_returns(env, tmp_path):
+    camera, _other, selected, bindings, _viewers, _recordings, coordinator = env
+    running = simulated_run(camera, bindings)
+    engine = Go2rtc(manage=False, config_path=tmp_path / "hub.json")
+    engine.reconciliation = coordinator.reconciliation
+    waiting, release, attempting = threading.Event(), threading.Event(), threading.Event()
+    def reap(**kwargs):
+        waiting.set()
+        assert release.wait(2)
+        running.worker._process = None
+    running.completion.result.side_effect = reap
+    def apply():
+        attempting.set()
+        return engine.write_config()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        retiring = pool.submit(coordinator.retire, running, target_mode="native", expected_revision=selected.revision)
+        try:
+            assert waiting.wait(1)
+            applying = pool.submit(apply)
+            assert attempting.wait(1)
+            with pytest.raises(TimeoutError):
+                applying.result(timeout=0.02)
+        finally:
+            release.set()
+        receipt = retiring.result(timeout=2)
+        applying.result(timeout=2)
+    assert receipt.selection.phase == "transition" and camera.rtsp_url not in engine.config_path.read_text()

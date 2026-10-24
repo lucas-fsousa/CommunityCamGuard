@@ -18,6 +18,7 @@ from backend.app import auth
 from backend.app.api import media
 from backend.app.db import registry, source_policy
 from backend.app.media.fragmented_mp4 import Mp4Chunk
+from backend.app.media.go2rtc import Go2rtc
 from backend.app.media.mp4_fanout import Mp4Fanout
 from backend.app.media.native_activation import NativeActivation
 from backend.app.media.owned_bindings import OwnedIngressBindings
@@ -343,3 +344,39 @@ def test_closed_preparation_can_never_submit_a_late_source_job(retired):
     with pytest.raises(SourceUnavailable):
         session.launch(executor)
     executor.submit.assert_not_called()
+
+
+def test_shared_hub_guard_covers_preparation_and_reentrant_route_publication(retired, tmp_path):
+    camera, retirement, receipt, _viewers, _recordings = retired
+    source, sources = SyntheticSource(ready=False), SourceRegistry()
+    engine = Go2rtc(manage=False, config_path=tmp_path / "hub.json")
+    engine.reconciliation = retirement.reconciliation
+    engine.reload_external = Mock(return_value=True)
+    offered = NativeSourceOffer(camera.camera_id, "test/shared", lambda: source, lambda: True)
+    events, attempting = [], threading.Event()
+    def publish():
+        events.append("publish")
+        engine.write_config([])  # same coordinator thread re-enters the shared guard
+    def reconcile():
+        attempting.set()
+        engine.restart([])
+        events.append("reconcile")
+    with ThreadPoolExecutor(max_workers=1) as source_pool, ThreadPoolExecutor(max_workers=2) as coordinator_pool:
+        activation = NativeActivation(retirement=retirement, sources=sources, executor=source_pool, apply_routes=publish)
+        preparing = coordinator_pool.submit(activation.start, receipt, offered, ready_timeout=2)
+        session = None
+        try:
+            assert source.entered.wait(1)
+            applying = coordinator_pool.submit(reconcile)
+            assert attempting.wait(1)
+            with pytest.raises(TimeoutError):
+                applying.result(timeout=0.02)
+            source.hub.publish(Mp4Chunk(True, INIT))
+            source.hub.publish(Mp4Chunk(False, FRAGMENT))
+            session = preparing.result(timeout=3)
+            applying.result(timeout=2)
+            assert events == ["publish", "reconcile"]
+        finally:
+            source.finish.set()
+            if session is not None:
+                session.close()

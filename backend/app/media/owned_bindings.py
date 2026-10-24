@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from ..db import registry, source_policy
+from .reconciliation import ReconciliationGuard
 from .rtsp_ingress import OwnedRtspIngress
 from .source_registry import SourceCleanupUnconfirmed, SourceUnavailable
 
@@ -34,10 +35,11 @@ class BoundIngress:
 
 
 class OwnedIngressBindings:
-    def __init__(self, *, capacity: int = 1):
+    def __init__(self, *, capacity: int = 1, reconciliation: ReconciliationGuard | None = None):
         if type(capacity) is not int or not 1 <= capacity <= 32:
             raise ValueError("owned ingress capacity must be between 1 and 32")
         self._capacity = capacity
+        self.reconciliation = reconciliation if reconciliation is not None else ReconciliationGuard()
         self._lock = threading.Lock()
         self._entries: dict[str, BoundIngress] = {}
 

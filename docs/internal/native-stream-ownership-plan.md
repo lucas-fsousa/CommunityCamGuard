@@ -21,8 +21,9 @@ worker installer; actual ARM64 worker/runtime acceptance remains open.
 [Durable source intent](durable-source-policy.md) now guards config writes and
 recorder admission. [Runtime bindings](owned-runtime-bindings.md) now connect ready
 owned workers to hub/recorder/browser consumers. Explicit native target activation
-is now [implemented/offline-tested](native-source-activation.md); runtime
-reconciliation exclusion and controlled legacy migration are pending.
+is now [implemented/offline-tested](native-source-activation.md).
+[Reconciliation exclusion](media-reconciliation-exclusion.md) now guards shared
+hub mutations and handoff stages; controlled legacy migration remains pending.
 The [owned retirement coordinator](owned-ingress-retirement.md) now composes the
 registered-viewer gate, recording hold, transition intent and verified owned reap.
 It leaves holds/transition in place; the native activation adapter consumes that

@@ -10,6 +10,8 @@ from ..camera_identity import valid_camera_id
 from ..db import registry
 from ..discovery import active_scan
 from ..media import go2rtc
+from ..media.reconciliation import mutation_scope
+from .address_recovery import AddressRecovery
 
 log = logging.getLogger(__name__)
 
@@ -60,10 +62,15 @@ def resync_services(request: Any) -> None:
     media = getattr(request.app.state, "media", None)
     recorder = getattr(request.app.state, "rec", None)
     try:
-        if media is not None:
-            media.restart()
-            media.wait_healthy(timeout=6)
-        if recorder is not None:
-            recorder.start()
+        with mutation_scope(media):
+            if media is not None:
+                media.restart()
+                if not media.wait_healthy(timeout=6):
+                    raise RuntimeError("media unavailable after registry reconciliation")
+            if recorder is not None:
+                recorder.start()
     except Exception as exc:  # registry changes are durable; startup reconciles later
+        recovery = getattr(request.app.state, "address_recovery", None)
+        if isinstance(recovery, AddressRecovery):
+            recovery.request_apply()
         log.warning("service resync after registry change failed error_type=%s", type(exc).__name__)

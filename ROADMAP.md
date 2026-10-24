@@ -52,10 +52,15 @@ This section overrides the priorities and pending labels in the chronological hi
    reserves its domain, verifies shared MP4 readiness and publishes before releasing
    viewers. Owner tokens isolate competing runs and source completion recloses
    admission. Recording remains held; no native audio/archive integration or
-   production rollout. Reconciliation exclusion, first legacy migration, reviewed
+   production rollout. First legacy migration, reviewed
    native-video records and real browser/endurance acceptance remain.
    Current driver foreground yielding may terminate native viewing; coordinated
    resumption remains part of production orchestration, not an automatic login retry.
+   [Process-local reconciliation exclusion](docs/internal/media-reconciliation-exclusion.md)
+   now covers hub mutation transactions plus retirement/preparation, with shared
+   default wiring, bounded acquisition and safe recovery lock order. Deferred
+   application uses the existing worker, retains requests arriving during apply
+   and respects shutdown/storage pause. No production migration or restart.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,
