@@ -20,8 +20,10 @@ reader without stopping independent readers or the source.
 
 The server must explicitly provide `app.state.native_sources` as a `SourceRegistry`.
 The route never constructs a registry, starts a source, authenticates a camera or
-creates an encoder. Startup does not currently provide this registry, so the
-dedicated native route declines with code1013. This is essential while the
+creates an encoder. Startup now provides an initially empty registry owned by the
+[native runtime lifecycle](native-runtime-lifecycle.md), so the dedicated native
+route declines unclaimed IDs with code1013 before accepting. No source is scheduled
+or restored. This is essential while the
 [existing RTSP ingress retirement](go2rtc-source-retirement.md) is unresolved.
 
 The existing dashboard URL `/api/go2rtc/ws?src={camera_id}_hd` (also `_web`/base)

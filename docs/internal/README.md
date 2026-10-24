@@ -9,6 +9,15 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Latest native media integration (offline, not deployed):
+[explicit source activation](native-source-activation.md),
+[hub reconciliation exclusion](media-reconciliation-exclusion.md) and
+[server-owned native runtime](native-runtime-lifecycle.md). Lifespan now owns an
+initially empty registry and bounded lazy source executor, with off-ASGI shutdown.
+No automatic source restoration, first shared-hub migration or physical/browser
+native acceptance is claimed. Historical milestones below retain their original
+scope; these newer checkpoints supersede earlier missing-lifecycle statements.
+
 Native relay RE (experimental, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).
 See also [pinned SDK codec enum translation](yoosee-rtc-codecs.md).

@@ -72,6 +72,12 @@ another. Synthetic MP4 is structural test data, not physical playback acceptance
 The two-viewer socket test now waits for each ASGI handler to complete, avoiding
 a TestClient context-cancellation race observed while repeating these regressions.
 
+At commit `ba53d09`, [CI](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40085046263)
+passed5014 Python tests (one skipped), all frontend contracts, lint and typing.
+[Image](https://github.com/lucas-fsousa/CommunityCamGuard/actions/runs/40085046246)
+also passed the amd64 build and restricted worker smoke. This is not native
+physical-camera, long-running browser or ARM64 runtime acceptance.
+
 The runtime owns only explicit native activations, not externally prepared
 owned-RTSP workers or the legacy shared hub. It does not restore active/blocked
 policy after restart, schedule migrations or resume native viewing after driver
