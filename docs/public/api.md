@@ -30,6 +30,9 @@ no native source. Its experimental output is video-only, with recording held.
 The [server-owned runtime](../internal/native-runtime-lifecycle.md) now retains
 explicit activations and shuts them down off the ASGI loop. It does not schedule
 sources or restore persisted native intent on startup.
+The [owned RTSP runtime](../internal/owned-runtime-lifecycle.md) similarly owns
+explicit replacement runs and empty hub/recorder bindings. It adds no HTTP
+activation route, does not migrate the legacy hub and does not restore sources.
 
 Hub mutations are now [serialized with handoff stages](../internal/media-reconciliation-exclusion.md)
 in code. Registry CRUD remains durable/best-effort: a busy or unhealthy media

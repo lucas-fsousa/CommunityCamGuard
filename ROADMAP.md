@@ -65,8 +65,14 @@ This section overrides the priorities and pending labels in the chronological hi
    now retains explicit activations before submission, bounds lazy workers/queue,
    closes admission and joins source threads off the ASGI loop during shutdown.
    Cancellation races and uncertain cleanup retain ownership/fail closed. Startup
-   remains native-idle; owned-RTSP lifetime, restore/recovery orchestration and
+   remains native-idle; restore/recovery orchestration and
    first legacy migration remain required before production switching.
+   [Owned-RTSP lifespan ownership](docs/internal/owned-runtime-lifecycle.md) now
+   shares empty bindings with hub/recorder, retains before submission, claims
+   authentic owned-target retirements and publishes a ready worker before releasing
+   consumers. Old completion/cleanup cannot hold or remove a newer generation.
+   Worker/thread shutdown and owned-to-synthetic-native handoff are loopback/offline
+   tested. No first legacy migration, automatic restoration or dashboard switch.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

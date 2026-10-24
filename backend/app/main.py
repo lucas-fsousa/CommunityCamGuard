@@ -49,6 +49,8 @@ from .frontend_build import build_version
 from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
 from .media.native_runtime import NativeSourceRuntime
+from .media.owned_bindings import OwnedIngressBindings
+from .media.owned_runtime import OwnedSourceRuntime
 from .media.viewer_gate import ViewerGate
 from .recording.playback import Warmer
 from .recording.playback_logging import configure as configure_playback_logging
@@ -70,10 +72,12 @@ async def lifespan(app: FastAPI):
     p2p.init_db()
     drivers.init_onboarding()
 
-    media = Go2rtc()
+    owned_bindings = OwnedIngressBindings()
+    media = Go2rtc(owned_ingress=owned_bindings)
     viewers = ViewerGate()
     native_runtime = NativeSourceRuntime(viewers=viewers)
-    rec = Recorder()
+    rec = Recorder(owned_ingress=owned_bindings)
+    owned_runtime = OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings)
     storage = StorageMonitor(rec)
     retention = RetentionCleaner()
     warmer = Warmer()
@@ -83,6 +87,7 @@ async def lifespan(app: FastAPI):
     app.state.viewer_sessions = viewers
     app.state.native_runtime = native_runtime
     app.state.native_sources = native_runtime.sources
+    app.state.owned_runtime = owned_runtime
     app.state.rec = rec
     app.state.storage = storage
     app.state.retention = retention
@@ -121,7 +126,8 @@ async def lifespan(app: FastAPI):
         # ExitStack preserves failure propagation while running callbacks in reverse.
         def stop_services():
             with ExitStack() as cleanup:
-                for service in (media, rec, native_runtime, storage, retention, warmer, address_recovery, control_sessions):
+                for service in (media, rec, owned_runtime, native_runtime, storage, retention, warmer,
+                                address_recovery, control_sessions):
                     cleanup.callback(service.stop)
         # Draining registered sockets requires the ASGI loop to remain runnable.
         await asyncio.to_thread(stop_services)

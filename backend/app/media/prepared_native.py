@@ -3,32 +3,14 @@
 import math
 import threading
 import time
-from _thread import LockType
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from concurrent.futures import Executor, Future
-from contextlib import contextmanager
 
 from ..db import source_policy
+from .retirement_wait import locked_until, remaining
 from .source_offer import NativeSourceOffer
 from .source_registry import SourceCleanupUnconfirmed, SourceRegistry, SourceUnavailable
 from .viewer_gate import ViewerGate
-
-
-def _remaining(deadline: float) -> float:
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise SourceCleanupUnconfirmed("native cleanup deadline exceeded")
-    return remaining
-
-
-@contextmanager
-def _locked_until(lock: LockType, deadline: float) -> Iterator[None]:
-    if not lock.acquire(timeout=_remaining(deadline)):
-        raise SourceCleanupUnconfirmed("native cleanup lock unavailable")
-    try:
-        yield
-    finally:
-        lock.release()
 
 
 class PreparedNative:
@@ -125,11 +107,11 @@ class PreparedNative:
             raise ValueError("bounded native cleanup timeout required")
         self.request_stop()
         deadline = time.monotonic() + timeout
-        with _locked_until(self._closing, deadline):
+        with locked_until(self._closing, deadline):
             self._close(deadline)
 
     def _close(self, deadline: float) -> None:
-        with _locked_until(self._lock, deadline):
+        with locked_until(self._lock, deadline):
             if self._closed:
                 return  # an old receipt must not re-hold a later camera generation
             self._block_locked()
@@ -140,10 +122,10 @@ class PreparedNative:
                 pass  # still await the actual owner; its reservation remains blocked
             try:
                 if not self.completion.cancelled():
-                    self.completion.result(timeout=min(6.0, _remaining(deadline)))
+                    self.completion.result(timeout=min(6.0, remaining(deadline)))
             except Exception:
                 if self._constructed.is_set() or self._sources.owns(self.offer.camera_id, self.owner):
                     raise SourceCleanupUnconfirmed("native owner retirement unconfirmed") from None
-        self._viewers.suspend(self.offer.camera_id, timeout=min(8.0, _remaining(deadline)))
-        with _locked_until(self._lock, deadline):
+        self._viewers.suspend(self.offer.camera_id, timeout=min(8.0, remaining(deadline)))
+        with locked_until(self._lock, deadline):
             self._closed = True

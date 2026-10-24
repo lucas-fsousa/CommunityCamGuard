@@ -58,7 +58,7 @@ and holds no reservation is resource-free, unlike an uncertain constructed owner
 Lifespan runs synchronous service cleanup off the ASGI loop, allowing registered
 WebSocket consumers to complete while shutdown waits for their leases. Existing
 reverse cleanup order stops control/recovery/background services first, then the
-native runtime, recorder and media service. Every service stop is attempted even
+native runtime, explicit owned-RTSP runtime, recorder and media service. Every service stop is attempted even
 if another fails; failure propagates rather than being reported as clean shutdown.
 
 ## Evidence and remaining deployment work
@@ -79,7 +79,9 @@ also passed the amd64 build and restricted worker smoke. This is not native
 physical-camera, long-running browser or ARM64 runtime acceptance.
 
 The runtime owns only explicit native activations, not externally prepared
-owned-RTSP workers or the legacy shared hub. It does not restore active/blocked
+owned-RTSP workers or the legacy shared hub. A separate
+[owned runtime](owned-runtime-lifecycle.md) now owns RTSP runs that it explicitly
+submits. Neither runtime restores active/blocked
 policy after restart, schedule migrations or resume native viewing after driver
 foreground-control yielding. First shared-hub migration requires a separate
 controlled closure procedure affecting all shared consumers. Native audio/archive,

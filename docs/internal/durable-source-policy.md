@@ -34,7 +34,8 @@ selections. Transitioning, blocked, native and owned selections omit the base an
 both quality variants. Active `owned_rtsp` now uses a matching ready
 [runtime binding](owned-runtime-bindings.md), when explicitly supplied. Missing,
 withdrawn or wrong-revision bindings omit the source; they never restore its camera
-URL. Startup does not supply a registry or activate an owned worker.
+URL. Startup supplies an empty owned registry, but does not activate or restore
+an owned worker; see [runtime lifetime](owned-runtime-lifecycle.md).
 
 `Go2rtc.write_config`/`write_config_if_changed` retain a policy read transaction
 through rendering and the actual private-file write. A concurrent transition

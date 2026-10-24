@@ -12,7 +12,8 @@ remains the fuller narrative record and the source for decisions not yet migrate
 Latest native media integration (offline, not deployed):
 [explicit source activation](native-source-activation.md),
 [hub reconciliation exclusion](media-reconciliation-exclusion.md) and
-[server-owned native runtime](native-runtime-lifecycle.md). Lifespan now owns an
+[server-owned native runtime](native-runtime-lifecycle.md) and
+[explicit RTSP runtime](owned-runtime-lifecycle.md). Lifespan now owns an
 initially empty registry and bounded lazy source executor, with off-ASGI shutdown.
 No automatic source restoration, first shared-hub migration or physical/browser
 native acceptance is claimed. Historical milestones below retain their original

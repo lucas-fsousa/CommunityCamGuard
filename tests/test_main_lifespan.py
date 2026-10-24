@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.app import config, main
 from backend.app.media.native_runtime import NativeSourceRuntime
+from backend.app.media.owned_runtime import OwnedSourceRuntime
 from backend.app.media.source_registry import SourceRegistry
 from backend.app.recording.process_lifecycle import RecorderCleanupUnconfirmed
 
@@ -16,7 +17,8 @@ from backend.app.recording.process_lifecycle import RecorderCleanupUnconfirmed
 def _fake_service(name, events):
     class F:
         def __init__(self, *a, **k):
-            pass
+            self.ingress = object()
+            self.owned_ingress = k.get("owned_ingress")
 
         def start(self, *a, **k):
             events.append(f"{name}.start")
@@ -53,6 +55,7 @@ def _patch_services(monkeypatch, events):
         def __init__(self, *args, **kwargs):
             self.sources = SourceRegistry()
     monkeypatch.setattr(main, "NativeSourceRuntime", Native)
+    monkeypatch.setattr(main, "OwnedSourceRuntime", _fake_service("owned", events))
 
 
 def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
@@ -68,7 +71,7 @@ def test_lifespan_autostarts_then_stops_all_services(monkeypatch):
     for svc in ("rec", "storage", "retention", "warmer", "controls"):
         assert f"{svc}.start" in events
     # cleanly stopped on shutdown
-    for svc in ("controls", "warmer", "retention", "storage", "native", "rec", "media"):
+    for svc in ("controls", "warmer", "retention", "storage", "native", "owned", "rec", "media"):
         assert f"{svc}.stop" in events
     config.get_settings.cache_clear()
 
@@ -99,7 +102,7 @@ def test_lifespan_external_go2rtc_syncs_without_spawning(monkeypatch):
     config.get_settings.cache_clear()
 
 
-@pytest.mark.parametrize("failure", ["controls", "native", "rec", "media"])
+@pytest.mark.parametrize("failure", ["controls", "native", "owned", "rec", "media"])
 def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch, failure):
     events = []
     _patch_services(monkeypatch, events)
@@ -107,11 +110,13 @@ def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch,
     class Failed(_fake_service(failure, events)):
         def __init__(self, *args, **kwargs):
             self.sources = SourceRegistry()
+            self.ingress = object()
         def stop(self):
             events.append(f"{failure}.stop")
             raise RecorderCleanupUnconfirmed("synthetic cleanup unconfirmed")
 
     attribute = {"controls": "ControlSessions", "native": "NativeSourceRuntime",
+                 "owned": "OwnedSourceRuntime",
                  "rec": "Recorder", "media": "Go2rtc"}[failure]
     monkeypatch.setattr(main, attribute, Failed)
     with pytest.raises(RecorderCleanupUnconfirmed):
@@ -119,18 +124,23 @@ def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch,
             pass
     assert [event for event in events if event.endswith(".stop")] == [
         "controls.stop", "recovery.stop", "warmer.stop", "retention.stop",
-        "storage.stop", "native.stop", "rec.stop", "media.stop",
+        "storage.stop", "native.stop", "owned.stop", "rec.stop", "media.stop",
     ]
 
 
 def test_native_runtime_stays_idle_and_is_replaced_on_a_new_lifespan(monkeypatch):
     _patch_services(monkeypatch, [])
     monkeypatch.setattr(main, "NativeSourceRuntime", NativeSourceRuntime)
+    monkeypatch.setattr(main, "OwnedSourceRuntime", OwnedSourceRuntime)
     with TestClient(main.app):
         first = main.app.state.native_runtime
         assert main.app.state.native_sources is first.sources
         assert first.sources.camera_ids() == () and not first._executor._threads
+        owned = main.app.state.owned_runtime
+        assert not owned._runs and not owned._executor._threads
+        assert owned._bindings is main.app.state.media.owned_ingress is main.app.state.rec.owned_ingress
     assert first._stopped
+    assert owned._stopped
     with TestClient(main.app):
         second = main.app.state.native_runtime
         assert second is not first and not second._executor._threads

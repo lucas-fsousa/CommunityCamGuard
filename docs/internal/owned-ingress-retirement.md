@@ -3,6 +3,9 @@
 Status: the **retirement half** of source handoff is implemented and loopback-
 tested. It is not invoked by startup or an API. Explicit native target preparation/
 activation now follows through [driver offers and readiness](native-source-activation.md).
+Explicit owned-RTSP replacement can follow through the
+[server-owned RTSP runtime](owned-runtime-lifecycle.md), with the same authentic
+claim, consumer holds and reconciliation guard.
 First migration from the legacy shared hub remains open. No production source or
 policy changed.
 

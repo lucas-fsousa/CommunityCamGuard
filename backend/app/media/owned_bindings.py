@@ -77,19 +77,19 @@ class OwnedIngressBindings:
         with self._lock:
             yield dict(self._entries)
 
-    def withdraw(self, camera_id: str) -> bool:
+    def withdraw(self, camera_id: str, *, worker: OwnedRtspIngress | None = None) -> bool:
         """Hide delivery immediately, retaining ownership until the child is reaped."""
         with self._lock:
             binding = self._entries.get(camera_id)
-            if binding is None:
+            if binding is None or (worker is not None and binding.worker is not worker):
                 return False
             binding.withdrawn.set()
             return True
 
-    def discard(self, camera_id: str) -> None:
+    def discard(self, camera_id: str, *, worker: OwnedRtspIngress | None = None) -> None:
         with self._lock:
             binding = self._entries.get(camera_id)
-            if binding is None:
+            if binding is None or (worker is not None and binding.worker is not worker):
                 return
             if binding.worker.pid is not None:
                 raise SourceCleanupUnconfirmed("owned RTSP worker has not been reaped")

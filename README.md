@@ -437,6 +437,10 @@ The [native runtime lifecycle](docs/internal/native-runtime-lifecycle.md) now
 retains explicit activations before preparation, bounds source workers and joins
 them during shutdown without blocking the ASGI loop. Startup remains idle for
 native media: no automatic restoration, camera connection or production switch.
+The [explicit owned-RTSP runtime](docs/internal/owned-runtime-lifecycle.md) now
+shares empty bindings with hub/recorder and retains/reaps its submitted workers.
+Replacement requires a verified owned-retirement receipt, readiness and route
+publication before releasing consumers. The first legacy migration remains open.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

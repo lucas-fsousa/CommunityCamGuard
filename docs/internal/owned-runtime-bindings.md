@@ -1,7 +1,8 @@
 # Owned RTSP runtime bindings — 2026-10-23
 
-Status: runtime consumers integrated and offline/loopback-tested. No default
-binding registry, source scheduler, camera migration or production deployment.
+Status: runtime consumers integrated and offline/loopback-tested. Lifespan now
+shares an initially empty registry with the [explicit owned runtime](owned-runtime-lifecycle.md).
+No source scheduler, camera migration or production deployment.
 
 ## Contract
 
@@ -47,8 +48,8 @@ binding is a substitute for authentication: the RTSP boundary remains loopback.
 
 ## Handoff still required
 
-Supplying the optional runtime registry is not an activation procedure. Startup
-does not create it. The [retirement coordinator](owned-ingress-retirement.md) now
+Supplying the runtime registry is not an activation procedure. Startup creates it
+empty and does not start a worker. The [retirement coordinator](owned-ingress-retirement.md) now
 composes consumer holds and physical owned-worker retirement. The explicit
 [native activation adapter](native-source-activation.md) now owns per-camera/driver admission,
 use the [viewer gate](viewer-session-drain.md) and recording holds to gate/drain
