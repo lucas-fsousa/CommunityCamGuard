@@ -7,6 +7,7 @@ import time
 
 from .. import drivers
 from ..db import registry
+from .thread_shutdown import join_thread, require_retired
 
 log = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ class ControlSessions:
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=1)
+        join_thread(self._thread, timeout=1)
+        require_retired(self._thread)
         # The worker owns cleanup, including when its bounded network read is
         # still finishing. Never close a socket under an in-flight preparation.
 

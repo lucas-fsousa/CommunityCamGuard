@@ -79,6 +79,12 @@ This section overrides the priorities and pending labels in the chronological hi
    reconnects; refresh rechecks metadata without starting/restoring a camera.
    Missing/blocked state is not cleared and no direct-RTSP fallback is inferred.
    Verified source restoration itself remains pending.
+   [Single-server source ownership](docs/internal/server-source-owner.md) now
+   rejects a second app owner of the same database before schema/service startup.
+   Partial startup rolls back registered services; timed-out background joins
+   cannot release ownership as if shutdown succeeded. Kernel process-death and
+   cleanup retry are tested locally, without camera/container changes. This is
+   a recovery prerequisite, not automatic restoration or legacy closure proof.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

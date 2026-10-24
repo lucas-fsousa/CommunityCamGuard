@@ -25,6 +25,7 @@ from pathlib import Path
 
 from ..config import get_settings
 from ..runtime_settings import playback_cache_limit_mb
+from ..services.thread_shutdown import join_thread, require_retired
 from . import codec_cache
 from .playback_budget import (
     ENCODE_TIMEOUT_SECONDS,
@@ -355,8 +356,8 @@ class Warmer:
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=5)
+        join_thread(self._thread, timeout=5)
+        require_retired(self._thread)
 
     def _loop(self) -> None:
         while not self._stop.is_set():

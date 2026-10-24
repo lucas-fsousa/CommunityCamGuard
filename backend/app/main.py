@@ -13,7 +13,7 @@ Custom Uvicorn launchers must retain ``--no-proxy-headers``.
 from __future__ import annotations
 
 import asyncio
-from contextlib import ExitStack, asynccontextmanager
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -51,6 +51,7 @@ from .media.go2rtc import Go2rtc
 from .media.native_runtime import NativeSourceRuntime
 from .media.owned_bindings import OwnedIngressBindings
 from .media.owned_runtime import OwnedSourceRuntime
+from .media.server_owner import ServerOwner
 from .media.viewer_gate import ViewerGate
 from .recording.playback import Warmer
 from .recording.playback_logging import configure as configure_playback_logging
@@ -59,78 +60,71 @@ from .recording.retention import RetentionCleaner
 from .recording.storage import StorageMonitor
 from .services.address_recovery import AddressRecovery
 from .services.control_sessions import ControlSessions
+from .services.lifetime import ServiceLifetime
 from .validation_errors import invalid_request
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_playback_logging()
     settings = get_settings()
-    configure_control_diagnostics(settings.db_path.parent / "logs")
-    registry.init_db()
-    source_policy.init_db()
-    p2p.init_db()
-    drivers.init_onboarding()
-
-    owned_bindings = OwnedIngressBindings()
-    media = Go2rtc(owned_ingress=owned_bindings)
-    viewers = ViewerGate()
-    native_runtime = NativeSourceRuntime(viewers=viewers)
-    rec = Recorder(owned_ingress=owned_bindings)
-    owned_runtime = OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings)
-    storage = StorageMonitor(rec)
-    retention = RetentionCleaner()
-    warmer = Warmer()
-    address_recovery = AddressRecovery(media, rec)
-    control_sessions = ControlSessions()
-    app.state.media = media
-    app.state.viewer_sessions = viewers
-    app.state.native_runtime = native_runtime
-    app.state.native_sources = native_runtime.sources
-    app.state.owned_runtime = owned_runtime
-    app.state.rec = rec
-    app.state.storage = storage
-    app.state.retention = retention
-    app.state.warmer = warmer
-    app.state.address_recovery = address_recovery
-    app.state.control_sessions = control_sessions
-    app.state.startup_error = None
-
-    if settings.autostart_services:
-        try:
-            if settings.manage_go2rtc:
-                media.start()  # spawn + own the go2rtc binary (host mode)
-            else:
-                # The external container does not watch its mounted config. Writing without an
-                # explicit reload leaves old stream IDs alive after registry/identity migrations;
-                # recorders then loop forever on RTSP 404 while the API still looks healthy. Do
-                # not restart it when only this app container restarted and config is identical:
-                # go2rtc can otherwise retain an old FFmpeg producer beside its replacement.
-                if not media.ensure_external_config():
-                    raise RuntimeError("external go2rtc did not apply its generated configuration")
-            if media.wait_healthy(timeout=15):
-                rec.start()
-            storage.start()
-            retention.start()  # sporadic cleanup of footage past the retention window
-            warmer.start()  # opt-in: pre-transcode recent segments for instant playback
-        except Exception as exc:  # missing binary, etc. — keep the API usable
-            app.state.startup_error = str(exc)
-        address_recovery.start()
-        if settings.control_session_warmup:
-            control_sessions.start()
-
+    owner = ServerOwner(settings.db_path)
+    owner.acquire()  # before schema/config reconciliation or any service birth
+    lifetime = ServiceLifetime(owner)
+    app.state.service_lifetime = lifetime  # retain handles even if startup/cleanup fails
     try:
+        configure_playback_logging()
+        configure_control_diagnostics(settings.db_path.parent / "logs")
+        registry.init_db()
+        source_policy.init_db()
+        p2p.init_db()
+        drivers.init_onboarding()
+
+        owned_bindings = OwnedIngressBindings()
+        viewers = ViewerGate()
+        media = lifetime.own(Go2rtc(owned_ingress=owned_bindings))
+        rec = lifetime.own(Recorder(owned_ingress=owned_bindings))
+        owned_runtime = lifetime.own(OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings))
+        native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers))
+        storage = lifetime.own(StorageMonitor(rec))
+        retention = lifetime.own(RetentionCleaner())
+        warmer = lifetime.own(Warmer())
+        address_recovery = lifetime.own(AddressRecovery(media, rec))
+        control_sessions = lifetime.own(ControlSessions())
+        app.state.media = media
+        app.state.viewer_sessions = viewers
+        app.state.native_runtime = native_runtime
+        app.state.native_sources = native_runtime.sources
+        app.state.owned_runtime = owned_runtime
+        app.state.rec = rec
+        app.state.storage = storage
+        app.state.retention = retention
+        app.state.warmer = warmer
+        app.state.address_recovery = address_recovery
+        app.state.control_sessions = control_sessions
+        app.state.startup_error = None
+
+        if settings.autostart_services:
+            try:
+                if settings.manage_go2rtc:
+                    media.start()
+                # The external container does not watch its config. Apply only
+                # real changes: unnecessary restart can leave overlapping producers.
+                elif not media.ensure_external_config():
+                    raise RuntimeError("external go2rtc did not apply its generated configuration")
+                if media.wait_healthy(timeout=15):
+                    rec.start()
+                storage.start()
+                retention.start()
+                warmer.start()
+            except Exception as exc:  # keep API usable after best-effort media startup
+                app.state.startup_error = str(exc)
+            address_recovery.start()
+            if settings.control_session_warmup:
+                control_sessions.start()
         yield
     finally:
-        # Attempt every cleanup even if one recorder cannot confirm termination.
-        # ExitStack preserves failure propagation while running callbacks in reverse.
-        def stop_services():
-            with ExitStack() as cleanup:
-                for service in (media, rec, owned_runtime, native_runtime, storage, retention, warmer,
-                                address_recovery, control_sessions):
-                    cleanup.callback(service.stop)
-        # Draining registered sockets requires the ASGI loop to remain runnable.
-        await asyncio.to_thread(stop_services)
+        # Partial startup is covered too. Keep ASGI runnable for viewer drains.
+        await asyncio.to_thread(lifetime.stop)
 
 
 # Interactive API docs live at /api/docs (Swagger) and /api/redoc; the raw schema at

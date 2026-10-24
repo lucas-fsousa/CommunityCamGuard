@@ -12,6 +12,7 @@ from ..db import registry
 from ..discovery.address_refresh import find_addresses
 from ..media.go2rtc import stream_id
 from ..media.reconciliation import mutation_scope
+from .thread_shutdown import join_thread, require_retired
 
 log = logging.getLogger(__name__)
 
@@ -42,8 +43,8 @@ class AddressRecovery:
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=8)
+        join_thread(self._thread, timeout=8)
+        require_retired(self._thread)
 
     def _run(self) -> None:
         while not self._stop.wait(30):

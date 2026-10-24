@@ -21,6 +21,9 @@ scope; these newer checkpoints supersede earlier missing-lifecycle statements.
 The [restart availability report](media-source-recovery.md) now distinguishes
 persisted intent from live sessions and prevents known-unavailable dashboard
 sources from entering a player reconnect loop. It does not restore sources.
+The [server ownership lock and startup rollback](server-source-owner.md) now
+exclude duplicate cooperating app owners and retain ownership after uncertain
+background-service shutdown. Source restoration remains separate.
 
 Native relay RE (experimental, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).

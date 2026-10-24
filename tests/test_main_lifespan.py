@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from backend.app import config, main
 from backend.app.media.native_runtime import NativeSourceRuntime
 from backend.app.media.owned_runtime import OwnedSourceRuntime
+from backend.app.media.server_owner import ServerOwner, ServerOwnerBusy
 from backend.app.media.source_registry import SourceRegistry
 from backend.app.recording.process_lifecycle import RecorderCleanupUnconfirmed
 
@@ -126,6 +127,68 @@ def test_shutdown_attempts_other_services_after_unconfirmed_cleanup(monkeypatch,
         "controls.stop", "recovery.stop", "warmer.stop", "retention.stop",
         "storage.stop", "native.stop", "owned.stop", "rec.stop", "media.stop",
     ]
+    lifetime = main.app.state.service_lifetime
+    try:
+        assert lifetime.owner.acquired
+        with pytest.raises(ServerOwnerBusy):
+            ServerOwner(config.get_settings().db_path).acquire()
+    finally:
+        # All services are fakes; clear the injected failure and retry cleanup.
+        for service in lifetime._services:
+            if isinstance(service, Failed):
+                service.stop = lambda: None
+        lifetime.stop()
+
+
+def test_second_lifespan_is_rejected_before_schema_or_service_creation(monkeypatch):
+    from fastapi import FastAPI
+
+    events = []
+    _patch_services(monkeypatch, events)
+    initialize = main.registry.init_db
+    calls = []
+    def init():
+        calls.append("schema")
+        initialize()
+    monkeypatch.setattr(main.registry, "init_db", init)
+    with TestClient(FastAPI(lifespan=main.lifespan)):
+        with pytest.raises(ServerOwnerBusy):
+            with TestClient(FastAPI(lifespan=main.lifespan)):
+                pytest.fail("duplicate owner started")
+        assert calls == ["schema"] and events == []
+    replacement = ServerOwner(config.get_settings().db_path)
+    replacement.acquire()
+    replacement.close()
+
+
+@pytest.mark.parametrize("stage", ["schema", "constructor", "background-start"])
+def test_partial_startup_failure_rolls_back_and_releases_confirmed_owner(monkeypatch, stage):
+    events = []
+    _patch_services(monkeypatch, events)
+    def fail(*_, **__):
+        raise RuntimeError("synthetic partial startup")
+    if stage == "schema":
+        monkeypatch.setattr(main.registry, "init_db", fail)
+    elif stage == "constructor":
+        monkeypatch.setattr(main, "RetentionCleaner", fail)
+    else:
+        monkeypatch.setenv("AUTOSTART_SERVICES", "true")
+        config.get_settings.cache_clear()
+        class Failed(_fake_service("recovery", events)):
+            start = fail
+        monkeypatch.setattr(main, "AddressRecovery", Failed)
+    with pytest.raises(RuntimeError, match="synthetic partial startup"):
+        with TestClient(main.app):
+            pass
+    stopped = [event for event in events if event.endswith(".stop")]
+    expected = [] if stage == "schema" else ["storage.stop", "native.stop", "owned.stop", "rec.stop", "media.stop"]
+    if stage == "background-start":
+        expected = ["controls.stop", "recovery.stop", "warmer.stop", "retention.stop", *expected]
+    assert stopped == expected
+    assert not main.app.state.service_lifetime.owner.acquired
+    replacement = ServerOwner(config.get_settings().db_path)
+    replacement.acquire()
+    replacement.close()
 
 
 def test_native_runtime_stays_idle_and_is_replaced_on_a_new_lifespan(monkeypatch):

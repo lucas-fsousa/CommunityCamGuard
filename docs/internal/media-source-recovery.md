@@ -70,7 +70,10 @@ Two successive real app lifespans preserve native/owned intent, report missing
 runtime and start no source threads. Native output in fixtures is structural MP4,
 not physical playback acceptance.
 
-Actual restoration remains open: it needs verified old-session retirement,
+The [server ownership lock](server-source-owner.md) now excludes duplicate app
+owners of the same database and covers partial startup/uncertain service shutdown.
+This prerequisite does not supply a source-retirement receipt. Actual restoration
+still needs verified old-session retirement,
 fresh per-device driver admission/evidence, bounded preparation and publication,
 and a defined policy for interrupted transitions/unknown cleanup. No stored flag,
 HTTP recovery request or UI refresh supplies that authority. First external shared

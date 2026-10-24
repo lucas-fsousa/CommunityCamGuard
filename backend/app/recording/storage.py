@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..config import get_settings
+from ..services.thread_shutdown import join_thread, require_retired
 from .recorder import Recorder
 
 OK = "ok"
@@ -101,8 +102,8 @@ class StorageMonitor:
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=self.interval + 1)
+        join_thread(self._thread, timeout=self.interval + 1)
+        require_retired(self._thread)
 
     def _loop(self) -> None:
         while not self._stop.is_set():

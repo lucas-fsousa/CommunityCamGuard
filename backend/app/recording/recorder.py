@@ -39,6 +39,7 @@ from ..config import get_settings
 from ..db import connect, registry, source_policy
 from ..media import go2rtc
 from ..media.owned_bindings import OwnedIngressBindings
+from ..services.thread_shutdown import join_thread, require_retired
 from .ingress_gate import RecordingIngressGate
 from .process_lifecycle import RecorderCleanupUnconfirmed, retire_process
 
@@ -384,11 +385,11 @@ class Recorder:
 
     def stop(self) -> None:
         self._stop.set()
-        if self._maint is not None:
-            self._maint.join(timeout=self.maint_interval + 2)
+        join_thread(self._maint, timeout=self.maint_interval + 2)
         with self._lock:
             self._terminate_all_locked()
         self._index(list_all=True)  # catch the final segments
+        require_retired(self._maint)
 
     def _terminate_all_locked(self) -> None:
         failed = False

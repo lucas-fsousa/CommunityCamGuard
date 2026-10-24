@@ -159,6 +159,12 @@ amd64/arm64. Existing deployments still use the separate media-hub service; the
 bundled binary does not enable owned/native source selection automatically.
 ARM64 Docker and the new worker's ARM64 runtime acceptance remain pending.
 
+Run only one app process/Uvicorn worker per database. The
+[server ownership lock](docs/internal/server-source-owner.md) rejects a duplicate
+owner and remains held after unconfirmed service cleanup. Do not delete its
+`.source-owner.lock` file to bypass contention; stop the other app process.
+Keep ASGI lifespan enabled in custom launchers.
+
 Or run it directly with Python (spawns/owns the go2rtc binary itself):
 
 ```bash
