@@ -108,6 +108,7 @@ def test_missing_malformed_or_unrelated_light_state_cannot_grant_support():
 def test_strict_dashboard_read_is_scoped_to_migrated_units(monkeypatch, migrated):
     from types import SimpleNamespace
 
+    from backend.app.db.p2p import P2PEnrollment
     from backend.app.drivers.yoosee import capability_rollout, controls
 
     calls = []
@@ -115,12 +116,16 @@ def test_strict_dashboard_read_is_scoped_to_migrated_units(monkeypatch, migrated
     def read(_access, **kwargs):
         calls.append(kwargs)
         return state
-    monkeypatch.setattr(controls, "_enrollment", lambda _camera: object())
+    camera_id = "cam_" + "1" * 24
+    enrollment = P2PEnrollment(device_id=DEVICE_ID, access_id=123,
+        access_token=bytes(range(64)), dev_token=None, created_at="now", updated_at="now",
+        camera_id=camera_id)
+    monkeypatch.setattr(controls, "_enrollment", lambda _camera: enrollment)
     monkeypatch.setattr(controls, "run_with_fresh_access", lambda access, fn: fn(access))
     monkeypatch.setattr(controls, "read_camera_white_light", read)
     monkeypatch.setattr(capability_rollout, "selected", lambda _id: (
         (None, frozenset({"white_light"})) if migrated else None
     ))
-    result = controls.read(SimpleNamespace(camera_id="cam_" + "1" * 24), "white_light")
+    result = controls.read(SimpleNamespace(camera_id=camera_id), "white_light")
     assert result.value is False and result.verified
     assert calls == ([{"require_correlated_response": True}] if migrated else [{}])
