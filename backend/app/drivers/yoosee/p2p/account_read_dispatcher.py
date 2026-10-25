@@ -11,6 +11,7 @@ from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .lamp_read_job import LampReadJob, LampReadSpec
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .ptz_scheduler import PtzScheduler, PtzSpec
 
@@ -59,6 +60,9 @@ class AccountReadDispatcher:
 
     def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
         return self._account.prepare_media(spec, output)
+
+    def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
+        return self._account.prepare_lamp_read(spec, deadline=deadline)
 
     def _publish(self, events: AccountEvents) -> AccountEvents:
         for completion in events.reads:

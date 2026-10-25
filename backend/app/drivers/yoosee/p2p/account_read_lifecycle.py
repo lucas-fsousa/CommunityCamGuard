@@ -11,6 +11,8 @@ from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode, OnlineDevice
+from .lamp_read_inbox import LampReadTicket
+from .lamp_read_job import LampReadResult, LampReadSpec
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteSpec
 from .ptz_authority import PtzAuthority, PtzGrant
@@ -71,6 +73,23 @@ class AccountReadLifecycle:
             if self._state != "active" or self._worker is None:
                 raise ValueError("account not accepting reads")
             return self._worker.mailbox.submit(device_id, path, timeout)
+
+    def submit_lamp_read(self, spec: LampReadSpec) -> LampReadTicket:
+        with self._lock:
+            if self._state != "active" or self._worker is None or self._worker.lamp_inbox is None:
+                raise ValueError("account not accepting lamp-state reads")
+            return self._worker.lamp_inbox.submit(spec)
+
+    def take_lamp_read(self, ticket: LampReadTicket) -> LampReadResult | None:
+        with self._lock:
+            if self._worker is None or self._worker.lamp_inbox is None or ticket.generation != self._generation:
+                return None
+            return self._worker.lamp_inbox.take(ticket)
+
+    def cancel_lamp_read(self, ticket: LampReadTicket) -> None:
+        with self._lock:
+            if self._worker is not None and self._worker.lamp_inbox is not None and ticket.generation == self._generation:
+                self._worker.lamp_inbox.cancel(ticket)
 
     def submit_motion(self, spec: PtzSpec, *, generation: int | None = None) -> MotionTicket:
         """Trusted driver callers only; grants are fixed before authentication."""

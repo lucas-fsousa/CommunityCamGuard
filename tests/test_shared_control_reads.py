@@ -9,6 +9,8 @@ from backend.app.drivers.contracts import ControlNotReady, ControlOperationError
 from backend.app.drivers.yoosee import controls
 from backend.app.drivers.yoosee import shared_control_reads as module
 from backend.app.drivers.yoosee.p2p.broker_mailbox import MailboxTicket, ReadOutcome
+from backend.app.drivers.yoosee.p2p.lamp_read_inbox import LampReadTicket
+from backend.app.drivers.yoosee.p2p.lamp_read_job import LampReadResult
 from backend.app.drivers.yoosee.p2p.smart_protection_schedule import (
     native_smart_protection_schedule,
 )
@@ -26,6 +28,9 @@ class Session:
     def submit(self, path): self.paths.append(path); return MailboxTicket(1, 1)
     def take(self, ticket): return self.result
     def cancel(self, ticket): self.cancelled.append(ticket); return True
+    def submit_lamp_read(self): self.paths.append("lamp:type12"); return LampReadTicket(1, 1)
+    def take_lamp_read(self, ticket): return LampReadResult("response", False, True)
+    def cancel_lamp_read(self, ticket): self.cancelled.append(ticket)
 
 
 def test_no_native_owner_retains_legacy_dispatch():
@@ -73,17 +78,26 @@ def test_shared_reads_never_accept_an_action_or_unmapped_control():
         module.read(ENROLLMENT, "siren_pulse")
 
 
-@pytest.mark.parametrize("operation", ["lamp_read", "write", "resource_options"])
+@pytest.mark.parametrize("operation", ["write", "resource_options"])
 def test_unintegrated_controls_cannot_preempt_live_native_stream(monkeypatch, operation):
     session = Session()
     monkeypatch.setattr(controls, "_enrollment", lambda _: ENROLLMENT)
     monkeypatch.setattr(controls, "run_with_fresh_access", lambda *a, **k: pytest.fail("parallel login"))
     camera = SimpleNamespace(camera_id=ENROLLMENT.camera_id)
     with module.publish(ENROLLMENT.camera_id, session), pytest.raises(ControlNotReady, match="cannot yet share"):
-        if operation == "lamp_read": controls.read(camera, "white_light")
-        elif operation == "write": controls.write(camera, "speaker_volume", "50")
+        if operation == "write": controls.write(camera, "speaker_volume", "50")
         else: controls.options(camera, "alarm_voice")
     assert not session.paths
+
+
+def test_lamp_state_uses_typed_read_not_legacy_login_or_model_path(monkeypatch):
+    session = Session()
+    monkeypatch.setattr(controls, "_enrollment", lambda _: ENROLLMENT)
+    monkeypatch.setattr(controls, "run_with_fresh_access", lambda *a, **k: pytest.fail("second login"))
+    with module.publish(ENROLLMENT.camera_id, session):
+        result = controls.read(SimpleNamespace(camera_id=ENROLLMENT.camera_id), "white_light")
+    assert result.value is False and result.verified and result.application_acknowledged
+    assert session.paths == ["lamp:type12"] and session.cancelled == [LampReadTicket(1, 1)]
 
 
 @pytest.mark.parametrize("fault", ["unready", "changed_token", "transport", "bad_value", "camera_error"])

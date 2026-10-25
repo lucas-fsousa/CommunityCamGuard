@@ -14,6 +14,7 @@ from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .lamp_read_job import LampReadJob, LampReadSpec
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .model_protocol import build_model_read
 from .ptz_scheduler import PtzScheduler
@@ -134,6 +135,16 @@ class BrokerAccount:
             self._reads.cancel(request.ticket)
             raise
         return AccountRead(request, wire)
+
+    def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
+        if (self.state != "active" or self._media_release_uncertain or self._node is None
+                or deadline > self._deadline
+                or (self._ptz is not None and self._ptz.result is not None
+                    and self._ptz.result.start_attempted
+                    and not self._ptz.result.release_delivery_confirmed)):
+            raise ValueError("account not accepting lamp-state reads")
+        return LampReadJob(self._node, self._source, spec, generation=self._generation,
+                           deadline=deadline, clock=self._clock)
 
     def retire(self, reason: Retirement = "closed") -> AccountEvents:
         if reason not in ("closed", "transport", "lifetime", "heartbeat_timeout", "input_budget",

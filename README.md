@@ -458,7 +458,7 @@ also delivered listen-in AAC and original HEVC/AAC recordings from that same ing
 without a parallel camera RTSP capture. The original deployment was restored after
 both trials. Controls coexistence, recovery, longer A/V acceptance and permanent
 rollout remain pending; these experiments do not enable native streaming at startup.
-Existing volume, protection-state and protection-schedule queries also passed a
+Existing volume, protection-state, protection-schedule and lamp-state queries passed a
 real shared-session trial without interrupting native video. Other control families,
 including writes/PTZ, still require that integration.
 See `ROADMAP.md` and

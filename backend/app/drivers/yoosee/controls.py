@@ -193,7 +193,7 @@ def read(camera: Camera, key: str) -> ControlResult:
         raise Unsupported(key)
     try:
         enrollment = _enrollment(camera)
-        if key in {SPEAKER_VOLUME, SMART_PROTECTION, SMART_PROTECTION_SCHEDULE}:
+        if key in {WHITE_LIGHT, SPEAKER_VOLUME, SMART_PROTECTION, SMART_PROTECTION_SCHEDULE}:
             from .shared_control_reads import read as read_shared
             shared = read_shared(enrollment, key)
             if shared is not None:

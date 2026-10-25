@@ -45,7 +45,7 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
     """None only when no native owner exists; active-owner failures NEVER fall back/login."""
     if not entry.camera_id:
         return None
-    if key not in _paths:
+    if key not in _paths and key != "white_light":
         raise ControlOperationError("control is not a supported shared state read")
     with _lock:
         session = _sessions.get(entry.camera_id)
@@ -53,6 +53,8 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
         return None
     if not session.matches_enrollment(entry):
         raise ControlNotReady("native shared-control session is not ready for this enrollment")
+    if key == "white_light":
+        return _read_lamp(session)
     try:
         ticket = session.submit(_paths[key])
     except ValueError:
@@ -84,3 +86,25 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
         raise ControlOperationError("native state read timed out")
     finally:
         session.cancel(ticket)
+
+
+def _read_lamp(session: SharedReadSession) -> ControlResult:
+    try:
+        ticket = session.submit_lamp_read()
+    except ValueError:
+        raise ControlNotReady("native account is not accepting lamp-state reads") from None
+    try:
+        deadline = time.monotonic() + 2.5
+        while time.monotonic() < deadline:
+            result = session.take_lamp_read(ticket)
+            if result is not None:
+                if result.status != "response" or type(result.enabled) is not bool:
+                    raise ControlOperationError("native lamp-state read was not confirmed")
+                return ControlResult(key="white_light", value=result.enabled, verified=True,
+                    authenticated=True, direct_connection=False,
+                    transport_acknowledged=result.transport_acknowledged,
+                    application_acknowledged=True)
+            time.sleep(0.005)
+        raise ControlOperationError("native lamp-state read timed out")
+    finally:
+        session.cancel_lamp_read(ticket)

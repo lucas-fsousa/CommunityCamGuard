@@ -26,6 +26,11 @@ The next60s trial also passed protection-state and schedule GETs on the same
 native session (volume/state/schedule108/84/89ms, unchanged source revision).
 Unintegrated semantic control operations fail busy rather than open a competing
 legacy login. Shared writable/B9/PTZ operations remain the next implementation task.
+The four existing state getters now passed together on the native account:
+volume/protection/schedule/lamp68/92/90/170ms, unchanged source revision throughout
+a60s A/V/archive trial. The lamp query is strictly type12 read-only B9, with one
+reader and account-wide sequences. Shared **writes**, PTZ, resource catalogues,
+capability refresh and recovery remain; no light/sound/configuration action was sent.
 
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.

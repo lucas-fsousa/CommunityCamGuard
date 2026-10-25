@@ -15,6 +15,8 @@ from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
 from .contracts import CertifiedNode
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
+from .lamp_read_inbox import LampReadInbox
+from .lamp_read_pump import LampReadPump
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
@@ -63,6 +65,7 @@ class AccountReadWorker:
         self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port,
                                                  clock=clock, policy=policy, state_reads=state_reads)
         self.mailbox = self._dispatcher.mailbox
+        self.lamp_inbox = LampReadInbox(generation, clock=clock) if state_reads else None
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
         self._generation, self._clock = generation, clock
@@ -73,6 +76,8 @@ class AccountReadWorker:
         self._socket: ReadSocket | None = None
 
     def stop(self) -> None:
+        if self.lamp_inbox is not None:
+            self.lamp_inbox.close()
         if self.motion_inbox is not None:
             self.motion_inbox.close()
         self._stop.set()
@@ -81,6 +86,8 @@ class AccountReadWorker:
         """Request no new work, with <=2 seconds for already active replies."""
         if self.motion_inbox is not None:
             self.motion_inbox.close()
+        if self.lamp_inbox is not None:
+            self.lamp_inbox.close()
         self._drain.set()
 
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
@@ -123,7 +130,9 @@ class AccountReadWorker:
         tcp_cleanup_error: BaseException | None = None
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
+        lamp = LampReadPump(self._dispatcher, self.lamp_inbox, clock=self._clock) if self.lamp_inbox is not None else None
         mixed = initial_motion is not None or self.motion_inbox is not None
+        manual_acks = mixed or lamp is not None
         node = self._node
         try:
             assert node is not None
@@ -138,7 +147,7 @@ class AccountReadWorker:
                 raise ValueError("video delivery requires a fresh TCP media handoff")
             deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
-                acknowledge_messages=not mixed, policy=self._policy)
+                acknowledge_messages=not manual_acks, policy=self._policy)
             if initial_media is not None:
                 if not isinstance(initial_media, MediaRouteSpec) or mixed:
                     raise ValueError("typed media-only bootstrap required")
@@ -235,6 +244,9 @@ class AccountReadWorker:
                         send(packet.wire, reserved=True)
                 batch = self._dispatcher.step()
                 service(batch.maintenance)
+                if lamp is not None:
+                    for packet_lamp in lamp.poll():
+                        send(packet_lamp)
                 for item in batch.reads:
                     check()
                     if self.mailbox.ready(item.ticket):
@@ -252,15 +264,18 @@ class AccountReadWorker:
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
+                    lamp_packets = lamp.observe(plain, peer, generation=self._generation) if lamp is not None else ()
+                    for packet_lamp in lamp_packets:
+                        send(packet_lamp)
                     if media is not None:
                         media.observe(plain, peer, generation=self._generation)
                     service(self._dispatcher.receive(plain, peer, generation=self._generation))
                     if motion is not None:
                         for packet in motion.observe(plain, peer, generation=self._generation):
                             send(packet.wire, reserved=True)
-                    if mixed:
+                    if manual_acks:
                         flags = struct.unpack_from("<I", plain, 20)[0]
-                        if ((motion is None or not motion.owns_release_reply(plain))
+                        if ((motion is None or not motion.owns_release_reply(plain)) and not lamp_packets
                                 and not flags & (1 << 20) and (flags >> 18) & 3):
                             send(build_mode2_response_ack(node, plain))
                 for acknowledgement in acknowledgements:
@@ -273,6 +288,8 @@ class AccountReadWorker:
             reason = "protocol"
         finally:
             try:
+                if lamp is not None:
+                    lamp.close()
                 if self.motion_inbox is not None:
                     self.motion_inbox.close()
                 if tcp is not None:

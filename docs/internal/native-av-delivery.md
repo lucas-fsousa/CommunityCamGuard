@@ -136,9 +136,43 @@ or schedule was changed. All six10s samples retained both other recorders; the60
 trial restored the deployment cleanly, with238.2MiB peak and19.209CPU seconds over
 81.772s including migration/rollback.
 
-The semantic controls adapter now rejects unintegrated legacy reads, writes and
+The semantic controls adapter now rejects unintegrated writes and
 resource-option requests for that active native camera instead of displacing its
 owner to authenticate separately. Ordinary RTSP/idle operation retains existing
 behavior and the hardware capability catalogue is unchanged. Shared write/B9/PTZ
 families, shared capability refresh and recovery still need implementation; this
 is not a claim that the complete control panel can run alongside native video yet.
+
+### Lamp-state query on the same account
+
+The remaining existing readable control, white-light state, now uses a dedicated
+bounded type12 B9 job on that same sole broker reader. It does **not** infer lamp
+state from another B7 property and cannot build type11 writes. Request and BA
+receipt sequences come from the account-wide namespace; the job does not close
+that namespace. Peer/session/generation/access/device/request-ID/type correlation
+and the existing typed binary-state parser all apply. A positive transport ACK
+alone never completes the operation.
+
+The driver handoff has one slot, an absolute2s deadline and a2.5s API wait. Timeout
+and cancellation never trigger a write, retry, login or camera STOP. Output uses
+the existing account budget without borrowing media/PTZ cleanup reserves. Message
+ACK ownership is explicit: the typed job's response is not acknowledged again by
+the generic dispatcher path. The synthetic encrypted worker test combines media
+OPEN/CLOSE, B7, lamp B9 and heartbeat with six distinct allocated sequences and
+exactly one lamp message ACK and one BA receipt.
+
+TrialM automatically ran the existing authenticated four-control API probe at
+native readiness. Volume/protection/schedule/lamp replies took68/92/90/170ms; all
+were verified and application-confirmed, and the same native revision2 was running
+after each. The lamp reported OFF; no type11, speaker, siren, movement or configuration
+write was sent. All six10s samples retained native running and both other recorders.
+The60s trial and rollback completed without cleanup errors, with223.6MiB service
+peak and20.287CPU seconds over76.618s including migration/rollback. The source and
+probe shared the768MiB hard cap; hub/permission helpers remain separately capped.
+TrialL ran the same A/V path but its manual API probe missed the window; it is not
+counted as lamp-query acceptance. TrialM's automatic readiness probe avoids that gap.
+
+This completes same-session integration of the four currently exposed semantic
+state getters for the test unit, not writes/PTZ, resource catalogues, all capability
+refresh reads, multiple native routes or automatic recovery. Ordinary production
+was restored and still uses its existing source mode.
