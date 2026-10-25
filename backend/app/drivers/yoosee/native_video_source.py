@@ -14,7 +14,7 @@ from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
 from .p2p.contracts import P2PProbeError
 from .p2p.video_consumer import VideoConsumer
-from .p2p.video_delivery import VideoDelivery
+from .p2p.video_delivery import VideoDelivery, VideoFrame
 from .shared_read_session import SharedReadResult, SharedReadSession
 
 
@@ -22,6 +22,7 @@ from .shared_read_session import SharedReadResult, SharedReadSession
 class NativeVideoResult:
     reason: str
     session: SharedReadResult
+    failure_type: str = ""
 
 
 class NativeVideoSource:
@@ -41,6 +42,8 @@ class NativeVideoSource:
         self._hub: Mp4Fanout | None = None
         self._output: FragmentedMp4 | None = None  # Consumer-thread confined.
         self._thread: threading.Thread | None = None
+        self._failure_type = ""
+        self.frame_rate: int | None = None
 
     def subscribe(self) -> Subscription:
         """Internal only: future transport must authorize/revoke each subscription."""
@@ -61,12 +64,13 @@ class NativeVideoSource:
         self._delivery.close()
         self._retire_hub()
 
-    def _decoder(self) -> HevcDecoder:
+    def _decoder(self, frame: VideoFrame) -> HevcDecoder:
         if self._stop.is_set():
             raise StreamClosedError("native video stopping")
         self._retire_hub()
         output = FragmentedMp4()
-        decoder = HevcDecoder(output=output)
+        self.frame_rate = frame.encoding.video_frame_rate
+        decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
         self._output = output
         with self._hub_lock:
             self._hub = Mp4Fanout()
@@ -90,7 +94,8 @@ class NativeVideoSource:
         except StreamClosedError:
             if not self._stop.is_set():
                 self._failed.set()
-        except BaseException:
+        except BaseException as error:
+            self._failure_type = type(error).__name__
             self._failed.set()
         finally:
             try:
@@ -128,4 +133,5 @@ class NativeVideoSource:
                     raise P2PProbeError("native video consumer shutdown unconfirmed")
             if self._cleanup_failed.is_set():
                 raise P2PProbeError("native video decoder shutdown unconfirmed")
-        return NativeVideoResult("consumer_failed" if self._failed.is_set() else result.reason, result)
+        return NativeVideoResult("consumer_failed" if self._failed.is_set() else result.reason,
+                                 result, self._failure_type)

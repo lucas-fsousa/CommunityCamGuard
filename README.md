@@ -451,6 +451,10 @@ The [source recovery snapshot](docs/internal/media-source-recovery.md) now
 distinguishes hub health from missing native/owned sessions after restart. The
 dashboard avoids reconnect loops for known unavailable sources and rechecks their
 state on refresh; this does not automatically restore a source or fall back to RTSP.
+An authorized [real camera3 native-video trial](docs/internal/native-dashboard-live-trial.md)
+now completed15 minutes through the existing dashboard, with the other two recorders
+running. The original deployment was restored afterward. Native listen-in audio,
+archival recording and permanent rollout are not yet enabled by that milestone.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

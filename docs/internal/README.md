@@ -9,6 +9,11 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Latest usable delivery: [real camera3 native dashboard trial](native-dashboard-live-trial.md),
+900s with the existing player and two other recorders active. This supersedes earlier
+"synthetic-only" integration status, not the remaining native audio/recording and
+permanent deployment requirements.
+
 Latest native media integration (offline, not deployed):
 [explicit source activation](native-source-activation.md),
 [hub reconciliation exclusion](media-reconciliation-exclusion.md) and

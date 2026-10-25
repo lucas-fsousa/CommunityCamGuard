@@ -1,12 +1,12 @@
-"""Verified retirement half of a source handoff, for an owned RTSP ingress only.
+"""Verified retirement for owned RTSP or an explicit operator legacy close adapter.
 
-No factory, activation, fallback, driver capability inference or legacy hub stop.
+No factory, activation, fallback, driver capability inference or implicit hub stop.
 Run on a coordinator thread, never the ASGI event loop. Failures stay latched.
 """
 
 import math
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -43,12 +43,52 @@ class OwnedRetirementCoordinator:
             raise ValueError("handoff and owned bindings must share the hub reconciliation guard")
         self.reconciliation = bindings.reconciliation
         self._operation = threading.Lock()
-        self._failed: OwnedRun | None = None  # retain owned handles on uncertainty
+        self._failed: OwnedRun | bool | None = None  # retain/latch uncertainty
         self._receipts: dict[str, RetiredIngress] = {}
 
     @property
     def viewer_gate(self) -> ViewerGate:
         return self._viewers
+
+    @serialized_mutation
+    def retire_legacy(self, camera_id: str, *, expected_revision: int,
+                      retire_ingress: Callable[[], object], target_mode: str = "native") -> RetiredIngress:
+        """Operator-only first handoff. Callback MUST certify physical closure.
+
+        No HTTP input/DELETE receipt. The trusted deployment adapter owns the old
+        ingress/container identity, affected consumers and actual close evidence.
+        """
+        if target_mode not in {"native", "owned_rtsp"}:
+            raise ValueError("owned or native target intent required")
+        if not self._operation.acquire(blocking=False):
+            raise SourceUnavailable("source handoff already in progress")
+        try:
+            previous = source_policy.read_for((camera_id,))[camera_id]
+            if (self._failed is not None or len(self._receipts) >= 32
+                    or not previous.permits_legacy_rtsp
+                    or previous.revision != expected_revision
+                    or self._viewers.is_suspended(camera_id) or self._recordings.is_suspended(camera_id)):
+                raise SourceUnavailable("fresh legacy retirement admission required")
+            pending = source_policy.begin_change(camera_id, target_mode, expected_revision=expected_revision)
+            try:
+                self._viewers.suspend(camera_id)
+                self._recordings.suspend(camera_id)
+                if retire_ingress() is not None:
+                    raise SourceCleanupUnconfirmed("physical closure callback did not certify completion")
+                if source_policy.read_for((camera_id,))[camera_id] != pending:
+                    raise SourceCleanupUnconfirmed("source intent changed during legacy retirement")
+                receipt = RetiredIngress(camera_id, pending)
+                self._receipts[camera_id] = receipt
+                return receipt
+            except BaseException:
+                self._failed = True
+                try:
+                    source_policy.block(camera_id, expected_revision=pending.revision)
+                except Exception:
+                    pass
+                raise SourceCleanupUnconfirmed("legacy ingress closure unconfirmed") from None
+        finally:
+            self._operation.release()
 
     @contextmanager
     def claim(self, receipt: RetiredIngress) -> Iterator[None]:

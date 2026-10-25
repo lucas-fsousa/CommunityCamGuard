@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-25 execution update: prioritize usable vertical deliveries, not additional
+infrastructure. [Real camera3 native dashboard trial](docs/internal/native-dashboard-live-trial.md)
+completed900s with the existing player, two other recorders running and restored
+production afterward. Input timing, virtual-memory allowance and leaked status-DB
+connections were corrected from live failures. Browser logs had no later stalls;
+independent visual/latency acceptance remains distinct. **Next: native listen-in
+audio + archival recording on that same ingress**, then controls/recovery, multiple
+routes, factory onboarding and ARM acceptance. LAN-only/SD/other brands/UI polish
+remain deferred. Do not report the isolated trial as permanent production rollout.
+
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.
    The stream retest had one small initial gap, then clear playback; owner accepted

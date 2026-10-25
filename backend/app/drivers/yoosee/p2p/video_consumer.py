@@ -7,7 +7,7 @@ threads or camera connections are created here; this is not an account-loop task
 from collections.abc import Callable
 from typing import Protocol
 
-from .video_delivery import VideoDelivery
+from .video_delivery import VideoDelivery, VideoFrame
 
 
 class Decoder(Protocol):
@@ -19,7 +19,7 @@ class Decoder(Protocol):
 
 
 class VideoConsumer:
-    def __init__(self, delivery: VideoDelivery, *, factory: Callable[[], Decoder]):
+    def __init__(self, delivery: VideoDelivery, *, factory: Callable[[VideoFrame], Decoder]):
         self._delivery = delivery
         self._factory = factory
         self._decoder: Decoder | None = None
@@ -47,7 +47,7 @@ class VideoConsumer:
                     # Keep the reference until shutdown succeeds; no overlapping child.
                     self._decoder.close()
                     self._decoder = None
-                self._decoder = self._factory()
+                self._decoder = self._factory(frame)
                 self._epoch = frame.epoch
             elif frame.restart_decoder:
                 raise ValueError("repeated decoder epoch boundary")

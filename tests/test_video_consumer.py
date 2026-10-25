@@ -34,7 +34,7 @@ def test_epochs_replace_only_after_confirmed_retirement():
     queue = delivery()
     sinks = []
 
-    def factory():
+    def factory(frame):
         assert not sinks or sinks[-1].closed
         sink = Sink()
         sinks.append(sink)
@@ -55,7 +55,7 @@ def test_epochs_replace_only_after_confirmed_retirement():
 def test_busy_decoder_leaves_next_frame_in_bounded_queue():
     queue = delivery()
     sink = Sink()
-    consumer = VideoConsumer(queue, factory=lambda: sink)
+    consumer = VideoConsumer(queue, factory=lambda frame: sink)
     queue.consume(V1Record(video=idr(), video_timestamp=1))
     consumer.step()
     sink.stalled = True
@@ -72,7 +72,7 @@ def test_uncertain_shutdown_never_starts_second_decoder():
     sink = Sink()
     calls = []
 
-    def factory():
+    def factory(frame):
         calls.append(1)
         return sink
 
@@ -92,7 +92,7 @@ def test_factory_failure_retires_source_queue():
     queue = delivery()
     queue.consume(V1Record(video=idr(), video_timestamp=1))
 
-    def fail():
+    def fail(frame):
         raise RuntimeError("decoder unavailable")
 
     consumer = VideoConsumer(queue, factory=fail)

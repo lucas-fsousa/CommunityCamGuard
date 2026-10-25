@@ -17,7 +17,12 @@ from .nonblocking_input import NonblockingInput
 
 class HevcDecoder:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
-                 output: FragmentedMp4 | None = None):
+                 output: FragmentedMp4 | None = None, frame_rate: int | None = None,
+                 live_timing: bool = False):
+        if type(live_timing) is not bool:
+            raise ValueError("explicit live timing mode required")
+        if frame_rate is not None and (type(frame_rate) is not int or not 1 <= frame_rate <= 60):
+            raise ValueError("bounded decoder frame rate required")
         if output is not None and (output.closed or output.started):
             raise ValueError("fresh MP4 output required")
         if any(shutil.which(name) is None for name in ("prlimit", "ffmpeg")):
@@ -32,10 +37,19 @@ class HevcDecoder:
         self._input: NonblockingInput | None = None
         self._closed = False
         self._output = output
-        command = ["prlimit", "--as=536870912", "--nofile=64", "--",
+        # Combined HEVC decode + x264 reserves more address space than decode
+        # alone (~108MiB measured RSS at1080p). Keep the caller's cgroup RSS cap;
+        # a512MiB AS limit otherwise fails get_buffer() despite available memory.
+        address_space = 1073741824 if output is not None else 536870912
+        command = ["prlimit", f"--as={address_space}", "--nofile=64", "--",
                    "ffmpeg", "-v", "error", "-nostdin", "-xerror", "-err_detect", "explode",
                    "-filter_threads", "1", "-protocol_whitelist", "pipe", "-threads", "1",
-                   "-f", "hevc", "-probesize", "32", "-analyzeduration", "0", "-i", "pipe:0",
+                   "-f", "hevc", "-probesize", "32", "-analyzeduration", "0"]
+        if live_timing:
+            command += ["-use_wallclock_as_timestamps", "1"]
+        elif frame_rate is not None:
+            command += ["-r", str(frame_rate)]
+        command += ["-i", "pipe:0",
                    "-map", "0:v:0", "-an", "-threads", "1"]
         if output is None:
             command += ["-progress", "pipe:1", "-stats_period", "0.1", "-f", "null", "-"]
@@ -43,8 +57,11 @@ class HevcDecoder:
             # Keep media stdout separate from machine-readable progress on stderr.
             command += ["-v", "quiet", "-progress", "pipe:2", "-stats_period", "0.1",
                         "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-                        "-pix_fmt", "yuv420p", "-profile:v", "baseline", "-g", "25",
-                        "-keyint_min", "25", "-sc_threshold", "0",
+                        "-pix_fmt", "yuv420p", "-profile:v", "baseline", "-g", "10" if live_timing else "25",
+                        "-keyint_min", "10" if live_timing else "25", "-sc_threshold", "0"]
+            if live_timing:
+                command += ["-fps_mode", "vfr"]
+            command += ["-flush_packets", "1",
                         "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
                         "-f", "mp4", "pipe:1"]
         if output is not None:

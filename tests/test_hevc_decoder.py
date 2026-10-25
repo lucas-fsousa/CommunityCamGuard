@@ -8,11 +8,12 @@ from backend.app.media.fragmented_mp4 import FragmentedMp4
 from tests.test_fragmented_mp4 import box
 
 
-@pytest.fixture(params=[False, True], ids=["null", "h264-mp4"])
+@pytest.fixture(params=[(False, False), (True, False), (True, True)], ids=["null", "h264-mp4", "live-vfr"])
 def decoder(monkeypatch, request):
+    as_mp4, live = request.param
     input_read, input_write = os.pipe()
     output_read, output_write = os.pipe()
-    progress_read, progress_write = os.pipe() if request.param else (None, None)
+    progress_read, progress_write = os.pipe() if as_mp4 else (None, None)
     now = [0.0]
     calls = []
 
@@ -20,7 +21,7 @@ def decoder(monkeypatch, request):
         stdin = os.fdopen(input_write, "wb", buffering=0)
         stdout = os.fdopen(output_read, "rb", buffering=0)
         stderr = os.fdopen(progress_read, "rb", buffering=0) if progress_read is not None else None
-        output = FragmentedMp4() if request.param else None
+        output = FragmentedMp4() if as_mp4 else None
         media_write = output_write
         stopped = False
         stubborn = False
@@ -46,11 +47,18 @@ def decoder(monkeypatch, request):
     process = Process()
 
     def popen(command, **kwargs):
-        assert command[:4] == ["prlimit", "--as=536870912", "--nofile=64", "--"]
+        limit = "--as=1073741824" if as_mp4 else "--as=536870912"
+        assert command[:4] == ["prlimit", limit, "--nofile=64", "--"]
         assert "-xerror" in command and "-an" in command
         assert command[command.index("-protocol_whitelist") + 1] == "pipe"
-        assert kwargs["stderr"] == (subprocess.PIPE if request.param else subprocess.DEVNULL)
-        if request.param:
+        assert kwargs["stderr"] == (subprocess.PIPE if as_mp4 else subprocess.DEVNULL)
+        if live:
+            assert command[command.index("-use_wallclock_as_timestamps")+1] == "1"
+            assert command[command.index("-fps_mode")+1] == "vfr" and "-r" not in command
+            assert command[command.index("-g")+1] == "10"
+        else:
+            assert "-use_wallclock_as_timestamps" not in command
+        if as_mp4:
             assert command[-3:] == ["-f", "mp4", "pipe:1"]
             assert "libx264" in command and "zerolatency" in command
             assert "pipe:2" in command and "-c:a" not in command
@@ -58,9 +66,9 @@ def decoder(monkeypatch, request):
 
     monkeypatch.setattr(module.shutil, "which", lambda _: "/test/tool")
     monkeypatch.setattr(module.subprocess, "Popen", popen)
-    instance = module.HevcDecoder(clock=lambda: now[0], output=process.output)
+    instance = module.HevcDecoder(clock=lambda: now[0], output=process.output, live_timing=live)
     try:
-        yield instance, process, now, input_read, progress_write if request.param else output_write, calls
+        yield instance, process, now, input_read, progress_write if as_mp4 else output_write, calls
     finally:
         instance.close()
         os.close(input_read)

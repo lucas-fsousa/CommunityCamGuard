@@ -47,7 +47,9 @@ def setup(monkeypatch):
     class Decoder:
         pending_bytes = 0
 
-        def __init__(self, *, output):
+        def __init__(self, *, output, frame_rate, live_timing):
+            assert 1 <= frame_rate <= 60
+            assert live_timing is True
             self.output = output
             self.closed = False
             decoders.append(self)

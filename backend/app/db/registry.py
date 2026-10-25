@@ -18,6 +18,7 @@ import json
 import logging
 import sqlite3
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -223,7 +224,7 @@ def refresh_address(camera: Camera, ip: str) -> bool:
 
 
 def list_cameras() -> list[Camera]:
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         rows = conn.execute("SELECT * FROM cameras ORDER BY name, mac").fetchall()
     return [_row_to_camera(r) for r in rows]
 
@@ -231,7 +232,7 @@ def list_cameras() -> list[Camera]:
 def get_camera(mac: str) -> Camera | None:
     if not mac:
         return None
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         row = conn.execute("SELECT * FROM cameras WHERE mac = ?", (mac.lower(),)).fetchone()
     return _row_to_camera(row) if row else None
 
@@ -239,7 +240,7 @@ def get_camera(mac: str) -> Camera | None:
 def get_camera_by_id(camera_id: str) -> Camera | None:
     if not valid_camera_id(camera_id):
         return None
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         row = conn.execute(
             "SELECT * FROM cameras WHERE camera_id = ?", (str(camera_id),)
         ).fetchone()

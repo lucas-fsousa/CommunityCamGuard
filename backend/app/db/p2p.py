@@ -52,7 +52,7 @@ class P2PEnrollment:
 
 
 def init_db() -> None:
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         conn.executescript(_SCHEMA)
         existing = {row["name"] for row in conn.execute("PRAGMA table_info(p2p_enrollments)")}
         for column, ddl in _MIGRATIONS.items():
@@ -160,7 +160,7 @@ def upsert_enrollment(
 
 def get_enrollment(device_id: str) -> P2PEnrollment | None:
     init_db()
-    with connect() as conn:
+    with closing(connect()) as conn:
         row = conn.execute(
             "SELECT * FROM p2p_enrollments WHERE device_id = ?", (str(device_id),)
         ).fetchone()
@@ -219,7 +219,7 @@ def get_enrollment_for_camera(camera_id: str) -> P2PEnrollment | None:
     if normalized is None:
         return None
     init_db()
-    with connect() as conn:
+    with closing(connect()) as conn:
         row = conn.execute(
             "SELECT device_id FROM p2p_enrollments WHERE camera_id = ?", (normalized,)
         ).fetchone()
@@ -236,7 +236,7 @@ def has_enrollment_for_camera(camera_id: str) -> bool:
     if normalized is None:
         return False
     init_db()
-    with connect() as conn:
+    with closing(connect()) as conn:
         row = conn.execute(
             "SELECT 1 FROM p2p_enrollments WHERE camera_id = ?", (normalized,)
         ).fetchone()
