@@ -195,11 +195,12 @@ def test_only_reviewed_identity_paths_admitted(path):
     assert box.poll().submissions[0].ticket == ticket
 
 
-def test_explicit_state_scope_adds_only_volume_and_never_a_write_or_action():
+def test_explicit_state_scope_adds_only_reviewed_state_roots_and_never_a_write_or_action():
     box = BrokerMailbox(1, state_reads=True)
     ticket = box.submit(DEVICE.device_id, "ProWritable.volume")
     assert box.poll().submissions[0].ticket == ticket
-    for path in (MODEL_READ_PATHS - set(ACCOUNT_IDENTITY_READ_PATHS) - {"ProWritable.volume"}) | {"ProWritable.volume.setVal"}:
+    box.submit(DEVICE.device_id, "ProWritable.guardParm")
+    for path in (MODEL_READ_PATHS - set(ACCOUNT_IDENTITY_READ_PATHS) - {"ProWritable.volume", "ProWritable.guardParm"}) | {"ProWritable.volume.setVal", "ProWritable.guardParm.setVal"}:
         with pytest.raises(ValueError):
             box.submit(DEVICE.device_id, path)
     with pytest.raises(ValueError):

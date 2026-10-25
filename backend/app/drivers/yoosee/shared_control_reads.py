@@ -6,12 +6,24 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from ...db.p2p import P2PEnrollment
-from ..contracts import ControlNotReady, ControlOperationError, ControlResult
+from ..contracts import ControlNotReady, ControlOperationError, ControlResult, ControlValue
+from .p2p.smart_protection import SMART_PROTECTION_READ_PATH, extract_smart_protection_enabled
+from .p2p.smart_protection_schedule import extract_smart_protection_schedule
 from .p2p.volume import VOLUME_READ_PATH, extract_volume_raw, volume_percent
 from .shared_read_session import SharedReadSession
 
 _lock = threading.Lock()
 _sessions: dict[str, SharedReadSession] = {}
+_paths = {"speaker_volume": VOLUME_READ_PATH, "smart_protection": SMART_PROTECTION_READ_PATH,
+          "smart_protection_schedule": SMART_PROTECTION_READ_PATH}
+
+
+def require_legacy_available(camera_id: str | None) -> None:
+    """Unintegrated operations must not displace a live native account to log in again."""
+    with _lock:
+        occupied = camera_id in _sessions
+    if occupied:
+        raise ControlNotReady("this operation cannot yet share the active native streaming session")
 
 
 @contextmanager
@@ -29,10 +41,12 @@ def publish(camera_id: str, session: SharedReadSession) -> Iterator[None]:
                 del _sessions[camera_id]
 
 
-def read_volume(entry: P2PEnrollment) -> ControlResult | None:
+def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
     """None only when no native owner exists; active-owner failures NEVER fall back/login."""
     if not entry.camera_id:
         return None
+    if key not in _paths:
+        raise ControlOperationError("control is not a supported shared state read")
     with _lock:
         session = _sessions.get(entry.camera_id)
     if session is None:
@@ -40,7 +54,7 @@ def read_volume(entry: P2PEnrollment) -> ControlResult | None:
     if not session.matches_enrollment(entry):
         raise ControlNotReady("native shared-control session is not ready for this enrollment")
     try:
-        ticket = session.submit(VOLUME_READ_PATH)
+        ticket = session.submit(_paths[key])
     except ValueError:
         raise ControlNotReady("native shared-control session is not accepting reads") from None
     try:
@@ -50,15 +64,23 @@ def read_volume(entry: P2PEnrollment) -> ControlResult | None:
             if outcome is not None:
                 completion = outcome.completion
                 if outcome.status != "response" or completion is None or completion.error_code != 0:
-                    raise ControlOperationError("native volume read was not confirmed")
-                raw = extract_volume_raw(completion.value)
-                if raw is None:
-                    raise ControlOperationError("native volume read returned an unsupported state")
-                return ControlResult(key="speaker_volume", value=volume_percent(raw),
+                    raise ControlOperationError("native state read was not confirmed")
+                raw = None
+                value: ControlValue | None
+                if key == "speaker_volume":
+                    raw = extract_volume_raw(completion.value)
+                    value = volume_percent(raw) if raw is not None else None
+                elif key == "smart_protection":
+                    value = extract_smart_protection_enabled(completion.value)
+                else:
+                    value = extract_smart_protection_schedule(completion.value)
+                if value is None:
+                    raise ControlOperationError("native state read returned an unsupported state")
+                return ControlResult(key=key, value=value,
                     verified=True, authenticated=True, direct_connection=False,
                     transport_acknowledged=completion.transport_result == 0,
                     application_acknowledged=True, error_code=0, native_previous_value=raw)
             time.sleep(0.005)
-        raise ControlOperationError("native volume read timed out")
+        raise ControlOperationError("native state read timed out")
     finally:
         session.cancel(ticket)

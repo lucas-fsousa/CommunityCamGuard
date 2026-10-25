@@ -22,6 +22,10 @@ account during a60s A/V/archive trial (three replies187/65/83ms, same source rev
 other two recorders active). Background capability refresh no longer preempts an
 active account. Exact-device/fresh-evidence gates remain; other control families,
 shared capability refresh and automatic native recovery are still pending.
+The next60s trial also passed protection-state and schedule GETs on the same
+native session (volume/state/schedule108/84/89ms, unchanged source revision).
+Unintegrated semantic control operations fail busy rather than open a competing
+legacy login. Shared writable/B9/PTZ operations remain the next implementation task.
 
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.

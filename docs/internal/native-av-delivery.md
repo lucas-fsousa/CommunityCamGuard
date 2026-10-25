@@ -96,13 +96,14 @@ as `Câmera 3`, with UTC `started_at` values. Authenticated original-file reques
 returned HTTP206 for `Range: bytes=0-63`, with the expected MP4 header. That verifies
 archive discovery and serving, not a new claim about browser transcoding latency.
 
-## First control coexistence: read speaker volume
+## Read-only control coexistence
 
 Native sources now publish a driver-private run-lifetime reference to their
-already-owned read session. The existing semantic speaker-volume GET can submit
-`ProWritable.volume` to that account's bounded mailbox and validate the correlated
-reply without authenticating again. The explicit state-read scope adds only this
-B7 read; identity-only workers retain their old scope. No volume write, arbitrary
+already-owned read session. Existing semantic GETs for speaker volume, protection
+state and protection schedule can submit `ProWritable.volume` or
+`ProWritable.guardParm` to that account's bounded mailbox and validate the correlated
+reply without authenticating again. The explicit state-read scope adds only these
+two B7 roots; identity-only workers retain their old scope. No volume write, arbitrary
 model path, speaker playback or public raw-command API was added.
 
 An active native owner with stale credentials, no readiness, a timeout or invalid
@@ -125,3 +126,19 @@ The source completed the trial and rollback cleanly; peak236.7MiB, CPU19.433s ov
 76.962s including migration/rollback, with the768MiB/zero-swap bound. No speaker,
 light, movement, reboot or camera setting was changed. This proves volume-read
 coexistence only, not all controls/PTZ or multiple simultaneous native cameras.
+
+TrialK subsequently queried all three semantic controls through the existing
+authenticated API while native A/V/archive remained active. Replies were verified,
+authenticated and application-confirmed in108/84/89ms; every follow-up manifest
+still reported the same native source at revision2. Guard state/schedule were
+decoded with the existing typed parsers, not guessed from another field. No state
+or schedule was changed. All six10s samples retained both other recorders; the60s
+trial restored the deployment cleanly, with238.2MiB peak and19.209CPU seconds over
+81.772s including migration/rollback.
+
+The semantic controls adapter now rejects unintegrated legacy reads, writes and
+resource-option requests for that active native camera instead of displacing its
+owner to authenticate separately. Ordinary RTSP/idle operation retains existing
+behavior and the hardware capability catalogue is unchanged. Shared write/B9/PTZ
+families, shared capability refresh and recovery still need implementation; this
+is not a claim that the complete control panel can run alongside native video yet.

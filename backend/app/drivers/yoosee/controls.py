@@ -193,12 +193,14 @@ def read(camera: Camera, key: str) -> ControlResult:
         raise Unsupported(key)
     try:
         enrollment = _enrollment(camera)
-        if key == SPEAKER_VOLUME:
-            from .shared_control_reads import read_volume
-            shared = read_volume(enrollment)
+        if key in {SPEAKER_VOLUME, SMART_PROTECTION, SMART_PROTECTION_SCHEDULE}:
+            from .shared_control_reads import read as read_shared
+            shared = read_shared(enrollment, key)
             if shared is not None:
                 return shared
         if key == WHITE_LIGHT:
+            from .shared_control_reads import require_legacy_available
+            require_legacy_available(camera.camera_id)
             from .capability_rollout import selected
 
             rollout = selected(camera.camera_id)
@@ -260,6 +262,8 @@ def read(camera: Camera, key: str) -> ControlResult:
 def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
     if key != ALARM_VOICE:
         raise Unsupported(key)
+    from .shared_control_reads import require_legacy_available
+    require_legacy_available(camera.camera_id)
     try:
         from . import alarm_resource_controls
 
@@ -283,6 +287,8 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    from .shared_control_reads import require_legacy_available
+    require_legacy_available(camera.camera_id)
     enrollment = _enrollment(camera)
     try:
         if key == WHITE_LIGHT:
