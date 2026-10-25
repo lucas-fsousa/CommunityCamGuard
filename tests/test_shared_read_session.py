@@ -44,6 +44,7 @@ def test_continuous_read_after_old_deadline_and_server_shutdown(setup, monkeypat
     assert result.reason == "stopped" and result.worker.heartbeat_responses == 3
     assert session.take(tickets[0]).status == "response"
     assert calls == ["auth"] and sock.closed == 1 and not owner._paused
+    assert session.diagnostics()["session_broker_socket_closed"] is True
     with pytest.raises(ValueError, match="already started"):
         session.run(cancelled=lambda: False)
     assert calls == ["auth"]
@@ -93,6 +94,10 @@ def test_cleanup_barrier_is_preserved(setup, monkeypatch, fault):
         with pytest.raises((OSError, module.P2PProbeError)):
             session.run(cancelled=lambda: sock.now >= 1)
         assert control_ownership._cleanup_uncertain
+        if fault == "close":
+            assert session.diagnostics()["session_broker_socket_closed"] is False
+        else:
+            assert session.diagnostics() == {"session_worker":"unavailable"}
 
 
 def test_foreground_waiter_enters_only_after_physical_close(setup, monkeypatch, owner):

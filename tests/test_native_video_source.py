@@ -31,6 +31,9 @@ def setup(monkeypatch):
         def stop(self):
             stopped.set()
 
+        def diagnostics(self):
+            return {"session_worker":"test"}
+
         def run(self, *, cancelled, video_delivery):
             calls.append("account")
             try:
@@ -114,6 +117,9 @@ def test_consumer_failure_cancels_account_and_is_not_retried(setup):
     assert "private" not in repr(result)
     assert calls == ["account", "account_closed"] and len(decoders) == 1
     assert decoders[0].closed and not source._thread.is_alive()
+    diagnostic = source.diagnostics()
+    assert diagnostic["consumer_error"] == "ValueError" and diagnostic["consumer_site"].startswith("offer:")
+    assert "private" not in repr(diagnostic)
 
 
 def test_unconfirmed_decoder_shutdown_cannot_report_success(setup):

@@ -60,7 +60,8 @@ class NativeVideoSource:
 
     def diagnostics(self) -> dict[str, str | bool]:
         """Safe local failure metadata, never exception messages, media or credentials."""
-        return {"consumer_error": self._failure_type, "consumer_site": self._failure_site,
+        return {**self._session.diagnostics(),
+                "consumer_error": self._failure_type, "consumer_site": self._failure_site,
                 "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
                 "consumer_alive": self._thread is not None and self._thread.is_alive(),
                 "cleanup_failed": self._cleanup_failed.is_set()}

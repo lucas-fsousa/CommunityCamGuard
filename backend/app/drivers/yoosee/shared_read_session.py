@@ -50,6 +50,18 @@ class SharedReadSession:
         self._stop = threading.Event()
         self._claim = threading.Lock()
         self._started = False
+        self._last_worker: WorkerSummary | None = None
+
+    def diagnostics(self) -> dict[str, str | bool]:
+        """Fixed cleanup facts, including failures that cannot return a successful result."""
+        worker = self._last_worker
+        if worker is None:
+            return {"session_worker": "unavailable"}
+        return {"session_worker": worker.reason,
+                "session_broker_socket_closed": not worker.socket_close_failed,
+                "session_broker_release": worker.media is None or worker.media.broker_release,
+                "session_tcp_receipt": worker.tcp is None or worker.tcp.close_acknowledged,
+                "session_tcp_socket_closed": worker.tcp is None or not worker.tcp.socket_close_failed}
 
     def stop(self) -> None:
         self._stop.set()
@@ -137,6 +149,7 @@ class SharedReadSession:
                                                    cancelled=should_yield)
         except ReadConnectFailure:
             return SharedReadResult(reason or "connection")
+        self._last_worker = result
         if self._lifecycle.state == "blocked":
             raise P2PProbeError("shared read/media cleanup unconfirmed")
         return SharedReadResult(reason or result.reason, result)

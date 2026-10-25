@@ -78,6 +78,9 @@ not replaced. Private footage remains local/ignored.
 This establishes the short real A/V/archive delivery, not long-term availability:
 trialG's intermittent early exit remains unresolved, and controls currently yield
 the shared owner rather than safely resuming it. Those are the next delivery tasks.
+Failure diagnostics now retain the worker's fixed reason and independent broker
+release/TCP CLOSE/socket-close facts even when cleanup raises. Unknown results
+remain unknown; this does not relax the cleanup barrier or trigger another login.
 Archive shutdown now also allows a bounded1s EOF flush while draining discarded
 live output, then retains the existing terminate/kill fallback. Archive consumer
 join is bounded at3s; ordinary video-only shutdown retains its2s join.
@@ -87,3 +90,8 @@ HEVC/AAC archive durations15.062667s/14.848s. Peak147.1MiB with256MiB hard cap
 and zero swap. The earlier400ms allowance lost the pending tail under the50%
 CPU replay quota; the1s allowance passed. This is a bounded grace, not permission
 to replace a child whose termination remains unconfirmed.
+
+After rollback, the normal production recording index listed both native segments
+as `Câmera 3`, with UTC `started_at` values. Authenticated original-file requests
+returned HTTP206 for `Range: bytes=0-63`, with the expected MP4 header. That verifies
+archive discovery and serving, not a new claim about browser transcoding latency.
