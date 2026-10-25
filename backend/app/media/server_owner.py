@@ -38,6 +38,7 @@ def _lock(fd: int) -> None:
 class ServerOwner:
     def __init__(self, database: Path):
         canonical = database.resolve()
+        self._database = canonical
         self._path = canonical.with_name(canonical.name + ".source-owner.lock")
         self._lock = threading.Lock()
         self._fd: int | None = None
@@ -66,7 +67,7 @@ class ServerOwner:
                         or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
                         or opened.st_nlink != 1):
                     raise SourceUnavailable("unsafe server ownership file")
-                if os.name == "posix" and (opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) & 0o077):
+                if os.name == "posix" and not self._private_owner(opened):
                     raise SourceUnavailable("private server ownership file required")
                 _lock(fd)
                 current = self._path.lstat()
@@ -80,6 +81,23 @@ class ServerOwner:
             finally:
                 if fd is not None:
                     os.close(fd)
+
+    def _private_owner(self, opened: os.stat_result) -> bool:
+        if stat.S_IMODE(opened.st_mode) & 0o077:
+            return False
+        current = os.geteuid()
+        if opened.st_uid == current:
+            return True
+        # A root Docker app may share a bind-mounted DB with its non-root host
+        # operator. Trust only that existing regular DB's owner, not arbitrary
+        # foreign lock files. No chown/chmod/unlink: both users lock the same inode.
+        if current != 0:
+            return False
+        try:
+            database = self._database.stat()
+        except OSError:
+            return False
+        return stat.S_ISREG(database.st_mode) and opened.st_uid == database.st_uid
 
     def close(self) -> None:
         """Only after all services confirmed cleanup. Never unlink the lock inode."""

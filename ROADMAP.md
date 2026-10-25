@@ -100,6 +100,10 @@ remain deferred. Do not report the isolated trial as permanent production rollou
    cannot release ownership as if shutdown succeeded. Kernel process-death and
    cleanup retry are tested locally, without camera/container changes. This is
    a recovery prerequisite, not automatic restoration or legacy closure proof.
+   Host/Docker UID compatibility now retains the same private lock inode and
+   admits root only for a lock owned by the existing regular DB's owner. An isolated
+   real root-container test preserved exclusion during host ownership; no production
+   restart or general wrong-owner permission bypass was introduced.
 3. Publish the experimental Termux/Ubuntu ARM64 installation path with the actual
    tested limits: three recordings + three reduced views or one HD view passed;
    three simultaneous HD views failed. Native Linux Docker validation is separate,

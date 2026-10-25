@@ -83,3 +83,22 @@ passed5071 Python tests (one skipped), frontend contracts, lint and typing.
 passed the amd64 build and restricted worker smoke. Runtime lock markers are
 excluded from Git and Docker build context. No Windows/ARM64 kernel acceptance
 or automatic source restoration is implied by these results.
+
+## Host/container UID compatibility — 2026-10-25
+
+A private lock created by the non-root host operator originally prevented the
+root Docker app from starting against the same bind-mounted database. POSIX
+validation now allows root to acquire an existing private lock belonging to the
+owner of the existing regular database. Non-root callers still require their own
+UID. Unrelated lock owners, missing/nonregular databases for the cross-UID case,
+public modes, symlinks, hardlinks and changed inodes remain rejected.
+
+This changes no ownership or permissions and never replaces/unlinks the marker.
+The same kernel lock still rejects root while the host owner holds it. A real
+isolated test used the current source mounted read-only into the existing Python
+image, with network disabled,64MiB memory ceiling and only DAC_OVERRIDE capability:
+root was rejected during host ownership, acquired after host close, and preserved
+the exact inode, UID and0600 mode. Only a disposable fixture DB was mounted; no
+production container restart, camera connection or primary-data mutation occurred.
+The host-side harness peaked at20.9MiB; the separately capped helper is outside
+that measurement. This is Linux/amd64 evidence, not Windows/ARM acceptance.

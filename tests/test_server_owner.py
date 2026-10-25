@@ -84,6 +84,57 @@ def test_lock_failure_closes_only_the_new_descriptor(tmp_path, monkeypatch):
         os.fstat(recorded[0])
 
 
+@pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="non-root host / root container policy fixture")
+def test_root_container_can_share_private_database_owner_lock_without_changing_inode(tmp_path, monkeypatch):
+    database = tmp_path / "app.db"
+    database.touch()
+    host = ServerOwner(database)
+    host.acquire()
+    inode, uid = host._path.stat().st_ino, host._path.stat().st_uid
+    monkeypatch.setattr(server_owner.os, "geteuid", lambda: 0)
+    with pytest.raises(ServerOwnerBusy):
+        ServerOwner(database).acquire()
+    host.close()
+    container = ServerOwner(database)
+    container.acquire()
+    try:
+        assert container._path.stat().st_ino == inode
+        assert container._path.stat().st_uid == uid
+        assert container._path.stat().st_mode & 0o777 == 0o600
+    finally:
+        container.close()
+
+
+@pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="non-root host UID policy fixture")
+@pytest.mark.parametrize("identity", ["unprivileged_other", "root_without_database",
+                                      "root_nonregular_database", "root_public_lock"])
+def test_foreign_uid_is_not_a_general_permission_bypass(tmp_path, monkeypatch, identity):
+    owner = ServerOwner(tmp_path / "app.db")
+    owner._path.touch(mode=0o600)
+    if identity == "root_nonregular_database":
+        owner._database.mkdir()
+    elif identity == "root_public_lock":
+        owner._database.touch()
+        owner._path.chmod(0o644)
+    initial = owner._path.stat()
+    uid = initial.st_uid + 1 if identity == "unprivileged_other" else 0
+    monkeypatch.setattr(server_owner.os, "geteuid", lambda: uid)
+    with pytest.raises(SourceUnavailable, match="private server"):
+        owner.acquire()
+    assert owner._path.stat().st_ino == initial.st_ino
+    assert owner._path.stat().st_uid == initial.st_uid
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX UID policy")
+def test_root_rejects_a_lock_owner_unrelated_to_the_existing_database(tmp_path, monkeypatch):
+    database = tmp_path / "app.db"
+    database.touch()
+    owner = ServerOwner(database)
+    monkeypatch.setattr(server_owner.os, "geteuid", lambda: 0)
+    unrelated = SimpleNamespace(st_mode=0o100600, st_uid=database.stat().st_uid + 1000)
+    assert owner._private_owner(unrelated) is False
+
+
 def test_uncertain_close_is_not_retried_against_a_possibly_recycled_descriptor(tmp_path, monkeypatch):
     owner = ServerOwner(tmp_path / "app.db")
     owner.acquire()
