@@ -14,7 +14,7 @@ class Sink:
         self.stalled = False
         self.close_error = False
 
-    def offer(self, payload):
+    def offer(self, payload, *, timestamp=None):
         self.frames.append(payload)
         self.pending_bytes = len(payload)
         return True

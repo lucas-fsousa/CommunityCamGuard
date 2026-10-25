@@ -9,8 +9,11 @@ infrastructure. [Real camera3 native dashboard trial](docs/internal/native-dashb
 completed900s with the existing player, two other recorders running and restored
 production afterward. Input timing, virtual-memory allowance and leaked status-DB
 connections were corrected from live failures. Browser logs had no later stalls;
-independent visual/latency acceptance remains distinct. **Next: native listen-in
-audio + archival recording on that same ingress**, then controls/recovery, multiple
+independent visual/latency acceptance remains distinct. A subsequent
+[90s native A/V/archive trial](docs/internal/native-av-delivery.md) delivered H264/AAC
+to the authenticated socket and original HEVC/AAC archives from one capture/process;
+both other recorders remained active. A preceding early-exit trial remains an open
+recovery issue, not a successful acceptance. **Next: controls coexistence/recovery**, multiple
 routes, factory onboarding and ARM acceptance. LAN-only/SD/other brands/UI polish
 remain deferred. Do not report the isolated trial as permanent production rollout.
 
@@ -61,9 +64,11 @@ remain deferred. Do not report the isolated trial as permanent production rollou
    now consumes an authentic retirement once, uses a per-device driver offer,
    reserves its domain, verifies shared MP4 readiness and publishes before releasing
    viewers. Owner tokens isolate competing runs and source completion recloses
-   admission. Recording remains held; no native audio/archive integration or
-   production rollout. First legacy migration, reviewed
-   native-video records and real browser/endurance acceptance remain.
+   admission. The RTSP recorder stays held during native operation; the explicit
+   A/V experiment now writes original-codec archives from its one native capture.
+   First legacy migration and short real A/V/archive delivery have passed in the
+   controlled operator trial. Reviewed production records, coordinated recovery,
+   longer A/V/browser acceptance and permanent rollout remain.
    Current driver foreground yielding may terminate native viewing; coordinated
    resumption remains part of production orchestration, not an automatic login retry.
    [Process-local reconciliation exclusion](docs/internal/media-reconciliation-exclusion.md)

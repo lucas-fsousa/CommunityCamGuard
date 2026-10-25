@@ -54,7 +54,7 @@ def setup(monkeypatch):
             self.closed = False
             decoders.append(self)
 
-        def offer(self, payload):
+        def offer(self, payload, *, timestamp=None):
             if failure[0] == "offer":
                 raise ValueError("private decoder detail")
             self.output.feed(box(b"ftyp") + box(b"moov") + box(b"moof") + box(b"mdat"))
@@ -135,6 +135,29 @@ def test_stop_before_run_creates_no_thread_account_or_decoder(setup):
     source.stop()
     assert source.run(cancelled=lambda: False).reason == "stopped"
     assert not calls and not decoders and source._thread is None
+
+
+def test_native_av_owns_one_delivery_and_refuses_archive_epoch_replacement(tmp_path, monkeypatch):
+    calls = []
+    class Decoder:
+        def __init__(self, **kwargs): calls.append(kwargs)
+    monkeypatch.setattr(module, "NativeAvDecoder", Decoder)
+    source = module.NativeVideoSource("test", "123", native_audio=True, archive=tmp_path / "%Y%m%d_%H%M%S.mp4")
+    source._delivery.consume(V1Record(encoding=unpack_v1_encoding_header(header()),
+                                    video=idr(), video_timestamp=1_000_000))
+    frame = source._delivery.take()
+    source._decoder(frame)
+    assert len(calls) == 1 and calls[0]["origin_us"] == 1_000_000
+    with pytest.raises(ValueError, match="epoch retirement"):
+        source._decoder(frame)
+    assert len(calls) == 1
+    source.stop()
+    assert source._delivery.closed
+
+
+def test_native_archive_cannot_be_requested_without_validated_audio(tmp_path):
+    with pytest.raises(ValueError, match="A/V ingress"):
+        module.NativeVideoSource("test", "123", archive=tmp_path / "archive.mp4")
 
 
 def test_account_exception_still_retires_consumer(setup, monkeypatch):

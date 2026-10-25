@@ -8,10 +8,13 @@ fallback, physical actions or capabilities are inferred by this adapter.
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from ...media.fragmented_mp4 import FragmentedMp4
 from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
+from ...media.native_av_decoder import NativeAvDecoder
+from .p2p.av_delivery import NativeAvDelivery, supported_audio
 from .p2p.contracts import P2PProbeError
 from .p2p.video_consumer import VideoConsumer
 from .p2p.video_delivery import VideoDelivery, VideoFrame
@@ -30,9 +33,18 @@ class NativeVideoSource:
     # The generic registry must not derive an independent domain per camera.
     admission_domain = "yoosee/shared-control"
 
-    def __init__(self, camera_id: str, device_id: str):
+    def __init__(self, camera_id: str, device_id: str, *, delivery: VideoDelivery | None = None,
+                 native_audio: bool = False, archive: Path | None = None):
+        if archive is not None and not native_audio:
+            raise ValueError("native archive requires validated A/V ingress")
+        if native_audio and delivery is not None:
+            raise ValueError("native A/V owns its delivery")
+        if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
+            raise ValueError("fresh native delivery required")
         self._session = SharedReadSession(camera_id, device_id)
-        self._delivery = VideoDelivery()
+        self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
+        self._archive = archive
+        self._archive_started = False
         self._stop = threading.Event()
         self._failed = threading.Event()
         self._cleanup_failed = threading.Event()
@@ -43,7 +55,15 @@ class NativeVideoSource:
         self._output: FragmentedMp4 | None = None  # Consumer-thread confined.
         self._thread: threading.Thread | None = None
         self._failure_type = ""
+        self._failure_site = ""
         self.frame_rate: int | None = None
+
+    def diagnostics(self) -> dict[str, str | bool]:
+        """Safe local failure metadata, never exception messages, media or credentials."""
+        return {"consumer_error": self._failure_type, "consumer_site": self._failure_site,
+                "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
+                "consumer_alive": self._thread is not None and self._thread.is_alive(),
+                "cleanup_failed": self._cleanup_failed.is_set()}
 
     def subscribe(self) -> Subscription:
         """Internal only: future transport must authorize/revoke each subscription."""
@@ -64,13 +84,23 @@ class NativeVideoSource:
         self._delivery.close()
         self._retire_hub()
 
-    def _decoder(self, frame: VideoFrame) -> HevcDecoder:
+    def _decoder(self, frame: VideoFrame) -> HevcDecoder | NativeAvDecoder:
         if self._stop.is_set():
             raise StreamClosedError("native video stopping")
+        if self._archive is not None and self._archive_started:
+            # Experimental archive has no collision-safe epoch/recovery coordinator yet.
+            raise ValueError("native archive requires explicit epoch retirement")
         self._retire_hub()
         output = FragmentedMp4()
         self.frame_rate = frame.encoding.video_frame_rate
-        decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
+        decoder: HevcDecoder | NativeAvDecoder
+        if isinstance(self._delivery, NativeAvDelivery):
+            if not supported_audio(frame.encoding):
+                raise ValueError("native AAC format not validated")
+            decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=self._archive)
+            self._archive_started = self._archive is not None
+        else:
+            decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
         self._output = output
         with self._hub_lock:
             self._hub = Mp4Fanout()
@@ -85,6 +115,12 @@ class NativeVideoSource:
                 consumer.step()
                 if consumer.closed or self._stop.is_set():
                     break
+                decoder = consumer.decoder
+                if isinstance(self._delivery, NativeAvDelivery) and isinstance(decoder, NativeAvDecoder):
+                    if not decoder.pending_bytes:
+                        audio = self._delivery.take_audio()
+                        if audio is not None and not decoder.offer_audio(audio.payload, audio.timestamp):
+                            raise ValueError("native decoder refused audio access unit")
                 if self._output is not None:
                     while (chunk := self._output.take()) is not None:
                         with self._hub_lock:
@@ -96,6 +132,10 @@ class NativeVideoSource:
                 self._failed.set()
         except BaseException as error:
             self._failure_type = type(error).__name__
+            trace = error.__traceback__
+            while trace is not None:
+                self._failure_site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
+                trace = trace.tb_next
             self._failed.set()
         finally:
             try:
@@ -128,7 +168,7 @@ class NativeVideoSource:
         finally:
             self.stop()
             if self._thread.ident is not None:
-                self._thread.join(timeout=2)
+                self._thread.join(timeout=3 if self._archive is not None else 2)
                 if self._thread.is_alive():
                     raise P2PProbeError("native video consumer shutdown unconfirmed")
             if self._cleanup_failed.is_set():

@@ -14,6 +14,11 @@ Latest usable delivery: [real camera3 native dashboard trial](native-dashboard-l
 "synthetic-only" integration status, not the remaining native audio/recording and
 permanent deployment requirements.
 
+Current delivery work: [native listen-in and original-codec archive](native-av-delivery.md)
+from the same capture, with bounded AAC queues, one encoder and codec negotiation.
+File integration and a90s real camera3 A/V/archive trial passed, with the other two
+recorders active. Longer acceptance, controls coexistence and recovery remain open.
+
 Latest native media integration (offline, not deployed):
 [explicit source activation](native-source-activation.md),
 [hub reconciliation exclusion](media-reconciliation-exclusion.md) and

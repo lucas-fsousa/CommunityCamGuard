@@ -26,13 +26,16 @@ def main():
     parser.add_argument("--camera-id")
     parser.add_argument("--directory", type=Path)
     parser.add_argument("--restore", type=Path)
+    parser.add_argument("--sample-audio", action="store_true")
+    parser.add_argument("--native-av", action="store_true", help="test validated native AAC and original-codec archive")
     parser.add_argument("--seconds", type=int, default=900)
     parser.add_argument("--confirm-interruption", action="store_true")
     args = parser.parse_args()
     if args.restore is not None:
         restore_trial(args.restore)
         return
-    if not args.camera_id or not args.directory or not args.confirm_interruption or not 30 <= args.seconds <= 900:
+    if (not args.camera_id or not args.directory or not args.confirm_interruption
+            or not 30 <= args.seconds <= 900 or (args.sample_audio and args.native_av)):
         parser.error("explicit interruption approval and 30..900 seconds required")
     original = get_settings()
     database = original.db_path.resolve()
@@ -63,7 +66,7 @@ def main():
         print(json.dumps({"event": "maintenance_start", "camera_id": camera.camera_id}), flush=True)
         owners = []
         for other in registry.list_cameras():
-            if other.camera_id == camera.camera_id:
+            if other.camera_id == camera.camera_id and not args.native_av:
                 continue
             for moment in (datetime.now(UTC), datetime.now(UTC)+timedelta(hours=1)):
                 folder = Path("recordings") / other.camera_id / moment.strftime("%Y-%m-%d/%H")
@@ -87,7 +90,8 @@ def main():
                           GO2RTC_CONFIG=str(config_path), RECORDINGS_DIR="recordings", FRONTEND_DIR="frontend",
                           CONTROL_SESSION_WARMUP="false")
         get_settings.cache_clear()
-        run_server(args.camera_id, args.seconds, trial, containers, entry)
+        run_server(args.camera_id, args.seconds, trial, containers, entry,
+                   sample_audio=args.sample_audio, native_av=args.native_av)
     finally:
         try:
             if (trial / "rollback.json").exists():
@@ -96,10 +100,11 @@ def main():
             owner.close()
 
 
-def run_server(camera_id, seconds, trial, containers, enrollment):
+def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audio=False, native_av=False):
     import uvicorn
 
     from backend.app.db import p2p
+    from backend.app.diagnostics.native_audio_sample import NativeAudioSample
     from backend.app.drivers.yoosee.native_video_source import NativeVideoSource
     from backend.app.main import app
     from backend.app.media.source_offer import NativeSourceOffer
@@ -117,7 +122,14 @@ def run_server(camera_id, seconds, trial, containers, enrollment):
             runtime = application.state.native_runtime
             retirement = application.state.owned_runtime.retirement
             # An explicit exact-unit experiment, not an invented driver profile.
-            source = NativeVideoSource(camera_id, enrollment.device_id)
+            audio = NativeAudioSample() if sample_audio else None
+            archive = None
+            if native_av:
+                # Precreate UTC hour paths before FFmpeg starts, without resuming the RTSP recorder.
+                await asyncio.to_thread(application.state.rec._ensure_dirs, [camera_id])
+                archive = Path(application.state.rec._output_template(camera_id))
+            source = NativeVideoSource(camera_id, enrollment.device_id, delivery=audio,
+                                       native_audio=native_av, archive=archive)
             offer = NativeSourceOffer(camera_id, NativeVideoSource.admission_domain,
                 lambda: source,
                 lambda: p2p.read_registered_enrollment(camera_id) == enrollment)
@@ -145,8 +157,13 @@ def run_server(camera_id, seconds, trial, containers, enrollment):
                    other_recorders=len(application.state.rec._procs), frame_rate=source.frame_rate)
             async def monitor():
                 started = time.monotonic()
+                sampled = False
                 while time.monotonic() - started < seconds:
                     await asyncio.sleep(10)
+                    if audio is not None and not sampled:
+                        metadata = await asyncio.to_thread(audio.save, trial)
+                        status(event="native_audio_sample", **metadata)
+                        sampled = True
                     if session.completion.done():
                         try:
                             result = session.completion.result()
@@ -154,7 +171,7 @@ def run_server(camera_id, seconds, trial, containers, enrollment):
                                    reason=result.reason, session_reason=result.session.reason,
                                    consumer_error=result.failure_type)
                         except Exception as error:
-                            status(event="native_ended", error_type=type(error).__name__)
+                            status(event="native_ended", error_type=type(error).__name__, **source.diagnostics())
                         break
                     status(event="native_running", elapsed=round(time.monotonic()-started),
                            reservations=list(runtime.sources.states().values()),

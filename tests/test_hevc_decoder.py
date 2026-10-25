@@ -95,6 +95,19 @@ def test_input_and_incremental_progress(decoder):
     assert calls == ["terminate", "wait"]
 
 
+def test_archive_closes_input_before_bounded_flush_and_keeps_termination_fallback(decoder, monkeypatch):
+    value, _process, _now, _read, _write, calls = decoder
+    value._archive = True
+    def flush():
+        assert value.pending_bytes == 0
+        assert not calls
+        calls.append("flush")
+    monkeypatch.setattr(value, "_finish_archive", flush)
+    value.close()
+    assert calls == ["flush", "terminate", "wait"]
+    value._archive = False  # fixture's repeated close must not repeat this test callback
+
+
 @pytest.mark.parametrize("progress", [b"frame=bad\n", b"frame=" + b"1" * 21 + b"\n"])
 def test_invalid_progress_closes_process(decoder, progress):
     value, process, _, _, write, _ = decoder

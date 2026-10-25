@@ -13,7 +13,7 @@ from .video_delivery import VideoDelivery, VideoFrame
 class Decoder(Protocol):
     @property
     def pending_bytes(self) -> int: ...
-    def offer(self, payload: bytes) -> bool: ...
+    def offer(self, payload: bytes, *, timestamp: int | None = None) -> bool: ...
     def step(self) -> None: ...
     def close(self) -> None: ...
 
@@ -25,6 +25,11 @@ class VideoConsumer:
         self._decoder: Decoder | None = None
         self._epoch: int | None = None
         self.closed = False
+
+    @property
+    def decoder(self) -> Decoder | None:
+        """Consumer-thread-only access to the currently owned decoder."""
+        return self._decoder
 
     def step(self) -> None:
         if self.closed:
@@ -51,7 +56,7 @@ class VideoConsumer:
                 self._epoch = frame.epoch
             elif frame.restart_decoder:
                 raise ValueError("repeated decoder epoch boundary")
-            if self._decoder is None or not self._decoder.offer(frame.payload):
+            if self._decoder is None or not self._decoder.offer(frame.payload, timestamp=frame.timestamp):
                 raise ValueError("decoder refused access unit")
         except Exception:
             self.close()

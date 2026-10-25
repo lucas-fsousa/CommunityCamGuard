@@ -10,7 +10,9 @@ import shutil
 import subprocess
 import time
 from collections.abc import Callable
+from pathlib import Path
 
+from .decoder_command import decoder_command
 from .fragmented_mp4 import FragmentedMp4
 from .nonblocking_input import NonblockingInput
 
@@ -18,7 +20,8 @@ from .nonblocking_input import NonblockingInput
 class HevcDecoder:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
                  output: FragmentedMp4 | None = None, frame_rate: int | None = None,
-                 live_timing: bool = False):
+                 live_timing: bool = False, transport: str = "hevc", audio: bool = False,
+                 archive: Path | None = None):
         if type(live_timing) is not bool:
             raise ValueError("explicit live timing mode required")
         if frame_rate is not None and (type(frame_rate) is not int or not 1 <= frame_rate <= 60):
@@ -37,39 +40,16 @@ class HevcDecoder:
         self._input: NonblockingInput | None = None
         self._closed = False
         self._output = output
-        # Combined HEVC decode + x264 reserves more address space than decode
-        # alone (~108MiB measured RSS at1080p). Keep the caller's cgroup RSS cap;
-        # a512MiB AS limit otherwise fails get_buffer() despite available memory.
-        address_space = 1073741824 if output is not None else 536870912
-        command = ["prlimit", f"--as={address_space}", "--nofile=64", "--",
-                   "ffmpeg", "-v", "error", "-nostdin", "-xerror", "-err_detect", "explode",
-                   "-filter_threads", "1", "-protocol_whitelist", "pipe", "-threads", "1",
-                   "-f", "hevc", "-probesize", "32", "-analyzeduration", "0"]
-        if live_timing:
-            command += ["-use_wallclock_as_timestamps", "1"]
-        elif frame_rate is not None:
-            command += ["-r", str(frame_rate)]
-        command += ["-i", "pipe:0",
-                   "-map", "0:v:0", "-an", "-threads", "1"]
-        if output is None:
-            command += ["-progress", "pipe:1", "-stats_period", "0.1", "-f", "null", "-"]
-        else:
-            # Keep media stdout separate from machine-readable progress on stderr.
-            command += ["-v", "quiet", "-progress", "pipe:2", "-stats_period", "0.1",
-                        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-                        "-pix_fmt", "yuv420p", "-profile:v", "baseline", "-g", "10" if live_timing else "25",
-                        "-keyint_min", "10" if live_timing else "25", "-sc_threshold", "0"]
-            if live_timing:
-                command += ["-fps_mode", "vfr"]
-            command += ["-flush_packets", "1",
-                        "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-                        "-f", "mp4", "pipe:1"]
+        self._archive = archive is not None
+        command = decoder_command(output=output is not None, live_timing=live_timing,
+                                  frame_rate=frame_rate, transport=transport, audio=audio, archive=archive)
         if output is not None:
             output.claim()
         try:
             self._process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE if output is not None else subprocess.DEVNULL,
-                                             bufsize=0)
+                                             bufsize=0, env={"PATH": os.environ.get("PATH", os.defpath),
+                                                             "LANG": "C", "TZ": "UTC0"})
         except Exception:
             if output is not None:
                 output.close()
@@ -92,7 +72,7 @@ class HevcDecoder:
     def pending_bytes(self) -> int:
         return self._input.pending_bytes if self._input is not None else 0
 
-    def offer(self, payload: bytes) -> bool:
+    def offer(self, payload: bytes, *, timestamp: int | None = None) -> bool:
         if self._closed or self._input is None:
             raise ValueError("decoder closed")
         return self._input.offer(payload)
@@ -154,6 +134,8 @@ class HevcDecoder:
                 self._input.close()
         finally:
             try:
+                if self._archive:
+                    self._finish_archive()
                 if self._process.poll() is None:
                     self._process.terminate()
                     try:
@@ -166,3 +148,24 @@ class HevcDecoder:
                                getattr(self._process, "stderr", None)):
                     if stream is not None:
                         stream.close()
+
+    def _finish_archive(self) -> None:
+        """Bounded EOF flush; drain discarded live output so archive finalization cannot block."""
+        for stream in (self._process.stdout, self._process.stderr):
+            if stream is not None and not stream.closed:
+                try:
+                    os.set_blocking(stream.fileno(), False)
+                except OSError:
+                    return  # still run the ordinary terminate/kill fallback
+        deadline = time.monotonic() + 1.0
+        while self._process.poll() is None and time.monotonic() < deadline:
+            for stream in (self._process.stdout, self._process.stderr):
+                if stream is None or stream.closed:
+                    continue
+                try:
+                    os.read(stream.fileno(), 65536)
+                except (BlockingIOError, InterruptedError):
+                    continue
+                except OSError:
+                    return
+            time.sleep(0.002)

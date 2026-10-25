@@ -453,8 +453,11 @@ dashboard avoids reconnect loops for known unavailable sources and rechecks thei
 state on refresh; this does not automatically restore a source or fall back to RTSP.
 An authorized [real camera3 native-video trial](docs/internal/native-dashboard-live-trial.md)
 now completed15 minutes through the existing dashboard, with the other two recorders
-running. The original deployment was restored afterward. Native listen-in audio,
-archival recording and permanent rollout are not yet enabled by that milestone.
+running. A subsequent [90-second native A/V trial](docs/internal/native-av-delivery.md)
+also delivered listen-in AAC and original HEVC/AAC recordings from that same ingress,
+without a parallel camera RTSP capture. The original deployment was restored after
+both trials. Controls coexistence, recovery, longer A/V acceptance and permanent
+rollout remain pending; these experiments do not enable native streaming at startup.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

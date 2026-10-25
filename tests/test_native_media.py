@@ -92,6 +92,27 @@ def start(ws):
     assert ws.receive_bytes() == FRAGMENT
 
 
+@pytest.mark.parametrize("aac", [True, False])
+def test_native_aac_requires_client_codec_negotiation(env, aac):
+    from tests.test_mp4_codec import av_init
+    client, camera, source, _sources, _app, _finished = env
+    source.hub.close()
+    source.hub = Mp4Fanout()
+    initialization = av_init()
+    source.hub.publish(Mp4Chunk(True, initialization))
+    source.hub.publish(Mp4Chunk(False, FRAGMENT))
+    with client.websocket_connect(f"/api/media/native/{camera.camera_id}/ws") as socket:
+        socket.send_json({"type":"mse", "value":"avc1.640029" + (",mp4a.40.2" if aac else "")})
+        if aac:
+            assert "mp4a.40.2" in socket.receive_json()["value"]
+            assert socket.receive_bytes() == initialization
+            assert socket.receive_bytes() == FRAGMENT
+        else:
+            with pytest.raises(WebSocketDisconnect) as result:
+                socket.receive_json()
+            assert result.value.code == 1008
+
+
 def test_two_viewers_share_source_and_one_disconnect_does_not_stop_other(env):
     client, camera, source, sources, _app, finished = env
     path = f"/api/media/native/{camera.camera_id}/ws"

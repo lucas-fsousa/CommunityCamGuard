@@ -67,13 +67,15 @@ async def serve_native_video(socket: WebSocket, camera_id: str, *, source: str |
     await run_viewer(socket, camera_id, token, lambda: _stream(socket, sources, camera_id), lambda _: valid())
 
 
-async def _deliver(socket: WebSocket, reader: Subscription, max_level: int) -> None:
+async def _deliver(socket: WebSocket, reader: Subscription, max_level: int, *, aac: bool = False) -> None:
     init = reader.take()
     if init is None or not init.initialization:
         raise ValueError("MP4 initialization required")
     mime, level = h264_mime(init.data)
     if level > max_level:
         raise ValueError("client H264 level too low")
+    if "mp4a.40.2" in mime and not aac:
+        raise ValueError("client AAC support required")
     await asyncio.wait_for(socket.send_json({"type": "mse", "value": mime}), WRITE_TIMEOUT)
     await asyncio.wait_for(socket.send_bytes(init.data), WRITE_TIMEOUT)
     del init
@@ -114,7 +116,8 @@ async def _stream(socket: WebSocket, sources: SourceRegistry, camera_id: str) ->
                 raise ValueError("MSE negotiation already completed")
 
         tasks = [asyncio.create_task(disconnect()),
-                 asyncio.create_task(_deliver(socket, reader, max(levels)))]
+                 asyncio.create_task(_deliver(socket, reader, max(levels),
+                     aac="mp4a.40.2" in request["value"].split(",")))]
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for task in done:
             task.result()
