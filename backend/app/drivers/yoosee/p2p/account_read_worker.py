@@ -55,13 +55,13 @@ class AccountReadWorker:
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
                  clock: Callable[[], float] = time.monotonic, allow_motion: bool = False,
-                 policy: AccountPolicy = AccountPolicy.FINITE):
+                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False):
         validate_policy(policy)
         self._policy = policy
         if type(allow_motion) is not bool:
             raise ValueError("explicit motion admission flag required")
         self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port,
-                                                 clock=clock, policy=policy)
+                                                 clock=clock, policy=policy, state_reads=state_reads)
         self.mailbox = self._dispatcher.mailbox
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node

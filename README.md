@@ -458,6 +458,8 @@ also delivered listen-in AAC and original HEVC/AAC recordings from that same ing
 without a parallel camera RTSP capture. The original deployment was restored after
 both trials. Controls coexistence, recovery, longer A/V acceptance and permanent
 rollout remain pending; these experiments do not enable native streaming at startup.
+The existing volume-state query also passed a real shared-session trial without
+interrupting native video; other control families still require that integration.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

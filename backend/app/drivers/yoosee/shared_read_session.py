@@ -2,7 +2,8 @@
 
 Not a periodic warmup or public endpoint. The server supplies its shutdown
 predicate and owns the calling thread. Optional media requires an explicit bounded
-delivery queue; controls/motion are not admitted and no decoder runs on this thread.
+delivery queue; only explicitly scoped read-only state queries are admitted, never
+writes/motion, and no decoder runs on this thread.
 """
 
 import threading
@@ -11,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from ...db import p2p
+from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady
 from .native_ptz import reserve_read_handoff
 from .p2p.account_policy import AccountPolicy
@@ -40,13 +42,15 @@ class SharedReadSession:
     """
 
     def __init__(self, camera_id: str, device_id: str, *,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, state_reads: bool = False):
         if (not camera_id or not device_id or len(device_id) > 20
                 or not device_id.isascii() or not device_id.isdecimal()
                 or not 0 < int(device_id) < 1 << 64):
             raise ValueError("shared read target required")
         self._camera_id, self._device_id, self._clock = camera_id, device_id, clock
-        self._lifecycle = AccountReadLifecycle(clock=clock, policy=AccountPolicy.CONTINUOUS)
+        self._lifecycle = AccountReadLifecycle(clock=clock, policy=AccountPolicy.CONTINUOUS,
+                                               state_reads=state_reads)
+        self._active_entry: P2PEnrollment | None = None
         self._stop = threading.Event()
         self._claim = threading.Lock()
         self._started = False
@@ -68,11 +72,17 @@ class SharedReadSession:
         self._lifecycle.stop()
 
     def submit(self, path: str) -> MailboxTicket:
-        """Only the worker's existing identity-read allowlist; no caller device ID."""
+        """Only the fixed identity/state read scope; no caller device ID or write."""
         return self._lifecycle.submit(int(self._device_id), path)
 
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
         return self._lifecycle.take(ticket)
+
+    def cancel(self, ticket: MailboxTicket) -> bool:
+        return self._lifecycle.cancel(ticket)
+
+    def matches_enrollment(self, entry: P2PEnrollment) -> bool:
+        return self._active_entry == entry and self._lifecycle.state == "active"
 
     def run(self, *, cancelled: Callable[[], bool],
             video_delivery: VideoDelivery | None = None) -> SharedReadResult:
@@ -92,6 +102,7 @@ class SharedReadSession:
             except (ControlChannelBusy, ControlNotReady):
                 return SharedReadResult("busy")
         finally:
+            self._active_entry = None
             if video_delivery is not None:
                 video_delivery.close()
 
@@ -104,6 +115,7 @@ class SharedReadSession:
         if (entry is None or entry.camera_id != self._camera_id
                 or entry.device_id != self._device_id):
             return SharedReadResult("enrollment_changed")
+        self._active_entry = entry
         reason: str | None = None
         next_check = self._clock()  # Recheck immediately before opening.
 

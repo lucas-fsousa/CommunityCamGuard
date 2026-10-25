@@ -25,8 +25,9 @@ def setup(monkeypatch):
     stopped = threading.Event()
 
     class Session:
-        def __init__(self, camera_id, device_id):
+        def __init__(self, camera_id, device_id, *, state_reads=False):
             assert camera_id == "test" and device_id == "123"
+            assert state_reads is True
 
         def stop(self):
             stopped.set()

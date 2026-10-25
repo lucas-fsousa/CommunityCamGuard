@@ -78,6 +78,24 @@ def test_explicit_stop_before_start_never_authenticates(setup):
     assert not calls and not sock.closed
 
 
+def test_explicit_volume_query_reuses_one_active_authenticated_session(setup, monkeypatch):
+    _old, sock, calls = setup
+    session = module.SharedReadSession(ENROLLMENT.camera_id, ENROLLMENT.device_id,
+                                      clock=lambda: sock.now, state_reads=True)
+    tickets = []
+    original = sock.recvfrom
+    def receive(size):
+        if not tickets:
+            assert session.matches_enrollment(ENROLLMENT)
+            tickets.append(session.submit("ProWritable.volume"))
+        return original(size)
+    monkeypatch.setattr(sock, "recvfrom", receive)
+    result = session.run(cancelled=lambda: sock.now >= 1)
+    assert result.reason == "stopped" and calls == ["auth"] and sock.reads == 1
+    assert session.take(tickets[0]).status == "response"
+    assert not session.matches_enrollment(ENROLLMENT)
+
+
 @pytest.mark.parametrize("fault", ["safe", "unknown", "close"])
 def test_cleanup_barrier_is_preserved(setup, monkeypatch, fault):
     session, sock, _calls = setup

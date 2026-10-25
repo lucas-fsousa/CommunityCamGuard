@@ -13,6 +13,7 @@ import time
 from ...db import p2p
 from .capability_refresh import refresh
 from .capability_rollout import selected
+from .p2p.control_ownership import ControlChannelBusy, own_control_channel
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -44,7 +45,13 @@ def request_refresh(camera_id: str, device_id: str) -> None:
                     rollout is not None and rollout[0].device_id == device_id
                     and "siren_pulse" in rollout[1]
                 )
-                refresh(enrollment, validity_seconds=VALIDITY_SECONDS, include_siren=include_siren)
+                # Opportunistic metadata must not signal foreground contention,
+                # invalidate snapshots or displace an existing media/account owner.
+                # The collector's nested reservation is reentrant on this thread.
+                with own_control_channel(wait=False):
+                    refresh(enrollment, validity_seconds=VALIDITY_SECONDS, include_siren=include_siren)
+        except ControlChannelBusy:
+            pass  # Evidence remains unknown/stale, not a grant to bypass validation.
         except Exception as exc:
             # Never log payloads or exception text that may contain credentials.
             log.warning(

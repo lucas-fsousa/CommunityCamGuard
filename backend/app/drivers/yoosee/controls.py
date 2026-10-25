@@ -193,6 +193,11 @@ def read(camera: Camera, key: str) -> ControlResult:
         raise Unsupported(key)
     try:
         enrollment = _enrollment(camera)
+        if key == SPEAKER_VOLUME:
+            from .shared_control_reads import read_volume
+            shared = read_volume(enrollment)
+            if shared is not None:
+                return shared
         if key == WHITE_LIGHT:
             from .capability_rollout import selected
 

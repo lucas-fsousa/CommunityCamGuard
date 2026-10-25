@@ -95,3 +95,33 @@ After rollback, the normal production recording index listed both native segment
 as `Câmera 3`, with UTC `started_at` values. Authenticated original-file requests
 returned HTTP206 for `Range: bytes=0-63`, with the expected MP4 header. That verifies
 archive discovery and serving, not a new claim about browser transcoding latency.
+
+## First control coexistence: read speaker volume
+
+Native sources now publish a driver-private run-lifetime reference to their
+already-owned read session. The existing semantic speaker-volume GET can submit
+`ProWritable.volume` to that account's bounded mailbox and validate the correlated
+reply without authenticating again. The explicit state-read scope adds only this
+B7 read; identity-only workers retain their old scope. No volume write, arbitrary
+model path, speaker playback or public raw-command API was added.
+
+An active native owner with stale credentials, no readiness, a timeout or invalid
+reply fails the operation: it never falls back to a second login. Driver capability
+catalogue checks still run first, including expiry and exact-device proof. Broker
+authentication is reported honestly; a direct camera handshake is not fabricated.
+
+TrialI exposed another real interaction: the catalogue's automatic capability
+refresh used a blocking account reservation and displaced native media when a
+snapshot expired. Background refresh now reserves nonblocking **before** snapshot
+invalidation/network I/O. It defers when another owner is active; existing expiry
+and retry-backoff rules remain. This does not make stale evidence a capability grant.
+Refreshing all capabilities through the shared session is still pending.
+
+After ordinary read-only capability collection while native media was idle,
+trialJ ran60s of native A/V/archive. Three authenticated existing dashboard GETs
+returned verified volume50% in187/65/83ms. The same native source revision2 remained
+running after each query; all six10s samples retained the two other recorders.
+The source completed the trial and rollback cleanly; peak236.7MiB, CPU19.433s over
+76.962s including migration/rollback, with the768MiB/zero-swap bound. No speaker,
+light, movement, reboot or camera setting was changed. This proves volume-read
+coexistence only, not all controls/PTZ or multiple simultaneous native cameras.

@@ -1,3 +1,4 @@
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -105,3 +106,28 @@ def test_refresh_is_bounded_single_worker_with_backoff(monkeypatch):
     assert not runtime._busy
     runtime.request_refresh(CAMERA, IDENTITY.device_id)
     assert len(tasks) == 1
+
+
+def test_background_refresh_never_displaces_an_existing_account_owner(monkeypatch):
+    from backend.app.drivers.yoosee.p2p.control_ownership import (
+        control_channel_contended,
+        own_control_channel,
+    )
+    real_thread = threading.Thread
+    threads, calls = [], []
+    def spawn(**kwargs):
+        thread = real_thread(**kwargs)
+        threads.append(thread)
+        return thread
+    monkeypatch.setattr(runtime.threading, "Thread", spawn)
+    monkeypatch.setattr(runtime, "_busy", False)
+    monkeypatch.setattr(runtime, "_attempts", {})
+    monkeypatch.setattr(runtime.p2p, "get_enrollment_for_camera", lambda _: SimpleNamespace(device_id=IDENTITY.device_id))
+    monkeypatch.setattr(runtime, "selected", lambda _: None)
+    monkeypatch.setattr(runtime, "refresh", lambda *a, **k: calls.append("network refresh"))
+    with own_control_channel():
+        runtime.request_refresh(CAMERA, IDENTITY.device_id)
+        threads[0].join(timeout=2)
+        assert not threads[0].is_alive()
+        assert not control_channel_contended()
+        assert not calls and not runtime._busy

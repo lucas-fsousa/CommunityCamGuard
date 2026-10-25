@@ -46,7 +46,10 @@ class AccountReadLifecycle:
 
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
                  motion_grants: tuple[PtzGrant, ...] = (),
-                 policy: AccountPolicy = AccountPolicy.FINITE):
+                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False):
+        if type(state_reads) is not bool:
+            raise ValueError("explicit state-read scope required")
+        self._state_reads = state_reads
         validate_policy(policy)
         self._policy = policy
         self._motion_authority = PtzAuthority(motion_grants)
@@ -150,7 +153,7 @@ class AccountReadLifecycle:
         if not isinstance(reads, tuple) or not 1 <= len(reads) <= 8:
             raise ValueError("bounded initial read tuple required")
         # Reuse admission validation before claiming/authenticating. No wire I/O.
-        validation = BrokerMailbox(1)
+        validation = BrokerMailbox(1, state_reads=self._state_reads)
         for spec in reads:
             if not isinstance(spec, ReadSpec):
                 raise ValueError("invalid initial read specification")
@@ -203,7 +206,7 @@ class AccountReadLifecycle:
             worker = AccountReadWorker(connection.node, generation, connection.local_ip,
                                        connection.local_port, clock=self._clock,
                                        allow_motion=self._motion_authority.enabled,
-                                       policy=self._policy)
+                                       policy=self._policy, state_reads=self._state_reads)
             spec = media(connection) if media is not None else None
             if media is not None and not isinstance(spec, MediaRouteSpec):
                 raise ValueError("typed authenticated media route required")

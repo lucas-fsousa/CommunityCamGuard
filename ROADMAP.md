@@ -17,6 +17,12 @@ recovery issue, not a successful acceptance. **Next: controls coexistence/recove
 routes, factory onboarding and ARM acceptance. LAN-only/SD/other brands/UI polish
 remain deferred. Do not report the isolated trial as permanent production rollout.
 
+First coexistence slice passed: the existing speaker-volume GET reused the native
+account during a60s A/V/archive trial (three replies187/65/83ms, same source revision,
+other two recorders active). Background capability refresh no longer preempts an
+active account. Exact-device/fresh-evidence gates remain; other control families,
+shared capability refresh and automatic native recovery are still pending.
+
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.
    The stream retest had one small initial gap, then clear playback; owner accepted

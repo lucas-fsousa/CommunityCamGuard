@@ -20,6 +20,18 @@ def submit(box, timeout=2): return box.submit(DEVICE.device_id, PATH, timeout)
 def deliver(owner, frame): return owner.receive(frame, NODE.address, generation=1)
 
 
+def test_volume_query_uses_existing_dispatcher_and_correlated_response():
+    from tests.test_vendor_p2p_model_session import _response
+    owner = AccountReadDispatcher(NODE, 1, "192.0.2.1", 1234, state_reads=True)
+    ticket = owner.mailbox.submit(DEVICE.device_id, "ProWritable.volume")
+    item = owner.step().reads[0]
+    assert item.prepared.request.path == "ProWritable.volume"
+    deliver(owner, _response(NODE, DEVICE, {"setVal":5}, sequence=item.prepared.request.ticket.sequence))
+    result = owner.mailbox.take(ticket)
+    assert result.status == "response" and result.completion.value == {"setVal":5}
+    owner.close()
+
+
 def test_identical_reads_completed_in_reverse_route_to_exact_callers():
     owner, box, _ = dispatcher()
     tickets = [submit(box) for _ in range(8)]

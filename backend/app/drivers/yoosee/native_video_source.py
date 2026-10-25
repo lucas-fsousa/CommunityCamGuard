@@ -18,6 +18,7 @@ from .p2p.av_delivery import NativeAvDelivery, supported_audio
 from .p2p.contracts import P2PProbeError
 from .p2p.video_consumer import VideoConsumer
 from .p2p.video_delivery import VideoDelivery, VideoFrame
+from .shared_control_reads import publish
 from .shared_read_session import SharedReadResult, SharedReadSession
 
 
@@ -41,7 +42,8 @@ class NativeVideoSource:
             raise ValueError("native A/V owns its delivery")
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
             raise ValueError("fresh native delivery required")
-        self._session = SharedReadSession(camera_id, device_id)
+        self._camera_id = camera_id
+        self._session = SharedReadSession(camera_id, device_id, state_reads=True)
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
         self._archive_started = False
@@ -164,8 +166,9 @@ class NativeVideoSource:
         self._thread = threading.Thread(target=self._consume, name="native-video-consumer", daemon=True)
         try:
             self._thread.start()
-            result = self._session.run(video_delivery=self._delivery,
-                cancelled=lambda: self._stop.is_set() or cancelled())
+            with publish(self._camera_id, self._session):
+                result = self._session.run(video_delivery=self._delivery,
+                    cancelled=lambda: self._stop.is_set() or cancelled())
         finally:
             self.stop()
             if self._thread.ident is not None:

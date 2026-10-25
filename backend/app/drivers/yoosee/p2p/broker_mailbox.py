@@ -9,7 +9,7 @@ from typing import Literal
 
 from .broker_reads import ReadCompletion, ReadRequest
 from .broker_transactions import MAX_PENDING, MAX_TIMEOUT
-from .contracts import ACCOUNT_IDENTITY_READ_PATHS
+from .contracts import ACCOUNT_IDENTITY_READ_PATHS, ACCOUNT_STATE_READ_PATHS
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +62,11 @@ class BrokerMailbox:
     Payload bounds are inherited from the account's bounded ReadCompletion decoder.
     """
 
-    def __init__(self, generation: int, *, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, generation: int, *, clock: Callable[[], float] = time.monotonic,
+                 state_reads: bool = False):
+        if type(state_reads) is not bool:
+            raise ValueError("explicit state-read scope required")
+        self._read_paths = frozenset(ACCOUNT_IDENTITY_READ_PATHS) | (ACCOUNT_STATE_READ_PATHS if state_reads else frozenset())
         if type(generation) is not int or generation <= 0:
             raise ValueError("invalid mailbox generation")
         self._generation, self._clock = generation, clock
@@ -73,7 +77,7 @@ class BrokerMailbox:
 
     def submit(self, device_id: int, path: str, timeout: float = 2.0) -> MailboxTicket:
         if (type(device_id) is not int or not 0 < device_id < 1 << 64
-                or not isinstance(path, str) or path not in ACCOUNT_IDENTITY_READ_PATHS
+                or not isinstance(path, str) or path not in self._read_paths
                 or type(timeout) not in (int, float) or not 0 < timeout <= MAX_TIMEOUT
                 or not math.isfinite(timeout)):
             raise ValueError("invalid bounded read submission")
