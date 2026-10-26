@@ -176,3 +176,39 @@ This completes same-session integration of the four currently exposed semantic
 state getters for the test unit, not writes/PTZ, resource catalogues, all capability
 refresh reads, multiple native routes or automatic recovery. Ordinary production
 was restored and still uses its existing source mode.
+
+## Shared PTZ implementation — 2026-10-26, synthetic acceptance only
+
+The existing dashboard PTZ dispatcher can now submit a bounded gesture to its
+camera's active native media owner, without preparing another route or logging in
+again. This requires an explicit driver-supplied `PtzGrant` for the exact device,
+current enrollment access ID and reviewed directions. A normal media session still
+has no motion permission. Neither the production source factory nor the operator
+trial supplies this grant yet; no UI capability was widened and no real motion was
+sent for this implementation.
+
+The account retains one UDP reader, sequence allocator and output budget while its
+cooperative TCP pump delivers media. Queued gestures cannot START before TCP media
+readiness. On cancellation or teardown, the existing reserved STOP is drained on
+the old broker socket **before** potentially slow TCP/media closure. Failed STOP
+delivery blocks replacement; closing the media route cannot make it successful.
+An HTTP timeout abandons the ticket to the socket owner, not the motor cleanup.
+The one gesture slot becomes reusable only after safe completion. Existing STOP
+requests keep their cancellation hook even if the selected profile is unavailable.
+
+An active native owner without a ready grant rejects the gesture; it never falls
+back to ONVIF or a second native login. The same guard covers unsupported directions
+and missing profiles in the driver. Idle/ordinary RTSP operation retains its
+existing behavior.
+
+Encrypted synthetic tests combine all four directions, media pumping, B7 and lamp
+B9 reads and heartbeat with distinct account sequences. They cover early STOP,
+failed START send, interrupted delivery, missing STOP receipt, failed TCP closure,
+handshake readiness, stale credentials and caller timeout. The focused regression
+group passed192 tests under a192MiB memory cap, swap disabled and50% CPU quota
+(113.9MiB observed peak). This is not physical PTZ/video coexistence acceptance.
+No camera connection, container restart, light or sound command was performed.
+
+Next: driver-reviewed admission and a bounded camera3 coexistence trial, then
+remaining shared writes and coordinated recovery. Default native activation,
+multiple native routes and permanent production rollout remain unchanged/pending.

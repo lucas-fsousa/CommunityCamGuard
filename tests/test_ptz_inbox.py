@@ -31,6 +31,38 @@ def test_cancelled_claim_waits_for_worker_stop_before_freeing_slot():
     assert inbox.take(ticket) == SUCCESS
 
 
+def test_abandoned_caller_frees_slot_only_after_confirmed_stop():
+    inbox = PtzInbox(1)
+    ticket = inbox.submit(SPEC)
+    inbox.claim()
+    inbox.abandon(ticket)
+    assert inbox.should_cancel(ticket)
+    with pytest.raises(ValueError): inbox.submit(SPEC)
+    assert inbox.finish(ticket, SUCCESS)
+    current = inbox.submit(SPEC)
+    inbox.abandon(ticket)
+    assert not inbox.should_cancel(current)
+
+
+def test_abandoned_unknown_stop_keeps_inbox_poisoned():
+    inbox = PtzInbox(1)
+    ticket = inbox.submit(SPEC)
+    inbox.claim()
+    inbox.abandon(ticket)
+    inbox.finish(ticket, ScheduledPtzResult("release_unconfirmed", True, 3, False, False))
+    with pytest.raises(ValueError): inbox.submit(SPEC)
+    assert not inbox.take(ticket).release_delivery_confirmed
+    with pytest.raises(ValueError): inbox.submit(SPEC)
+
+
+def test_abandoning_before_claim_cannot_create_a_move_or_leave_a_stuck_slot():
+    inbox = PtzInbox(1)
+    old = inbox.submit(SPEC)
+    inbox.abandon(old)
+    assert inbox.claim() is None
+    assert inbox.submit(SPEC).serial > old.serial
+
+
 @pytest.mark.parametrize("mode", ["cancel", "expire", "close"])
 def test_unclaimed_job_cancels_without_motion(mode):
     now = [0.0]

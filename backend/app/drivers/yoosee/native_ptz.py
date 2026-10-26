@@ -123,6 +123,10 @@ def step(camera: Camera, direction: str, profile: PtzProfile, fallback: Callable
         _active[camera.camera_id] = motion
         warming = next(iter(_warming.values()), None)
     try:
+        from .shared_native_motion import step as shared_step
+        shared = shared_step(camera, direction, profile, motion)
+        if shared is not None:
+            return shared
         # Join an already running read-only preparation, never open a duplicate
         # session or reject the user's first click just because warming is active.
         if warming is not None and not warming.wait(15):

@@ -96,6 +96,7 @@ class AccountReadWorker:
             with_media_tcp: bool = False,
             video_delivery: VideoDelivery | None = None,
             media_policy: MediaPolicy = MediaPolicy.FINITE,
+            allow_media_motion: bool = False,
             wait: Callable[[float], None] = time.sleep) -> WorkerSummary:
         """Optional trusted bootstrap gesture; no public/concurrent PTZ admission.
 
@@ -128,6 +129,7 @@ class AccountReadWorker:
         media: MediaRouteJob | None = None
         tcp: CooperativeTcpMedia | None = None
         tcp_cleanup_error: BaseException | None = None
+        motion_cleanup_error: BaseException | None = None
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         lamp = LampReadPump(self._dispatcher, self.lamp_inbox, clock=self._clock) if self.lamp_inbox is not None else None
@@ -137,6 +139,13 @@ class AccountReadWorker:
         try:
             assert node is not None
             validate_media_policy(media_policy)
+            if type(allow_media_motion) is not bool:
+                raise ValueError("explicit media/motion admission required")
+            if allow_media_motion and (initial_media is None or initial_motion is not None
+                    or self.motion_inbox is None or not with_media_tcp
+                    or media_policy is not MediaPolicy.CONTINUOUS
+                    or self._policy is not AccountPolicy.CONTINUOUS):
+                raise ValueError("reviewed continuous media/motion scope required")
             if media_policy is MediaPolicy.CONTINUOUS and (
                     not with_media_tcp or self._policy is not AccountPolicy.CONTINUOUS):
                 raise ValueError("continuous media requires a continuous account and TCP")
@@ -149,7 +158,7 @@ class AccountReadWorker:
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
                 acknowledge_messages=not manual_acks, policy=self._policy)
             if initial_media is not None:
-                if not isinstance(initial_media, MediaRouteSpec) or mixed:
+                if not isinstance(initial_media, MediaRouteSpec) or (mixed and not allow_media_motion):
                     raise ValueError("typed media-only bootstrap required")
                 media = self._dispatcher.prepare_media(initial_media, output)
             if initial_motion is not None:
@@ -225,7 +234,7 @@ class AccountReadWorker:
                         last_motion = motion.result
                         self.motion_inbox.finish(motion_ticket, last_motion)
                         motion, motion_ticket = None, None
-                    if motion is None:
+                    if motion is None and (media is None or (tcp is not None and tcp.ready)):
                         claimed = self.motion_inbox.claim()
                         if claimed is not None:
                             motion_ticket, spec = claimed
@@ -290,8 +299,21 @@ class AccountReadWorker:
             try:
                 if lamp is not None:
                     lamp.close()
+                self.mailbox.close()
                 if self.motion_inbox is not None:
                     self.motion_inbox.close()
+                # Motor safety precedes potentially slow TCP/media teardown.
+                # Keep the old broker socket and reserved STOP capacity throughout.
+                if motion is not None and motion.result is None:
+                    assert node is not None
+                    motion.cancel()
+                    try:
+                        cleanup = pump_ptz(sock, node, motion, output, generation=self._generation,
+                                           cancelled=lambda: True, clock=self._clock, wait=wait)
+                        sent += cleanup.sent_datagrams
+                        received += cleanup.received_datagrams
+                    except BaseException as exc:
+                        motion_cleanup_error = exc  # still retire TCP, route and socket
                 if tcp is not None:
                     try:
                         tcp.finish()
@@ -305,18 +327,6 @@ class AccountReadWorker:
                             generation=self._generation, clock=self._clock, wait=wait)
                         sent += media_sent
                         received += media_received
-                    finally:
-                        if maintenance is not None:
-                            maintenance.close()
-                        self._node = None
-                if motion is not None and motion.result is None:
-                    assert node is not None
-                    motion.cancel()
-                    try:
-                        cleanup = pump_ptz(sock, node, motion, output, generation=self._generation,
-                                           cancelled=lambda: True, clock=self._clock, wait=wait)
-                        sent += cleanup.sent_datagrams
-                        received += cleanup.received_datagrams
                     finally:
                         if maintenance is not None:
                             maintenance.close()
@@ -337,6 +347,8 @@ class AccountReadWorker:
                         video_delivery.close()
                     with self._claim:
                         self._socket = None
+                    if motion_cleanup_error is not None:
+                        raise motion_cleanup_error
                     if tcp_cleanup_error is not None:
                         raise tcp_cleanup_error
         return WorkerSummary(reason, sent, received, beats, close_failed,

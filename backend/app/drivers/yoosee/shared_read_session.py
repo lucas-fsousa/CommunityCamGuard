@@ -2,8 +2,8 @@
 
 Not a periodic warmup or public endpoint. The server supplies its shutdown
 predicate and owns the calling thread. Optional media requires an explicit bounded
-delivery queue; only explicitly scoped read-only state queries are admitted, never
-writes/motion, and no decoder runs on this thread.
+delivery queue. Motion remains disabled unless the driver supplies an exact-device
+grant; queued gestures wait for TCP readiness. No generic writes or decoder run here.
 """
 
 import threading
@@ -25,6 +25,9 @@ from .p2p.control_ownership import ControlChannelBusy, control_channel_contended
 from .p2p.lamp_read_inbox import LampReadTicket
 from .p2p.lamp_read_job import LampReadResult, LampReadSpec
 from .p2p.media_route_job import MediaRouteSpec
+from .p2p.ptz_authority import PtzGrant
+from .p2p.ptz_inbox import MotionTicket
+from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .p2p.video_delivery import VideoDelivery
 
 
@@ -44,14 +47,20 @@ class SharedReadSession:
     """
 
     def __init__(self, camera_id: str, device_id: str, *,
-                 clock: Callable[[], float] = time.monotonic, state_reads: bool = False):
+                 clock: Callable[[], float] = time.monotonic, state_reads: bool = False,
+                 motion_grants: tuple[PtzGrant, ...] = ()):
         if (not camera_id or not device_id or len(device_id) > 20
                 or not device_id.isascii() or not device_id.isdecimal()
                 or not 0 < int(device_id) < 1 << 64):
             raise ValueError("shared read target required")
         self._camera_id, self._device_id, self._clock = camera_id, device_id, clock
+        if (not isinstance(motion_grants, tuple) or len(motion_grants) > 1
+                or any(not isinstance(grant, PtzGrant) or grant.device_id != int(device_id)
+                       for grant in motion_grants)):
+            raise ValueError("motion grant must match this exact media device")
+        self._motion_grants = motion_grants
         self._lifecycle = AccountReadLifecycle(clock=clock, policy=AccountPolicy.CONTINUOUS,
-                                               state_reads=state_reads)
+                                               state_reads=state_reads, motion_grants=motion_grants)
         self._active_entry: P2PEnrollment | None = None
         self._stop = threading.Event()
         self._claim = threading.Lock()
@@ -67,7 +76,10 @@ class SharedReadSession:
                 "session_broker_socket_closed": not worker.socket_close_failed,
                 "session_broker_release": worker.media is None or worker.media.broker_release,
                 "session_tcp_receipt": worker.tcp is None or worker.tcp.close_acknowledged,
-                "session_tcp_socket_closed": worker.tcp is None or not worker.tcp.socket_close_failed}
+                "session_tcp_socket_closed": worker.tcp is None or not worker.tcp.socket_close_failed,
+                "session_motion_started": worker.motion is not None and worker.motion.start_attempted,
+                "session_motion_cleanup_confirmed": worker.motion is None or not worker.motion.start_attempted
+                    or worker.motion.release_delivery_confirmed}
 
     def stop(self) -> None:
         self._stop.set()
@@ -98,8 +110,29 @@ class SharedReadSession:
     def cancel_lamp_read(self, ticket: LampReadTicket) -> None:
         self._lifecycle.cancel_lamp_read(ticket)
 
+    def submit_motion(self, direction: str) -> MotionTicket:
+        entry = self._active_entry
+        if entry is None or not self._motion_grants:
+            raise ValueError("reviewed active media motion scope required")
+        grant = self._motion_grants[0]
+        if grant.access_id != entry.access_id:
+            raise ValueError("media motion enrollment changed")
+        return self._lifecycle.submit_motion(PtzSpec(grant.access_id, grant.device_id,
+                                                    direction, grant.directions))
+
+    def take_motion(self, ticket: MotionTicket) -> ScheduledPtzResult | None:
+        return self._lifecycle.take_motion(ticket)
+
+    def cancel_motion(self, ticket: MotionTicket) -> bool:
+        return self._lifecycle.cancel_motion(ticket)
+
+    def abandon_motion(self, ticket: MotionTicket) -> None:
+        self._lifecycle.abandon_motion(ticket)
+
     def run(self, *, cancelled: Callable[[], bool],
             video_delivery: VideoDelivery | None = None) -> SharedReadResult:
+        if self._motion_grants and video_delivery is None:
+            raise ValueError("motion scope requires explicit native media delivery")
         if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
                                            or video_delivery.closed):
             raise ValueError("fresh media delivery required")
@@ -129,6 +162,8 @@ class SharedReadSession:
         if (entry is None or entry.camera_id != self._camera_id
                 or entry.device_id != self._device_id):
             return SharedReadResult("enrollment_changed")
+        if self._motion_grants and self._motion_grants[0].access_id != entry.access_id:
+            return SharedReadResult("motion_scope_changed")
         self._active_entry = entry
         reason: str | None = None
         next_check = self._clock()  # Recheck immediately before opening.
@@ -171,8 +206,12 @@ class SharedReadSession:
             if delivery is None:
                 result = self._lifecycle.run(connect, cancelled=should_yield)
             else:
-                result = self._lifecycle.run_media(connect, media=media, delivery=delivery,
-                                                   cancelled=should_yield)
+                if self._motion_grants:
+                    result = self._lifecycle.run_media_motion(connect, media=media, delivery=delivery,
+                                                             cancelled=should_yield)
+                else:
+                    result = self._lifecycle.run_media(connect, media=media, delivery=delivery,
+                                                       cancelled=should_yield)
         except ReadConnectFailure:
             return SharedReadResult(reason or "connection")
         self._last_worker = result

@@ -459,8 +459,11 @@ without a parallel camera RTSP capture. The original deployment was restored aft
 both trials. Controls coexistence, recovery, longer A/V acceptance and permanent
 rollout remain pending; these experiments do not enable native streaming at startup.
 Existing volume, protection-state, protection-schedule and lamp-state queries passed a
-real shared-session trial without interrupting native video. Other control families,
-including writes/PTZ, still require that integration.
+real shared-session trial without interrupting native video. Shared-session PTZ now
+has a dashboard dispatch path behind an explicit, exact-device driver grant, with
+synthetic tests for all four directions and STOP-before-media-close behavior. No
+production factory or trial currently supplies that grant; real PTZ/video coexistence
+is not yet accepted. Shared writes and recovery remain pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

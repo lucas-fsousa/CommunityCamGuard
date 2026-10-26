@@ -23,6 +23,7 @@ class _Slot:
     deadline: float
     claimed: bool = False
     cancelled: bool = False
+    abandoned: bool = False
     result: ScheduledPtzResult | None = None
 
 
@@ -92,6 +93,18 @@ class PtzInbox:
             return (self._closed or self._slot is None or self._slot.ticket != ticket
                     or self._slot.cancelled)
 
+    def abandon(self, ticket: MotionTicket) -> None:
+        """Caller gone: cancel, but retain a claimed gesture until STOP is known."""
+        with self._lock:
+            slot = self._slot
+            if slot is None or slot.ticket != ticket:
+                return
+            slot.abandoned = True
+            self._cancel(slot)
+            if slot.result is not None and (not slot.result.start_attempted
+                                           or slot.result.release_delivery_confirmed):
+                self._slot = None
+
     def finish(self, ticket: MotionTicket, result: ScheduledPtzResult) -> bool:
         if not isinstance(result, ScheduledPtzResult):
             raise ValueError("typed terminal motion result required")
@@ -102,6 +115,8 @@ class PtzInbox:
             slot.result = result
             if result.start_attempted and not result.release_delivery_confirmed:
                 self._closed = True
+            elif slot.abandoned:
+                self._slot = None  # only after safe completion, never before STOP
             return True
 
     def take(self, ticket: MotionTicket) -> ScheduledPtzResult | None:

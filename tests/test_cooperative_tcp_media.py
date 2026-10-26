@@ -31,12 +31,16 @@ def test_finite_pump_consumes_records_without_second_reader_or_history():
     now = [1.0]
     sock, owner = OwnedSocket(now), session(now)
     pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0])
+    assert not pump.ready
+    seen_ready = False
     steps = 0
     while pump.result is None:
         pump.step()
+        seen_ready = seen_ready or pump.ready
         steps += 1
         assert steps < 200
     result = pump.finish()
+    assert seen_ready and not pump.ready
     assert result.ready and result.close_acknowledged and not result.socket_close_failed
     assert (result.video_frames, result.audio_frames, result.encoding_headers) == (1, 2, 1)
     assert sock.actions == [1, 6, 7] and sock.closed == 1

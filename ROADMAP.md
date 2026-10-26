@@ -32,6 +32,16 @@ a60s A/V/archive trial. The lamp query is strictly type12 read-only B9, with one
 reader and account-wide sequences. Shared **writes**, PTZ, resource catalogues,
 capability refresh and recovery remain; no light/sound/configuration action was sent.
 
+2026-10-26: shared-session PTZ is implemented behind an explicit exact-device driver
+grant, reusing the existing dashboard dispatcher and STOP hook. Synthetic encrypted
+tests cover all four directions alongside media, B7/B9 reads and heartbeat. STOP
+drains before TCP/media teardown; an unconfirmed STOP blocks replacement rather
+than opening another route. HTTP timeout/cancellation does not discard motor cleanup
+ownership. **Not physically accepted or enabled**: production factories and the trial
+tool still supply no motion grant. Next: reviewed driver admission and camera3
+PTZ/video coexistence acceptance when visual testing is permitted, then shared
+writes/recovery. No camera action or container interruption in this implementation.
+
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.
    The stream retest had one small initial gap, then clear playback; owner accepted

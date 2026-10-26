@@ -126,6 +126,12 @@ class AccountReadLifecycle:
                 return False
             return self._worker.motion_inbox.cancel(ticket)
 
+    def abandon_motion(self, ticket: MotionTicket) -> None:
+        with self._lock:
+            if (ticket.generation == self._generation and self._worker is not None
+                    and self._worker.motion_inbox is not None):
+                self._worker.motion_inbox.abandon(ticket)
+
     def take(self, ticket: MailboxTicket) -> ReadOutcome | None:
         with self._lock:
             if ticket.generation != self._generation or self._worker is None:
@@ -195,10 +201,24 @@ class AccountReadLifecycle:
             raise ValueError("continuous media-only account and fresh delivery required")
         return self._run(connect, (), cancelled, media=media, delivery=delivery).worker
 
+    def run_media_motion(self, connect: Callable[[int], ReadConnection], *,
+                         media: Callable[[ReadConnection], MediaRouteSpec],
+                         delivery: VideoDelivery, cancelled: Callable[[], bool]) -> WorkerSummary:
+        """Explicit driver grants only; no bootstrap gesture or inferred permission.
+
+        Queued gestures cannot start before TCP media readiness. STOP is drained
+        before media/route teardown, and any unconfirmed release blocks reuse.
+        """
+        if (self._policy is not AccountPolicy.CONTINUOUS or not self._motion_authority.enabled
+                or not isinstance(delivery, VideoDelivery) or delivery.closed):
+            raise ValueError("reviewed continuous motion grants and fresh media delivery required")
+        return self._run(connect, (), cancelled, media=media, delivery=delivery,
+                         media_motion=True).worker
+
     def _run(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...],
              cancelled: Callable[[], bool], *,
              media: Callable[[ReadConnection], MediaRouteSpec] | None = None,
-             delivery: VideoDelivery | None = None) -> ReadBatchSummary:
+             delivery: VideoDelivery | None = None, media_motion: bool = False) -> ReadBatchSummary:
         """Claim before auth; permit replacement only after verified physical close.
 
         No I/O under the lifecycle lock. Old results are retained only until the
@@ -244,9 +264,14 @@ class AccountReadLifecycle:
             if media is None:
                 summary = worker.run(connection.socket, cancelled=cancelled)
             else:
-                summary = worker.run(connection.socket, cancelled=cancelled,
-                                     initial_media=spec, with_media_tcp=True,
-                                     video_delivery=delivery, media_policy=MediaPolicy.CONTINUOUS)
+                if media_motion:
+                    summary = worker.run(connection.socket, cancelled=cancelled,
+                        initial_media=spec, with_media_tcp=True, video_delivery=delivery,
+                        media_policy=MediaPolicy.CONTINUOUS, allow_media_motion=True)
+                else:
+                    summary = worker.run(connection.socket, cancelled=cancelled,
+                        initial_media=spec, with_media_tcp=True, video_delivery=delivery,
+                        media_policy=MediaPolicy.CONTINUOUS)
             return ReadBatchSummary(summary, tuple(worker.mailbox.take(t) for t in tickets))
         finally:
             try:

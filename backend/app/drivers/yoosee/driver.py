@@ -97,7 +97,10 @@ class YooseeDriver(CameraDriver):
     def ptz(self, camera: Camera, direction: str | None, action: str = "step") -> bool:
         from . import native_ptz
         from .native_ptz_policy import selected
+        from .shared_control_reads import has_session, require_legacy_available
 
+        if action == "stop" and has_session(camera.camera_id):
+            return native_ptz.stop(camera.camera_id)
         profile = selected(camera.camera_id)
         if profile is not None:
             if action == "stop":
@@ -108,7 +111,9 @@ class YooseeDriver(CameraDriver):
             ptz.velocity_for(direction)
             if direction in profile.directions:
                 return native_ptz.step(camera, direction, profile, lambda: ptz.move(camera, direction))
+            require_legacy_available(camera.camera_id)
             return ptz.move(camera, direction)
+        require_legacy_available(camera.camera_id)
         if action == "stop":
             return ptz.halt(camera)
         if action == "start":

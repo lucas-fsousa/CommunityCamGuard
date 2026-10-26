@@ -49,6 +49,10 @@ class CooperativeTcpMedia:
         self._video = self._audio = self._headers = 0
         self.result: TcpMediaResult | None = None
 
+    @property
+    def ready(self) -> bool:
+        return self._ready_at is not None and not self._closing and self.result is None
+
     def _close(self) -> TcpMediaResult:
         if self.result is not None:
             return self.result

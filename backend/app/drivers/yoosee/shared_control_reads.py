@@ -18,6 +18,21 @@ _paths = {"speaker_volume": VOLUME_READ_PATH, "smart_protection": SMART_PROTECTI
           "smart_protection_schedule": SMART_PROTECTION_READ_PATH}
 
 
+def has_session(camera_id: str | None) -> bool:
+    with _lock:
+        return camera_id in _sessions
+
+
+def session_for(entry: P2PEnrollment) -> SharedReadSession | None:
+    if not entry.camera_id:
+        return None
+    with _lock:
+        session = _sessions.get(entry.camera_id)
+    if session is not None and not session.matches_enrollment(entry):
+        raise ControlNotReady("native shared-control session is not ready for this enrollment")
+    return session
+
+
 def require_legacy_available(camera_id: str | None) -> None:
     """Unintegrated operations must not displace a live native account to log in again."""
     with _lock:
@@ -47,12 +62,9 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
         return None
     if key not in _paths and key != "white_light":
         raise ControlOperationError("control is not a supported shared state read")
-    with _lock:
-        session = _sessions.get(entry.camera_id)
+    session = session_for(entry)
     if session is None:
         return None
-    if not session.matches_enrollment(entry):
-        raise ControlNotReady("native shared-control session is not ready for this enrollment")
     if key == "white_light":
         return _read_lamp(session)
     try:
