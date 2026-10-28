@@ -48,7 +48,8 @@ class SharedReadSession:
 
     def __init__(self, camera_id: str, device_id: str, *,
                  clock: Callable[[], float] = time.monotonic, state_reads: bool = False,
-                 motion_grants: tuple[PtzGrant, ...] = ()):
+                 motion_grants: tuple[PtzGrant, ...] = (),
+                 motion_valid: Callable[[], bool] | None = None):
         if (not camera_id or not device_id or len(device_id) > 20
                 or not device_id.isascii() or not device_id.isdecimal()
                 or not 0 < int(device_id) < 1 << 64):
@@ -59,6 +60,9 @@ class SharedReadSession:
                        for grant in motion_grants)):
             raise ValueError("motion grant must match this exact media device")
         self._motion_grants = motion_grants
+        if motion_valid is not None and (not callable(motion_valid) or not motion_grants):
+            raise ValueError("motion revalidation requires an explicit grant")
+        self._motion_valid = motion_valid
         self._lifecycle = AccountReadLifecycle(clock=clock, policy=AccountPolicy.CONTINUOUS,
                                                state_reads=state_reads, motion_grants=motion_grants)
         self._active_entry: P2PEnrollment | None = None
@@ -117,6 +121,9 @@ class SharedReadSession:
         grant = self._motion_grants[0]
         if grant.access_id != entry.access_id:
             raise ValueError("media motion enrollment changed")
+        # Local evidence only; never authenticate/refresh from an admission check.
+        if self._motion_valid is not None and self._motion_valid() is not True:
+            raise ValueError("media motion evidence is no longer current")
         return self._lifecycle.submit_motion(PtzSpec(grant.access_id, grant.device_id,
                                                     direction, grant.directions))
 

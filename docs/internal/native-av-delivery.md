@@ -212,3 +212,36 @@ No camera connection, container restart, light or sound command was performed.
 Next: driver-reviewed admission and a bounded camera3 coexistence trial, then
 remaining shared writes and coordinated recovery. Default native activation,
 multiple native routes and permanent production rollout remain unchanged/pending.
+
+## Reviewed factory admission — 2026-10-28
+
+`native_media_offer` now translates a separate `native_media_ptz` operation proof
+into the exact-device `PtzGrant` used by the shared-session implementation above.
+The registered profile and explicit rollout must agree on the exact model/firmware
+identity, with a current snapshot. The proof is write-only and its nonempty options
+must be a subset of the four reviewed directions. Enrollment, the read-only video
+proof and ordinary PTZ support never imply combined-session motion permission.
+No such real-camera proof was registered by this implementation; default sources
+and the operator trial remain without motion grants.
+
+The offer captures the resolved scope. Removing rollout, changing directions or
+credentials, or expiring/invalidation of the snapshot invalidates that offer before
+construction. A granted source also keeps the local revalidation callback: an
+already constructed session checks it before each new gesture, not merely once at
+startup. Only the literal `True` admits; unknown/stale evidence refuses START without
+another login or ONVIF fallback. The callback performs local database reads, never
+capability refresh/authentication. It is outside the account lifecycle lock.
+Revocation does not block cancelling or draining the STOP of an existing gesture.
+
+Tests exercise both the real factory-to-session callback and its admission boundary:
+read-only/ambiguous proofs, wrong directions, missing activation, ordinary PTZ
+proof, snapshot invalidation, expiry, review withdrawal and credential rotation.
+The221-test focused regression group passed under192MiB/swap0/CPU50%, with145.2MiB
+peak. Mypy354 files passed under256MiB, observed122.4MiB. Ruff passed. These are
+synthetic checks, not physical PTZ/video coexistence acceptance.
+
+The stable server now runs on Termux independently through its dedicated tunnel.
+This WSL development change was not deployed there, and no media/camera action or
+restart was performed. The next real camera3 trial must explicitly release that
+camera's capture on Termux before WSL connects; the earlier workstation-only
+shared-hub trial is not a safe phone handover mechanism.

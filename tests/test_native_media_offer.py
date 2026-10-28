@@ -18,6 +18,7 @@ from backend.app.drivers.yoosee import (
 from backend.app.drivers.yoosee.capability_identity import CapabilityIdentity
 from backend.app.drivers.yoosee.capability_policy import OperationProof, ValidatedProfile
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
+from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
 from backend.app.media.source_registry import SourceUnavailable
 
 
@@ -104,3 +105,101 @@ def test_repeated_offer_checks_close_evidence_connections_without_waiting_for_gc
     for connection in opened:
         with pytest.raises(sqlite3.ProgrammingError, match="closed"):
             connection.execute("SELECT 1")
+
+
+def review_motion(evidence, proof, *, activate=True, reviewed_at=101):
+    _camera, _identity, _enrollment, profile = evidence
+    combined = replace(profile, operations=(*profile.operations, proof))
+    capability_profiles.register(combined, sources={
+        item.key: "sha256:" + "b" * 64 + " proof#combined-session" for item in combined.operations
+    }, reviewed_at=reviewed_at)
+    if activate:
+        capability_rollout.activate(combined)
+
+
+def test_factory_gets_only_explicit_exact_unit_combined_motion_proof(evidence, monkeypatch):
+    camera, _identity, enrollment, _profile = evidence
+    review_motion(evidence, OperationProof("native_media_ptz", writable=True,
+                                         options=frozenset({"left", "right"})))
+    factory = Mock(return_value=object())
+    monkeypatch.setattr(native_media_offer, "NativeVideoSource", Mock(admission_domain="driver/shared", side_effect=factory))
+    offer = YooseeDriver().native_media_offer(camera)
+    assert offer is not None and offer.valid()
+    factory.assert_not_called()
+    offer.factory()
+    factory.assert_called_once_with(camera.camera_id, enrollment.device_id, motion_grants=(
+        PtzGrant(enrollment.access_id, int(enrollment.device_id), frozenset({"left", "right"})),),
+        motion_valid=offer.valid)
+
+
+@pytest.mark.parametrize("proof", [
+    OperationProof("native_media_ptz", readable=True, options=frozenset({"right"})),
+    OperationProof("native_media_ptz", readable=True, writable=True, options=frozenset({"right"})),
+    OperationProof("native_media_ptz", writable=True),
+    OperationProof("native_media_ptz", writable=True, options=frozenset({"all"})),
+])
+def test_ambiguous_or_read_only_motion_proof_cannot_authorize_a_factory(evidence, proof):
+    review_motion(evidence, proof)
+    assert YooseeDriver().native_media_offer(evidence[0]) is None
+
+
+@pytest.mark.parametrize("key", ["native_media_ptz", "ptz"])
+def test_unactivated_combined_or_ordinary_ptz_proof_does_not_enable_motion(evidence, monkeypatch, key):
+    camera = evidence[0]
+    review_motion(evidence, OperationProof(key, writable=True, options=frozenset({"right"})), activate=False)
+    factory = Mock(return_value=object())
+    monkeypatch.setattr(native_media_offer, "NativeVideoSource", Mock(admission_domain="driver/shared", side_effect=factory))
+    offer = YooseeDriver().native_media_offer(camera)
+    assert offer is not None
+    offer.factory()
+    factory.assert_called_once_with(camera.camera_id, evidence[2].device_id)
+
+
+@pytest.mark.parametrize("change", ["remove", "directions", "expiry", "credentials"])
+def test_changed_motion_scope_invalidates_offer_before_source_construction(evidence, monkeypatch, change):
+    camera, identity, enrollment, profile = evidence
+    review_motion(evidence, OperationProof("native_media_ptz", writable=True, options=frozenset({"right"})))
+    factory = Mock(return_value=object())
+    monkeypatch.setattr(native_media_offer, "NativeVideoSource", Mock(admission_domain="driver/shared", side_effect=factory))
+    offer = YooseeDriver().native_media_offer(camera)
+    assert offer is not None
+    if change == "remove":
+        capability_rollout.activate(profile)
+    elif change == "directions":
+        review_motion(evidence, OperationProof("native_media_ptz", writable=True,
+                                              options=frozenset({"left"})), reviewed_at=102)
+    elif change == "expiry":
+        monkeypatch.setattr(native_media_offer, "time", lambda: 200)
+    else:
+        p2p.upsert_enrollment(identity.device_id, access_id=enrollment.access_id + 1,
+                              access_token=b"y" * 64, camera_id=camera.camera_id)
+    assert not offer.valid()
+    with pytest.raises(SourceUnavailable):
+        offer.factory()
+    factory.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["expiry", "review", "snapshot", "credentials"])
+def test_constructed_source_cannot_keep_using_an_expired_or_revoked_motion_grant(evidence, monkeypatch, change):
+    camera, identity, enrollment, profile = evidence
+    review_motion(evidence, OperationProof("native_media_ptz", writable=True, options=frozenset({"right"})))
+    offer = YooseeDriver().native_media_offer(camera)
+    assert offer is not None
+    source = offer.factory()  # construction only: no thread, decoder or connection
+    session = source._session
+    session._active_entry = enrollment
+    submit = Mock(return_value="synthetic-ticket")
+    monkeypatch.setattr(session._lifecycle, "submit_motion", submit)
+    assert session.submit_motion("right") == "synthetic-ticket"
+    if change == "expiry":
+        monkeypatch.setattr(native_media_offer, "time", lambda: 200)
+    elif change == "review":
+        capability_rollout.activate(profile)
+    elif change == "snapshot":
+        capability_snapshot_store.begin(camera.camera_id)
+    else:
+        p2p.upsert_enrollment(identity.device_id, access_id=enrollment.access_id + 1,
+                              access_token=b"y" * 64, camera_id=camera.camera_id)
+    with pytest.raises(ValueError, match="no longer current"):
+        session.submit_motion("right")
+    assert submit.call_count == 1

@@ -2,6 +2,20 @@
 
 ## Stable-server handover — 2026-10-28
 
+Follow-up: the owner supplied the dedicated connector token privately. Native
+cloudflared now runs enabled under Termux runit, with four active connections.
+The configured public-hostname origin is `http://127.0.0.1:3200` on the phone.
+The missing DNS record initially returned authoritative NXDOMAIN; after the owner's
+correction, public Cloudflare DNS resolves the hostname. A TLS-verified tagged
+HTTPS health probe using that DNS answer returned200 and did not appear in WSL
+nginx logs; the phone connector has now processed167 requests. It reported two
+request errors over its lifetime at that sample, not a zero-error/endurance claim.
+No app/media restart or camera action was required. The old CCG nginx configuration
+is retained as a rollback artifact, but the verified request no longer uses it.
+The workstation resolver still had negative caching during this check; its global
+DNS settings were not changed. The initial handover notes below describe the earlier
+temporary relay, not the current verified public route.
+
 Owner changed the operating topology: stable server on the phone, development on
 WSL. A separate `/opt/ccg/releases/4650a29ffeacecc60455ca0fcecbf2a628b01996`
 source release uses `/opt/ccg/current` and private `/opt/ccg/shared` state. The

@@ -38,9 +38,12 @@ class NativeVideoSource:
 
     def __init__(self, camera_id: str, device_id: str, *, delivery: VideoDelivery | None = None,
                  native_audio: bool = False, archive: Path | None = None,
-                 motion_grants: tuple[PtzGrant, ...] = ()):
+                 motion_grants: tuple[PtzGrant, ...] = (),
+                 motion_valid: Callable[[], bool] | None = None):
         if not isinstance(motion_grants, tuple):
             raise ValueError("explicit reviewed media motion grants required")
+        if motion_valid is not None and (not callable(motion_valid) or not motion_grants):
+            raise ValueError("motion revalidation requires an explicit grant")
         if archive is not None and not native_audio:
             raise ValueError("native archive requires validated A/V ingress")
         if native_audio and delivery is not None:
@@ -48,7 +51,8 @@ class NativeVideoSource:
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
             raise ValueError("fresh native delivery required")
         self._camera_id = camera_id
-        self._session = (SharedReadSession(camera_id, device_id, state_reads=True, motion_grants=motion_grants)
+        self._session = (SharedReadSession(camera_id, device_id, state_reads=True,
+                                          motion_grants=motion_grants, motion_valid=motion_valid)
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive

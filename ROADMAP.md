@@ -9,8 +9,10 @@ ARM64 Termux/Ubuntu host; use WSL for development. Publish validated committed s
 bundles, not Docker images, to this non-Docker runtime. Keep secrets/data separate
 from releases and retain rollback. Phone go2rtc/three recorders and HTTPS primary/
 temporary login, revocation, reduced camera3 WebSocket and original-file Range checks
-passed. The current domain still relays through the workstation proxy; a dedicated
-Cloudflare tunnel token/hostname migration is required to remove that dependency.
+passed. A dedicated native Cloudflare connector on the phone now serves the public
+hostname; an HTTPS health probe reached it without crossing the workstation nginx.
+The workstation's local resolver can retain the earlier negative DNS cache;
+public DNS resolves correctly and TLS-verified requests to its published edge work.
 Do not reuse the workstation's multi-application tunnel token on the phone.
 See [deployment workflow](docs/public/termux.md#stable-phone-development-workstation)
 and [hardware checkpoint](docs/internal/arm64-termux-check.md). This is not24/7,
@@ -53,6 +55,17 @@ ownership. **Not physically accepted or enabled**: production factories and the 
 tool still supply no motion grant. Next: reviewed driver admission and camera3
 PTZ/video coexistence acceptance when visual testing is permitted, then shared
 writes/recovery. No camera action or container interruption in this implementation.
+
+2026-10-28 driver admission: the source factory now resolves a separately reviewed
+`native_media_ptz` write proof for the exact identity/current snapshot and direction
+set. Enrollment, video proof or ordinary PTZ proof cannot grant coexistence. Expired
+or revoked evidence blocks the next gesture even on an already constructed source;
+STOP/cancellation remains available. Focused221 tests passed under192MiB/swap0,
+observed145.2MiB peak; Mypy354 files and Ruff passed. **No real combined-session
+record registered, movement sent, phone release replaced or media restarted.**
+Next is the bounded camera3 coexistence acceptance, followed by shared writes and
+recovery. A test migration must release camera3 on Termux before WSL captures it;
+do not reuse the old shared-hub trial as if the phone were still idle.
 
 1. Camera3 audio physical acceptance COMPLETE for recorded message, paced stream
    and the browser microphone/hold-to-speak flow, confirmed by the owner.

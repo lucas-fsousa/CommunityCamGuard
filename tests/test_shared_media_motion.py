@@ -1,5 +1,7 @@
 """Explicit grants and fail-closed account reuse, with no camera connections."""
 
+from unittest.mock import Mock
+
 import pytest
 
 from backend.app.drivers.yoosee import shared_read_session as module
@@ -9,6 +11,7 @@ from backend.app.drivers.yoosee.p2p.account_read_lifecycle import (
     ReadConnection,
 )
 from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
+from backend.app.drivers.yoosee.p2p.ptz_inbox import MotionTicket
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from tests.test_account_media_motion import MEDIA, MOTION, setup
 from tests.test_broker_reads import DEVICE, NODE
@@ -71,3 +74,31 @@ def test_granted_session_cannot_move_without_explicit_media_delivery():
         session.run(cancelled=lambda: False)
     with pytest.raises(ValueError, match="active media motion"):
         session.submit_motion("right")
+
+
+@pytest.mark.parametrize("current", [False, None, 1, "true"])
+def test_session_revalidates_evidence_before_each_gesture_without_authentication(monkeypatch, current):
+    grant = PtzGrant(ENROLLMENT.access_id, int(ENROLLMENT.device_id), frozenset({"right"}))
+    valid = Mock(return_value=True)
+    session = module.SharedReadSession(ENROLLMENT.camera_id, ENROLLMENT.device_id,
+                                      motion_grants=(grant,), motion_valid=valid)
+    session._active_entry = ENROLLMENT
+    submit = Mock(return_value=MotionTicket(1, 0))
+    cancel = Mock(return_value=True)
+    monkeypatch.setattr(session._lifecycle, "submit_motion", submit)
+    monkeypatch.setattr(session._lifecycle, "cancel_motion", cancel)
+    assert session.submit_motion("right") == MotionTicket(1, 0)
+    valid.return_value = current
+    with pytest.raises(ValueError, match="no longer current"):
+        session.submit_motion("right")
+    assert submit.call_count == 1 and valid.call_count == 2
+    # Revocation denies new START, never the STOP of an already-owned gesture.
+    assert session.cancel_motion(MotionTicket(1, 0))
+    cancel.assert_called_once_with(MotionTicket(1, 0))
+    assert valid.call_count == 2
+
+
+def test_motion_revalidation_cannot_replace_explicit_scope():
+    with pytest.raises(ValueError, match="explicit grant"):
+        module.SharedReadSession(ENROLLMENT.camera_id, ENROLLMENT.device_id,
+                                 motion_valid=lambda: True)
