@@ -284,3 +284,25 @@ Revision `115b5d0` subsequently passed CI (5263 passed,3 skipped and Node
 contracts) and the image workflow, and was deployed to the WSL app container.
 Production remains on its existing RTSP sources; the experimental native defaults
 were not enabled. Three recording files grew across a15s post-deploy window.
+
+## Native archive directory maintenance — 2026-10-28
+
+The native A/V consumer now owns its directory horizon independently of the RTSP
+recorder's camera map. A driver-neutral `ArchiveDirectories` helper prepares the
+current UTC hour plus24 hours before constructing each decoder and refreshes this
+horizon every30 seconds in the existing consumer loop. No new thread, encoder,
+capture connection, recursive footage scan or deletion is introduced. Construction
+alone has no filesystem effects; video-only sources do not run the helper.
+
+Refresh uses the same UTC strftime parent template as the archive writer. Fixed
+parents are deduplicated. Failed preparation never advances the refresh deadline.
+Initial failure prevents child construction; a later failure cancels the account
+and retires the existing decoder through its normal confirmed-close path. Failure
+diagnostics retain only the exception type/site, not filesystem messages.
+
+77 focused regressions passed under256MiB/no swap/50% CPU, peak143.3MiB, covering
+midnight/year rollover, refresh throttling, forced epoch preparation, filesystem
+failure cleanup and real local HEVC/AAC archive epochs. Mypy356 files passed under
+256MiB (104.1MiB peak). These are synthetic/file-only tests: no real camera action,
+production native activation or continuous24/7 acceptance is implied. Account
+cleanup/reconnect and physical shared-control coexistence remain pending.

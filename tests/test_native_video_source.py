@@ -192,6 +192,40 @@ def test_native_archive_cannot_be_requested_without_validated_audio(tmp_path):
         module.NativeVideoSource("test", "123", archive=tmp_path / "archive.mp4")
 
 
+@pytest.mark.parametrize("fail_initial", [True, False])
+def test_archive_directory_failure_stops_account_and_retires_decoder(setup, tmp_path, monkeypatch, fail_initial):
+    _, _, _, _, calls = setup
+    decoders = []
+    preparations = []
+
+    class Decoder:
+        pending_bytes = 0
+        closed = False
+        def __init__(self, **kwargs):
+            assert preparations == [True]  # directory readiness precedes child construction
+            decoders.append(self)
+        def offer(self, *args, **kwargs): return True
+        def step(self): pass
+        def close(self): self.closed = True
+
+    monkeypatch.setattr(module, "NativeAvDecoder", Decoder)
+    source = module.NativeVideoSource("test", "123", native_audio=True,
+                                      archive=tmp_path / "%Y%m%d_%H%M%S.mp4")
+    def prepare(*, force=False):
+        preparations.append(force)
+        if fail_initial or not force:
+            raise PermissionError("private filesystem detail")
+    monkeypatch.setattr(source._archive_dirs, "prepare", prepare)
+    result = source.run(cancelled=lambda: False)
+    assert result.reason == "consumer_failed" and result.failure_type == "PermissionError"
+    assert calls == ["account", "account_closed"]
+    assert preparations == ([True] if fail_initial else [True, False])
+    assert len(decoders) == (0 if fail_initial else 1)
+    assert all(decoder.closed for decoder in decoders)
+    assert not source._thread.is_alive()
+    assert "private filesystem" not in repr(result) + repr(source.diagnostics())
+
+
 def test_constant_archive_filename_is_rejected_before_session_construction(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "SharedReadSession", lambda *a, **k: pytest.fail("session constructed"))
     with pytest.raises(ValueError, match="timestamped UTC archive"):

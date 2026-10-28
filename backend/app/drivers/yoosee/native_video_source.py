@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.fragmented_mp4 import FragmentedMp4
 from ...media.hevc_decoder import HevcDecoder
@@ -59,6 +60,7 @@ class NativeVideoSource:
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
+        self._archive_dirs = ArchiveDirectories(archive) if archive is not None else None
         self._stop = threading.Event()
         self._failed = threading.Event()
         self._cleanup_failed = threading.Event()
@@ -109,6 +111,8 @@ class NativeVideoSource:
         if isinstance(self._delivery, NativeAvDelivery):
             if not supported_audio(frame.encoding):
                 raise ValueError("native AAC format not validated")
+            if self._archive_dirs is not None:
+                self._archive_dirs.prepare(force=True)
             archive = epoch_template(self._archive) if self._archive is not None else None
             decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive)
         else:
@@ -124,6 +128,8 @@ class NativeVideoSource:
         consumer = VideoConsumer(self._delivery, factory=self._decoder)
         try:
             while not self._stop.is_set():
+                if self._archive_dirs is not None and consumer.decoder is not None:
+                    self._archive_dirs.prepare()
                 consumer.step()
                 if consumer.closed or self._stop.is_set():
                     break

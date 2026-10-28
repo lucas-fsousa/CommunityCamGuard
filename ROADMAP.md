@@ -4,12 +4,21 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 native archive directory maintenance: the native archive consumer now
+prepares its UTC parent paths before each decoder and refreshes a24-hour horizon
+every30s, without another thread/process/camera connection or footage scan.
+The helper is driver-neutral and does nothing on construction. Preparation failure
+stops the source and retires its decoder instead of reporting healthy recording.
+77 focused tests passed under256MiB/no swap/50% CPU (143.3MiB peak), including
+year/day rollover and failure cleanup; Mypy356 files passed. This closes the
+directory-preparation implementation gap, not account reconnect or24/7 acceptance.
+
 2026-10-28 native archive recovery: replace blanket epoch-restart rejection with
 unique per-decoder filenames, keeping UTC folders and legacy indexing compatible.
 The old child must confirm exit before replacement; uncertain cleanup still blocks.
 The101-test bounded group passed, including real HEVC/AAC files from two epochs in
 the same second (both retained). No new camera connection or native startup grant.
-Account cleanup/reconnect, long-term native directory maintenance and physical
+Account cleanup/reconnect, long-term native recording acceptance and physical
 shared-control coexistence are not completed by this change.
 
 2026-10-28 WSL continuation: disable unnecessary WebSocket deflate in the bundled
