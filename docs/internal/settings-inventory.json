@@ -19,7 +19,7 @@
         "dashboard_secret_key", "session_signing_key", "dashboard_public_origin",
         "dashboard_allow_local_origin", "host", "port",
         "autostart_services", "control_session_warmup", "manage_go2rtc", "db_path", "recordings_dir",
-        "frontend_dir", "discovery_scan_subnets", "live_hwaccel",
+        "frontend_dir", "discovery_scan_subnets", "live_hwaccel", "live_ffmpeg_threads",
         "broker_read_diagnostic_enabled", "broker_read_diagnostic_camera_id",
         "broker_read_diagnostic_heartbeat",
         "broker_read_diagnostic_worker",
