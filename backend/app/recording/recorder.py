@@ -38,6 +38,7 @@ from ..camera_identity import valid_camera_id
 from ..config import get_settings
 from ..db import connect, registry, source_policy
 from ..media import go2rtc
+from ..media.archive_names import started_at as archive_started_at
 from ..media.owned_bindings import OwnedIngressBindings
 from ..services.thread_shutdown import join_thread, require_retired
 from .ingress_gate import RecordingIngressGate
@@ -482,7 +483,7 @@ class Recorder:
                     # the index as well so downstream consumers never reinterpret the value as
                     # local time.  Legacy index rows remain untouched; historical filenames may
                     # have been produced before the UTC invariant and cannot be safely guessed.
-                    started = datetime.strptime(path.stem, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
+                    started = archive_started_at(path)
                 except ValueError:
                     continue
                 rows.append((mac, camera_id, str(path), started.isoformat(timespec="seconds"),

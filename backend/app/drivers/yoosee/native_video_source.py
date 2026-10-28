@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.fragmented_mp4 import FragmentedMp4
 from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
@@ -46,6 +47,8 @@ class NativeVideoSource:
             raise ValueError("motion revalidation requires an explicit grant")
         if archive is not None and not native_audio:
             raise ValueError("native archive requires validated A/V ingress")
+        if archive is not None and archive.name != ARCHIVE_TEMPLATE:
+            raise ValueError("timestamped UTC archive template required")
         if native_audio and delivery is not None:
             raise ValueError("native A/V owns its delivery")
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
@@ -56,7 +59,6 @@ class NativeVideoSource:
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
-        self._archive_started = False
         self._stop = threading.Event()
         self._failed = threading.Event()
         self._cleanup_failed = threading.Event()
@@ -100,9 +102,6 @@ class NativeVideoSource:
     def _decoder(self, frame: VideoFrame) -> HevcDecoder | NativeAvDecoder:
         if self._stop.is_set():
             raise StreamClosedError("native video stopping")
-        if self._archive is not None and self._archive_started:
-            # Experimental archive has no collision-safe epoch/recovery coordinator yet.
-            raise ValueError("native archive requires explicit epoch retirement")
         self._retire_hub()
         output = FragmentedMp4()
         self.frame_rate = frame.encoding.video_frame_rate
@@ -110,8 +109,8 @@ class NativeVideoSource:
         if isinstance(self._delivery, NativeAvDelivery):
             if not supported_audio(frame.encoding):
                 raise ValueError("native AAC format not validated")
-            decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=self._archive)
-            self._archive_started = self._archive is not None
+            archive = epoch_template(self._archive) if self._archive is not None else None
+            decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive)
         else:
             decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
         self._output = output

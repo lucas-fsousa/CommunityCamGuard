@@ -16,6 +16,10 @@ timezone. The default segment length is 300 seconds. Downloads return the origin
 file, named with the friendly camera name followed by the original UTC-based
 filename. Original resolution is not reduced for browser playback.
 
+Experimental native A/V archives may append `_e<unique epoch ID>` to that UTC
+basename. This keeps decoder restarts from targeting the previous epoch's file;
+the recording browser indexes both names without changing existing archives.
+
 ## How the dashboard plays an archive
 
 1. Select a recording in **Recordings**. Repeated selection of the same ready item

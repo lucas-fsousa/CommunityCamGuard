@@ -36,9 +36,10 @@ explicitly advertise AAC support. `delay_moov` is necessary for copied ADTS: wri
 the init before the bitstream filter sees its first frame omitted AudioSpecificConfig.
 Video-only muxer timing/flags retain the previous tested behavior.
 
-The archive currently rejects decoder epoch replacement instead of risking
-same-second filename overwrite. Collision-safe archive restart, control coexistence
-and source recovery remain required before continuous deployment.
+The initial trial rejected decoder epoch replacement instead of risking same-second
+filename overwrite. Decoder-epoch naming is now isolated as described below; full
+account/source recovery and control coexistence remain required before continuous
+deployment.
 
 ## Evidence and limits
 
@@ -245,3 +246,36 @@ This WSL development change was not deployed there, and no media/camera action o
 restart was performed. The next real camera3 trial must explicitly release that
 camera's capture on Termux before WSL connects; the earlier workstation-only
 shared-hub trial is not a safe phone handover mechanism.
+
+## Decoder-epoch archive recovery — 2026-10-28
+
+The native A/V source now gives every decoder epoch a UUID-derived filename suffix:
+`%Y%m%d_%H%M%S_e<32 lowercase hex digits>.mp4`. Existing UTC day/hour folders are
+unchanged. Distinct decoder instances, including replacements started in the same
+wall-clock second, no longer target the same archive filename. Constant filenames
+are rejected before constructing the session. This isolates decoder restarts; it
+does not claim protection against clock rollback within one ongoing decoder epoch.
+
+`VideoConsumer` still retains the old decoder reference until close succeeds. Only
+after confirmed retirement may the next decoder be constructed. Unknown shutdown
+continues to fail closed, not create an overlapping process. The former blanket
+`_archive_started` rejection is removed; no new camera socket or separate recording
+process is introduced. Original HEVC/AAC codecs and the video-only default remain
+unchanged.
+
+The camera-independent archive-name helper accepts both legacy UTC filenames and
+the exact epoch suffix. Indexing preserves separate paths for multiple files with
+the same UTC start second. Unknown suffixes/invalid dates are not guessed. No
+database migration, old-file rename, deletion or mass conversion is performed;
+download delivery still prefixes the friendly camera name to the original basename.
+
+The100-test focused regression group passed under256MiB/swap0/CPU50%, observed
+199.9MiB peak, including a real bounded local FFmpeg roundtrip: two same-second
+epochs retained both original HEVC/AAC files, the first file's bytes unchanged.
+The replacement test also verifies no second decoder starts after failed close.
+These are file-only/synthetic tests, not a fresh physical camera acceptance.
+
+The server has returned to WSL. Native startup remains disabled by default. The
+earlier unconfirmed account cleanup, coordinated source restoration, long-term
+native directory maintenance and shared control coexistence remain separate work;
+this change must not be reported as completing all native recovery.

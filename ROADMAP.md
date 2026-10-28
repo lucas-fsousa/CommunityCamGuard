@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 native archive recovery: replace blanket epoch-restart rejection with
+unique per-decoder filenames, keeping UTC folders and legacy indexing compatible.
+The old child must confirm exit before replacement; uncertain cleanup still blocks.
+The100-test bounded group passed, including real HEVC/AAC files from two epochs in
+the same second (both retained). No new camera connection or native startup grant.
+Account cleanup/reconnect, long-term native directory maintenance and physical
+shared-control coexistence are not completed by this change.
+
 2026-10-28 WSL continuation: disable unnecessary WebSocket deflate in the bundled
 launcher and both primary/temporary upstream media relays, without changing image
 quality, authentication, origin checks or revocation. A real loopback handshake and

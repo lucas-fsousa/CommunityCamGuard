@@ -135,6 +135,22 @@ def test_index_records_finalized_segments():
     assert res["items"][0]["hour"] == 12
 
 
+def test_index_keeps_two_native_epochs_from_same_second_and_legacy_segment():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")
+    recorder.init_db()
+    rec = Recorder(segment_seconds=60)
+    segment = _make_segment(rec, camera.camera_id)
+    for token in ("a" * 32, "b" * 32):
+        segment.with_name(segment.stem + "_e" + token + ".mp4").write_bytes(b"epoch")
+    assert rec._index(list_all=True) == 3
+    result = recorder.query_segments(camera_id=camera.camera_id)
+    assert result["total"] == 3
+    assert {item["started_at"] for item in result["items"]} == {"2026-08-01T12:00:00+00:00"}
+    assert len({item["path"] for item in result["items"]}) == 3
+    assert rec._index(list_all=True) == 0
+
+
 def test_index_records_opaque_archive_owner_and_compatibility_mac():
     registry.init_db()
     camera = registry.upsert_camera("aa:bb:cc:dd:ee:01")

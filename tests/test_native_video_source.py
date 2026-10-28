@@ -8,6 +8,7 @@ import pytest
 from backend.app.drivers.yoosee import native_video_source as module
 from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_header
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
+from backend.app.drivers.yoosee.p2p.video_consumer import VideoConsumer
 from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
 from backend.app.media.mp4_fanout import StreamClosedError
 from backend.app.media.source_registry import SourceRegistry, SourceUnavailable
@@ -144,20 +145,44 @@ def test_stop_before_run_creates_no_thread_account_or_decoder(setup):
     assert not calls and not decoders and source._thread is None
 
 
-def test_native_av_owns_one_delivery_and_refuses_archive_epoch_replacement(tmp_path, monkeypatch):
+@pytest.mark.parametrize("failed_close", [False, True])
+def test_native_archive_epochs_replace_only_after_confirmed_close(tmp_path, monkeypatch, failed_close):
     calls = []
+    decoders = []
     class Decoder:
-        def __init__(self, **kwargs): calls.append(kwargs)
+        pending_bytes = 0
+        closed = False
+        close_error = False
+        def __init__(self, **kwargs):
+            assert not decoders or decoders[-1].closed
+            calls.append(kwargs)
+            decoders.append(self)
+        def offer(self, *args, **kwargs): return True
+        def step(self): pass
+        def close(self):
+            if self.close_error:
+                raise RuntimeError("shutdown unconfirmed")
+            self.closed = True
     monkeypatch.setattr(module, "NativeAvDecoder", Decoder)
     source = module.NativeVideoSource("test", "123", native_audio=True, archive=tmp_path / "%Y%m%d_%H%M%S.mp4")
+    consumer = VideoConsumer(source._delivery, factory=source._decoder)
     source._delivery.consume(V1Record(encoding=unpack_v1_encoding_header(header()),
-                                    video=idr(), video_timestamp=1_000_000))
-    frame = source._delivery.take()
-    source._decoder(frame)
-    assert len(calls) == 1 and calls[0]["origin_us"] == 1_000_000
-    with pytest.raises(ValueError, match="epoch retirement"):
-        source._decoder(frame)
-    assert len(calls) == 1
+                                    video=idr(), video_timestamp=10_000_000))
+    consumer.step()
+    decoders[0].close_error = failed_close
+    source._delivery.consume(V1Record(video=idr(), video_timestamp=1_000_000))
+    if failed_close:
+        with pytest.raises(RuntimeError, match="shutdown unconfirmed"):
+            consumer.step()
+        assert len(calls) == 1
+        decoders[0].close_error = False
+    else:
+        consumer.step()
+        assert len(calls) == 2 and decoders[0].closed
+        assert calls[0]["origin_us"] == 10_000_000 and calls[1]["origin_us"] == 1_000_000
+        assert calls[0]["archive"] != calls[1]["archive"]
+        assert all(call["archive"].parent == tmp_path for call in calls)
+    consumer.close()
     source.stop()
     assert source._delivery.closed
 
@@ -165,6 +190,12 @@ def test_native_av_owns_one_delivery_and_refuses_archive_epoch_replacement(tmp_p
 def test_native_archive_cannot_be_requested_without_validated_audio(tmp_path):
     with pytest.raises(ValueError, match="A/V ingress"):
         module.NativeVideoSource("test", "123", archive=tmp_path / "archive.mp4")
+
+
+def test_constant_archive_filename_is_rejected_before_session_construction(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "SharedReadSession", lambda *a, **k: pytest.fail("session constructed"))
+    with pytest.raises(ValueError, match="timestamped UTC archive"):
+        module.NativeVideoSource("test", "123", native_audio=True, archive=tmp_path / "archive.mp4")
 
 
 def test_account_exception_still_retires_consumer(setup, monkeypatch):
