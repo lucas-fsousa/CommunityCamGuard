@@ -94,6 +94,7 @@ def test_mse_delivers_then_revocation_closes_socket_and_upstream(env, suffix):
     assert connections[0][0].endswith("src=" + cam.camera_id + "_" + suffix)
     assert connections[0][1]["max_size"] == 4 * 1024 * 1024
     assert connections[0][1]["max_queue"] == 4
+    assert connections[0][1]["compression"] is None
 
 
 def test_registered_source_still_requires_live_permission(env):

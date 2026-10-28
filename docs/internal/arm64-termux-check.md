@@ -27,6 +27,14 @@ CCG app/service/token artifacts, preserving SSH and the rest of Termux/Ubuntu.
 The measurements below remain experimental hardware evidence, not a recommendation
 or claim that three simultaneous HD views are accepted on that phone.
 
+Follow-up implementation on WSL disables `ws_per_message_deflate` in the bundled
+Uvicorn launcher and `compression` in both upstream media relay clients. A real
+loopback handshake using the launch flags declined deflate and delivered identical
+binary bytes. The61-test focused group also retained temporary-key revocation,
+origin/login protections and relay teardown. No picture-quality policy changed.
+This is not an ARM performance acceptance or a measured live CPU improvement; no
+phone restart or new ARM deployment was performed for this change.
+
 ## Stable-server handover — 2026-10-28
 
 ### Live-view load incident

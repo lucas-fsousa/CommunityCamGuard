@@ -4,6 +4,13 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 WSL continuation: disable unnecessary WebSocket deflate in the bundled
+launcher and both primary/temporary upstream media relays, without changing image
+quality, authentication, origin checks or revocation. A real loopback handshake and
+binary roundtrip passed; focused61 tests passed under192MiB/swap0/CPU50%, peak138.4MiB.
+This is a transport optimization, not a claim that all live delay is fixed. Next:
+finish collision-safe native archive epochs and verify CI before deployment.
+
 2026-10-28 owner decision supersedes the phone deployment below: return production
 to Docker on WSL. Rebuilt validated revisiond15bf32 with bounded build steps
 (512MiB, no swap extension,50% CPU); the in-progress archive-epoch changes were

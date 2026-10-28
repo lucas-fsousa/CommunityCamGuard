@@ -228,7 +228,8 @@ async def _proxy_media(websocket: WebSocket) -> None:
     upstream_url = "ws" + api[4:] + "/api/ws?src=" + urllib.parse.quote(src)
     await websocket.accept()
     try:
-        async with websockets.connect(upstream_url, open_timeout=5, max_size=None) as upstream:
+        async with websockets.connect(upstream_url, open_timeout=5, max_size=None,
+                                      compression=None) as upstream:
 
             async def browser_to_go2rtc() -> None:
                 while True:

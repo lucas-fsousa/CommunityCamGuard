@@ -132,6 +132,11 @@ placeholders, never as a claim of hardware support. Unknown support fails closed
 Runs anywhere Docker does — **Linux, macOS and Windows**. The one requirement is that the host can
 reach the cameras on your LAN (discovery and RTSP are direct, on-network):
 
+The bundled server disables WebSocket per-message compression for already-compressed
+media. Primary and temporary media relays also decline upstream compression. This
+does not lower video quality or disable HTTPS/authentication. Custom Uvicorn launchers
+should use `--no-ws-per-message-deflate` together with `--no-proxy-headers`.
+
 - **Linux / macOS** — host networking works out of the box; nothing special to do.
 - **Windows** — run via **Docker Desktop** or **WSL2**. WSL2's default NAT can't reach LAN cameras
   and blocks multicast discovery, so enable **mirrored** networking. Add to `C:\Users\<you>\.wslconfig`:

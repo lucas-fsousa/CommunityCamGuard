@@ -114,8 +114,15 @@ def test_success_cannot_reset_budget_and_app_instances_are_isolated(clock):
 
 
 def test_bundled_launcher_disables_proxy_identity_rewriting():
+    import ast
     source = (Path(__file__).parents[1] / "backend/app/main.py").read_text()
-    assert "uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False, log_config=access_log_config())" in source
+    calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+             and node.func.value.id == "uvicorn" and node.func.attr == "run"]
+    assert len(calls) == 1
+    flags = {item.arg: item.value for item in calls[0].keywords}
+    assert ast.literal_eval(flags["proxy_headers"]) is False
+    assert ast.literal_eval(flags["ws_per_message_deflate"]) is False
 
 
 def test_login_throttle_feedback_is_localized():

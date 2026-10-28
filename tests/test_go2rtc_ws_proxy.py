@@ -70,9 +70,11 @@ def test_ws_proxy_cancels_and_awaits_upstream_reader_on_browser_disconnect(monke
     camera = registry.upsert_camera("aa:bb:cc:dd:ee:03")
     upstream = _Upstream()
     urls: list[str] = []
+    options: list[dict] = []
 
     def connect(url, **_kwargs):
         urls.append(url)
+        options.append(_kwargs)
         return upstream
 
     monkeypatch.setattr(media_routes.websockets, "connect", connect)
@@ -88,3 +90,4 @@ def test_ws_proxy_cancels_and_awaits_upstream_reader_on_browser_disconnect(monke
     assert urls and urls[0].endswith("/api/ws?src=" + camera.camera_id + "_hd")
     assert upstream.sent == ['{"type":"webrtc/offer","value":"test"}']
     assert upstream.reader_cancelled.wait(timeout=1)
+    assert options[0]["compression"] is None

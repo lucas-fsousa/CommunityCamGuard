@@ -52,7 +52,8 @@ async def _bridge(socket: WebSocket, src: str) -> None:
         request = mse_request(first.get("text"))
         api = get_settings().go2rtc_api.rstrip("/")
         url = "ws" + api[4:] + "/api/ws?src=" + quote(src, safe="")
-        async with websockets.connect(url, open_timeout=5, max_size=4 * 1024 * 1024, max_queue=4) as upstream:
+        async with websockets.connect(url, open_timeout=5, max_size=4 * 1024 * 1024,
+                                      max_queue=4, compression=None) as upstream:
             await upstream.send(request)
 
             async def reject_more_requests():

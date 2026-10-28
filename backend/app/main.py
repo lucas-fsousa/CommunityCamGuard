@@ -223,4 +223,7 @@ if __name__ == "__main__":
     s = get_settings()
     # Binds to settings.host (0.0.0.0 by default); dashboard authentication remains mandatory.
     # Keep request.client tied to the transport peer (not attacker-supplied headers).
-    uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False, log_config=access_log_config())
+    # Media payloads are already codec-compressed. Per-message deflate wastes CPU
+    # on the NVR and adds no useful video-quality or transport-security benefit.
+    uvicorn.run(app, host=s.host, port=s.port, proxy_headers=False,
+                ws_per_message_deflate=False, log_config=access_log_config())
