@@ -194,11 +194,13 @@ def build_config(cameras: list[Camera] | None = None, *,
             # normal demuxer buffer. This is still a loopback RTSP hop; the few seconds of MSE
             # startup buffer dominate latency and reliability matters more than shaving packets.
             "rtsp": (
+                f"-threads {s.live_ffmpeg_threads} -filter_threads {s.live_ffmpeg_threads} "
+                f"-filter_complex_threads {s.live_ffmpeg_threads} "
                 "-timeout {timeout} -user_agent go2rtc/ffmpeg "
                 "-rtsp_flags prefer_tcp -i {input}"
             ),
-            "h264": quality.h264_encoder_template(s.live_fps),
-            "h264_sd": quality.h264_encoder_template(s.live_fps, width=640),
+            "h264": quality.h264_encoder_template(s.live_fps, threads=s.live_ffmpeg_threads),
+            "h264_sd": quality.h264_encoder_template(s.live_fps, width=640, threads=s.live_ffmpeg_threads),
             # ffmpeg sources are redirected to go2rtc's exec producer. Keep its startup window
             # above the measured first-IDR delay; the fragment is consumed by exec, not FFmpeg.
             "output": (

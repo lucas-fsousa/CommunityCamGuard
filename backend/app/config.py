@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Never cut recording chunks shorter than this (tiny chunks are wasteful and fragile).
@@ -151,6 +151,9 @@ class Settings(BaseSettings):
     # because the limit is the *host*, not the design: give the box more cores and raising this
     # is the single change that improves the grid.
     grid_hd_max_cameras: int = 0
+    # Bound decoder/filter/encoder thread fan-out separately from image quality.
+    # PRoot tracing makes FFmpeg's CPU-count-based defaults especially expensive.
+    live_ffmpeg_threads: int = Field(default=2, ge=1, le=16)
 
     # Playback transcode cache (HEVC -> H.264 for the browser). Size cap in MB for the LRU
     # cache under data/playback_cache/; 0 disables eviction (unbounded). Never touches the

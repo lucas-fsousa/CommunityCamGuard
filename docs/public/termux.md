@@ -71,6 +71,16 @@ experiment. Choose recording retention/storage limits that fit the phone; footag
 can quickly exhaust internal storage. Do not publish `.env` or database backups.
 Changing the primary key later affects decryption of stored camera credentials.
 
+For PRoot, start with `LIVE_FFMPEG_THREADS=1`. This bounds the input decoder,
+filter graphs and software H.264 encoder independently; it does not lower resolution
+or bitrate. The generic default is2 threads per stage. Unbounded FFmpeg defaults
+created60–68 threads per live HD encoder on the tested phone, alongside three
+recorders, and the HD players repeatedly reconnected. A thread budget is not a
+promise that this phone can encode three HD views in real time: use the existing
+per-camera SD/Auto controls or a single HD view when needed. The dashboard's normal
+per-camera default remains explicit HD; the grid Auto budget does not override a
+user's explicit HD selection.
+
 If a dependency lacks an ARM64 wheel, stop and review it instead of starting a large
 native compilation on the phone. Do not disable authentication to bypass setup errors.
 

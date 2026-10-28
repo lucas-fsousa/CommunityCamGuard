@@ -1,5 +1,8 @@
 """Unit tests for the live-view quality policy (backend/app/media/quality.py)."""
 import re
+import shlex
+import shutil
+import subprocess
 
 import pytest
 
@@ -65,6 +68,30 @@ def test_h264_template_owns_frame_pacing_and_gop():
     assert "-fps_mode passthrough" in template
     # never zero, even at 1 fps
     assert "-g:v 2" in quality.h264_encoder_template(1)
+
+
+@pytest.mark.parametrize("threads", [1, 2, 8, 16])
+def test_live_encoder_thread_budget_does_not_lower_resolution_or_quality(threads):
+    template = quality.h264_encoder_template(10, threads=threads)
+    assert f"-threads:v {threads}" in template
+    assert "scale=" not in template and "fps=10" in template
+    assert "-preset:v superfast" in template
+
+
+@pytest.mark.parametrize("threads", [0, -1, 17, True, 1.5, "2", None])
+def test_invalid_thread_budget_cannot_render_an_unbounded_encoder(threads):
+    with pytest.raises(ValueError, match="bounded"):
+        quality.h264_encoder_template(10, threads=threads)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="local FFmpeg required")
+def test_bounded_software_template_keeps_real_frames_and_resolution():
+    command = ["ffmpeg", "-v", "error", "-nostdin", "-filter_threads", "1",
+               "-filter_complex_threads", "1", "-threads", "1", "-f", "lavfi",
+               "-i", "testsrc=size=64x64:rate=10", "-t", "0.3",
+               *shlex.split(quality.h264_encoder_template(10, threads=1)),
+               "-f", "null", "-"]
+    subprocess.run(command, capture_output=True, timeout=10, check=True)
 
 
 def test_sd_h264_template_combines_pacing_and_scaling_in_one_filter_graph():

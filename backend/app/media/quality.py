@@ -77,7 +77,7 @@ def target_kbps(level: str | None, *, hd: bool) -> int:
     return table[normalize_level(level)]
 
 
-def h264_encoder_template(fps: int, *, width: int | None = None) -> str:
+def h264_encoder_template(fps: int, *, width: int | None = None, threads: int = 2) -> str:
     """Return the software H.264 template installed over go2rtc's built-in preset.
 
     go2rtc expands ``#raw`` *before* its codec template.  Putting ``-g`` in ``#raw`` therefore
@@ -91,6 +91,8 @@ def h264_encoder_template(fps: int, *, width: int | None = None) -> str:
     liveness counter moving while the dashboard was visibly frozen.  The filter only advances
     when decoded input frames reach it, allowing the existing watchdog to observe a dead producer.
     """
+    if type(threads) is not int or not 1 <= threads <= 16:
+        raise ValueError("bounded live encoder threads required")
     rate = max(1, min(int(fps), 60))
     gop = max(1, round(rate * GOP_SECONDS))
     filters = f"fps={rate}"
@@ -106,7 +108,7 @@ def h264_encoder_template(fps: int, *, width: int | None = None) -> str:
         f"-c:v libx264 -vf {filters} -g:v {gop} -keyint_min:v {gop} "
         "-sc_threshold:v 0 -bf:v 0 -profile:v high -level:v 4.1 "
         "-preset:v superfast -tune:v zerolatency -pix_fmt:v yuv420p "
-        "-fps_mode passthrough"
+        f"-fps_mode passthrough -threads:v {threads}"
     )
 
 

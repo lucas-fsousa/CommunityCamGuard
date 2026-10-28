@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 live-load incident takes priority over native research: owner observed
+repeated phone dashboard reconnects on LAN and HTTPS. Snapshot: three recorders plus
+three HD encoders; live encoders had60–68 threads each and113–128% per-core CPU
+samples. No proven orphan accumulation. Add bounded per-stage FFmpeg threads without
+silently downgrading quality, validate and then measure the phone. Three simultaneous
+software HD views remain unaccepted on this device; SD/Auto is an explicit user
+choice. The separate archive-epoch recovery work is paused/unreleased for this fix.
+
 2026-10-28 deployment decision: keep the validated functional server on the tested
 ARM64 Termux/Ubuntu host; use WSL for development. Publish validated committed source
 bundles, not Docker images, to this non-Docker runtime. Keep secrets/data separate
