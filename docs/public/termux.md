@@ -4,6 +4,13 @@ This path runs the Python server and Linux ARM64 go2rtc inside Ubuntu/PRoot on
 Android. It does **not** require Docker, and does not certify Docker Compose on
 native Linux ARM64.
 
+Deployment status (2026-10-28): this phone experiment was discontinued and the
+active installation returned to Docker on WSL. Three simultaneous software-encoded
+HD views were not accepted on the tested phone, even with bounded thread counts.
+The installation recipe below is retained for experimentation, not as a recommended
+always-on deployment. CCG phone services were stopped/disabled; removal of their
+files remains pending because the phone SSH service became unavailable.
+
 ## What actually passed
 
 On a Redmi Note8 (Android11, aarch64, about3.55GiB RAM), Ubuntu26.04.1/PRoot ran

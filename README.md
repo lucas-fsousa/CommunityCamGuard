@@ -24,8 +24,10 @@ cameras and delivered three 640×360 views, or one 1080p view. Three simultaneou
 remains pending; see the [hardware checkpoint](docs/internal/arm64-termux-check.md).
 For the tested non-Docker approach, see the [experimental Termux installation guide](docs/public/termux.md),
 including performance limits and Android background-process caveats.
-That guide also covers [stable releases and a dedicated HTTPS tunnel on Termux](docs/public/termux.md#stable-phone-development-workstation),
-keeping WSL development separate without requiring Docker on Android.
+The phone deployment was discontinued on2026-10-28 because the tested device did
+not meet the three-HD-view workload; the active installation returned to Docker
+on WSL. The guide retains the experimental release/tunnel recipe for reference,
+not a recommendation to host continuous monitoring on that phone.
 
 | | |
 |---|---|

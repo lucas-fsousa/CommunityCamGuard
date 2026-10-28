@@ -7,7 +7,7 @@ This section overrides the priorities and pending labels in the chronological hi
 2026-10-28 native archive recovery: replace blanket epoch-restart rejection with
 unique per-decoder filenames, keeping UTC folders and legacy indexing compatible.
 The old child must confirm exit before replacement; uncertain cleanup still blocks.
-The100-test bounded group passed, including real HEVC/AAC files from two epochs in
+The101-test bounded group passed, including real HEVC/AAC files from two epochs in
 the same second (both retained). No new camera connection or native startup grant.
 Account cleanup/reconnect, long-term native directory maintenance and physical
 shared-control coexistence are not completed by this change.
@@ -18,6 +18,17 @@ quality, authentication, origin checks or revocation. A real loopback handshake 
 binary roundtrip passed; focused61 tests passed under192MiB/swap0/CPU50%, peak138.4MiB.
 This is a transport optimization, not a claim that all live delay is fixed. Next:
 finish collision-safe native archive epochs and verify CI before deployment.
+
+Deployment checkpoint: both fixes are running on WSL at `115b5d0`, build
+`b-51ebebf326ea`. CI passed5263 tests (3 skipped) and all Node contracts; the
+image workflow passed. Bounded local image build used512MiB/no extra swap/50% CPU.
+Only the app container was replaced; the shared media hub/tunnel were not restarted.
+Local primary authentication, unauthenticated rejection, HTTPS health/build and a
+real authenticated WebSocket offering deflate passed (no extension negotiated).
+All three original recording files grew over15s. The first5s observation missed
+one buffered write and is not counted as a successful recording check. No OOM or
+unexpected container restart observed. Next native milestone remains camera3
+shared PTZ/media coexistence and confirmed account cleanup, not default rollout.
 
 2026-10-28 owner decision supersedes the phone deployment below: return production
 to Docker on WSL. Rebuilt validated revisiond15bf32 with bounded build steps

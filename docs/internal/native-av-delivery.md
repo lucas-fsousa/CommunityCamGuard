@@ -269,8 +269,8 @@ the same UTC start second. Unknown suffixes/invalid dates are not guessed. No
 database migration, old-file rename, deletion or mass conversion is performed;
 download delivery still prefixes the friendly camera name to the original basename.
 
-The100-test focused regression group passed under256MiB/swap0/CPU50%, observed
-199.9MiB peak, including a real bounded local FFmpeg roundtrip: two same-second
+The101-test focused regression group passed under256MiB/swap0/CPU50%, observed
+133.7MiB peak in the final run, including a real bounded local FFmpeg roundtrip: two same-second
 epochs retained both original HEVC/AAC files, the first file's bytes unchanged.
 The replacement test also verifies no second decoder starts after failed close.
 These are file-only/synthetic tests, not a fresh physical camera acceptance.
@@ -279,3 +279,8 @@ The server has returned to WSL. Native startup remains disabled by default. The
 earlier unconfirmed account cleanup, coordinated source restoration, long-term
 native directory maintenance and shared control coexistence remain separate work;
 this change must not be reported as completing all native recovery.
+
+Revision `115b5d0` subsequently passed CI (5263 passed,3 skipped and Node
+contracts) and the image workflow, and was deployed to the WSL app container.
+Production remains on its existing RTSP sources; the experimental native defaults
+were not enabled. Three recording files grew across a15s post-deploy window.
