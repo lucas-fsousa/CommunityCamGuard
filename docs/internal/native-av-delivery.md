@@ -313,3 +313,10 @@ and binary-roundtrip test exercises flags extracted from both launchers, without
 importing/running the disruptive trial.62 transport/auth regressions passed under
 192MiB/no swap/50% CPU (121.6MiB peak). This does not authorize or execute a new
 hub interruption or camera trial, and does not certify lower native video latency.
+
+Deployment: native directory support (`b860b63`) is now present in the WSL app
+image, build `b-62322e79d306`, after green CI/Image workflows. The launcher/test
+follow-up (`d1c77e3`) also passed CI. Local authentication/rejection, HTTPS,
+deflate-free socket negotiation and all three recording files growing were checked
+after app replacement. The shared hub/tunnel stayed running; native sources stayed
+inactive. No physical camera action was sent and no OOM/unexpected restart observed.

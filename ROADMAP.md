@@ -13,6 +13,14 @@ stops the source and retires its decoder instead of reporting healthy recording.
 year/day rollover and failure cleanup; Mypy356 files passed. This closes the
 directory-preparation implementation gap, not account reconnect or24/7 acceptance.
 
+WSL rollout: runtime `b860b63`, build `b-62322e79d306`, is deployed after green
+CI/Image workflows. The follow-up trial-launcher alignment `d1c77e3` also passed
+CI. Primary login, unauthenticated rejection, HTTPS health/build, deflate-free
+authenticated WebSocket and growth of all three recording files passed after
+replacing only the app container. Native sources remain inactive by default.
+No camera configuration/movement/light/audio command or shared-hub restart was
+performed; no container OOM or unexpected restart observed.
+
 2026-10-28 native archive recovery: replace blanket epoch-restart rejection with
 unique per-decoder filenames, keeping UTC folders and legacy indexing compatible.
 The old child must confirm exit before replacement; uncertain cleanup still blocks.
