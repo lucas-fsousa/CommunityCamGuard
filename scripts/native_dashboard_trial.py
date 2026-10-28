@@ -195,7 +195,8 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
             return JSONResponse({"detail": "view-only native video trial"}, status_code=409)
         return await call_next(request)
     server = uvicorn.Server(uvicorn.Config(app, host=get_settings().host, port=get_settings().port,
-                            proxy_headers=False, timeout_graceful_shutdown=30, log_level="warning"))
+                            proxy_headers=False, ws_per_message_deflate=False,
+                            timeout_graceful_shutdown=30, log_level="warning"))
     @contextmanager
     def operator_signals():
         # Do not re-raise SIGTERM before the outer rollback finally runs.

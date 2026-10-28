@@ -7,15 +7,19 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 import uvicorn
 import websockets
 
 
-def test_bundled_flags_disable_deflate_and_deliver_identical_binary_bytes():
-    tree = ast.parse((Path(__file__).parents[1] / "backend/app/main.py").read_text())
+@pytest.mark.parametrize("launcher,call_name", [
+    ("backend/app/main.py", "run"), ("scripts/native_dashboard_trial.py", "Config"),
+])
+def test_launcher_flags_disable_deflate_and_deliver_identical_binary_bytes(launcher, call_name):
+    tree = ast.parse((Path(__file__).parents[1] / launcher).read_text())
     call = next(node for node in ast.walk(tree) if isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "uvicorn" and node.func.attr == "run")
+                and node.func.value.id == "uvicorn" and node.func.attr == call_name)
     options = {item.arg: ast.literal_eval(item.value) for item in call.keywords
                if item.arg in {"proxy_headers", "ws_per_message_deflate"}}
     assert options == {"proxy_headers": False, "ws_per_message_deflate": False}

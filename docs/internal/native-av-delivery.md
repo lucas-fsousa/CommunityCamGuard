@@ -306,3 +306,10 @@ failure cleanup and real local HEVC/AAC archive epochs. Mypy356 files passed und
 256MiB (104.1MiB peak). These are synthetic/file-only tests: no real camera action,
 production native activation or continuous24/7 acceptance is implied. Account
 cleanup/reconnect and physical shared-control coexistence remain pending.
+
+The operator's `native_dashboard_trial.py` launcher now also disables WebSocket
+per-message deflate, matching the production launcher. The real loopback handshake
+and binary-roundtrip test exercises flags extracted from both launchers, without
+importing/running the disruptive trial.62 transport/auth regressions passed under
+192MiB/no swap/50% CPU (121.6MiB peak). This does not authorize or execute a new
+hub interruption or camera trial, and does not certify lower native video latency.
