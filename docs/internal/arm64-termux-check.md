@@ -1,8 +1,77 @@
 # ARM64 Android/Termux checkpoint
 
+## Deployment ended: owner returned to WSL
+
+On2026-10-28 the owner ended the Termux production experiment and requested a direct
+Docker rebuild on WSL, without further database migration, and removal of the CCG
+installation on the phone. The validatedd15bf32 source snapshot was built with
+512MiB/no extra swap/50% CPU per build step; source-only research changes in the
+working tree were excluded. The rebuilt app and go2rtc run on WSL again, build
+`b-5dd00c822bcd`, using the original database and recordings. Authentication, three
+recorders, media health and public HTTPS were checked.
+
+The old workstation tunnel's current remote route points the public hostname to
+`http://localhost:3200`; the phone-only tunnel now has only a404 fallback rule.
+The temporary extra WSL connector was therefore removed, while the original shared
+workstation tunnel and other applications remained running. No DNS change was needed.
+
+Termux `ccg` and `ccg-cloudflared` services were gracefully stopped and disabled
+before WSL captured the cameras. When attempting the authorized filesystem cleanup,
+SSH at the known phone endpoint refused connections. The delete command did not
+execute; the `/opt/ccg` and old test installation must not be reported removed.
+Previously copied private state and approximately1.1GiB of footage remain in the
+ignored WSL handover workspace, but were not merged into production. This is not a
+complete backup of the final phone segments. Reopen SSH to finish removal of only
+CCG app/service/token artifacts, preserving SSH and the rest of Termux/Ubuntu.
+
+The measurements below remain experimental hardware evidence, not a recommendation
+or claim that three simultaneous HD views are accepted on that phone.
+
 ## Stable-server handover — 2026-10-28
 
 ### Live-view load incident
+
+#### Follow-up: investigation while the owner retained HD
+
+The owner reported that delay improved without selecting SD and requested further
+read-only investigation. No quality, service, governor or clock setting was changed.
+A fresh8.23s process sample found all relevant processes permitted on CPUs0–7 in
+the Android `top-app` cpuset, without per-process swap. CPU/address-space rlimits
+were unlimited; cgroup CPU-quota files were not readable, so quota absence is not
+claimed. The PRoot tracer consumed67.9% of one core, app48.1%, go2rtc24.4% and
+the three live encoders142.1/132.8/117.0% (per-core notation).
+
+Additional limits were observable: policy4's current and allowed maximum clocks
+were1.4016GHz versus a2.016GHz hardware maximum; policy0 was capped at1.4208GHz
+versus1.8048GHz. The same caps remained on recheck. CPU thermal sensors read about
+66–70°C, with `thermal-cpufreq-4` cooling state3/8 and `thermal-cpufreq-0`2/8.
+These are active cooling states, not merely an idle low-frequency reading. See
+[kernel thermal semantics](https://kernel.org/doc/html/v5.7/driver-api/thermal/sysfs-api.html).
+Do not disable thermal safety controls or force higher clocks as a software fix.
+
+An aligned LAN comparison of the existing camera3 base HEVC and HD H264 restreams
+still found approximately32.18s extra delay in the HD path: camera OSD01:10:39 vs
+01:10:06, first video-fragment arrival timestamps1793207439.233537 and
+1793207438.4101353 respectively. Subtracting their0.8234s arrival difference avoids
+confounding keyframe startup waits. OSD resolution gives about±1s precision; the
+camera's timezone offset cancels. This does not isolate decoding, encoding and
+interleaving queues separately. No additional camera connection or encoder was opened.
+
+One further software candidate is WebSocket compression. A handshake with the
+authenticated app negotiated `PerMessageDeflate` without requesting any media.
+The launch code does not override Uvicorn's
+[enabled-by-default setting](https://github.com/encode/uvicorn/blob/master/docs/settings.md).
+The pinned go2rtc upstream does not enable that compression, so this is not a claim
+of two compressed hops. An offline whole-file proxy test on8,747,222bytes of the
+captured HD MP4 produced8,767,144bytes with deflate: no bandwidth saving in that
+sample. It is not a live per-message or ARM CPU benchmark, and does not quantify
+the benefit of disabling it. Test that candidate while preserving HD/authentication,
+then compare thread budgets1/2 under a controlled load; neither change was applied.
+
+The Ubuntu FFmpeg lists compiled VDPAU/CUDA/VAAPI/DRM/OpenCL/Vulkan methods, not
+MediaCodec. No native Termux FFmpeg or DRM render node was observed. Compiled
+method names do not prove working acceleration. Evaluating a native Android worker
+is separate work; no package was installed or hardware capability advertised here.
 
 The owner reported repeated camera reloads on both LAN and HTTPS. A read-only
 process snapshot found six FFmpeg processes, not a growing set of proven orphan

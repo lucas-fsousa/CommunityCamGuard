@@ -4,6 +4,18 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 owner decision supersedes the phone deployment below: return production
+to Docker on WSL. Rebuilt validated revisiond15bf32 with bounded build steps
+(512MiB, no swap extension,50% CPU); the in-progress archive-epoch changes were
+excluded. Original WSL database and126GiB archive retained; phone state was not
+merged after the owner requested a straightforward rebuild. Three recorders and
+HTTPS/primary authentication verified. The existing workstation Cloudflare tunnel
+now routes the hostname directly tolocalhost3200; the extra dedicated connector
+created during preparation was removed because its remote route is now404-only.
+Termux CCG services were stopped/disabled. Owner authorized removing its app and
+recordings, but SSH subsequently refused connections, so filesystem cleanup remains
+pending until SSH is reopened. Do not claim the phone installation deleted.
+
 2026-10-28 live-load incident takes priority over native research: owner observed
 repeated phone dashboard reconnects on LAN and HTTPS. Snapshot: three recorders plus
 three HD encoders; live encoders had60–68 threads each and113–128% per-core CPU
