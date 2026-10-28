@@ -22,6 +22,37 @@ FFmpeg template check (118.1MiB suite peak under192MiB/swap0/CPU50%). This is no
 three-HD phone acceptance. Deployment and real before/after results must be recorded
 separately; the phone has not yet been claimed fixed by these synthetic checks.
 
+The fix was subsequently deployed as source release
+`7435b6586f0898a55347a59f3ac206aaff233415`, build`b-5dd00c822bcd`, with
+`LIVE_FFMPEG_THREADS=1`. CI40728866238 passed5248 tests/2skip, Ruff/Mypy and all
+Node groups. Image40728449110 passed for identical runtime code4b69465; the
+follow-up commit only classified the setting as server-only. The first CI failure
+was that missing classification and was corrected before activation, not ignored.
+
+The staged venv copied the existing validated binary dependencies (unchanged
+pyproject), without reinstalling or modifying the old venv. SHA256 was verified,
+then imports/sys.prefix checked from the candidate release. A graceful app stop
+preceded activation; port3200 and old FFmpeg/go2rtc closure were verified before
+switching. Private database/config snapshots and release4650a29 remain available.
+Only the app/media service restarted; cloudflared and camera configuration stayed
+untouched. A handover recording gap is possible/expected.
+
+With three HD encoders active again, each had11 threads instead of60–68. Their
+PIDs27891/27936/27937 remained unchanged across the subsequent samples. One camera3
+HD consumer shared the existing encoder and received9088858bytes/413binary messages
+over a20s receive window, first binary data0.342s. WebSocket teardown extended the
+probe to31.353s; these are encoded bytes, not human visual acceptance. The local
+probe used44.4MiB under192MiB/swap0/CPU50%. No speaker/light/movement action.
+
+CPU remains high: a later5.27s sample measured121.4/118.0/131.5% per-core CPU
+for the HD encoders, with approximately1.18GiB MemAvailable. This was not a controlled
+comparison and does **not** establish adequate capacity for three HD feeds. LAN
+health returned200 in0.45s in a separate sample. No browser diagnostic events were
+received after restart, so absence of those events does not prove stall-free video.
+The owner was asked to refresh and validate the same three-camera view. SD/Auto or
+a single HD view remains the fallback performance choice; resolution/bitrate and
+the user's explicit HD preferences were not silently lowered.
+
 Follow-up: the owner supplied the dedicated connector token privately. Native
 cloudflared now runs enabled under Termux runit, with four active connections.
 The configured public-hostname origin is `http://127.0.0.1:3200` on the phone.
