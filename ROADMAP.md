@@ -4,6 +4,18 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 deployment decision: keep the validated functional server on the tested
+ARM64 Termux/Ubuntu host; use WSL for development. Publish validated committed source
+bundles, not Docker images, to this non-Docker runtime. Keep secrets/data separate
+from releases and retain rollback. Phone go2rtc/three recorders and HTTPS primary/
+temporary login, revocation, reduced camera3 WebSocket and original-file Range checks
+passed. The current domain still relays through the workstation proxy; a dedicated
+Cloudflare tunnel token/hostname migration is required to remove that dependency.
+Do not reuse the workstation's multi-application tunnel token on the phone.
+See [deployment workflow](docs/public/termux.md#stable-phone-development-workstation)
+and [hardware checkpoint](docs/internal/arm64-termux-check.md). This is not24/7,
+Android boot or three-HD-viewer acceptance. LAN-only/SD/other drivers stay deferred.
+
 2026-10-25 execution update: prioritize usable vertical deliveries, not additional
 infrastructure. [Real camera3 native dashboard trial](docs/internal/native-dashboard-live-trial.md)
 completed900s with the existing player, two other recorders running and restored

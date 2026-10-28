@@ -1,0 +1,10 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Use a dedicated tunnel, never a replica of an unrelated multi-application tunnel.
+set -eu
+umask 077
+exec 2>&1
+token_file="$HOME/.config/ccg/cloudflared.token"
+test -s "$token_file"
+case "$(stat -c %a "$token_file")" in 400|600) ;; *) exit 1 ;; esac
+exec cloudflared tunnel --no-autoupdate --protocol http2 \
+    --metrics 127.0.0.1:3204 run --token-file "$token_file"

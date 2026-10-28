@@ -96,8 +96,117 @@ a performance comparison without budgeting the extra connections. Arrange any ha
 explicitly; stopping the primary NVR creates a recording gap.
 
 Stop with Ctrl+C. Next launch: log into Ubuntu, enter the repository, activate `.venv`,
-and start the same command. This guide intentionally does not install a boot service.
+and start the same command. For supervised operation and separate development/stable
+releases, see the workflow below; neither recipe by itself installs Android boot startup.
 Android may suspend/kill background processes; charging, battery management and heat
 need device-specific validation before relying on unattended monitoring. A wake lock
 alone is not proof of reliability. Keep the server on a trusted LAN; this recipe
 does not establish safe public-internet exposure or HTTPS/Web Bluetooth availability.
+
+## Stable phone, development workstation
+
+Keep the validated server on the phone and development on the workstation. Docker
+images are **not** the deployment artifact for this PRoot installation: publish a
+committed source release, with Linux ARM64 dependencies installed on the phone.
+Never upload a dirty working tree, `.env`, RE files or a complete workspace archive.
+
+Build only a revision whose CI passed:
+
+```sh
+python scripts/package_release.py --revision <validated-commit> --output temp/releases
+```
+
+The resulting source TAR has a JSON manifest containing its full commit and SHA256.
+Verify the digest after transfer. Install each release in its own directory and
+virtual environment; use binary wheels (`pip install --only-binary=:all: -e .`)
+and run `pip check` before activation. Do not compile dependencies on the phone.
+
+Recommended layout inside Ubuntu:
+
+```text
+/opt/ccg/
+  current -> releases/<validated-commit>
+  releases/<validated-commit>/   # backend, frontend, .venv
+  shared/
+    .env                       # private; stable key and absolute paths
+    data/                      # registry, accounts, temporary accesses, settings
+    recordings/                # original-resolution footage
+    bin/go2rtc
+    backups/                   # private SQLite snapshots before upgrades
+```
+
+Each release links `.env`, `data`, `recordings` and `bin` to `shared`. Keep the old
+release and a SQLite online-backup snapshot before switching `current`. Rollback
+requires stopping the service first; if an upgrade migrated the schema, restore a
+compatible database snapshot too. Changing only the symlink is not a general database
+rollback. Never run two releases against the same database or cameras.
+
+### Supervised services and HTTPS
+
+In **Termux itself**, not inside Ubuntu:
+
+```sh
+pkg install termux-services cloudflared
+```
+
+Templates in [deploy/termux](../../deploy/termux) provide `ccg.run`,
+`cloudflared.run` and a size-limited `log.run`/`log.config`. Install them as the
+`run` and `log/run` files of separate `ccg` and `ccg-cloudflared` services under
+`$PREFIX/var/service`. Install `log.config` as `log/logs/config`. Make `run` files
+executable and keep `down` files present until configuration is ready. Restart
+the Termux shell after installing termux-services, or initialize it explicitly:
+
+```sh
+export SVDIR="$PREFIX/var/service"
+service-daemon start
+sv up "$SVDIR/ccg"
+sv status "$SVDIR/ccg"
+sv -w 40 down "$SVDIR/ccg"
+```
+
+Also install `launch.py` as `/opt/ccg/shared/launch.py` inside Ubuntu and
+`stop.control` as executable `ccg/control/t` in the Termux service directory.
+`ccg.run` binds its private `state` directory into the guest. The stop hook validates
+the recorded child's command line before sending TERM to the actual application;
+sending TERM only to the PRoot tracer did not stop Uvicorn in the real deployment.
+
+`sv up` starts a normally-down service for this session. Once accepted, `sv-enable
+ccg` enables automatic supervision on future Termux service starts. Android may
+still suspend or kill Termux; supervision is not a24/7 or boot reliability claim.
+PRoot's kill-on-exit behavior must remain enabled so an exited session cannot leave
+old encoders running. Confirm port/process closure before starting a replacement.
+See the official [Termux services instructions](https://github.com/termux/termux-services).
+
+Use a **dedicated Cloudflare Tunnel** for this phone and point the dashboard hostname
+at `http://127.0.0.1:3200`. Reusing a workstation's multi-application tunnel token
+would create another connector for that same tunnel and can send unrelated hostnames
+to the phone. Keep the dedicated token in
+`$HOME/.config/ccg/cloudflared.token`, mode600, in Termux private storage. The template
+uses `--token-file`, never a command-line token, and binds metrics to loopback.
+See [Cloudflare run parameters](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/).
+Configure the public hostname/tunnel routing in Cloudflare before enabling this
+service; do not expose go2rtc or change authentication to make the tunnel work.
+
+Set `DASHBOARD_PUBLIC_ORIGIN` to the exact HTTPS origin and
+`DASHBOARD_ALLOW_LOCAL_ORIGIN=true` if direct LAN/localhost access is also wanted.
+Verify primary and temporary-key login, cookies, WebSocket delivery and recorded
+video Range requests through HTTPS. The browser's HTTPS endpoint is independent
+of the loopback HTTP connection from cloudflared to the app.
+
+### Handover and subsequent updates
+
+First start with `AUTOSTART_SERVICES=false`: check health, dependency imports,
+authentication and blocked unauthenticated APIs without opening camera captures.
+Import registry/accounts/settings/access keys over private SSH with the original
+encryption/signing keys; do not publish them in the release manifest. Historical
+footage on the workstation does not move with the registry. Keep it there unless a
+separate storage migration is arranged; do not advertise absent recordings on the phone.
+
+Only after this preparation: stop the workstation's app **and** media hub, confirm
+their processes exited, then enable phone media and validate growing recordings,
+one bounded viewer and HTTPS routing. Preserve an immediate workstation rollback
+until those checks pass. During later development, keep media autostart disabled
+on WSL; an intentional camera3 test must first release that camera on the stable
+server rather than create competing captures. Deploy a new commit only after its
+tests pass, then repeat the bounded smoke checks; leave the stable release untouched
+if preparation fails.

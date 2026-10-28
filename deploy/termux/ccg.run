@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Foreground process: runit owns the PRoot session and its descendants.
+set -eu
+umask 077
+exec 2>&1
+mkdir -p ./state
+exec proot-distro login --bind "$PWD/state:/run/ccg" ubuntu -- /bin/sh -c \
+    'cd /opt/ccg/current && exec .venv/bin/python /opt/ccg/shared/launch.py'

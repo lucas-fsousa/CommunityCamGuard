@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# PRoot does not forward TERM to uvicorn reliably. Signal only our actual child.
+set -eu
+pid=$(cat ./state/app.pid)
+case "$pid" in ''|*[!0-9]*) exit 1 ;; esac
+test "$pid" -gt 1
+grep -Fq '/opt/ccg/shared/launch.py' "/proc/$pid/cmdline"
+kill -TERM "$pid"

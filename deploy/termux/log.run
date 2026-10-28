@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Runit starts log/run with the service directory as its working directory.
+set -eu
+umask 077
+mkdir -p ./logs
+exec svlogd -tt ./logs

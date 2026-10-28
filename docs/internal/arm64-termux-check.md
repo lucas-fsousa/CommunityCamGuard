@@ -1,5 +1,65 @@
 # ARM64 Android/Termux checkpoint
 
+## Stable-server handover — 2026-10-28
+
+Owner changed the operating topology: stable server on the phone, development on
+WSL. A separate `/opt/ccg/releases/4650a29ffeacecc60455ca0fcecbf2a628b01996`
+source release uses `/opt/ccg/current` and private `/opt/ccg/shared` state. The
+original `/opt/ccg-arm-test-20261013` installation remains untouched. This source
+revision passed CI5209 tests/1skip and its image workflow; Docker is not used on
+the phone. Python3.14.4 installed binary ARM64 wheels; go2rtc1.9.14 retained its
+previously verified SHA256. The new venv passed `pip check`.
+
+An online SQLite snapshot and effective configuration travelled over authenticated
+SSH without displaying secrets. Registry, encrypted vendor accounts/enrollments,
+temporary access keys and runtime settings were retained. The primary/signing keys
+were retained so encrypted credentials remain usable. A private pre-migration DB
+snapshot is kept on the phone. Historical video remains on WSL; only its rows were
+removed from the **new phone copy**, because those files were not transferred.
+No original DB, video or other project container was deleted.
+
+First acceptance used API-only startup, then stopped `ccg-app` and `ccg-go2rtc`
+on WSL before enabling phone media. Those containers remain stopped. Phone process
+checks found one go2rtc and three recorders; a reduced viewer temporarily adds its
+encoder. There is a handover recording gap; this is not seamless migration.
+
+Measured HTTPS smoke through `ls-ccg.bytec.cloud`:
+
+- Health200; unauthenticated cameras401; `/.env`404; primary login with Secure cookie.
+- New three-minute live-only test access logged in, could not manage accesses403,
+  and lost access immediately on revocation (`/me` unauthenticated, cameras401).
+  The probe's key was revoked in cleanup, not left active.
+- Camera3 reduced MSE:3048656bytes/676binary messages over a30s receive window;
+  first binary data4.796s. Encoded delivery, not visual browser-smoothness acceptance.
+- Camera3 recording indexed and original HTTP Range returned206/256bytes.
+- Local probe capped192MiB/swap0/CPU50%; observed46.4MiB peak. No WSL build,
+  browser, emulator, sound, light or movement command.
+
+Termux runit supervises the app, with bounded rotating logs. TERM to PRoot alone
+did **not** stop the initial API-only app. The deployed `control/t` hook now validates
+the actual app PID/command and sends TERM to Uvicorn; a later media stop completed
+in about1s with no FFmpeg/go2rtc remaining. Preserve PRoot kill-on-exit. The app was
+then restarted/enabled. This does not establish survival of Android suspension or
+automatic startup after device reboot.
+
+Cloudflared2026.10.5 was installed natively in Termux, not as a container. Its own
+service is configured **down** until a dedicated private token is supplied. The
+workstation's existing tunnel also serves unrelated projects and was not replicated.
+For continuity, only the CCG nginx upstream was changed to the phone's LAN endpoint;
+other applications and the shared tunnel were not restarted. Public HTTPS currently
+still depends on that workstation relay. A backup of the original CCG proxy config
+is in the ignored deployment workspace. Final step: create a phone-only tunnel,
+point this hostname to phone loopback3200, verify it, then retire only the old CCG
+hostname route. Do not stop the shared workstation tunnel.
+
+The new [workflow](../public/termux.md#stable-phone-development-workstation) and
+`scripts/package_release.py` distinguish committed source releases from OCI images.
+Uncommitted native media/PTZ factory work in WSL was intentionally excluded from
+the deployed revision. ARM control behavior, continuous load/thermal/background
+acceptance and native Linux Docker remain separate validations.
+
+## Original bounded hardware test — 2026-10-13
+
 2026-10-20 review: the owner requested public installation instructions for this
 non-Docker path. The bounded results below support an experimental guide, not a
 claim of three-HD or24/7 reliability. See [Termux setup](../public/termux.md).
