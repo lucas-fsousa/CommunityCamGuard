@@ -49,7 +49,19 @@ def write(entry: P2PEnrollment, percent: int) -> ControlResult | None:
         raise ControlOperationError('native volume write unconfirmed; command was not repeated')
     if session_for(entry) is not session:
         raise ControlOperationError('native volume owner changed; command was not repeated')
-    current = read(entry, 'speaker_volume')
+    # D3 acknowledges acceptance before this firmware updates the readable model.
+    # Match the existing driver's bounded read-only settling checks. Never send
+    # D2 again merely because the first readback still contains the old value.
+    current = None
+    verify_until = time.monotonic()+5
+    for attempt in range(5):
+        if attempt:
+            time.sleep(0.5)
+        if time.monotonic() >= verify_until or session_for(entry) is not session:
+            break
+        current = read(entry, 'speaker_volume')
+        if current is not None and current.native_previous_value == raw:
+            break
     if current is None or current.native_previous_value != raw:
         log.warning('native volume readback mismatch camera_id=%s', entry.camera_id)
         raise ControlOperationError('camera did not confirm the requested speaker volume')

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.drivers.contracts import ControlNotReady, ControlOperationError
-from backend.app.drivers.yoosee import controls, shared_control_reads
+from backend.app.drivers.yoosee import controls, shared_control_reads, shared_volume
 from backend.app.drivers.yoosee.p2p.volume import VOLUME_RAW_BY_PERCENT
 from backend.app.drivers.yoosee.p2p.volume_write_job import VolumeWriteResult
 from tests.test_shared_control_reads import ENROLLMENT, Session
@@ -55,3 +55,20 @@ def test_failed_confirmation_never_repeats_or_falls_back(camera, fault):
         with pytest.raises((ControlOperationError, ControlNotReady)):
             controls.write(camera, 'speaker_volume', 75)
     assert session.writes == [75]
+
+
+def test_delayed_readback_is_polled_without_repeating_write(camera, monkeypatch):
+    session = VolumeSession('readback')
+    calls = []
+    original = shared_volume.read
+    def read(*args):
+        calls.append(True)
+        if len(calls) == 3:
+            session.result = replace(session.result, completion=replace(session.result.completion,
+                value={'setVal':7}))
+        return original(*args)
+    monkeypatch.setattr(shared_volume, 'read', read)
+    monkeypatch.setattr(shared_volume.time, 'sleep', lambda _: None)
+    with shared_control_reads.publish(ENROLLMENT.camera_id, session):
+        result = controls.write(camera, 'speaker_volume', 75)
+    assert result.verified and len(calls) == 3 and session.writes == [75]
