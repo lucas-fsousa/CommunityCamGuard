@@ -95,6 +95,11 @@ class VideoDelivery:
         with self._lock:
             return self._bytes
 
+    def resynchronize(self) -> None:
+        """Discard dependent backlog and require a fresh IDR, retaining the receiver."""
+        with self._lock:
+            self._reset()
+
     @property
     def closed(self) -> bool:
         with self._lock:

@@ -69,6 +69,7 @@ def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None) -> Native
         if archive is not None:
             return NativeVideoSource(camera_id, enrollment.device_id, native_audio=True,
                                      archive=archive.template, archive_segment_seconds=archive.segment_seconds,
+                                     saving_allowed=archive.saving_allowed,
                                      motion_grants=captured, motion_valid=valid if captured else None)
         if captured:
             return NativeVideoSource(camera_id, enrollment.device_id, motion_grants=captured,

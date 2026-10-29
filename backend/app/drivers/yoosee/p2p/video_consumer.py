@@ -68,3 +68,17 @@ class VideoConsumer:
         if self._decoder is not None:
             self._decoder.close()
             self._decoder = None
+
+    def resynchronize(self) -> None:
+        """Consumer-thread only: retire the child before accepting a fresh epoch.
+
+        Unlike close(), this retains the receiver/account. Failed child retirement
+        retains ownership and must abort the source, never start a second child.
+        """
+        if self.closed:
+            raise ValueError("video consumer closed")
+        if self._decoder is not None:
+            self._decoder.close()
+            self._decoder = None
+        self._epoch = None
+        self._delivery.resynchronize()

@@ -71,6 +71,12 @@ class NativeAvDelivery(VideoDelivery):
             self._audio_bytes -= len(frame.payload)
             return frame
 
+    def resynchronize(self) -> None:
+        super().resynchronize()
+        with self._audio_lock:
+            self._audio.clear()
+            self._audio_bytes = 0
+
     def close(self) -> None:
         super().close()
         with self._audio_lock:

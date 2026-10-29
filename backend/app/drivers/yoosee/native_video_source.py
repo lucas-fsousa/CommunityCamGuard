@@ -42,6 +42,7 @@ class NativeVideoSource:
     def __init__(self, camera_id: str, device_id: str, *, delivery: VideoDelivery | None = None,
                  native_audio: bool = False, archive: Path | None = None,
                  archive_segment_seconds: int = 60,
+                 saving_allowed: Callable[[], bool] | None = None,
                  motion_grants: tuple[PtzGrant, ...] = (),
                  motion_valid: Callable[[], bool] | None = None):
         if not isinstance(motion_grants, tuple):
@@ -53,6 +54,8 @@ class NativeVideoSource:
         if archive is not None and archive.name != ARCHIVE_TEMPLATE:
             raise ValueError("timestamped UTC archive template required")
         validate_segment_seconds(archive_segment_seconds)
+        if saving_allowed is not None and (archive is None or not callable(saving_allowed)):
+            raise ValueError("recording policy requires an archive and callable")
         if native_audio and delivery is not None:
             raise ValueError("native A/V owns its delivery")
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
@@ -64,6 +67,8 @@ class NativeVideoSource:
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
         self._archive_segment_seconds = archive_segment_seconds
+        self._saving_allowed = saving_allowed
+        self._recording_allowed = True  # Consumer-thread confined; checked before its first step.
         self._archive_dirs = ArchiveDirectories(archive) if archive is not None else None
         self._stop = threading.Event()
         self._failed = threading.Event()
@@ -115,9 +120,10 @@ class NativeVideoSource:
         if isinstance(self._delivery, NativeAvDelivery):
             if not supported_audio(frame.encoding):
                 raise ValueError("native AAC format not validated")
-            if self._archive_dirs is not None:
+            if self._archive_dirs is not None and self._recording_allowed:
                 self._archive_dirs.prepare(force=True)
-            archive = epoch_template(self._archive) if self._archive is not None else None
+            archive = (epoch_template(self._archive)
+                       if self._archive is not None and self._recording_allowed else None)
             decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive,
                                        archive_segment_seconds=self._archive_segment_seconds)
         else:
@@ -129,11 +135,27 @@ class NativeVideoSource:
                 self._hub.close()
         return decoder
 
+    def _apply_recording_policy(self, consumer: VideoConsumer) -> None:
+        if self._saving_allowed is None:
+            return
+        allowed = self._saving_allowed()
+        if type(allowed) is not bool:
+            raise ValueError("recording policy must return a boolean")
+        if allowed == self._recording_allowed:
+            return
+        # No replacement process until the old child's final archive/exit is confirmed.
+        consumer.resynchronize()
+        self._retire_hub()
+        self._output = None
+        self._recording_allowed = allowed
+
     def _consume(self) -> None:
         consumer = VideoConsumer(self._delivery, factory=self._decoder)
         try:
             while not self._stop.is_set():
-                if self._archive_dirs is not None and consumer.decoder is not None:
+                self._apply_recording_policy(consumer)
+                if (self._archive_dirs is not None and self._recording_allowed
+                        and consumer.decoder is not None):
                     self._archive_dirs.prepare()
                 consumer.step()
                 if consumer.closed or self._stop.is_set():
@@ -144,6 +166,9 @@ class NativeVideoSource:
                         audio = self._delivery.take_audio()
                         if audio is not None and not decoder.offer_audio(audio.payload, audio.timestamp):
                             raise ValueError("native decoder refused audio access unit")
+                elif isinstance(self._delivery, NativeAvDelivery) and decoder is None:
+                    # Awaiting a fresh IDR: do not accumulate pre-epoch AAC indefinitely.
+                    self._delivery.take_audio()
                 if self._output is not None:
                     while (chunk := self._output.take()) is not None:
                         with self._hub_lock:

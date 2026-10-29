@@ -63,6 +63,18 @@ def test_factory_passes_server_policy_to_native_source_without_mkdir_or_capture(
     assert source._thread is None and not spec.root.exists()
 
 
+def test_factory_retains_live_server_storage_policy(evidence,tmp_path):
+    review(evidence)
+    allowed=[True]
+    def policy(): return allowed[0]
+    spec=NativeArchiveSpec(evidence[0].camera_id,tmp_path,300,saving_allowed=policy)
+    offered=YooseeDriver().native_media_offer(evidence[0],archive=spec)
+    source=offered.factory().current
+    assert source._saving_allowed is policy and source._saving_allowed()
+    allowed[0]=False
+    assert not source._saving_allowed() and offered.valid()
+
+
 def test_revoked_av_proof_blocks_original_factory_before_construction(evidence,tmp_path,monkeypatch):
     review(evidence)
     camera=evidence[0]; spec=NativeArchiveSpec(camera.camera_id,tmp_path,300)

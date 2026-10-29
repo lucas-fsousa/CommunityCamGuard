@@ -186,7 +186,8 @@ class Recorder:
 
     def native_archive(self, camera_id: str) -> NativeArchiveSpec:
         """Plan a driver's archive without starting a recorder or touching the filesystem."""
-        return NativeArchiveSpec(camera_id, self.root, self.segment_seconds)
+        return NativeArchiveSpec(camera_id, self.root, self.segment_seconds,
+                                 saving_allowed=lambda: not self.paused)
 
     def _ensure_dirs(self, camera_ids: list[str]) -> None:
         # Must use the same clock basis as ffmpeg's UTC strftime expansion below.  Using naive

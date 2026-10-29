@@ -42,3 +42,11 @@ def test_archive_mux_policy_is_not_fixed_to_sixty_seconds(tmp_path):
     assert command[command.index("-segment_time")+1] == "300"
     assert command.count("ffmpeg") == 1
     assert command[command.index("-c")+1] == "copy"  # original archive, no second encoder
+
+
+def test_spec_policy_is_validated_without_calling_it(tmp_path):
+    def never():
+        raise AssertionError("construction must not call server policy")
+    NativeArchiveSpec(CAMERA,tmp_path,300,saving_allowed=never)
+    with pytest.raises(ValueError,match="callable"):
+        NativeArchiveSpec(CAMERA,tmp_path,300,saving_allowed=True)

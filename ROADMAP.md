@@ -4,6 +4,21 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-29 storage integration: normal native archive offers now carry the server's
+live pause/resume policy. The existing consumer retires the old decoder, waits for
+a fresh IDR and replaces it with live-only A/V while paused, restoring a unique
+original archive on resume. Same camera account, at most one child; uncertain
+retirement blocks replacement. Initial pause does not prepare/open archives.
+159 focused tests passed, including actual local FFmpeg saving→live-only→saving;
+largest measured peak150.8MiB, no swap/50% CPU. Mypy362/Ruff passed. See
+docs/internal/native-storage-policy.md. Next: camera-backed pause/resume acceptance,
+then durable retirement/bootstrap and identity maintenance. No native boot enabled.
+
+WSL checkpoint: validated `6e28bcb` deployed as `b-fc721562835f` after green CI.
+Local/public HTTPS health/build, login/unauthenticated rejection, three online
+recorders and growth of all three files passed. App-only replacement; shared hub
+and tunnel not restarted. Native selections remain inactive/legacy revision0.
+
 2026-10-29 production-path integration: the ordinary driver offer now accepts a
 generic server-owned archive plan and admits original-codec native A/V only with
 its own explicit per-device proof. Missing/revoked recording support cannot fall
@@ -23,7 +38,8 @@ HEVC/AAC epochs (22s/65s). The other two recorders stayed active; rollback passe
 Peak196.7MiB/no swap; FDs31 stable.44 follow-up scope/revocation tests passed
 under192MiB/no swap/50% CPU (164.3MiB peak). CI5370 passed,4 skipped. No primary
 rollout was enabled. Next: native storage pause/resume, then durable safe boot;
-do not repeat the normal-driver A/V admission acceptance as pending.
+do not repeat the normal-driver A/V admission acceptance as pending. Storage
+policy integration and its remaining camera-backed acceptance are tracked above.
 
 2026-10-29 actual recovery milestone: camera3 completed90s native A/V/archive with
 one controlled session retirement at20s and automatic reattachment on the same

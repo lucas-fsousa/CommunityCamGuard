@@ -1,6 +1,7 @@
 """Server-owned recording destination and policy, independent of camera drivers."""
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..camera_identity import valid_camera_id
@@ -12,16 +13,23 @@ def validate_segment_seconds(value: int) -> None:
         raise ValueError("archive segment duration must be an integer of at least60 seconds")
 
 
+def _allowed() -> bool:
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class NativeArchiveSpec:
     camera_id: str
     root: Path
     segment_seconds: int
+    saving_allowed: Callable[[], bool] = field(default=_allowed, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not valid_camera_id(self.camera_id) or not isinstance(self.root, Path) or ":" in str(self.root):
             raise ValueError("local archive root and opaque camera identity required")
         validate_segment_seconds(self.segment_seconds)
+        if not callable(self.saving_allowed):
+            raise ValueError("recording policy must be callable")
 
     @property
     def template(self) -> Path:
