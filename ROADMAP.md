@@ -11,8 +11,14 @@ the downstream symptom, not permission to skip validation. Archive-only packet
 clock repair plus90000Hz MP4 timescale now passes a real negative/positive FFmpeg
 regression, retaining original codecs/all five video packets and valid timing.
 75 focused tests passed (118.6MiB peak,256MiB/no swap/50% CPU), Mypy363/Ruff passed.
-See docs/internal/native-archive-timestamps.md. Repaired camera-backed acceptance
-is in progress; do not mark the earlier O/Q/R failures as passed.
+See docs/internal/native-archive-timestamps.md. Repaired trial U now passed110s:
+H264/AAC player delivery before/during/after pause,8s of unchanged archive sizes,
+and a new growing original HEVC/AAC archive after resume. The resumed file has868
+video packets with strictly increasing DTS, including one repaired tick. Other
+two recorders stayed active; zero native reconnects, FDs31–32; confirmed rollback.
+Peak230.8MiB/no swap under768MiB cap. This closes bounded camera-backed storage
+acceptance; the earlier O/Q/R failures remain failures, not passing trials.
+Next delivery: durable confirmed-retirement/bootstrap and identity maintenance.
 
 2026-10-29 storage integration: normal native archive offers now carry the server's
 live pause/resume policy. The existing consumer retires the old decoder, waits for
@@ -21,8 +27,9 @@ original archive on resume. Same camera account, at most one child; uncertain
 retirement blocks replacement. Initial pause does not prepare/open archives.
 159 focused tests passed, including actual local FFmpeg saving→live-only→saving;
 largest measured peak150.8MiB, no swap/50% CPU. Mypy362/Ruff passed. See
-docs/internal/native-storage-policy.md. Next: camera-backed pause/resume acceptance,
-then durable retirement/bootstrap and identity maintenance. No native boot enabled.
+docs/internal/native-storage-policy.md. Camera-backed acceptance subsequently
+passed in U above. Durable retirement/bootstrap and identity maintenance are next.
+No native boot enabled.
 
 WSL checkpoint: storage integration `8da3fc2` is deployed as `b-3767f63eea2a`
 after green CI (5383 passed,4 skipped), Node contracts and Image smoke. Five

@@ -34,5 +34,8 @@ Mypy363 files passed (50.6MiB peak), Ruff passed.
 Fixed-label MP4 order diagnostics now distinguish expected/actual known box types
 without logging arbitrary media bytes. The bounded trial also preserves the
 consumer failure site after the source returns. Generated clips and private
-operator artifacts remain ignored. Live acceptance of the repaired path is tracked
-in the storage-policy document; default native boot remains disabled.
+operator artifacts remain ignored. Trial U subsequently passed110s of real
+camera3 saving→live-only→saving: the resumed original archive contains one repaired
+tick,868 video packets with strictly increasing DTS and57.20s of video. Both other
+recorders stayed active and shutdown/rollback passed. See the
+[live acceptance](native-storage-policy.md). Default native boot remains disabled.

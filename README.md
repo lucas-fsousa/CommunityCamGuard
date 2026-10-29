@@ -26,8 +26,9 @@ multiple native routes remain pending. The ordinary driver also passed a90s
 [A/V/archive admission trial](docs/internal/native-archive-admission.md), honoring
 the server's300s segment policy and recovering cleanly without stopping the other
 two recorders. [Native storage pause/resume](docs/internal/native-storage-policy.md)
-is implemented and locally tested; camera-backed acceptance and safe permanent
-startup are still required before default use.
+also passed a110s camera3 trial, retaining original HEVC/AAC recordings and live
+H264/AAC while paused. This exposed and fixed a duplicate archive-DTS failure.
+Safe permanent startup and identity maintenance are still required before default use.
 See the [integration evidence](docs/internal/native-av-delivery.md).
 
 ## Documentation

@@ -31,10 +31,39 @@ one-second64x64 generated inputs, not a camera endurance or300s rollover test.
 Mypy362 files passed under256MiB (96.7MiB peak); Ruff passed.
 
 No disk was filled, files deleted, camera setting changed or physical action sent.
-Native production boot remains disabled. Camera-backed pause/resume acceptance,
-durable confirmed-retirement/bootstrap and identity maintenance remain required
-before permanent native rollout. This work connects actual storage policy to the
-normal source path; it does not certify those remaining lifecycle gates.
+Native production boot remains disabled. Durable confirmed-retirement/bootstrap
+and identity maintenance remain required before permanent native rollout. The
+camera-backed pause/resume acceptance was subsequently completed below.
+
+## Actual camera3 acceptance — trial U
+
+The initial real trials uncovered a duplicate-video-DTS muxer failure on resume,
+not a successful acceptance; see the [cause and repair](native-archive-timestamps.md).
+After repair, the ordinary driver completed110s with archive pause at20s and
+resume at50s. An isolated, unstarted Recorder supplied its actual archive plan and
+public pause/resume methods, so the two ordinary recorders were not paused. This
+exercises the native policy consumer, not a deliberately filled disk/global stop.
+
+The authenticated existing player socket independently delivered H264/AAC before,
+during and after the pause on source revision2. During the paused phase, all
+archive sizes remained identical over8s. Resuming created a distinct original
+archive that continued growing after the final player probe. Both1920x1080 HEVC /
+16kHz mono AAC files survived confirmed shutdown and rollback: video durations
+22.06s/57.20s,335/868 video packets, with strictly increasing DTS. The resumed
+archive contains one one-tick adjustment, proving this trial exercised the fixed
+collision rather than simply avoiding it. Configured segmentation remained300s;
+neither a300s rollover nor continuous multi-day recording is certified here.
+
+The native account stayed running with zero reconnects, both other recorders were
+present at every5s observation, and FDs stayed31–32. Confirmed server exit, original
+container restoration and directory-owner restoration all passed. The whole group
+peaked at230.8MiB/no swap,53.044 CPU seconds over128.449s wall time (768MiB cap,
+100% CPU). Independent media observation peaked at50MiB and archive probes24.6MiB.
+Artifacts are private under ignored `temp/native-storage-20261029-u`.
+
+This closes bounded camera-backed storage pause/resume acceptance. Durable safe
+boot, identity refresh, unconfirmed-loss handling and multiple native routes remain;
+no primary native rollout was installed by the operator clone.
 
 ## Saved delivery checkpoint
 
