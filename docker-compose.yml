@@ -29,6 +29,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   app:
+    stop_grace_period: 45s
     build: .
     image: community-cam-guard-app:latest
     container_name: ccg-app

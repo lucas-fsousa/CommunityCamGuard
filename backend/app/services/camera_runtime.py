@@ -11,6 +11,7 @@ from ..db import registry
 from ..discovery import active_scan
 from ..media import go2rtc
 from ..media.reconciliation import mutation_scope
+from ..media.source_registry import SourceRegistry
 from .address_recovery import AddressRecovery
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,8 @@ def runtime_statuses(request: Any, cameras: list[registry.Camera]) -> list[dict]
 
     media = getattr(request.app.state, "media", None)
     recorder = getattr(request.app.state, "rec", None)
+    native = getattr(request.app.state, "native_sources", None)
+    native_states = native.states() if isinstance(native,SourceRegistry) else {}
     try:
         online_probe = getattr(media, "stream_online", None)
         online_streams = online_probe() if callable(online_probe) else {}
@@ -49,8 +52,10 @@ def runtime_statuses(request: Any, cameras: list[registry.Camera]) -> list[dict]
         {
             "id": camera.camera_id,
             "mac": camera.mac,
-            "online": bool(online_streams.get(go2rtc.stream_id(camera.camera_id), False)),
-            "recording": bool(recorder and recorder.is_recording(camera.camera_id)),
+            "online": (native_states[camera.camera_id]=='running' if camera.camera_id in native_states else
+                       bool(online_streams.get(go2rtc.stream_id(camera.camera_id), False))),
+            "recording": (bool(native and native.is_recording(camera.camera_id)) if camera.camera_id in native_states else
+                          bool(recorder and recorder.is_recording(camera.camera_id))),
         }
         for camera in cameras
     ]

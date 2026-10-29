@@ -66,6 +66,7 @@ class NativeVideoSource:
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
+        self._archive_active = False
         self._archive_segment_seconds = archive_segment_seconds
         self._saving_allowed = saving_allowed
         self._recording_allowed = True  # Consumer-thread confined; checked before its first step.
@@ -93,6 +94,10 @@ class NativeVideoSource:
                 "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
                 "consumer_alive": self._thread is not None and self._thread.is_alive(),
                 "cleanup_failed": self._cleanup_failed.is_set()}
+
+    @property
+    def recording(self) -> bool:
+        return self._archive_active and not self._stop.is_set()
 
     def subscribe(self) -> Subscription:
         """Internal only: future transport must authorize/revoke each subscription."""
@@ -129,6 +134,7 @@ class NativeVideoSource:
                        if self._archive is not None and self._recording_allowed else None)
             decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive,
                                        archive_segment_seconds=self._archive_segment_seconds)
+            self._archive_active = archive is not None
         else:
             decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
         self._output = output
@@ -148,6 +154,7 @@ class NativeVideoSource:
             return
         # No replacement process until the old child's final archive/exit is confirmed.
         consumer.resynchronize()
+        self._archive_active = False
         self._retire_hub()
         self._output = None
         self._recording_allowed = allowed

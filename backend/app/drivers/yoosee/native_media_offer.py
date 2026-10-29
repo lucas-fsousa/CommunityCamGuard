@@ -33,7 +33,7 @@ def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None) -> Native
         if current != selected or p2p.read_registered_enrollment(camera_id) != enrollment:
             return None
         now = time()
-        if not snapshots.is_current(camera_id=camera_id, identity=identity, now=now):
+        if not snapshots.matches_recorded_identity(camera_id=camera_id, identity=identity, now=now):
             return None
         profile = profiles.load(camera_id=camera_id, identity=identity, now=now)
         proofs = [item for item in profile.operations if item.key == "native_video"] if profile else []

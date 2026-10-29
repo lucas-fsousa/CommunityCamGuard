@@ -42,6 +42,10 @@ class RecoveringSource:
         with self._lock:
             return self._restarts
 
+    @property
+    def recording(self) -> bool:
+        return getattr(self.current,"recording",False) is True
+
     def subscribe(self) -> Subscription:
         source = self.current
         if source is None:

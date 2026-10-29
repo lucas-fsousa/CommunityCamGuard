@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Owner priority correction: ship the already-working native stream/PTZ on camera3
+in the real Docker/dashboard deployment. No more finite-test loops as delivery
+gates; prolonged validation/extra hardening are follow-ups. The installation path
+persists actual driver review/source preference and uses existing clean startup,
+with a private backup and rollback. Media support is not a30-minute control-cache
+lease; explicit invalidation/authentication/ownership checks remain. Generic native
+online/recording indicators are wired. See docs/internal/native-production.md.
+
 2026-10-29 native clean-startup implementation: one-use camera/revision/domain
 checkpoints are saved only after confirmed source/viewer/executor retirement and
 spent atomically before ordinary driver source birth. Opt-in startup checks disk

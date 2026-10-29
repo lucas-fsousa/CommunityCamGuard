@@ -112,6 +112,22 @@ def is_current(*, camera_id: str, identity: CapabilityIdentity, now: float) -> b
     return _load(camera_id=camera_id, identity=identity, now=now) is not None
 
 
+def matches_recorded_identity(*, camera_id: str, identity: CapabilityIdentity, now: float) -> bool:
+    """Persistent model evidence for reviewed media, not fresh control state/auth.
+
+    A clock expiring cannot change the camera's supported stream protocol. An
+    explicit probe invalidation, changed identity/rules or revoked review still
+    invalidates the media offer. Authentication and packet validation are separate.
+    """
+    if not _time(now): return False
+    with closing(connect()) as conn:
+        conn.execute(_SCHEMA)
+        return conn.execute("""SELECT 1 FROM yoosee_capability_snapshots
+            WHERE camera_id=? AND identity=? AND evidence IS NOT NULL
+            AND collected_at<=? AND revision=?""",
+            (camera_id,_identity(identity),now,RULE_REVISION)).fetchone() is not None
+
+
 def _load(*, camera_id: str, identity: CapabilityIdentity,
           now: float) -> dict[str, EvidenceState] | None:
     if not _time(now):

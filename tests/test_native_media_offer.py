@@ -54,7 +54,7 @@ def test_offer_is_lazy_exact_unit_and_does_not_expose_enrollment(evidence, monke
     assert CameraDriver().native_media_offer(camera) is None
 
 
-@pytest.mark.parametrize("change", ["snapshot", "expired", "identity", "review", "enrollment", "device", "other-camera"])
+@pytest.mark.parametrize("change", ["snapshot", "identity", "review", "enrollment", "device", "other-camera"])
 def test_missing_or_changed_evidence_never_becomes_brand_wide_support(evidence, change, monkeypatch):
     camera, identity, _enrollment, profile = evidence
     offer = YooseeDriver().native_media_offer(camera)
@@ -107,6 +107,30 @@ def test_repeated_offer_checks_close_evidence_connections_without_waiting_for_gc
             connection.execute("SELECT 1")
 
 
+def test_media_support_does_not_expire_with_the_control_observation_cache(evidence,monkeypatch):
+    camera,identity,_,_=evidence
+    offered=YooseeDriver().native_media_offer(camera)
+    monkeypatch.setattr(native_media_offer,'time',lambda:86400)
+    assert not capability_snapshot_store.is_current(camera_id=camera.camera_id,identity=identity,now=86400)
+    assert offered.valid() and YooseeDriver().native_media_offer(camera) is not None
+    capability_snapshot_store.begin(camera.camera_id)
+    assert not offered.valid()  # explicit invalidation still revokes the live offer
+
+
+def test_reviewed_motion_is_not_an_expiring_authentication_token(evidence,monkeypatch):
+    camera,_,enrollment,_=evidence
+    review_motion(evidence,OperationProof('native_media_ptz',writable=True,options=frozenset({'right'})))
+    offered=YooseeDriver().native_media_offer(camera)
+    session=offered.factory().current._session
+    session._active_entry=enrollment
+    submit=Mock(return_value='ticket')
+    monkeypatch.setattr(session._lifecycle,'submit_motion',submit)
+    monkeypatch.setattr(native_media_offer,'time',lambda:86400)
+    assert session.submit_motion('right')=='ticket'
+    capability_rollout.activate(evidence[3])
+    with pytest.raises(ValueError): session.submit_motion('right')
+
+
 def review_motion(evidence, proof, *, activate=True, reviewed_at=101):
     _camera, _identity, _enrollment, profile = evidence
     combined = replace(profile, operations=(*profile.operations, proof))
@@ -155,7 +179,7 @@ def test_unactivated_combined_or_ordinary_ptz_proof_does_not_enable_motion(evide
     factory.assert_called_once_with(camera.camera_id, evidence[2].device_id)
 
 
-@pytest.mark.parametrize("change", ["remove", "directions", "expiry", "credentials"])
+@pytest.mark.parametrize("change", ["remove", "directions", "credentials"])
 def test_changed_motion_scope_invalidates_offer_before_source_construction(evidence, monkeypatch, change):
     camera, identity, enrollment, profile = evidence
     review_motion(evidence, OperationProof("native_media_ptz", writable=True, options=frozenset({"right"})))
@@ -179,7 +203,7 @@ def test_changed_motion_scope_invalidates_offer_before_source_construction(evide
     factory.assert_not_called()
 
 
-@pytest.mark.parametrize("change", ["expiry", "review", "snapshot", "credentials"])
+@pytest.mark.parametrize("change", ["review", "snapshot", "credentials"])
 def test_constructed_source_cannot_keep_using_an_expired_or_revoked_motion_grant(evidence, monkeypatch, change):
     camera, identity, enrollment, profile = evidence
     review_motion(evidence, OperationProof("native_media_ptz", writable=True, options=frozenset({"right"})))

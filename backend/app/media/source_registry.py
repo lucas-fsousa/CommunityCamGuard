@@ -87,6 +87,12 @@ class SourceRegistry:
                     getattr(entry.source, "recovering", False) is True else entry.phase
                     for camera_id, entry in self._entries.items()}
 
+    def is_recording(self, camera_id: str) -> bool:
+        with self._lock:
+            entry=self._entries.get(camera_id)
+            return (not self._closed and entry is not None and entry.phase=='running'
+                    and getattr(entry.source,'recording',False) is True)
+
     def run(self, camera_id: str, *, domain: str,
             factory: Callable[[], ManagedSource], cancelled: Callable[[], bool],
             owner: object | None = None) -> object:

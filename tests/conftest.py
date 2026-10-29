@@ -19,6 +19,7 @@ def _isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("DASHBOARD_ALLOW_LOCAL_ORIGIN", "false")
     monkeypatch.setenv("RECORDINGS_DIR", str(tmp_path / "recordings"))
     monkeypatch.setenv("AUTOSTART_SERVICES", "false")
+    monkeypatch.setenv("NATIVE_RESUME_ON_START", "false")
     monkeypatch.setenv("PROVISIONING_REMOTE_BLE_ENABLED", "false")
     config.get_settings.cache_clear()
     yield
