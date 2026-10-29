@@ -39,3 +39,20 @@ camera3 saving→live-only→saving: the resumed original archive contains one r
 tick,868 video packets with strictly increasing DTS and57.20s of video. Both other
 recorders stayed active and shutdown/rollback passed. See the
 [live acceptance](native-storage-policy.md). Default native boot remains disabled.
+
+## Delivery checkpoint
+
+Runtime `eb1f930` is deployed on WSL as build `b-79d69a4161bf` using image
+`community-cam-guard-app:wsl-eb1f930` (`95c6917bec34`). Previous validated image
+`wsl-8da3fc2` is retained. Authenticated login, unauthenticated rejection, local/
+public HTTPS health/build, three online recording indicators and growth of all
+three files passed after app-only replacement. Native selection remains inactive,
+legacy revision0; no container OOM or unexpected restart was observed.
+
+An audit of the green CI log found media fixtures were silently skipped because
+the runner lacked FFmpeg. `34aba5b` installs FFmpeg explicitly and verifies all
+three local tool commands. CI then passed5395 tests (1 unrelated existing skip),
+including both real archive-policy fixtures and the duplicate-DTS regression;
+all Node contracts passed. The runtime image smoke also passed. The sampled tail
+of the actual resumed HEVC/AAC archive decoded successfully under192MiB/no swap/
+50% CPU (47.6MiB peak), without any camera connection or audio output.

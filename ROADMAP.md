@@ -20,6 +20,14 @@ Peak230.8MiB/no swap under768MiB cap. This closes bounded camera-backed storage
 acceptance; the earlier O/Q/R failures remain failures, not passing trials.
 Next delivery: durable confirmed-retirement/bootstrap and identity maintenance.
 
+Delivery saved: runtime `eb1f930`, build `b-79d69a4161bf`, is deployed on WSL.
+Auth/local/public HTTPS and growth of all three recordings passed; app-only
+replacement, no OOM/unexpected restart. Source policies remain legacy revision0.
+CI audit removed silent real-media skips by installing FFmpeg explicitly. CI at
+`34aba5b` passed5395 tests (1 unrelated existing skip), including the real DTS
+regression and60/300s archive fixtures; Node contracts and runtime Image smoke
+passed. The actual resumed archive tail also decoded successfully,47.6MiB peak.
+
 2026-10-29 storage integration: normal native archive offers now carry the server's
 live pause/resume policy. The existing consumer retires the old decoder, waits for
 a fresh IDR and replaces it with live-only A/V while paused, restoring a unique
