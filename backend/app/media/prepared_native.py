@@ -114,6 +114,15 @@ class PreparedNative:
                                     'kcp_receive_budget','kcp_fragment_chain'}: code=''
                     log.warning('native source ended camera_id=%s error_type=%s protocol_code=%s',self.offer.camera_id,
                                 type(error).__name__ if error is not None else 'source_returned',code)
+                    # Driver diagnostics contain only local classifications/closure
+                    # facts, never exception text, packets or credentials.
+                    log.warning('native source retirement camera_id=%s facts=%s', self.offer.camera_id,
+                                {key: value for key, value in details.items() if key in {
+                                    'session_worker', 'session_protocol_site', 'session_broker_socket_closed',
+                                    'session_broker_release', 'session_tcp_receipt', 'session_tcp_socket_closed',
+                                    'session_motion_started', 'session_motion_cleanup_confirmed',
+                                    'consumer_error', 'consumer_site', 'consumer_alive', 'cleanup_failed',
+                                    'audio_error'}})
                 self._block_locked()
 
     def publish(self, apply_routes: Callable[[], None]) -> None:
