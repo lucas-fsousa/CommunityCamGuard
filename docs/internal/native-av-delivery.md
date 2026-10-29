@@ -366,3 +366,49 @@ and the session/trial report it without raw exceptions, replies or credentials.
 This is diagnostic only, not permission to retry/renew or bypass cleanup.49
 focused regressions passed under192MiB/no swap/50% CPU (100.2MiB peak), including
 stale-access/DNS/timeout/unknown sanitization. Mypy357 source files passed.
+
+### Combined attempts J/K — real horizontal PTZ acceptance
+
+The owner confirmed camera3 had been powered off, then powered it on. A bounded
+read-only preflight connected and closed successfully. The90s J and60s K trials
+then completed with native A/V/archive and both other recorders active in every
+10s sample. No change to primary policies/profiles was made. Both trials retained
+clean service-stop and production-restoration markers, without OOM or an
+unexpected container restart.
+
+The existing authenticated dashboard PTZ endpoint performed one200ms right step
+and one200ms left step during each native session. J responses were418/374ms;
+K425/388ms. The owner explicitly confirmed seeing the camera move twice in K.
+This is physical **horizontal PTZ plus native media coexistence acceptance**, not
+merely synthetic command acknowledgement. No audio-output/light/siren action was
+sent; vertical coexistence and a long-running soak were not separately tested.
+
+Each independent MSE client received20 binary messages: J9,409,197 bytes and
+K9,465,574 bytes, maximum inter-message gaps1.112s/1.071s. Source revision/status
+remained unchanged across both gestures; the other two recording flags remained
+true. The wire MIME was H264/AAC. FFprobe confirmed H2641920x1080/AAC16kHz mono;
+the first10s of K's bounded private capture decoded without errors under192MiB
+(29.6MiB peak). These gap measurements are not end-to-end latency measurements.
+
+J's first original-codec archive was HEVC1920x1080/AAC16kHz mono, with video/audio
+durations59.961667/59.904s, followed by another epoch-suffixed segment. Footage and
+encrypted DB/config remain private under the ignored trial/archive directories.
+J used283.4MiB peak and27.127 CPU seconds over104.172s total; K212.7MiB and20.211
+CPU seconds over74.575s. Both had768MiB hard caps, zero swap and one-CPU quotas;
+the separately capped shared hub is outside these process-group measurements.
+
+This closes the real horizontal coexistence milestone. Automatic reconnection,
+permanent startup selection and multiple native-camera accounts/routes remain
+unimplemented; the normal deployment still uses its previous sources.
+
+### Descriptor-growth correction found during coexistence
+
+J's descriptors grew32→62 over90s. This observation alone did not establish the
+cause. An isolated GC-disabled regression then reproduced125 retained SQLite
+descriptors over25 recorder index/query/owner-lookup cycles. SQLite connection
+context managers commit/rollback but do not close; those paths relied on GC.
+All six recorder database contexts now explicitly close after their transaction.
+The same regression passed with at most2 descriptors growth.74 focused regressions
+passed under192MiB/no swap/50% CPU (120.6MiB peak); Mypy357 files passed. No database
+schema or footage changes are part of this correction. This removes a reproduced
+resource-retention path, not proof of a completed endurance/reconnection test.

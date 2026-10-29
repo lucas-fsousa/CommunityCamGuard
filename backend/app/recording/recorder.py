@@ -31,6 +31,7 @@ import os
 import subprocess
 import threading
 import time
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -110,7 +111,7 @@ def _safe_mac(mac: str) -> str:
 
 
 def init_db() -> None:
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         conn.executescript(_SCHEMA)
         existing = {row["name"] for row in conn.execute("PRAGMA table_info(recordings)")}
         for column, ddl in _MIGRATIONS.items():
@@ -451,7 +452,7 @@ class Recorder:
         """Index finalized segments not yet recorded. Returns how many were added."""
         now = time.time()
         rows: list[tuple] = []
-        with connect() as conn:
+        with closing(connect()) as conn, conn:
             camera_rows = conn.execute(
                 "SELECT camera_id, mac FROM cameras"
             ).fetchall() if conn.execute(
@@ -491,7 +492,7 @@ class Recorder:
                              st.st_size, self.segment_seconds, _now()))
         if not rows:
             return 0
-        with connect() as conn:
+        with closing(connect()) as conn, conn:
             # Upsert (not INSERT OR IGNORE): a fragmented-MP4 segment briefly exists as a tiny
             # header-only stub, so an early index pass can record a stub size; refresh size_bytes
             # once the file grows/finalizes. Only writes when the size actually changed (no churn
@@ -530,7 +531,7 @@ def rekey_segments(old_mac: str, new_mac: str) -> int:
     if old == new:
         return 0
     init_db()   # a scan can re-key before the recorder ever ran (autostart off / first boot)
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         cameras_exist = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cameras'"
         ).fetchone()
@@ -573,7 +574,7 @@ def query_segments(camera_id: str | None = None, mac: str | None = None,
     if day_to:
         where.append("day <= ?"); params.append(day_to)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         total = conn.execute("SELECT COUNT(*) FROM recordings" + clause, params).fetchone()[0]
         rows = conn.execute(
             "SELECT * FROM recordings" + clause + " ORDER BY started_at DESC LIMIT ? OFFSET ?",
@@ -585,7 +586,7 @@ def query_segments(camera_id: str | None = None, mac: str | None = None,
 def segment_camera_id(path: str) -> str:
     """Return the indexed canonical owner of one segment, if known."""
     init_db()
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         row = conn.execute(
             "SELECT camera_id FROM recordings WHERE path = ?", (str(path),)
         ).fetchone()

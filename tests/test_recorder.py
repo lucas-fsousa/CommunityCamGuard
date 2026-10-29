@@ -2,7 +2,9 @@
 command build, segment indexing, and the start/pause/resume/stop lifecycle. subprocess is faked,
 so no real ffmpeg runs.
 """
+import gc
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -133,6 +135,29 @@ def test_index_records_finalized_segments():
     assert res["items"][0]["started_at"] == "2026-08-01T12:00:00+00:00"
     assert res["items"][0]["day"] == "2026-08-01"
     assert res["items"][0]["hour"] == 12
+
+
+@pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="Linux descriptor accounting required")
+def test_repeated_index_and_recording_reads_close_connections_without_gc():
+    recorder.init_db()
+    rec = Recorder(segment_seconds=300)
+    segment = _make_segment(rec, "aa:bb:cc:dd:ee:01")
+    rec._index(list_all=True)
+    gc.collect()
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        before = len(list(Path("/proc/self/fd").iterdir()))
+        for _ in range(25):
+            rec._index(list_all=True)
+            assert recorder.query_segments()["total"] == 1
+            recorder.segment_camera_id(str(segment))
+        growth = len(list(Path("/proc/self/fd").iterdir())) - before
+    finally:
+        if enabled:
+            gc.enable()
+        gc.collect()
+    assert growth <= 2, f"recording SQLite descriptors retained: {growth}"
 
 
 def test_index_keeps_two_native_epochs_from_same_second_and_legacy_segment():

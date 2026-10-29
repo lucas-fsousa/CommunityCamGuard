@@ -4,6 +4,20 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 real milestone: camera3 native video/audio/archive plus horizontal PTZ
+coexistence passed90s and60s trials. Owner confirmed the two physical movements
+in the repeat. The existing dashboard API reused the native session, media kept
+arriving and both other recorders stayed active; clean shutdown/rollback passed.
+Original HEVC/AAC archive and H264/AAC browser capture were independently probed.
+No production capability proof/default native activation was silently installed.
+Next delivery is automatic clean-session recovery and permanent startup selection,
+then multiple native routes; do not describe horizontal coexistence as still only
+synthetic. Details/measurements are in docs/internal/native-av-delivery.md.
+
+The same trial exposed FD growth. A GC-disabled offline test reproduced125 retained
+SQLite handles over25 recording cycles; explicit connection closure fixes it.
+74 recording/lifecycle regressions passed under192MiB/no swap/50% CPU (120.6MiB peak).
+
 2026-10-28 next vertical delivery: the operator A/V/archive trial now accepts
 explicit target-only PTZ directions, without persistent proof/profile changes.
 Other camera/control writes stay blocked. Corrected original-DB lock ordering and
