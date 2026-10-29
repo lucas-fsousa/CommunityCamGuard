@@ -17,6 +17,7 @@ from .contracts import CertifiedNode
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
 from .lamp_read_inbox import LampReadInbox
 from .lamp_read_pump import LampReadPump
+from .media_failures import PROTOCOL_CODES
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
@@ -325,13 +326,7 @@ class AccountReadWorker:
                 sites.append(f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}")
                 trace=trace.tb_next
             protocol_site='/'.join(sites[-2:])
-            protocol_code={
-                'KCP assembly deadline exceeded':'kcp_assembly_timeout',
-                'invalid KCP receive segment':'kcp_invalid_segment',
-                'conflicting KCP duplicate':'kcp_conflicting_duplicate',
-                'KCP receive budget exceeded':'kcp_receive_budget',
-                'invalid KCP fragment chain':'kcp_fragment_chain',
-            }.get(str(error),'')
+            protocol_code=PROTOCOL_CODES.get(str(error),'')
         finally:
             try:
                 if volume is not None:

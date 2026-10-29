@@ -5,7 +5,7 @@ from collections.abc import Callable
 from ...media.recovering_source import RecoveringSource
 from ...media.source_registry import ManagedSource
 from .native_video_source import NativeVideoResult, NativeVideoSource
-from .p2p.media_retirement import retired_assembly_timeout, retired_media_route
+from .p2p.media_retirement import retired_media_route, retired_transport_failure
 from .shared_control_reads import reserve_native_owner
 
 
@@ -24,7 +24,7 @@ def retryable(result: object, source: ManagedSource) -> bool:
     if not isinstance(result, NativeVideoResult) or not isinstance(source, NativeVideoSource):
         return False
     worker = result.session.worker
-    released_timeout=worker is not None and result.reason=='transport' and retired_assembly_timeout(worker)
+    released_timeout=worker is not None and result.reason=='transport' and retired_transport_failure(worker)
     decoder_timeout = (worker is not None and result.reason == 'consumer_failed'
         and result.failure_type == 'TimeoutError' and worker.reason == 'stopped'
         and retired_media_route(worker))

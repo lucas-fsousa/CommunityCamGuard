@@ -125,7 +125,13 @@ def test_input_flood_has_fixed_bound(monkeypatch):
 
 
 @pytest.mark.parametrize('message,code',[
-    ('conflicting KCP duplicate','kcp_conflicting_duplicate'),('private-value-do-not-log','')])
+    ('conflicting KCP duplicate','kcp_conflicting_duplicate'),('private-value-do-not-log',''),
+    ('TCP AV session deadline exceeded','tcp_session_timeout'),
+    ('AV handshake readiness deadline exceeded','av_handshake_timeout'),
+    ('AV control receipt deadline exceeded','av_control_timeout'),
+    ('receive progress deadline exceeded','media_idle_timeout'),
+    ('receive initialization deadline exceeded','media_initialization_timeout'),
+    ('TCP media EOF before CLOSE receipt','tcp_eof')])
 def test_protocol_diagnostics_use_known_codes_not_exception_payload(monkeypatch,message,code):
     sock=WorkerSocket()
     def fail(_): raise ValueError(message)

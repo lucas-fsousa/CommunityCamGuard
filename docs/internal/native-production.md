@@ -91,3 +91,13 @@ automatically. Healthy neighboring players are not replaced and this never calls
 camera/producer restart. EN/PT text no longer asks for a manual player refresh.
 The Node contract verifies unavailable→available replacement and no healthy-player
 flapping. The separate shared-volume implementation is not part of this UI fix.
+
+Further production failure at revision21 occurred during a replacement route's
+initial TCP measurement (`poll:117`, session deadline). No decoder/parser failure
+occurred; both sockets and the outer route were retired, but the old classification
+required prior media readiness and therefore poisoned all later retries. Fixed
+local classifications now distinguish measurement/handshake/control-receipt/idle/
+I/O timeouts and EOF from malformed protocol data. These known transport failures
+may retry after confirmed outer/socket/motor retirement even before readiness.
+Malformed/unknown data, authentication rejection and uncertain cleanup remain
+blocked. No handshake deadlines, traffic limits or memory buffers are increased.

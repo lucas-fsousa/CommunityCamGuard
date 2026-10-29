@@ -70,3 +70,16 @@ def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(
     result = NativeVideoResult('consumer_failed', SharedReadResult('stopped', worker),
                                'ValueError' if fault == 'format' else 'TimeoutError')
     assert retryable(result, source) is (fault is None)
+
+
+@pytest.mark.parametrize('code', ['tcp_session_timeout', 'av_handshake_timeout', 'av_control_timeout',
+    'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof'])
+@pytest.mark.parametrize('fault', [None, 'route', 'socket', 'motor'])
+def test_failed_handshake_can_retry_only_after_confirmed_retirement(code, fault):
+    worker = WorkerSummary('protocol', 0, 0, 0, False,
+        media=SimpleNamespace(opened=True, broker_release=fault != 'route'),
+        tcp=SimpleNamespace(ready=False, close_acknowledged=False, socket_close_failed=fault == 'socket'),
+        motion=SimpleNamespace(start_attempted=True, release_delivery_confirmed=fault != 'motor'),
+        protocol_code=code)
+    source = NativeVideoSource('test', '123')
+    assert retryable(NativeVideoResult('transport', SharedReadResult('transport', worker)), source) is (fault is None)

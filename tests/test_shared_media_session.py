@@ -45,6 +45,19 @@ def test_stopped_media_accepts_only_confirmed_outer_retirement(setup, monkeypatc
         assert control_ownership._cleanup_uncertain
 
 
+def test_failed_measurement_is_transport_failure_not_permanent_cleanup_poison(setup, monkeypatch):
+    session, delivery, *_ = setup
+    summary = WorkerSummary('protocol', 0, 0, 0, False,
+        media=MediaRouteResult(True, True, True),
+        tcp=TcpMediaResult(False, False, False, 0, 0, 0), protocol_code='tcp_session_timeout')
+    def failed(*args, **kwargs):
+        session._lifecycle._state = 'blocked'
+        return summary
+    monkeypatch.setattr(session._lifecycle, 'run_media', failed)
+    result = session.run(cancelled=lambda: False, video_delivery=delivery)
+    assert result.reason == 'transport' and not control_ownership._cleanup_uncertain
+
+
 @pytest.fixture
 def setup(monkeypatch, owner):
     now = [1.0]
