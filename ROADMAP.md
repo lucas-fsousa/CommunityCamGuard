@@ -24,12 +24,16 @@ Next work is normal-use feedback, then additional shared native controls and
 multi-camera capacity. No new finite endurance gate is required for this delivery.
 The entries below describe historical checkpoints, not the current deployment.
 
-Native speaker-volume write integration is implemented with preflight, one D2,
-correlated D3 and exact raw readback on the existing stream owner, without another
-login. 121 targeted tests and Mypy373 passed; device acceptance/deployment is pending
-while prioritizing the owner's camera3 black-screen report. See
-docs/internal/native-shared-volume.md. The independent dashboard fix automatically
-replaces a recovered source's unavailable placeholder instead of requiring reload.
+Native speaker volume delivered (`2a211c9`, `b-be9a4c0476af`): camera3 accepted
+50→75→50 with preflight, one D2, correlated D3 and exact raw readback on the
+existing stream owner. Both API changes verified; the same MSE socket advanced
+from3 to9 fragments without reopening, source active revision32. Volume left50,
+no audio/light/motion emitted. Hardware exposed delayed readback, now handled by
+bounded read-only settling checks without replaying D2. See
+docs/internal/native-shared-volume.md. Known initial-handshake/idle/I/O timeouts
+also now reconnect after confirmed retirement, not only post-ready KCP failures.
+The independent dashboard fix automatically replaces a recovered unavailable
+placeholder; pre-fix browser tabs need one refresh to load it.
 
 Continuous-use follow-up: camera3 later blocked at revision12 following a decoder
 frame-progress timeout. A missing inner CLOSE receipt prevented retry despite

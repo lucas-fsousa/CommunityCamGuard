@@ -27,8 +27,8 @@ so dashboard online/recording indicators do not depend on a legacy go2rtc produc
 Docker gives the app45s for a clean stop. Clean restart is supported; abrupt-kill
 recovery and prolonged soak/extra hardening are deferred, not release gates.
 
-Only streaming and reviewed shared PTZ/state reads are provided by this native
-owner. Features that still require a separate account connection remain subject
+Streaming, reviewed shared PTZ/state reads and verified speaker-volume changes
+are provided by this native owner. Features that still require a separate account connection remain subject
 to the existing shared-account exclusion; this delivery does not pretend all
 native shared-write features have been implemented. Other-camera foreground
 controls can cause a clean native-session yield/reconnect through existing logic.
@@ -101,3 +101,11 @@ I/O timeouts and EOF from malformed protocol data. These known transport failure
 may retry after confirmed outer/socket/motor retirement even before readiness.
 Malformed/unknown data, authentication rejection and uncertain cleanup remain
 blocked. No handshake deadlines, traffic limits or memory buffers are increased.
+
+The deployment now includes shared speaker-volume writes, accepted on camera3
+through the ordinary authenticated API with the same MSE socket continuously
+receiving video (50→75→50, left50). See native-shared-volume.md for the delayed
+readback correction and precise evidence. Current runtime is `2a211c9`, build
+`b-be9a4c0476af`, source active revision32. Initial-handshake transport classification
+passed107 focused tests and Mypy374. Other shared-write features remain pending;
+this does not grant or claim unimplemented actions.

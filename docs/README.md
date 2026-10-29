@@ -15,6 +15,8 @@ Docs are split by audience:
 
 - **[Native production deployment](internal/native-production.md)** — current camera3
   Docker streaming/shared PTZ installation, persistent support, recovery and limitations.
+- **[Native shared speaker volume](internal/native-shared-volume.md)** — verified
+  volume changes without a second connection, delayed readback and camera3 acceptance.
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
   version-specific MTP/E4 evidence, correlated passive MTP collection, unknown-platform preservation, A4 relay
   advertisement and remaining native-HD gate.

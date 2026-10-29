@@ -22,6 +22,20 @@ readback. This control does not play any sound.
 121 targeted tests passed under192MiB/no swap (100.9MiB peak); Mypy373 passed
 under256MiB. These include encrypted D2/D3 through the actual account worker,
 one send only, no login fallback, rejection/readback failure, stale responses,
-generation/cancellation and unchanged-volume handling. Camera-backed acceptance
-and deployment are pending: work was interrupted to prioritize the reported
-camera3 black placeholder. The deployed UI fix is separate from these changes.
+generation/cancellation and unchanged-volume handling.
+
+Camera-backed acceptance exposed delayed model readback: D3 accepted the change
+before B8 returned the new value. An immediate read produced a false error, so
+verification now polls at most five times within a bounded settling window, as
+the existing legacy driver does. It never replays D2. The regression test covers
+old-value→new-value readback with exactly one write. A failed immediate cleanup
+initially skipped restoring50 because the prior change was still settling; the
+later explicit restore was checked at50 before the corrected acceptance below.
+
+Deployed `2a211c9`, build `b-be9a4c0476af`: camera3 accepted50→75→50 through the
+ordinary authenticated control API. Both responses were HTTP200, changed/verified,
+with transport ACK, D3 result0 and exact raw readback. The same authenticated MSE
+WebSocket stayed open and advanced from3 to9 binary fragments throughout both
+changes. Native source remained active revision32. No second login/source or
+sound/light/motion command was used. Volume was left at50 percent. This accepts
+volume on the current exact-unit driver profile, not every shared-write feature.
