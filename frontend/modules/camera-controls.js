@@ -3,15 +3,12 @@ import { api, el, onSessionEnd, state } from "ccg/core";
 import { notify } from "ccg/notifications";
 import { t } from "ccg/i18n";
 import { controlWidgets } from "ccg/control-actions";
-import { audioMessageButton } from "ccg/audio-message";
-import { pushToTalkButton } from "ccg/push-to-talk";
 import { allowed, permittedCamera } from "ccg/session-access";
 
 const GROUPS = [
   ["image", [["orientation", "control.orientation"], ["night_vision", "control.nightVision"],
     ["white_light", "control.whiteLight"]]],
-  ["audio", [["audio_messages", "intercom.open"], ["audio_streams", "talk.open"],
-    ["speaker_volume", "control.speakerVolume"]]],
+  ["audio", [["speaker_volume", "control.speakerVolume"]]],
   ["security", [["smart_protection", "control.smartProtection"],
     ["smart_protection_schedule", "control.scheduleOpen"], ["alarm_voice", "control.alarmVoiceOpen"],
     ["siren_pulse", "control.siren"]]],
@@ -26,12 +23,6 @@ function row(label, widget, reason = "panel.unavailable") {
     el("div", { className: "control-row-label" },
       el("strong", { textContent: t(label) }),
       ...(!enabled ? [el("small", { textContent: t(reason) })] : [])), content);
-}
-
-function labeledButton(button, label) {
-  button.textContent = t(label);
-  button.className = "camera-control-schedule-btn";
-  return button;
 }
 
 export function cameraControls(camera, extras = {}) {
@@ -70,8 +61,6 @@ export function cameraControls(camera, extras = {}) {
     status.setAttribute("role", "status");
     const widgets = new Map([...controlWidgets(cam, status).children]
       .map((widget) => [widget.dataset.controlKey, widget]));
-    if (cam.audio_messages) widgets.set("audio_messages", labeledButton(audioMessageButton(cam), "intercom.open"));
-    if (cam.audio_streams) widgets.set("audio_streams", labeledButton(pushToTalkButton(cam), "talk.open"));
 
     const close = el("button", { className: "icon-btn", type: "button", textContent: "×", title: t("scan.close") });
     close.setAttribute("aria-label", t("scan.close"));

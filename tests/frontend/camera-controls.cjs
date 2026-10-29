@@ -245,7 +245,7 @@ const cameraControls = load("camera-controls.js", {
   assert.equal(catalogueRequests, 1);
   let shell = document.body.children.at(-1);
   assert.equal(walk(shell).filter((item) => item.tagName === "h3").length, 5);
-  assert.equal(walk(shell).filter((item) => item.disabled).length, 11);
+  assert.equal(walk(shell).filter((item) => item.disabled).length, 9);
   assert.equal(audioButtons, 0);
   assert.equal(requests.length, 0);
   assert.equal(app.inert, true);
@@ -288,7 +288,7 @@ const cameraControls = load("camera-controls.js", {
   } }];
   await trigger.click();
   shell = document.body.children.at(-1);
-  assert.equal(audioButtons, 2);
+  assert.equal(audioButtons, 0); // Intercom actions moved out of the settings panel.
   assert.equal(requests.length, 0);
   const volume = walk(shell).find((item) => item.dataset.controlKey === "speaker_volume");
   assert.deepEqual(volume.options.map((item) => item.value), ["", "50", "75"]);

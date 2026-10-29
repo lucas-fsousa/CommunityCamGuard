@@ -1,6 +1,7 @@
 import { t } from "ccg/i18n";
 import { $, api, el, state, svgIcon } from "ccg/core";
 import { cameraControls } from "ccg/camera-controls";
+import { quickAudioControls } from "ccg/camera-quick-audio";
 import { finitePtzControls } from "ccg/step-ptz";
 import { allowed } from "ccg/session-access";
 
@@ -110,6 +111,8 @@ function camBar(cam) {
   // A single compact row: identity on the left, controls on the right. Keeping it one line is what
   // keeps the footer small (the go2rtc player already adds its own control strip above us).
   const actions = el("span", { className: "bar-actions" });
+  const audio = quickAudioControls(cam);
+  if (audio) actions.append(audio);
   if (caps.ptz && allowed("ptz")) actions.append(el("span", { className: "ptz-slot" }, ptzControls(cam)));
   if (allowed("live")) {
     if (cam.has_quality_variants && !state.nativeSources?.includes(cam.id)) actions.append(qualityControls(cam));

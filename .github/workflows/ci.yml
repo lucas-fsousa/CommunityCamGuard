@@ -44,6 +44,8 @@ jobs:
         run: pytest -o addopts='' -v -o faulthandler_timeout=60
       - name: Frontend contracts (Node)
         run: node --max-old-space-size=64 tests/frontend/camera-controls.cjs
+      - name: Direct intercom controls (Node)
+        run: node --max-old-space-size=64 tests/frontend/quick-audio.cjs
       - name: Recording playback lifecycle (Node)
         run: node --max-old-space-size=64 tests/frontend/recording-playback.cjs
       - name: Recording list lifecycle (Node)

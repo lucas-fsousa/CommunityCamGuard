@@ -358,6 +358,13 @@ header {
 .audio-message-actions button { min-width: 110px; }
 .push-talk-button { min-width: 210px !important; touch-action: none; user-select: none; }
 .push-talk-button.active { filter: brightness(.82); transform: translateY(1px); }
+.camera-quick-audio { display: inline-flex; align-items: flex-start; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
+.quick-talk { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; min-width: 0; flex: 1 1 120px; }
+.quick-audio-button, .camera-quick-audio .push-talk-button { min-width: 0 !important; min-height: 44px;
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.3; padding: 8px 10px; }
+.quick-audio-button { flex: 1 1 120px; }
+.quick-talk .camera-control-status { min-width: 0; max-width: 100%; font-size: 11px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Capability badges */
 .badges { display: inline-flex; gap: 4px; align-items: center; }
@@ -474,6 +481,7 @@ select { padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(
   .bar .name { flex: 1 1 120px; }
   .bar-spacer { display: none; }
   .bar-actions { flex: 1 1 100%; width: 100%; min-width: 0; justify-content: center; }
+  .bar-actions .camera-quick-audio { flex: 1 1 100%; width: 100%; }
   .ptz-slot { display: flex; flex: 0 0 100%; justify-content: center; }
   .ptz-pad { position: relative; left: auto; bottom: auto; margin: 4px 0;
     grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); }

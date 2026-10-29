@@ -180,20 +180,22 @@ class PushToTalkSession {
   }
 }
 
-export function pushToTalkButton(cam) {
+export function pushToTalkButton(cam, { inline = false } = {}) {
   const trigger = el("button", {
     className: "icon-btn", textContent: "🗣", title: t("talk.open"), type: "button",
   });
-  trigger.addEventListener("click", (event) => {
-    event.stopPropagation();
+  const createControl = () => {
     let session = null;
     let held = false;
     let starting = false;
     let stopping = false;
+    let disposed = false;
     const status = el("small", { className: "camera-control-status", textContent: t("talk.idle") });
     const talk = el("button", {
       className: "btn-primary push-talk-button", textContent: t("talk.hold"), type: "button",
     });
+    talk.setAttribute("aria-label", t("talk.hold"));
+    status.setAttribute("role", "status");
     const close = el("button", {
       className: "icon-btn", textContent: "×", title: t("scan.close"), type: "button",
     });
@@ -220,9 +222,12 @@ export function pushToTalkButton(cam) {
       }
     };
     const start = async () => {
-      if (starting || session) return;
+      if (disposed || starting || session) return;
       starting = true;
-      talk.disabled = true;
+      // Keep pointer/keyboard release deliverable while the microphone prompt
+      // or connection is pending. Admission is guarded by starting/session.
+      talk.disabled = !inline;
+      talk.setAttribute("aria-busy", "true");
       setStatus("talk.connecting");
       const current = new PushToTalkSession(cam.id, setStatus, () => void stop());
       session = current; // Cleanup must also own a pending microphone/connection request.
@@ -237,10 +242,13 @@ export function pushToTalkButton(cam) {
         talk.disabled = false;
       } finally {
         starting = false;
+        talk.setAttribute("aria-busy", "false");
       }
     };
     talk.addEventListener("pointerdown", (pointerEvent) => {
+      if (pointerEvent.button !== undefined && pointerEvent.button !== 0) return;
       pointerEvent.preventDefault();
+      pointerEvent.stopPropagation();
       held = true;
       talk.classList.add("active");
       talk.setPointerCapture?.(pointerEvent.pointerId);
@@ -249,21 +257,57 @@ export function pushToTalkButton(cam) {
     for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) {
       talk.addEventListener(name, () => void stop());
     }
+    talk.addEventListener("click", (event) => event.stopPropagation());
+    talk.addEventListener("keydown", (event) => {
+      if (![" ", "Enter"].includes(event.key)) return;
+      event.preventDefault();
+      if (event.repeat || held) return;
+      held = true; talk.classList.add("active"); void start();
+    });
+    talk.addEventListener("keyup", (event) => {
+      if ([" ", "Enter", "Escape"].includes(event.key)) { event.preventDefault(); void stop(); }
+    });
+    talk.addEventListener("blur", () => void stop());
+    let observer = null;
+    let unregister = () => {};
+    const release = () => void stop();
+    const visibility = () => { if (document.hidden) release(); };
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      held = false; session?.cancel(); session = null;
+      observer?.disconnect();
+      if (inline) {
+        window.removeEventListener("blur", release);
+        document.removeEventListener("visibilitychange", visibility);
+      }
+      unregister(); overlay.remove();
+    };
     close.addEventListener("click", () => {
       if (starting || session) return;
-      unregister();
-      overlay.remove();
+      dispose();
     });
-    const unregister = onSessionEnd(() => {
-      held = false; session?.cancel(); session = null; overlay.remove();
-    });
+    unregister = onSessionEnd(dispose);
     const card = el("div", { className: "card modal-card audio-message-modal" },
       el("div", { className: "modal-head" },
         el("h2", { textContent: t("talk.title", { name: cam.name || cam.mac }) }), close),
       el("p", { className: "muted compact", textContent: t("talk.hint") }),
       el("div", { className: "audio-message-actions" }, talk), status);
-    const overlay = el("div", { className: "modal" }, card);
-    document.body.append(overlay);
+    const overlay = inline
+      ? el("span", { className: "quick-talk" }, talk, status)
+      : el("div", { className: "modal" }, card);
+    if (inline) {
+      observer = new MutationObserver(() => { if (!overlay.isConnected) dispose(); });
+      observer.observe(document.body, { childList: true, subtree: true });
+      window.addEventListener("blur", release);
+      document.addEventListener("visibilitychange", visibility);
+    } else document.body.append(overlay);
+    return overlay;
+  };
+  if (inline) return createControl();
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    createControl();
   });
   return trigger;
 }

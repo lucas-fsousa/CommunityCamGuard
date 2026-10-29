@@ -191,6 +191,9 @@ export function audioMessageButton(cam) {
       }
     };
     let closed = false;
+    const nested = trigger.closest?.(".camera-panel-shell");
+    const previousOverflow = document.body.style.overflow;
+    const siblings = nested ? [] : [...document.body.children].map(node => [node, node.inert]);
     const sendAbort = new AbortController();
     const dismiss = async (force = false) => {
       if (closed || (sending && !force)) return;
@@ -198,6 +201,9 @@ export function audioMessageButton(cam) {
       clearInterval(elapsedTimer);
       pcmPreview.stop();
       overlay.remove();
+      siblings.forEach(([node, inert]) => { node.inert = inert; });
+      if (!nested) document.body.style.overflow = previousOverflow;
+      if (trigger.isConnected) trigger.focus();
       await recorder?.cancel();
     };
     const unregister = onSessionEnd(() => dismiss(true));
@@ -262,7 +268,20 @@ export function audioMessageButton(cam) {
       el("div", { className: "audio-message-actions" }, record, stop, preview, send),
       status);
     const overlay = el("div", { className: "modal" }, card);
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-label", t("intercom.title", { name: cam.name || cam.mac }));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      const items = [...card.querySelectorAll("button:not(:disabled)")];
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
+    siblings.forEach(([node]) => { node.inert = true; });
+    if (!nested) document.body.style.overflow = "hidden";
     document.body.append(overlay);
+    close.focus();
   });
   return trigger;
 }

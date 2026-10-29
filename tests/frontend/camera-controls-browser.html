@@ -13,6 +13,7 @@ window.addEventListener('unhandledrejection', () => { window.smokeResult = {ok: 
 <script type="module">
 import { state, endSession } from '/core.js';
 import { cameraControls } from '/camera-controls.js';
+import { quickAudioControls } from '/camera-quick-audio.js';
 import { notify } from '/notifications.js';
 import { setLang, t } from '/i18n.js';
 setLang('pt-BR');
@@ -79,16 +80,22 @@ try {
   check(toastBox.left >= 0 && toastBox.right <= innerWidth && toastBox.bottom <= innerHeight, 'Toast escapes viewport');
   toast.querySelector('button').click(); check(!panel.querySelector('.toast'), 'Toast not dismissed');
   body.scrollTop = 0;
-  // Opening this nested dialog must not start recording, capture a mic or make a request.
-  [...panel.querySelectorAll('button')].find(button => button.textContent === t('intercom.open')).click();
-  await tick();
-  const nested = document.querySelector('.modal');
-  check(nested && panel.inert && nested.contains(document.activeElement), 'Nested focus scope not established');
-  nested.querySelector('.icon-btn').click(); await tick();
-  check(!panel.inert && panel.contains(document.activeElement), 'Nested close did not restore focus');
+  check(![...panel.querySelectorAll('button')].some(button => button.textContent === t('intercom.open')),
+    'Voice action still inside settings');
   close.click();
   check(!document.querySelector('.camera-panel') && !stage.inert && document.body.style.overflow === 'auto', 'Close did not restore background');
   check(document.activeElement === trigger, 'Trigger focus not restored');
+  const audio = quickAudioControls(camera); stage.append(audio);
+  await tick();
+  const audioBox = audio.getBoundingClientRect();
+  check(audioBox.left >= 0 && audioBox.right <= innerWidth, 'Quick audio overflows viewport');
+  check(audio.querySelector('.push-talk-button'), 'Inline talk missing');
+  const voice = audio.querySelector('.quick-audio-button'); voice.click(); await tick();
+  const dialog = document.querySelector('.modal');
+  check(dialog && stage.inert && dialog.contains(document.activeElement), 'Standalone voice focus/background not locked');
+  dialog.querySelector('.icon-btn').click(); await tick();
+  check(!document.querySelector('.modal') && !stage.inert && document.activeElement === voice,
+    'Standalone voice did not restore background/focus');
   // Hardware support must remain intact even when session permissions disable its UI.
   state.authentication = 'temporary'; state.permissions = ['ptz'];
   await openPanel(); panel = layout();
@@ -125,7 +132,7 @@ try {
   check(mockReads === 2 && requests === 0, 'Unexpected configuration traffic');
   state.authentication = 'primary'; state.cameras = [camera]; await openPanel(); panel = layout();
   window.smokeResult = {ok: true, viewport: [innerWidth, innerHeight], requests, catalogueReads,
-    panelWidth: Math.round(panel.getBoundingClientRect().width), permissions: true, nestedFocus: true,
+    panelWidth: Math.round(panel.getBoundingClientRect().width), permissions: true, standaloneVoiceFocus: true,
     sessionCleanup: true, toastDismissal: true, configurationCleanup: true, mockReads};
 } catch (error) { window.smokeResult = {ok: false, error: error.message}; }
 </script>

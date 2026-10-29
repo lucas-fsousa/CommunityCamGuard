@@ -16,6 +16,10 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 > are physically validated on the current Yoosee units through the driver's LAN RTSP backchannel.
 > This does not establish support for every model/firmware or every fallback transport.
 
+Supported intercom actions are directly on each live camera bar: hold to speak
+without opening settings, or open the voice-message recorder with preview/send.
+Visibility still follows the selected driver's capabilities and access permissions.
+
 Yoosee proprietary streaming is now deployed for the test camera3 in the ordinary
 Docker dashboard: one native A/V connection supplies H264/AAC to the existing
 player, original HEVC/AAC recordings and reviewed PTZ on the same session. Speaker

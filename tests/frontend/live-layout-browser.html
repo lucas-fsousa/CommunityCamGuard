@@ -3,11 +3,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/style.css">
-<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js"}}</script>
+<script type="importmap">{"imports":{"ccg/core":"/core.js","ccg/i18n":"/i18n.js","ccg/audio-message":"/audio-message.js","ccg/push-to-talk":"/push-to-talk.js","ccg/session-access":"/session-access.js"}}</script>
 <div id="dash"><header>Monitoramento — layout isolado</header><main id="stage" class="grid"><div id="players"></div></main></div>
 <script type="module">
 import {el} from '/core.js';
 import {finitePtzControls} from '/step-ptz.js';
+import {quickAudioControls} from '/camera-quick-audio.js';
 const check = (ok, message) => {if (!ok) throw new Error(message);};
 const tick = () => new Promise(resolve => requestAnimationFrame(resolve));
 let requests = 0;
@@ -18,7 +19,9 @@ try {
   players.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
   for (let i = 0; i < 3; i++) {
     const pad = finitePtzControls({id: `synthetic-${i}`});
-    const actions = el('span', {className: 'bar-actions'}, el('span', {className: 'ptz-slot'}, pad),
+    const actions = el('span', {className: 'bar-actions'},
+      quickAudioControls({id: `synthetic-${i}`, audio_streams: true, audio_messages: true}),
+      el('span', {className: 'ptz-slot'}, pad),
       el('select', {className: 'quality-select'}, el('option', {textContent: 'Qualidade máxima'})),
       ...['−', '+', '↻', '⚙'].map(textContent => el('button', {className: 'icon-btn', textContent})));
     players.append(el('section', {className: 'cam selected'},
@@ -34,6 +37,11 @@ try {
     for (const cam of players.querySelectorAll('.cam')) {
       const box = cam.getBoundingClientRect(), pad = cam.querySelector('.ptz-pad').getBoundingClientRect();
       check(pad.left >= box.left && pad.right <= box.right && pad.bottom <= box.bottom, 'DPAD clipped');
+      for (const button of cam.querySelectorAll('.camera-quick-audio button')) {
+        const r = button.getBoundingClientRect();
+        check(r.left >= box.left && r.right <= box.right, 'Quick audio clipped');
+        check(r.height >= 44, 'Undersized audio touch target');
+      }
       if (mobile) {
         const video = cam.querySelector('.frame').getBoundingClientRect();
         check(pad.top >= video.bottom, 'DPAD overlaps mobile video');

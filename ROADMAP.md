@@ -4,6 +4,12 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Dashboard request: intercom quick actions moved out of settings. Hold-to-speak is
+inline on the live camera bar; recorded voice opens its own preview/send dialog.
+Both obey driver capability flags/intercom permission. Volume and other settings
+remain in the popup. Node lifetime contracts and isolated320px/mobile/desktop UI
+checks pass without microphone/camera actions. See dashboard-camera-controls.md.
+
 Owner priority correction: ship the already-working native stream/PTZ on camera3
 in the real Docker/dashboard deployment. No more finite-test loops as delivery
 gates; prolonged validation/extra hardening are follow-ups. The installation path

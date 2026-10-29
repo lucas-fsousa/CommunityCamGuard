@@ -27,6 +27,7 @@ COMPONENT_ASSETS = {
     "settings-preferences.js": "modules/settings-preferences.js",
     "access-key-dialog.js": "modules/access-key-dialog.js",
     "camera-controls.js": "modules/camera-controls.js", "control-actions.js": "modules/camera-control-actions.js",
+    "camera-quick-audio.js": "modules/camera-quick-audio.js",
     "audio-message.js": "modules/audio-message.js", "push-to-talk.js": "modules/push-to-talk.js",
     "session-access.js": "modules/session-access.js", "notifications.js": "modules/notifications.js",
     "step-ptz.js": "modules/step-ptz.js",

@@ -1,5 +1,29 @@
 # Camera control panel — 2026-09-12
 
+## Direct intercom actions — 2026-10-29
+
+Hold-to-speak and recorded voice messages moved out of the camera-settings popup
+into the live camera bar, alongside the existing quick controls. Hold-to-speak is
+an inline pointer/keyboard hold button, not another popup. Recording opens only
+its own record/preview/send dialog. Speaker volume stays in settings. The driver
+capability flags and intercom permission gate each quick action; there is no
+brand/model shortcut or new backend/audio transport.
+
+No microphone is requested when rendering a tile or opening the recording dialog.
+Inline talk stops on release/cancel/lost capture, blur and tab hiding, and cancels
+on control removal/session end. Its existing10-second limit is unchanged. The
+standalone recording dialog owns/restores focus, background inertness and scroll;
+closing it cannot leave the dashboard locked. The settings popup no longer
+duplicates either action.
+
+Node contracts cover capability/permission filtering, pointer and keyboard hold,
+release, detach/logout cleanup and old popup regressions. Isolated Chromium checks
+passed at320×568 and1280×900 for the settings/standalone voice dialog; the320px
+live tile/DPAD fixture also passed with the quick actions present. Zero camera,
+microphone or external network operations; mocked catalogue/state reads only.
+Runs were sequential, capped512MiB/no swap/50% CPU/128 tasks/60s; largest peak472.9MiB.
+This verifies UI/layout/lifecycle, not a new physical audio homologation.
+
 ## Browser checkpoint — 2026-09-28
 
 The isolated `--camera-controls` Chromium fixture uses production modules/CSS with
