@@ -32,6 +32,7 @@ def test_credentials_and_operator_boundaries_are_not_dashboard_candidates():
         "db_path", "recordings_dir", "frontend_dir", "host", "port", "discovery_scan_subnets",
         "provisioning_remote_ble_enabled", "provisioning_ble_material_file",
         "provisioning_ble_material_max_age_seconds", "live_hwaccel",
+        "native_resume_on_start",
     }
     required.update(name for name in Settings.model_fields
                     if name.startswith(("native_av_diagnostic_", "broker_read_diagnostic_", "go2rtc_")))

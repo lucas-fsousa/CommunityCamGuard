@@ -13,7 +13,7 @@ import websockets
 
 
 @pytest.mark.parametrize("launcher,call_name", [
-    ("backend/app/main.py", "run"), ("scripts/native_dashboard_trial.py", "Config"),
+    ("backend/app/main.py", "run"), ("backend/app/diagnostics/trial_server.py", "Config"),
 ])
 def test_launcher_flags_disable_deflate_and_deliver_identical_binary_bytes(launcher, call_name):
     tree = ast.parse((Path(__file__).parents[1] / launcher).read_text())
