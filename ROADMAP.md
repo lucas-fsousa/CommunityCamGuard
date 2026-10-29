@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-29 native clean-startup implementation: one-use camera/revision/domain
+checkpoints are saved only after confirmed source/viewer/executor retirement and
+spent atomically before ordinary driver source birth. Opt-in startup checks disk
+policy, revalidates the normal driver A/V offer and uses existing readiness/routes.
+Missing/expired proof or unknown shutdown never grants automatic RTSP fallback.
+98 focused tests passed under192MiB/no swap/50% CPU (146.7MiB peak), Mypy366/Ruff
+passed. See docs/internal/native-clean-startup.md. Paired actual camera3 lifecycle
+acceptance is next; opt-in remains false in production and evidence expiry is not
+bypassed. The operator launcher/monitor are now separate small modules.
+
 2026-10-29 storage acceptance found/fixed a genuine muxing defect: duplicate video
 DTS after resume terminated the original-codec archive output and its shared live
 encoder. Trial T captured the exact DTS collision; parser `moof→mfra` failure was

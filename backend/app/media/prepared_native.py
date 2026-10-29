@@ -9,7 +9,12 @@ from concurrent.futures import Executor, Future
 from ..db import source_policy
 from .retirement_wait import locked_until, remaining
 from .source_offer import NativeSourceOffer
-from .source_registry import SourceCleanupUnconfirmed, SourceRegistry, SourceUnavailable
+from .source_registry import (
+    ManagedSource,
+    SourceCleanupUnconfirmed,
+    SourceRegistry,
+    SourceUnavailable,
+)
 from .viewer_gate import ViewerGate
 
 
@@ -27,6 +32,13 @@ class PreparedNative:
         self.owner = object()  # registry generation, not a browser/vendor token
         self._constructed = threading.Event()
         self._completion: Future | None = None
+        self._published = False
+        self.source: ManagedSource | None = None  # Retained actual worker, never construct an observer copy.
+
+    @property
+    def was_published(self) -> bool:
+        with self._lock:
+            return self._published
 
     @property
     def completion(self) -> Future | None:
@@ -54,7 +66,8 @@ class PreparedNative:
         if self._stop.is_set() or self.offer.valid() is not True:
             raise SourceUnavailable("native source evidence unavailable")
         self._constructed.set()
-        return self.offer.factory()
+        self.source = self.offer.factory()
+        return self.source
 
     def launch(self, executor: Executor) -> Future:
         # Keep submission and handle assignment atomic with close(). A queued or
@@ -100,6 +113,7 @@ class PreparedNative:
             if self._stop.is_set() or self.completion.done() or self.offer.valid() is not True:
                 raise SourceUnavailable("native source ended during publication")
             self._viewers.resume(self.offer.camera_id)
+            self._published = True
 
     def close(self, *, timeout: float = 15.0) -> None:
         """No fallback/resume. Caller must await this, retaining handle on failure."""

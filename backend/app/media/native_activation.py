@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import Executor
 
+from ..db import native_restart
 from .mp4_codec import h264_mime
 from .mp4_fanout import StreamClosedError
 from .owned_retirement import OwnedRetirementCoordinator, RetiredIngress
@@ -62,6 +63,7 @@ class NativeActivation:
                 raise SourceUnavailable("native activation already attempted")
             self._used = True
         with self._retirement.claim(receipt):
+            native_restart.discard(offer.camera_id)
             session = PreparedNative(offer=offer, selection=receipt.selection, sources=self._sources,
                                      viewers=self._retirement.viewer_gate)
             self.session = session

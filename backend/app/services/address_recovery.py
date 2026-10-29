@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from ..config import get_settings
-from ..db import registry
+from ..db import registry, source_policy
 from ..discovery.address_refresh import find_addresses
 from ..media.go2rtc import stream_id
 from ..media.reconciliation import mutation_scope
@@ -89,6 +89,8 @@ class AddressRecovery:
             self._apply_pending()
             return
         cameras = registry.list_cameras()
+        selections=source_policy.read_for(cam.camera_id for cam in cameras)
+        cameras=[cam for cam in cameras if selections[cam.camera_id].permits_legacy_rtsp]
         online = self.media.stream_online()
         self._missing = {
             cam.camera_id: (0 if online.get(stream_id(cam.camera_id)) else

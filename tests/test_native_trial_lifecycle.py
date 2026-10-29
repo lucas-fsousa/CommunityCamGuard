@@ -93,3 +93,13 @@ def test_driver_review_rejects_motion_or_missing_av_before_container_operations(
     monkeypatch.setattr("sys.argv",["trial","--camera-id",ENROLLMENT.camera_id,
         "--directory","unused","--confirm-interruption","--driver-av-evidence","unused.md",*extra])
     with pytest.raises(SystemExit): module.main()
+
+
+@pytest.mark.parametrize('extra',[[],['--native-av'],
+    ['--native-av','--driver-av-evidence','unused.md','--storage-pause','--seconds','100'],
+    ['--native-av','--driver-av-evidence','unused.md','--recover-at','20']])
+def test_restart_rejects_unreviewed_or_overlapping_trials_before_docker(monkeypatch,extra):
+    monkeypatch.setattr(module,'TrialContainers',lambda:pytest.fail('no Docker call allowed'))
+    monkeypatch.setattr('sys.argv',['trial','--camera-id','cam_'+'a'*24,
+        '--directory','unused','--confirm-interruption','--restart-server',*extra])
+    with pytest.raises(SystemExit): module.main()

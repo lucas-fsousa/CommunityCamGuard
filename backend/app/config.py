@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Auto-start go2rtc + recorder + storage monitor with the API (disable for API-only /
     # hardware-less runs and tests).
     autostart_services: bool = True
+    # Only cleanly retired native sources with current driver evidence can resume.
+    # Does not migrate legacy RTSP, grant capabilities or recover an abrupt kill.
+    native_resume_on_start: bool = False
     control_session_warmup: bool = True  # driver-owned read-only preparation; no movement
     # Internal one-shot native-video diagnostic. Disabled unless an operator supplies
     # the reviewed test camera pair; not a dashboard feature or capability override.

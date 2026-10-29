@@ -24,6 +24,9 @@ def _fake_service(name, events):
         def start(self, *a, **k):
             events.append(f"{name}.start")
 
+        def check(self):
+            events.append(f"{name}.check")
+
         def write_config(self, *a, **k):
             events.append(f"{name}.write_config")
 

@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from backend.app.db import registry
+from backend.app.db import registry, source_policy
 from backend.app.discovery import address_refresh
 from backend.app.services import address_recovery
 
@@ -26,6 +26,20 @@ def test_refresh_preserves_identity_and_credentials_and_rejects_races():
     assert not registry.refresh_address(cam, "192.168.1.30")
     registry.delete_camera_by_id(cam.camera_id)
     assert not registry.refresh_address(updated, "192.168.1.30")
+
+
+@pytest.mark.parametrize('mode',['native','owned_rtsp'])
+def test_nonlegacy_source_is_not_treated_as_a_missing_hub_camera(monkeypatch,mode):
+    cam=camera()
+    pending=source_policy.begin_change(cam.camera_id,mode,expected_revision=0)
+    source_policy.activate(cam.camera_id,expected_revision=pending.revision)
+    lookup=Mock(side_effect=AssertionError('no legacy address scan for a native/owned source'))
+    monkeypatch.setattr(address_recovery,'find_addresses',lookup)
+    media=Mock();media.stream_online.return_value={}
+    recovery=address_recovery.AddressRecovery(media,Mock())
+    recovery.tick();recovery.tick()
+    lookup.assert_not_called()
+    assert recovery._missing=={}
 
 
 def test_offline_debounce_cooldown_and_apply(monkeypatch):

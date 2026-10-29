@@ -5,6 +5,7 @@ import threading
 import time
 from collections.abc import Callable
 
+from ..db import native_restart
 from .native_activation import NativeActivation
 from .owned_retirement import OwnedRetirementCoordinator, RetiredIngress
 from .source_executor import SourceExecutor
@@ -14,7 +15,7 @@ from .viewer_gate import ViewerGate
 
 
 class NativeSourceRuntime:
-    def __init__(self, *, viewers: ViewerGate, capacity: int = 1):
+    def __init__(self, *, viewers: ViewerGate, capacity: int = 1, restart_checkpoints: bool = False):
         self.sources = SourceRegistry(capacity=capacity)
         self._executor = SourceExecutor(capacity=capacity)
         self._viewers = viewers
@@ -25,6 +26,20 @@ class NativeSourceRuntime:
         self._stopped = False
         self._operations = 0
         self._activations: dict[str, NativeActivation] = {}
+        self._restart_checkpoints = restart_checkpoints
+
+    def restore(self, *, retirement: OwnedRetirementCoordinator, checkpoint: native_restart.CleanRestart,
+                offer: NativeSourceOffer, apply_routes: Callable[[], None], ready_timeout: float = 5.0):
+        if (not self._restart_checkpoints or retirement.viewer_gate is not self._viewers
+                or offer.camera_id!=checkpoint.camera_id or offer.domain!=checkpoint.domain
+                or offer.valid() is not True):
+            raise SourceUnavailable("reviewed clean native restart required")
+        with self._condition:
+            if self._closed or self._activations:
+                raise SourceUnavailable("idle native runtime required for restart")
+        receipt=retirement.resume_native(checkpoint)
+        return self.activate(retirement=retirement,receipt=receipt,offer=offer,
+                            apply_routes=apply_routes,ready_timeout=ready_timeout)
 
     def activate(self, *, retirement: OwnedRetirementCoordinator, receipt: RetiredIngress,
                  offer: NativeSourceOffer, apply_routes: Callable[[], None], ready_timeout: float = 5.0):
@@ -96,6 +111,11 @@ class NativeSourceRuntime:
             failed = True
         if failed:
             raise SourceCleanupUnconfirmed("native runtime shutdown unconfirmed") from None
+        if self._restart_checkpoints:
+            native_restart.save(tuple(native_restart.CleanRestart(session.offer.camera_id,
+                session.selection.revision,session.offer.domain)
+                for activation in activations if (session:=activation.session) is not None
+                and session.was_published))
         with self._condition:
             self._stopped = True
             self._activations.clear()

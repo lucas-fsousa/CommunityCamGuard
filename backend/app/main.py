@@ -61,6 +61,7 @@ from .recording.storage import StorageMonitor
 from .services.address_recovery import AddressRecovery
 from .services.control_sessions import ControlSessions
 from .services.lifetime import ServiceLifetime
+from .services.native_startup import restore_reviewed
 from .validation_errors import invalid_request
 
 
@@ -84,7 +85,7 @@ async def lifespan(app: FastAPI):
         media = lifetime.own(Go2rtc(owned_ingress=owned_bindings))
         rec = lifetime.own(Recorder(owned_ingress=owned_bindings))
         owned_runtime = lifetime.own(OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings))
-        native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers))
+        native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers, restart_checkpoints=True))
         storage = lifetime.own(StorageMonitor(rec))
         retention = lifetime.own(RetentionCleaner())
         warmer = lifetime.own(Warmer())
@@ -102,8 +103,20 @@ async def lifespan(app: FastAPI):
         app.state.address_recovery = address_recovery
         app.state.control_sessions = control_sessions
         app.state.startup_error = None
+        app.state.native_startup = {}
 
         if settings.autostart_services:
+            if settings.native_resume_on_start:
+                try:
+                    await asyncio.to_thread(storage.check)  # Set the disk policy before any native archive birth.
+                    def publish_native_routes() -> None:
+                        media.write_config()
+                    app.state.native_startup = await asyncio.to_thread(restore_reviewed,native_runtime,
+                        owned_runtime.retirement,rec,publish_native_routes)
+                except Exception:
+                    # Broken native state must not prevent the other legacy cameras
+                    # from starting. Source policy still excludes native fallback.
+                    app.state.native_startup = {"status":"unavailable"}
             try:
                 if settings.manage_go2rtc:
                     media.start()
