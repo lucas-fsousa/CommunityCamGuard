@@ -24,6 +24,11 @@ microphone or external network operations; mocked catalogue/state reads only.
 Runs were sequential, capped512MiB/no swap/50% CPU/128 tasks/60s; largest peak472.9MiB.
 This verifies UI/layout/lifecycle, not a new physical audio homologation.
 
+Deployment verification also caught the new module missing from the explicit
+public-asset allowlist (HTTP404). It is now registered as one reviewed asset;
+unlisted files remain denied. Frontend/static-boundary regressions cover the
+new location rather than expecting intercom factories in the settings popup.
+
 ## Browser checkpoint — 2026-09-28
 
 The isolated `--camera-controls` Chromium fixture uses production modules/CSS with

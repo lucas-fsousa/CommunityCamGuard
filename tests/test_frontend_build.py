@@ -99,11 +99,12 @@ def test_camera_controls_use_driver_catalog_and_semantic_api():
 
 def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
     frontend = Path(__file__).parents[1] / "frontend"
-    live = (frontend / "modules" / "camera-controls.js").read_text()
+    live = (frontend / "modules" / "camera-quick-audio.js").read_text()
     audio = (frontend / "modules" / "audio-message.js").read_text()
     boot = (frontend / "boot.js").read_text()
 
-    assert 'if (cam.audio_messages) widgets.set("audio_messages"' in live
+    assert 'if (cam.audio_messages)' in live
+    assert 'group.append(record)' in live
     assert 'from "ccg/audio-message"' in live
     assert '"ccg/audio-message": moduleUrl("/modules/audio-message.js")' in boot
     assert "navigator.mediaDevices?.getUserMedia" in audio
@@ -125,11 +126,13 @@ def test_audio_message_ui_captures_fixed_pcm_before_explicit_send():
 
 def test_push_to_talk_ui_streams_exact_frames_only_while_held():
     frontend = Path(__file__).parents[1] / "frontend"
-    live = (frontend / "modules" / "camera-controls.js").read_text()
+    live = (frontend / "modules" / "camera-quick-audio.js").read_text()
     talk = (frontend / "modules" / "push-to-talk.js").read_text()
     boot = (frontend / "boot.js").read_text()
 
-    assert 'if (cam.audio_streams) widgets.set("audio_streams"' in live
+    assert 'if (cam.audio_streams) group.append(pushToTalkButton(cam, { inline: true }))' in live
+    assert 'if (!allowed("intercom")) return null' in live
+    assert '"ccg/camera-quick-audio": moduleUrl("/modules/camera-quick-audio.js")' in boot
     assert 'from "ccg/push-to-talk"' in live
     assert '"ccg/push-to-talk": moduleUrl("/modules/push-to-talk.js")' in boot
     assert "const TARGET_RATE = 16000" in talk

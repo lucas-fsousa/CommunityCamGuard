@@ -14,6 +14,7 @@ PUBLIC_ASSETS = frozenset({
     "modules/camera-control-actions.js", "modules/notifications.js", "modules/audio-message.js",
     "modules/recording-playback.js", "modules/camera-provisioning-ble.js",
     "modules/camera-controls.js", "modules/live-cameras.js", "modules/camera-management.js",
+    "modules/camera-quick-audio.js",
 })
 
 
