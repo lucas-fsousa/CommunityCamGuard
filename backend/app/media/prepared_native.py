@@ -106,6 +106,7 @@ class PreparedNative:
                 if not self._stop.is_set():
                     error=_future.exception() if not _future.cancelled() else None
                     active=getattr(self.source,'current',self.source)
+                    details: dict[str,str|bool]
                     try: details=getattr(active,'diagnostics',lambda:{})()
                     except Exception: details={}
                     code=details.get('session_protocol_code','')
