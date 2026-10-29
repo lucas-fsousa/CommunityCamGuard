@@ -17,6 +17,8 @@ Docs are split by audience:
   Docker streaming/shared PTZ installation, persistent support, recovery and limitations.
 - **[Native shared speaker volume](internal/native-shared-volume.md)** — verified
   volume changes without a second connection, delayed readback and camera3 acceptance.
+- **[Native shared image orientation](internal/native-shared-orientation.md)** —
+  normal/inverted control on the media owner, shared typed-write queue and camera3 acceptance.
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
   version-specific MTP/E4 evidence, correlated passive MTP collection, unknown-platform preservation, A4 relay
   advertisement and remaining native-HD gate.

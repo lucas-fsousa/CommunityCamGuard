@@ -20,5 +20,14 @@ No additional public read capability is inferred from an existing write proof.
 
 179 focused tests and Ruff passed under192MiB/no swap (110.1MiB peak); Mypy376
 passed under256MiB. These cover both typed writes, one-slot exclusion, rejection,
-missing preflight, unchanged state, exact readback and no fallback login. Camera3
-installation and actual inversion/restoration are the next delivery step.
+missing preflight, unchanged state, exact readback and no fallback login.
+
+Deployed `9784dd2`, build `b-935096facb0c`: camera3 was confirmed normal by the
+ordinary control API's no-op preflight. It then accepted normal→inverted→normal;
+both changes returned HTTP200, verified, D3 result0, transport/application ACKs
+and exact raw readback. The same MSE socket stayed open and advanced from3 to7
+binary fragments throughout. The native source remained active revision35;
+speaker volume still read50 and all three cameras reported online/recording.
+No sound, light or motor movement was sent; only camera3's image orientation was
+changed and restored. This is protocol/readback acceptance, not a new human
+visual confirmation. GitHub CI and Image passed for the implementation.

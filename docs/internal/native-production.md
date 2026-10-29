@@ -27,7 +27,7 @@ so dashboard online/recording indicators do not depend on a legacy go2rtc produc
 Docker gives the app45s for a clean stop. Clean restart is supported; abrupt-kill
 recovery and prolonged soak/extra hardening are deferred, not release gates.
 
-Streaming, reviewed shared PTZ/state reads and verified speaker-volume changes
+Streaming, reviewed shared PTZ/state reads, verified speaker-volume and orientation changes
 are provided by this native owner. Features that still require a separate account connection remain subject
 to the existing shared-account exclusion; this delivery does not pretend all
 native shared-write features have been implemented. Other-camera foreground
@@ -109,3 +109,10 @@ readback correction and precise evidence. Current runtime is `2a211c9`, build
 `b-be9a4c0476af`, source active revision32. Initial-handshake transport classification
 passed107 focused tests and Mypy374. Other shared-write features remain pending;
 this does not grant or claim unimplemented actions.
+
+Orientation is now also deployed (`9784dd2`, `b-935096facb0c`), with camera3
+normal→inverted→normal accepted by D3/exact readback while the same MSE socket
+continued receiving video. Source stayed active revision35, volume stayed50 and
+all three cameras reported online/recording. See native-shared-orientation.md.
+No other camera was actuated. Human visual confirmation was not requested as
+another release gate; this evidence is explicitly protocol/readback acceptance.

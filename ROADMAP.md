@@ -12,7 +12,7 @@ with a private backup and rollback. Media support is not a30-minute control-cach
 lease; explicit invalidation/authentication/ownership checks remain. Generic native
 online/recording indicators are wired. See docs/internal/native-production.md.
 
-Current delivery (2026-10-29): camera3 now runs native A/V plus reviewed shared
+Initial permanent delivery (2026-10-29): camera3 runs native A/V plus reviewed shared
 PTZ in the normal Docker app (`5de4e7f`, `b-6932aecc11d2`, native active revision11).
 Existing authenticated dashboard MSE delivered H264/AAC; all three recording
 destinations grew and all three cameras report online/recording. Other cameras
@@ -24,11 +24,17 @@ Next work is normal-use feedback, then additional shared native controls and
 multi-camera capacity. No new finite endurance gate is required for this delivery.
 The entries below describe historical checkpoints, not the current deployment.
 
-Next native integration: orientation shares the existing account with streaming
-and volume, using a closed typed D2 union and one inbox instead of duplicating
-workers. Preflight, no-op, D3 and exact readback are implemented; 179 focused tests,
-Ruff and Mypy376 passed. Camera3 deployment/inversion/restoration is pending in
-this step. See docs/internal/native-shared-orientation.md. No sound/light commands.
+Current deployment: `9784dd2` / `b-935096facb0c`, camera3 native active revision35.
+Orientation now shares the account with streaming/PTZ/volume, using a closed typed
+D2 union and one inbox. The ordinary control API confirmed normal→inverted→normal
+with D3/exact readback while the same MSE socket advanced3→7 fragments. Volume
+remained50; all three cameras reported online/recording. 179 focused tests, Ruff,
+Mypy376, full GitHub CI and Image passed. See docs/internal/native-shared-orientation.md.
+No sound/light/motor commands; acceptance is protocol/readback, not a new human
+visual check. Next: capability-cache refresh through the native owner (the current
+background refresher cannot acquire a second account while streaming), followed
+by remaining shared controls and native multi-camera capacity. This is not a new
+finite endurance gate for the delivered orientation control.
 
 Native speaker volume delivered (`2a211c9`, `b-be9a4c0476af`): camera3 accepted
 50→75→50 with preflight, one D2, correlated D3 and exact raw readback on the
