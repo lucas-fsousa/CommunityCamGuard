@@ -207,7 +207,9 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                             result = session.completion.result()
                             status(event="native_ended", elapsed=round(time.monotonic()-started),
                                    reason=result.reason, session_reason=result.session.reason,
-                                   consumer_error=result.failure_type)
+                                   consumer_error=result.failure_type,
+                                   consumer_site=planned.diagnostics().get("consumer_site",""),
+                                   audio_error=planned.diagnostics().get("audio_error",""))
                         except Exception as error:
                             status(event="native_ended", error_type=type(error).__name__,
                                    **planned.diagnostics())
