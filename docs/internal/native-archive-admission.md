@@ -32,3 +32,26 @@ This closes the normal-driver A/V/recording-offer gap. It does not activate nati
 boot by itself. Durable bootstrap/retirement, identity validity maintenance and
 native storage pause/resume integration must be connected before permanent use;
 normal production remains on the established sources in the meantime.
+
+## Driver-offer operator path
+
+The host trial can now take `--driver-av-evidence docs/...md` with `--native-av`,
+and no motion scope. This is an explicit operator attestation that the referenced
+bounded repository document covers native A/V for this exact target. The private
+clone collects fresh correlated identity properties, records the document digest
+and the two read-only media proofs in that clone, then invokes the ordinary
+driver offer with `Recorder.native_archive(camera_id)`. It does not construct a
+special A/V source in place of the driver. No grants are copied to the primary
+database or another camera; the resulting source retains normal driver validation.
+
+Source planning/observation moved into small diagnostic modules rather than
+growing the operator script.46 focused tests passed under192MiB/no swap/50% CPU
+(135.5MiB peak), including document scope, fresh identity refusal, per-camera
+recording policy and trial argument guards. Mypy362 files passed. The live
+driver-offer recording acceptance is still pending at this checkpoint.
+
+CI on the initial archive change exposed a pre-existing ASGI test teardown race
+(`CancelledError` after a received frame). The fixture now sends disconnect and
+waits for actual handler completion and reader release before TestClient teardown.
+60 lifecycle/socket tests and eight isolated repetitions passed under192MiB,
+zero swap and50% CPU. No retry/ignore rule or production error suppression was added.

@@ -13,6 +13,12 @@ Mypy360 files passed. See docs/internal/native-archive-admission.md. The next st
 is exercising this normal driver offer instead of constructing a source by hand.
 Permanent boot still needs durable retirement/bootstrap, identity maintenance and
 storage pause/resume wiring; this change alone is not default native activation.
+The bounded host tool now has an explicit documentary review path that installs
+fresh identity/media evidence only in its private clone and uses the ordinary
+driver archive offer.46 focused tests passed (135.5MiB peak,192MiB/no swap/50% CPU).
+An unrelated WebSocket teardown race found by CI was fixed with disconnect/handler
+completion synchronization and passed eight isolated repeats plus60 regressions.
+The actual driver-offer A/V recording trial is next; no primary rollout was enabled.
 
 2026-10-29 actual recovery milestone: camera3 completed90s native A/V/archive with
 one controlled session retirement at20s and automatic reattachment on the same

@@ -85,3 +85,11 @@ def test_recovery_arguments_are_checked_before_container_operations(monkeypatch,
         "--directory", "unused", "--confirm-interruption", *args])
     with pytest.raises(SystemExit):
         module.main()
+
+
+@pytest.mark.parametrize("extra", [[],["--native-av","--ptz-direction","right"]])
+def test_driver_review_rejects_motion_or_missing_av_before_container_operations(monkeypatch,extra):
+    monkeypatch.setattr(module,"TrialContainers",lambda: pytest.fail("must reject before Docker"))
+    monkeypatch.setattr("sys.argv",["trial","--camera-id",ENROLLMENT.camera_id,
+        "--directory","unused","--confirm-interruption","--driver-av-evidence","unused.md",*extra])
+    with pytest.raises(SystemExit): module.main()

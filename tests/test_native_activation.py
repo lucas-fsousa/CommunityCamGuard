@@ -12,7 +12,7 @@ import pytest
 from _native_fixture import FRAGMENT, INIT
 from _native_runtime_fixture import SyntheticSource, retired_native_transition
 from _rtsp_fixture import CameraFixture, describe
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
 from backend.app import auth
@@ -189,7 +189,13 @@ def test_activated_source_reaches_existing_dashboard_socket_without_legacy_conne
     factory = Mock(return_value=source)
     offer = NativeSourceOffer(camera.camera_id, "test/shared", factory, lambda: True)
     app = FastAPI()
-    app.include_router(media.router)
+    finished = threading.Event()
+    @app.websocket("/api/go2rtc/ws")
+    async def bridge(socket: WebSocket):
+        try:
+            await media.go2rtc_ws(socket)
+        finally:
+            finished.set()
     app.state.native_sources, app.state.viewer_sessions = sources, viewers
     monkeypatch.setattr(media.websockets, "connect", lambda *a, **k: pytest.fail("legacy connection opened"))
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -202,6 +208,9 @@ def test_activated_source_reaches_existing_dashboard_socket_without_legacy_conne
                     socket.send_text('{"type":"mse","value":"avc1.640029"}')
                     assert socket.receive_json() == {"type": "mse", "value": 'video/mp4; codecs="avc1.42C01E"'}
                     assert socket.receive_bytes() == INIT and socket.receive_bytes() == FRAGMENT
+                    socket.close()
+                    assert finished.wait(2)
+                    assert source.hub.reader_count == 0
             assert factory.call_count == 1 and recordings.is_retired(camera.camera_id)
         finally:
             session.close()
