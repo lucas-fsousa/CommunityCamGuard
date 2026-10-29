@@ -11,11 +11,16 @@ from .av_route_io import BudgetSocket
 from .camera_session import open_camera_session
 from .contracts import P2PProbeError
 from .list_dns import resolve_list_hosts
+from .ptz_diagnostics import preparation_failure_reason
 from .session_io import local_route_ip
 
 
 class ReadConnectFailure(P2PProbeError):
     """Opening failed, but any allocated broker socket was confirmed closed."""
+
+    def __init__(self, message: str, *, failure: Exception | None = None):
+        super().__init__(message)
+        self.reason = preparation_failure_reason(failure) if failure is not None else "transport_or_auth"
 
 
 def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
@@ -54,5 +59,5 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
             # A close exception must escape unchanged: it does NOT prove cleanup.
             sock.close()
         if isinstance(exc, Exception):
-            raise ReadConnectFailure("read connection failed with confirmed cleanup") from None
+            raise ReadConnectFailure("read connection failed with confirmed cleanup", failure=exc) from None
         raise

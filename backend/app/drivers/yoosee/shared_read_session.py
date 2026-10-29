@@ -70,12 +70,14 @@ class SharedReadSession:
         self._claim = threading.Lock()
         self._started = False
         self._last_worker: WorkerSummary | None = None
+        self._connection_failure = ""
 
     def diagnostics(self) -> dict[str, str | bool]:
         """Fixed cleanup facts, including failures that cannot return a successful result."""
         worker = self._last_worker
         if worker is None:
-            return {"session_worker": "unavailable"}
+            return {"session_worker": "unavailable", **(
+                {"session_connection_failure": self._connection_failure} if self._connection_failure else {})}
         return {"session_worker": worker.reason,
                 "session_broker_socket_closed": not worker.socket_close_failed,
                 "session_broker_release": worker.media is None or worker.media.broker_release,
@@ -219,7 +221,8 @@ class SharedReadSession:
                 else:
                     result = self._lifecycle.run_media(connect, media=media, delivery=delivery,
                                                        cancelled=should_yield)
-        except ReadConnectFailure:
+        except ReadConnectFailure as error:
+            self._connection_failure = error.reason
             return SharedReadResult(reason or "connection")
         self._last_worker = result
         if self._lifecycle.state == "blocked":

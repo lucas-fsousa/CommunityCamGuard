@@ -107,6 +107,7 @@ def test_cleanup_barrier_is_preserved(setup, monkeypatch, fault):
         monkeypatch.setattr(module, "open_read_connection", fail)
     if fault == "safe":
         assert session.run(cancelled=lambda: False).reason == "connection"
+        assert session.diagnostics()["session_connection_failure"] == "transport_or_auth"
         assert not control_ownership._cleanup_uncertain
     else:
         with pytest.raises((OSError, module.P2PProbeError)):

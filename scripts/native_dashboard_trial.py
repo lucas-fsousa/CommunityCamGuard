@@ -165,7 +165,7 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 if result is not None and result.done() and result.exception() is None:
                     reason = getattr(result.result(), "reason", "unknown")
                 status(event="native_start_failed", error_type=type(error).__name__, reason=reason,
-                       consumer_error=getattr(result.result(), "failure_type", "") if result and result.done() and result.exception() is None else "")
+                       **source.diagnostics())
                 raise
             await asyncio.to_thread(containers.start_hub)
             if not await asyncio.to_thread(application.state.media.wait_healthy, timeout=15):

@@ -11,6 +11,15 @@ deferred uncertain rollback until systemd reaps the whole test group.50 focused
 offline tests passed (192MiB/no swap/50% CPU,106.5MiB peak). Next: actual camera3
 media/archive plus finite PTZ requests and confirmed shutdown; not yet accepted.
 
+Combined attempt I was executed but ended before video readiness (`connection`),
+without any movement request. Confirmed rollback restored the original containers.
+A separate authenticated read-only preflight found the exact test device offline;
+local status also had camera3 offline/not recording, with the other two healthy.
+Its old IP now belongs to the garage MAC: never send physical test actions to that
+IP. Await test-camera availability before repeating, not a fresh vendor-app login.
+Opening failures now preserve fixed safe reason labels;49 focused regressions
+passed under192MiB/no swap/50% CPU (100.2MiB peak). This does not complete coexistence.
+
 2026-10-28 native archive directory maintenance: the native archive consumer now
 prepares its UTC parent paths before each decoder and refreshes a24-hour horizon
 every30s, without another thread/process/camera connection or footage scan.

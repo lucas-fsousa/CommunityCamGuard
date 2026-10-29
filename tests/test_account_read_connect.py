@@ -3,9 +3,21 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.drivers.yoosee.p2p import account_read_connect as opener
-from backend.app.drivers.yoosee.p2p.contracts import P2PProbeError
+from backend.app.drivers.yoosee.p2p.contracts import InitInfoRejectedError, P2PProbeError
 from tests.test_av_route import ENROLLMENT
 from tests.test_broker_model_reply import NODE
+
+
+@pytest.mark.parametrize("error,label", [
+    (P2PProbeError("P2P list service could not be resolved"), "list_dns"),
+    (InitInfoRejectedError(0x216B), "stale_access"),
+    (TimeoutError("private peer details"), "socket_timeout"),
+    (P2PProbeError("private token/endpoint"), "transport_or_auth"),
+])
+def test_connection_failure_keeps_only_fixed_safe_label(error, label):
+    failure = opener.ReadConnectFailure("confirmed cleanup", failure=error)
+    assert failure.reason == label
+    assert "private" not in str(failure) + repr(failure) + failure.reason
 
 
 @pytest.mark.parametrize("fault", [None, "dns", "auth", "target", "offline", "route", "interrupt", "late"])

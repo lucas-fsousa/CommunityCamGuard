@@ -341,3 +341,28 @@ ordinary idempotent rollback. No policy/profile is copied to the primary databas
 covering scope, HTTP isolation, lock ordering, uncertain shutdown and existing
 shared-motion/source/transport behavior. Mypy357 source files passed. This section
 records test preparation, not real shared-motion acceptance.
+
+### First combined attempt I — 2026-10-29 UTC (2026-10-28 local)
+
+The owner authorized proceeding with the camera3 integration. The90s operator
+trial was launched under768MiB/no swap/one-CPU quota, RuntimeMax240s and an
+ExecStopPost rollback after whole-cgroup exit. Its source ended before readiness
+with `connection`; no player acceptance or PTZ command occurred. The clean
+service-owner release and production restoration markers exist. Both original
+containers returned running without OOM. Private artifacts are under
+`temp/native-coexist-20261028-i` (encrypted DB/config/footage must remain ignored).
+
+A subsequent bounded read-only broker preflight authenticated but reported
+`offline` for the exact test device; DNS resolved successfully. Production's
+camera3 status was also offline/not recording, while the other two were online
+and recording. The test camera's stored IP was occupied by the garage MAC, so
+that IP is **not** an authorized physical target. No light/sound/reboot or movement
+was sent. Physical power/Wi-Fi availability must be checked before repeating the
+combined trial; this is not successful coexistence acceptance.
+
+The generic `connection` result had hidden the observed opening stage. The opener
+now retains the existing fixed diagnostic label after confirmed socket cleanup,
+and the session/trial report it without raw exceptions, replies or credentials.
+This is diagnostic only, not permission to retry/renew or bypass cleanup.49
+focused regressions passed under192MiB/no swap/50% CPU (100.2MiB peak), including
+stale-access/DNS/timeout/unknown sanitization. Mypy357 source files passed.
