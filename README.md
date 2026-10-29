@@ -22,7 +22,11 @@ session; physical movement was confirmed. This remains experimental, not the
 default stream. Camera3 also passed [automatic recovery after confirmed session
 retirement](docs/internal/native-clean-recovery.md), with reader reattachment and
 separate archive epochs. Unconfirmed network-loss cleanup, permanent startup and
-multiple native routes remain pending. See the [integration evidence](docs/internal/native-av-delivery.md).
+multiple native routes remain pending. The ordinary driver also passed a90s
+[A/V/archive admission trial](docs/internal/native-archive-admission.md), honoring
+the server's300s segment policy and recovering cleanly without stopping the other
+two recorders. Native storage pause/resume is still required before permanent use.
+See the [integration evidence](docs/internal/native-av-delivery.md).
 
 ## Documentation
 
@@ -473,15 +477,18 @@ now completed15 minutes through the existing dashboard, with the other two recor
 running. A subsequent [90-second native A/V trial](docs/internal/native-av-delivery.md)
 also delivered listen-in AAC and original HEVC/AAC recordings from that same ingress,
 without a parallel camera RTSP capture. The original deployment was restored after
-both trials. Controls coexistence, recovery, longer A/V acceptance and permanent
-rollout remain pending; these experiments do not enable native streaming at startup.
+both trials. Horizontal PTZ coexistence and clean-retirement recovery subsequently
+passed bounded real trials. Longer A/V acceptance, unconfirmed-loss handling and
+permanent rollout remain pending; these experiments do not enable native streaming
+at startup.
 Existing volume, protection-state, protection-schedule and lamp-state queries passed a
 real shared-session trial without interrupting native video. Shared-session PTZ now
 has a dashboard dispatch path behind an explicit, exact-device driver grant, with
 synthetic tests for all four directions and STOP-before-media-close behavior. The
 driver factory requires a separate exact-unit combined-session proof and revalidates
-it before each gesture. No real combined-session proof is enabled; PTZ/video
-coexistence still needs physical acceptance. Shared writes and recovery remain pending.
+it before each gesture. Horizontal movement was physically confirmed in the
+combined trials; no such proof is enabled in the primary production database.
+Shared writes and unconfirmed-loss recovery remain pending.
 See `ROADMAP.md` and
 `docs/internal/0008-reboot-and-two-way-audio-live-in-vendor-p2p.md`.
 

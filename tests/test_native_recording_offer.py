@@ -80,3 +80,27 @@ def test_other_camera_archive_cannot_be_attached_to_offer(evidence,tmp_path):
     spec=NativeArchiveSpec("cam_" + "f"*24,tmp_path,300)
     with pytest.raises(ValueError,match="selected camera"):
         YooseeDriver().native_media_offer(evidence[0],archive=spec)
+
+
+def test_archive_offer_keeps_combined_motion_scope_and_revocation(evidence,tmp_path,monkeypatch):
+    camera,_identity,entry,profile=evidence
+    motion=OperationProof("native_media_ptz",writable=True,options=frozenset({"left","right"}))
+    combined=replace(profile,operations=(*profile.operations,AV,motion))
+    capability_profiles.register(combined,sources={
+        op.key:"sha256:"+"d"*64+" proof#av-motion" for op in combined.operations
+    },reviewed_at=102)
+    capability_rollout.activate(combined)
+    offered=YooseeDriver().native_media_offer(camera,archive=NativeArchiveSpec(camera.camera_id,tmp_path,300))
+    assert offered is not None
+    source=offered.factory().current
+    session=source._session
+    session._active_entry=entry
+    assert session._motion_grants[0].directions==frozenset({"left","right"})
+    submit=Mock(return_value="synthetic-ticket")
+    monkeypatch.setattr(session._lifecycle,"submit_motion",submit)
+    assert session.submit_motion("right")=="synthetic-ticket"
+    capability_rollout.activate(replace(combined,operations=(profile.operations[0],motion)))
+    assert not offered.valid()
+    with pytest.raises(ValueError,match="evidence"):
+        session.submit_motion("right")
+    assert submit.call_count==1 and source._archive_segment_seconds==300

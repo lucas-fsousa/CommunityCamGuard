@@ -9,8 +9,7 @@ generic server-owned archive plan and admits original-codec native A/V only with
 its own explicit per-device proof. Missing/revoked recording support cannot fall
 back silently to video-only. Configured segment length now reaches native FFmpeg
 (not fixed60s).128 focused tests passed under256MiB/no swap/50% CPU,155.1MiB peak;
-Mypy360 files passed. See docs/internal/native-archive-admission.md. The next step
-is exercising this normal driver offer instead of constructing a source by hand.
+Mypy360 files passed. See docs/internal/native-archive-admission.md.
 Permanent boot still needs durable retirement/bootstrap, identity maintenance and
 storage pause/resume wiring; this change alone is not default native activation.
 The bounded host tool now has an explicit documentary review path that installs
@@ -18,7 +17,13 @@ fresh identity/media evidence only in its private clone and uses the ordinary
 driver archive offer.46 focused tests passed (135.5MiB peak,192MiB/no swap/50% CPU).
 An unrelated WebSocket teardown race found by CI was fixed with disconnect/handler
 completion synchronization and passed eight isolated repeats plus60 regressions.
-The actual driver-offer A/V recording trial is next; no primary rollout was enabled.
+The actual90s driver-offer A/V recording trial now passed: server policy300s,
+one clean recovery, post-recovery H264/AAC player delivery and two retained original
+HEVC/AAC epochs (22s/65s). The other two recorders stayed active; rollback passed.
+Peak196.7MiB/no swap; FDs31 stable.44 follow-up scope/revocation tests passed
+under192MiB/no swap/50% CPU (164.3MiB peak). CI5370 passed,4 skipped. No primary
+rollout was enabled. Next: native storage pause/resume, then durable safe boot;
+do not repeat the normal-driver A/V admission acceptance as pending.
 
 2026-10-29 actual recovery milestone: camera3 completed90s native A/V/archive with
 one controlled session retirement at20s and automatic reattachment on the same

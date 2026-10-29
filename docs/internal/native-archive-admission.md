@@ -48,10 +48,47 @@ Source planning/observation moved into small diagnostic modules rather than
 growing the operator script.46 focused tests passed under192MiB/no swap/50% CPU
 (135.5MiB peak), including document scope, fresh identity refusal, per-camera
 recording policy and trial argument guards. Mypy362 files passed. The live
-driver-offer recording acceptance is still pending at this checkpoint.
+driver-offer recording acceptance was subsequently completed below.
 
 CI on the initial archive change exposed a pre-existing ASGI test teardown race
 (`CancelledError` after a received frame). The fixture now sends disconnect and
 waits for actual handler completion and reader release before TestClient teardown.
 60 lifecycle/socket tests and eight isolated repetitions passed under192MiB,
 zero swap and50% CPU. No retry/ignore rule or production error suppression was added.
+
+## Actual ordinary-driver acceptance — trial N,2026-10-29
+
+Camera3 (`GW-IPC-AK-AV100.25`, firmware40.1.14) completed a90-second trial using
+the ordinary driver factory, not a separately constructed experimental source.
+Fresh correlated identity and document-backed read-only media proofs existed only
+in the private clone. Readiness identified `source_origin=driver` and the server's
+configured `archive_segment_seconds=300`. No PTZ grant or physical control command
+was included, and primary rollout remained unchanged.
+
+A controlled clean session retirement at20s recovered once by30s on the same
+source revision2. An independent player socket after recovery delivered H264/AAC
+(`avc1.42C028,mp4a.40.2`); a bounded file-only decoder accepted both tracks. This
+trial did not independently capture the pre-recovery player socket; the preceding
+clean-recovery trials cover that separate acceptance.
+
+Both original1920x1080 HEVC /16kHz mono AAC archive epochs survived, with video
+durations22.07s and65.07s. The second file crossed the former hard-coded60s split
+without splitting; this is not a300s rollover or long-term endurance result. The
+two other recorders stayed active at every10s sample. FDs stayed at31. Confirmed
+server stop and rollback restored the original containers and configuration.
+
+The complete host group used196.7MiB peak, no swap,27.895 CPU seconds over108.470s
+wall time (768MiB hard cap,100% CPU). Probing the original files peaked at44.1MiB;
+decoding the browser sample peaked at28.5MiB. Private artifacts are under ignored
+`temp/native-driver-av-20261029-n`; they are not committed or required at startup.
+
+An additional44-test group passed under192MiB/no swap/50% CPU (164.3MiB peak).
+It includes ordinary archive offers retaining separately reviewed PTZ direction
+scope and rejecting subsequent motion when the A/V proof is revoked, without
+opening a camera connection. CI at `e5c8aeb` passed5370 tests (4 skipped); its
+runtime image workflow also passed at the preceding runtime-equivalent commit.
+
+Remaining permanent-use gates are storage pause/resume without losing live view,
+durable confirmed-retirement/bootstrap and identity validity maintenance. No
+default native activation, unsafe-loss recovery or multi-native rollout is
+certified by this acceptance.
