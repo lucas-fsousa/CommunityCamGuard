@@ -124,6 +124,17 @@ def test_input_flood_has_fixed_bound(monkeypatch):
     assert sock.closed == 1
 
 
+@pytest.mark.parametrize('message,code',[
+    ('conflicting KCP duplicate','kcp_conflicting_duplicate'),('private-value-do-not-log','')])
+def test_protocol_diagnostics_use_known_codes_not_exception_payload(monkeypatch,message,code):
+    sock=WorkerSocket()
+    def fail(_): raise ValueError(message)
+    monkeypatch.setattr(sock,'recvfrom',fail)
+    result=worker(sock).run(sock)
+    assert result.protocol_code==code and result.reason=='protocol'
+    assert 'private-value' not in repr(result)
+
+
 def test_drain_allows_inflight_response_but_rejects_queued_and_new_work(monkeypatch):
     sock = WorkerSocket()
     owner = worker(sock)

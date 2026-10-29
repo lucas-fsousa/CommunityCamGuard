@@ -37,6 +37,7 @@ class WorkerSummary:
     media: MediaRouteResult | None = None
     tcp: TcpMediaResult | None = None
     protocol_site: str = ""
+    protocol_code: str = ""
 
 
 class _Stop(Exception):
@@ -125,6 +126,7 @@ class AccountReadWorker:
         output = AccountOutputBudget(policy=self._policy, clock=self._clock)
         reason = "stopped"
         protocol_site = ""
+        protocol_code = ""
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
@@ -298,9 +300,18 @@ class AccountReadWorker:
         except ValueError as error:
             reason = "protocol"
             trace=error.__traceback__
+            sites=[]
             while trace is not None:
-                protocol_site=f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
+                sites.append(f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}")
                 trace=trace.tb_next
+            protocol_site='/'.join(sites[-2:])
+            protocol_code={
+                'KCP assembly deadline exceeded':'kcp_assembly_timeout',
+                'invalid KCP receive segment':'kcp_invalid_segment',
+                'conflicting KCP duplicate':'kcp_conflicting_duplicate',
+                'KCP receive budget exceeded':'kcp_receive_budget',
+                'invalid KCP fragment chain':'kcp_fragment_chain',
+            }.get(str(error),'')
         finally:
             try:
                 if lamp is not None:
@@ -360,4 +371,4 @@ class AccountReadWorker:
         return WorkerSummary(reason, sent, received, beats, close_failed,
                              motion.result if motion is not None else last_motion,
                              media.result if media is not None else None,
-                             tcp.result if tcp is not None else None,protocol_site)
+                             tcp.result if tcp is not None else None,protocol_site,protocol_code)

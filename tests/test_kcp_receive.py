@@ -92,6 +92,33 @@ def test_completed_message_resets_assembly_deadline():
     assert receiver.receive(segment(1)).messages == (b"data",)
 
 
+def test_next_buffered_message_does_not_inherit_completed_assembly_age():
+    clock=[0.0]
+    receiver=KcpReceiver(42,clock=lambda:clock[0])
+    receiver.receive(segment(1,body=b'b'))
+    receiver.receive(segment(3,body=b'd'))
+    clock[0]=1.5
+    assert receiver.receive(segment(0,body=b'a')).messages==(b'a',b'b')
+    assert receiver.next_sequence==2 and receiver.buffered_bytes==1
+    clock[0]=2.1
+    receiver.expire()  # old code falsely expired although previous message finished0.6s ago
+    clock[0]=3.4
+    receiver.receive(segment(3,body=b'd'))  # duplicate cannot refresh the new assembly
+    clock[0]=3.5
+    with pytest.raises(ReceiveError,match='deadline'): receiver.expire()
+    assert receiver.closed and receiver.buffered_bytes==0
+
+
+def test_partial_message_progress_still_has_original_bounded_deadline():
+    clock=[0.0]
+    receiver=KcpReceiver(42,clock=lambda:clock[0])
+    receiver.receive(segment(0,fragment=2))
+    clock[0]=1.5
+    assert receiver.receive(segment(1,fragment=1)).messages==()
+    clock[0]=2.0
+    with pytest.raises(ReceiveError,match='deadline'): receiver.expire()
+
+
 @pytest.mark.parametrize("kwargs", [dict(max_segments=129), dict(max_bytes=2**30),
                                     dict(timeout=float("nan")), dict(initial_sequence=-1)])
 def test_invalid_limits(kwargs):

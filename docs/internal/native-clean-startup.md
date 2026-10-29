@@ -69,6 +69,16 @@ The operator now exits with an error if Uvicorn returns without a confirmed clea
 stop marker, rather than letting a zero process status imply successful cleanup.
 No primary boot opt-in/profile/source-policy changes were made.
 
+Follow-up X/Y isolated the intermittent failure to `KcpReceiver.expire()`:
+`session_protocol_code=kcp_assembly_timeout`. Labels are allowlisted, never raw
+exception messages. Static review and a synthetic clock regression reproduced a
+deadline bookkeeping defect: after finishing an assembly, retained future sequence
+numbers kept the previous assembly's age. The next message could expire less than
+two seconds after real completed-message progress. Resetting the assembly origin
+only when a message completes fixes that case. Partial progress, duplicates/ACKs
+and out-of-order arrival alone still cannot renew it; byte/segment limits and
+the two-second timeout are unchanged. Repaired paired camera acceptance is pending.
+
 CI caught missing configuration-inventory classification and the old relocated
 launcher AST test; both were corrected in `0bdacd8`. CI then passed5412 tests
 (1 unrelated skip), Node contracts, with the runtime Image smoke already green.

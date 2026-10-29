@@ -122,4 +122,10 @@ class KcpReceiver:
                 self._remaining = None
         if not self._pending and not self._parts:
             self._since = None
+        elif messages:
+            # The previous assembly completed. Buffered future sequence numbers
+            # must not make the next message inherit that assembly's old age.
+            # Partial progress, duplicates/ACKs and out-of-order arrivals alone
+            # never extend this deadline; byte/segment bounds stay unchanged.
+            self._since = self.clock()
         return ReceiveResult(True, self.next_sequence, tuple(messages))
