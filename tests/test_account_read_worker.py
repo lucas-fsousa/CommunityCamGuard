@@ -135,6 +135,23 @@ def test_protocol_diagnostics_use_known_codes_not_exception_payload(monkeypatch,
     assert 'private-value' not in repr(result)
 
 
+def test_wrapped_media_timeout_keeps_safe_classification(monkeypatch):
+    from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+    sock = WorkerSocket()
+    def fail(_):
+        try:
+            try:
+                raise ReceiveError('KCP assembly deadline exceeded')
+            except ValueError:
+                raise ReceiveError('AV receive session failed') from None
+        except ValueError:
+            raise ReceiveError('TCP AV incoming stream failed') from None
+    monkeypatch.setattr(sock, 'recvfrom', fail)
+    result = worker(sock).run(sock)
+    assert result.protocol_code == 'kcp_assembly_timeout'
+    assert result.reason == 'protocol' and sock.closed == 1
+
+
 def test_drain_allows_inflight_response_but_rejects_queued_and_new_work(monkeypatch):
     sock = WorkerSocket()
     owner = worker(sock)

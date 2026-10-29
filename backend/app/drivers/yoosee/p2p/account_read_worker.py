@@ -299,6 +299,13 @@ class AccountReadWorker:
             reason = "socket"
         except ValueError as error:
             reason = "protocol"
+            # TCP/AV boundaries sanitize their public error messages. Retain the
+            # underlying fixed classification rather than treating a wrapped KCP
+            # timeout as an unknown protocol failure. Never log exception text.
+            for _ in range(8):
+                if not isinstance(error.__context__, ValueError):
+                    break
+                error = error.__context__
             trace=error.__traceback__
             sites=[]
             while trace is not None:
