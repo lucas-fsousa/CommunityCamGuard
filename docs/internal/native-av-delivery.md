@@ -412,3 +412,14 @@ The same regression passed with at most2 descriptors growth.74 focused regressio
 passed under192MiB/no swap/50% CPU (120.6MiB peak); Mypy357 files passed. No database
 schema or footage changes are part of this correction. This removes a reproduced
 resource-retention path, not proof of a completed endurance/reconnection test.
+
+Rollout checkpoint: `0bad44b` passed CI5293 tests (3 skipped), frontend contracts
+and the image workflow. Its bounded local build was deployed to the WSL app only,
+build `b-16bfa0fbec93`. Camera3 was found at192.168.0.106 by its exact MAC with RTSP
+open; the existing authenticated camera-registration API updated only its address
+using its existing credentials, restoring ordinary viewing after the trial.
+All three cameras then reported online/recording and all three recording files
+grew. Authentication/rejection and HTTPS health passed; primary source policies
+remained legacy revision0 and no trial native source stayed active. No OOM or
+unexpected container restart was observed. The active installation is not yet a
+permanent native-stream deployment.

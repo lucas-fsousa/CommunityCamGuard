@@ -16,6 +16,12 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 > are physically validated on the current Yoosee units through the driver's LAN RTSP backchannel.
 > This does not establish support for every model/firmware or every fallback transport.
 
+Yoosee proprietary-streaming status: bounded90s/60s camera3 trials delivered native
+video/audio and original-codec recordings while horizontal PTZ used the same
+session; physical movement was confirmed. This remains experimental, not the
+default stream. Automatic reconnection, permanent startup and multiple native
+routes are still pending. See the [integration evidence](docs/internal/native-av-delivery.md).
+
 ## Documentation
 
 ARM64 status: an experimental Android/Termux + Ubuntu/PRoot test recorded three

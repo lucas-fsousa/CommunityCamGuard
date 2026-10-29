@@ -17,6 +17,11 @@ synthetic. Details/measurements are in docs/internal/native-av-delivery.md.
 The same trial exposed FD growth. A GC-disabled offline test reproduced125 retained
 SQLite handles over25 recording cycles; explicit connection closure fixes it.
 74 recording/lifecycle regressions passed under192MiB/no swap/50% CPU (120.6MiB peak).
+CI then passed5293 tests (3 skipped), Node contracts and image checks. The fix is
+deployed on WSL, build `b-16bfa0fbec93`. Exact-MAC discovery recovered camera3 at
+its new LAN address; all three cameras are online and their recordings grew after
+restoration. Primary source policies remain unchanged (legacy revision0); default
+native activation/reconnect and multiple native routes are the remaining work.
 
 2026-10-28 next vertical delivery: the operator A/V/archive trial now accepts
 explicit target-only PTZ directions, without persistent proof/profile changes.
