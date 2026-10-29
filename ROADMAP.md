@@ -30,6 +30,13 @@ validity maintenance before permanent native use. Opt-in remains false in produc
 The operator launcher/monitor remain separate small modules. CI5417 tests/Node
 contracts and Image smoke passed; Mypy366/Ruff passed.
 
+WSL delivery: runtime `449f0a0`, build `b-653cb06c9678`, is deployed after bounded
+512MiB/no-extra-swap/50% CPU build. Auth/local/public HTTPS health/build and growth
+of all three recordings passed. App-only replacement, no OOM/unexpected restart.
+Primary native resume stays false, with zero native checkpoints and all three
+legacy revision0 policies unchanged. Private test state was not promoted. Next:
+shared-session identity evidence maintenance, then permanent native selection.
+
 2026-10-29 storage acceptance found/fixed a genuine muxing defect: duplicate video
 DTS after resume terminated the original-codec archive output and its shared live
 encoder. Trial T captured the exact DTS collision; parser `moof→mfra` failure was

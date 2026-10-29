@@ -111,3 +111,18 @@ No primary native selection/boot opt-in is installed by this change. Identity
 evidence maintenance is next before permanent use; production rollout, abrupt-loss
 recovery and multiple native routes remain separate gates. Existing short snapshot
 validity is deliberately not bypassed.
+
+## Saved WSL deployment
+
+Runtime `449f0a0` is deployed as build `b-653cb06c9678`, image
+`community-cam-guard-app:wsl-449f0a0` (`b5aa8269ae82`). The clean git-archive build
+used512MiB/no extra swap/50% CPU and only the app was replaced after green CI/Image.
+The previous `wsl-eb1f930` image is retained. Local/public HTTPS health/build,
+primary login/unauthenticated rejection and growth of all three recording files
+passed. Containers show no OOM or unexpected restart.
+
+Production explicitly remains `native_resume_on_start=False`, zero clean native
+checkpoints and three active legacy revision0 selections. Trial profiles/checkpoints
+were not copied to the primary database. There are no running physical test tasks.
+Next implementation is shared-session identity evidence maintenance before enabling
+permanent native selection; do not bypass the existing freshness/cleanup guards.
