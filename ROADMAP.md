@@ -4,6 +4,13 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 next vertical delivery: the operator A/V/archive trial now accepts
+explicit target-only PTZ directions, without persistent proof/profile changes.
+Other camera/control writes stay blocked. Corrected original-DB lock ordering and
+deferred uncertain rollback until systemd reaps the whole test group.50 focused
+offline tests passed (192MiB/no swap/50% CPU,106.5MiB peak). Next: actual camera3
+media/archive plus finite PTZ requests and confirmed shutdown; not yet accepted.
+
 2026-10-28 native archive directory maintenance: the native archive consumer now
 prepares its UTC parent paths before each decoder and refreshes a24-hour horizon
 every30s, without another thread/process/camera connection or footage scan.

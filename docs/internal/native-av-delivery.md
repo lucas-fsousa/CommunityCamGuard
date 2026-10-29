@@ -320,3 +320,24 @@ follow-up (`d1c77e3`) also passed CI. Local authentication/rejection, HTTPS,
 deflate-free socket negotiation and all three recording files growing were checked
 after app replacement. The shared hub/tunnel stayed running; native sources stayed
 inactive. No physical camera action was sent and no OOM/unexpected restart observed.
+
+## Scoped motion trial preparation — 2026-10-28
+
+The operator trial accepts explicit repeated `--ptz-direction` flags only with
+`--native-av`. This creates an ephemeral exact-enrollment grant for the specified
+test camera/directions, not a production `native_media_ptz` proof or brand-wide
+capability. The HTTP guard opens only that camera's existing PTZ endpoint; all
+other control writes remain blocked. No motion is automatic. Normal driver
+authentication, finite gestures, STOP ownership and enrollment revalidation apply.
+
+Preflight now requires existing PTZ support and validates the motion scope before
+interruption. The original database lock is acquired only after confirmed container
+stop and released before production restart. If trial service shutdown is uncertain,
+in-process restoration is deferred: the required systemd ExecStopPost restores only
+after the trial process group is gone. A clean service-owner release permits the
+ordinary idempotent rollback. No policy/profile is copied to the primary database.
+
+50 focused synthetic tests passed under192MiB/no swap/50% CPU (106.5MiB peak),
+covering scope, HTTP isolation, lock ordering, uncertain shutdown and existing
+shared-motion/source/transport behavior. Mypy357 source files passed. This section
+records test preparation, not real shared-motion acceptance.

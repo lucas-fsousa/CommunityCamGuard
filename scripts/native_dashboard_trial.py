@@ -17,6 +17,7 @@ from pathlib import Path
 
 from backend.app.config import Settings, get_settings
 from backend.app.diagnostics.trial_containers import TrialContainers, docker, restore_trial
+from backend.app.diagnostics.trial_motion import motion_grants, write_allowed
 from backend.app.media.config_file import write_private_config
 from backend.app.media.server_owner import ServerOwner
 
@@ -28,6 +29,8 @@ def main():
     parser.add_argument("--restore", type=Path)
     parser.add_argument("--sample-audio", action="store_true")
     parser.add_argument("--native-av", action="store_true", help="test validated native AAC and original-codec archive")
+    parser.add_argument("--ptz-direction", action="append", choices=("left", "right", "up", "down"), default=[],
+                        help="explicit operator trial scope; permits only target-camera PTZ, no automatic motion")
     parser.add_argument("--seconds", type=int, default=900)
     parser.add_argument("--confirm-interruption", action="store_true")
     args = parser.parse_args()
@@ -35,7 +38,8 @@ def main():
         restore_trial(args.restore)
         return
     if (not args.camera_id or not args.directory or not args.confirm_interruption
-            or not 30 <= args.seconds <= 900 or (args.sample_audio and args.native_av)):
+            or not 30 <= args.seconds <= 900 or (args.sample_audio and args.native_av)
+            or (args.ptz_direction and not args.native_av)):
         parser.error("explicit interruption approval and 30..900 seconds required")
     original = get_settings()
     database = original.db_path.resolve()
@@ -50,8 +54,8 @@ def main():
     backup = config_path.read_text()
     write_private_config(trial / "original-go2rtc.json", backup)
     owner = ServerOwner(database)
-    owner.acquire()
     clone = trial / "ccg.db"
+    server_started = False
     try:
         # Validate encrypted enrollment before interrupting anything.
         get_settings.cache_clear()
@@ -63,6 +67,9 @@ def main():
         from backend.app import drivers
         if camera is None or entry is None or drivers.for_camera(camera).key != "yoosee":
             raise RuntimeError("reviewed enrolled Yoosee test target required")
+        if args.ptz_direction and camera.capabilities.get("ptz") is not True:
+            raise RuntimeError("trial target requires existing PTZ support")
+        motion_grants(entry, frozenset(args.ptz_direction))
         print(json.dumps({"event": "maintenance_start", "camera_id": camera.camera_id}), flush=True)
         owners = []
         for other in registry.list_cameras():
@@ -82,6 +89,8 @@ def main():
                    "--mount", f"type=bind,src={item['path']},dst=/target", "--entrypoint", "/bin/chown",
                    manifest["helper_image"], f"{os.getuid()}:{os.getgid()}", "/target")
         containers.stop_all()
+        # Production owns this same bind-mounted lock until its confirmed exit.
+        owner.acquire()
         with (closing(sqlite3.connect(f"file:{database}?mode=ro", uri=True)) as source,
               closing(sqlite3.connect(clone)) as target):
             source.backup(target)
@@ -90,17 +99,23 @@ def main():
                           GO2RTC_CONFIG=str(config_path), RECORDINGS_DIR="recordings", FRONTEND_DIR="frontend",
                           CONTROL_SESSION_WARMUP="false")
         get_settings.cache_clear()
+        server_started = True
         run_server(args.camera_id, args.seconds, trial, containers, entry,
-                   sample_audio=args.sample_audio, native_av=args.native_av)
+                   sample_audio=args.sample_audio, native_av=args.native_av,
+                   ptz_directions=frozenset(args.ptz_direction))
     finally:
-        try:
-            if (trial / "rollback.json").exists():
+        owner.close()  # release the original DB before restarting its app
+        if (trial / "rollback.json").exists():
+            if not server_started or (trial / "server-stopped.json").exists():
                 restore_trial(trial)
-        finally:
-            owner.close()
+            else:
+                # ExecStopPost restores after the whole trial cgroup is gone.
+                # An uncertain live native owner cannot coexist with production.
+                print(json.dumps({"event": "rollback_deferred_until_process_exit"}), flush=True)
 
 
-def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audio=False, native_av=False):
+def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audio=False, native_av=False,
+               ptz_directions=frozenset()):
     import uvicorn
 
     from backend.app.db import p2p
@@ -128,11 +143,14 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 # Precreate UTC hour paths before FFmpeg starts, without resuming the RTSP recorder.
                 await asyncio.to_thread(application.state.rec._ensure_dirs, [camera_id])
                 archive = Path(application.state.rec._output_template(camera_id))
+            def valid():
+                return p2p.read_registered_enrollment(camera_id) == enrollment
+            grants = motion_grants(enrollment, ptz_directions)
             source = NativeVideoSource(camera_id, enrollment.device_id, delivery=audio,
-                                       native_audio=native_av, archive=archive)
+                                       native_audio=native_av, archive=archive,
+                                       motion_grants=grants, motion_valid=valid if grants else None)
             offer = NativeSourceOffer(camera_id, NativeVideoSource.admission_domain,
-                lambda: source,
-                lambda: p2p.read_registered_enrollment(camera_id) == enrollment)
+                lambda: source, valid)
             receipt = await asyncio.to_thread(retirement.retire_legacy, camera_id,
                 expected_revision=0, retire_ingress=containers.confirm_closed)
             try:
@@ -154,7 +172,8 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 raise RuntimeError("other-camera hub did not return")
             await asyncio.to_thread(application.state.rec.start)
             status(event="native_ready", camera_id=camera_id, seconds=seconds,
-                   other_recorders=len(application.state.rec._procs), frame_rate=source.frame_rate)
+                   other_recorders=len(application.state.rec._procs), frame_rate=source.frame_rate,
+                   ptz_directions=sorted(ptz_directions))
             async def monitor():
                 started = time.monotonic()
                 sampled = False
@@ -186,11 +205,11 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 await asyncio.gather(task, return_exceptions=True)
 
     app.router.lifespan_context = lifespan
-    # Test is view-only: no accidental light/sound/control writes during acceptance.
+    # View-only by default; explicit trial motion never grants light/sound/other writes.
     @app.middleware("http")
     async def view_only(request, call_next):
-        if request.method not in {"GET", "HEAD", "OPTIONS"} and request.url.path not in {
-                "/api/login", "/api/logout", "/api/media/client-event"}:
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not write_allowed(
+                request.url.path, camera_id=camera_id, motion=bool(ptz_directions)):
             from fastapi.responses import JSONResponse
             return JSONResponse({"detail": "view-only native video trial"}, status_code=409)
         return await call_next(request)
@@ -209,7 +228,12 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
             for sig, handler in before.items():
                 signal.signal(sig, handler)
     server.capture_signals = operator_signals
-    server.run()
+    try:
+        server.run()
+    finally:
+        lifetime = getattr(app.state, "service_lifetime", None)
+        if lifetime is not None and not lifetime.owner.acquired:
+            write_private_config(trial / "server-stopped.json", '{"stopped":true}')
 
 
 if __name__ == "__main__":
