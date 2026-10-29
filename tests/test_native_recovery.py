@@ -13,7 +13,7 @@ from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
 
 @pytest.mark.parametrize("reason,allowed", [
     ("socket",True),("media_complete",True),("contended",True),("stopped",True),
-    ("transport",True),("heartbeat_timeout",True),("lifetime",True),
+    ("transport",True),("heartbeat_timeout",True),("lifetime",True),("busy",True),
     ("protocol",False),("consumer_failed",False),("enrollment_changed",False),
     ("registry_unavailable",False),("unknown",False),
 ])

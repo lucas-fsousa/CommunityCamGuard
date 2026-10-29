@@ -61,6 +61,10 @@ def reserve_read_handoff(*, wait: bool = True) -> Iterator[None]:
 
 def warm(camera: Camera, profile: PtzProfile) -> bool:
     """Prepare authenticated control state with correlated reads only; no motion."""
+    from .shared_control_reads import has_session
+
+    if has_session(camera.camera_id):
+        return False
     with _guard:
         if _active or _warming:
             return False

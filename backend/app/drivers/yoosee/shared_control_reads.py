@@ -14,13 +14,14 @@ from .shared_read_session import SharedReadSession
 
 _lock = threading.Lock()
 _sessions: dict[str, SharedReadSession] = {}
+_owners: dict[str, object] = {}  # retain control admission across clean reconnect gaps
 _paths = {"speaker_volume": VOLUME_READ_PATH, "smart_protection": SMART_PROTECTION_READ_PATH,
           "smart_protection_schedule": SMART_PROTECTION_READ_PATH}
 
 
 def has_session(camera_id: str | None) -> bool:
     with _lock:
-        return camera_id in _sessions
+        return camera_id in _sessions or camera_id in _owners
 
 
 def session_for(entry: P2PEnrollment) -> SharedReadSession | None:
@@ -28,6 +29,9 @@ def session_for(entry: P2PEnrollment) -> SharedReadSession | None:
         return None
     with _lock:
         session = _sessions.get(entry.camera_id)
+        recovering = entry.camera_id in _owners and session is None
+    if recovering:
+        raise ControlNotReady("native media session is recovering; control was not repeated")
     if session is not None and not session.matches_enrollment(entry):
         raise ControlNotReady("native shared-control session is not ready for this enrollment")
     return session
@@ -36,16 +40,34 @@ def session_for(entry: P2PEnrollment) -> SharedReadSession | None:
 def require_legacy_available(camera_id: str | None) -> None:
     """Unintegrated operations must not displace a live native account to log in again."""
     with _lock:
-        occupied = camera_id in _sessions
+        occupied = camera_id in _sessions or camera_id in _owners
     if occupied:
         raise ControlNotReady("this operation cannot yet share the active native streaming session")
+
+
+@contextmanager
+def reserve_native_owner(camera_id: str) -> Iterator[None]:
+    """One recovery-run lease, not a broker lock. Unknown exit stays reserved."""
+    owner = object()
+    with _lock:
+        if _owners or _sessions:
+            raise ControlNotReady("native control owner already reserved")
+        _owners[camera_id] = owner
+    confirmed = False
+    try:
+        yield
+        confirmed = True
+    finally:
+        with _lock:
+            if confirmed and _owners.get(camera_id) is owner:
+                del _owners[camera_id]
 
 
 @contextmanager
 def publish(camera_id: str, session: SharedReadSession) -> Iterator[None]:
     """Run-lifetime lease, not a second owner, thread, socket or capability grant."""
     with _lock:
-        if _sessions:
+        if _sessions or (_owners and camera_id not in _owners):
             raise ControlNotReady("native shared-control owner already published")
         _sessions[camera_id] = session
     try:

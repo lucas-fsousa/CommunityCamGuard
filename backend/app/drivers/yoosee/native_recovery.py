@@ -5,6 +5,18 @@ from collections.abc import Callable
 from ...media.recovering_source import RecoveringSource
 from ...media.source_registry import ManagedSource
 from .native_video_source import NativeVideoResult, NativeVideoSource
+from .shared_control_reads import reserve_native_owner
+
+
+class _OwnedRecovery(RecoveringSource):
+    def __init__(self, initial: NativeVideoSource, *, camera_id: str,
+                 factory: Callable[[], NativeVideoSource], valid: Callable[[], bool]):
+        super().__init__(initial, factory=factory, valid=valid, retryable=retryable)
+        self._camera_id = camera_id
+
+    def run(self, *, cancelled: Callable[[], bool]) -> object:
+        with reserve_native_owner(self._camera_id):
+            return super().run(cancelled=cancelled)
 
 
 def retryable(result: object, source: ManagedSource) -> bool:
@@ -18,7 +30,7 @@ def retryable(result: object, source: ManagedSource) -> bool:
         or (worker.motion is not None and worker.motion.start_attempted and not worker.motion.release_delivery_confirmed)
     ):
         return False
-    if result.reason in {"socket", "media_complete", "contended", "stopped",
+    if result.reason in {"socket", "media_complete", "contended", "stopped", "busy",
                          "transport", "heartbeat_timeout", "lifetime"}:
         return True
     if result.reason == "connection":
@@ -29,6 +41,6 @@ def retryable(result: object, source: ManagedSource) -> bool:
     return False
 
 
-def wrap(initial: NativeVideoSource, *, factory: Callable[[], NativeVideoSource],
+def wrap(initial: NativeVideoSource, *, camera_id: str, factory: Callable[[], NativeVideoSource],
          valid: Callable[[], bool]) -> RecoveringSource:
-    return RecoveringSource(initial, factory=factory, valid=valid, retryable=retryable)
+    return _OwnedRecovery(initial, camera_id=camera_id, factory=factory, valid=valid)

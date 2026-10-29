@@ -34,7 +34,7 @@ no swap,50% CPU, observed157.5MiB peak. Mypy359 source files passed under256MiB.
 Tests cover confirmed teardown before replacement, shared-domain exclusion during
 backoff, finite memory/history, capped waits, healthy reset, cancellation, revocation,
 unconfirmed TCP/STOP/route cleanup and preservation of the current driver grants.
-Real clean-session reacquisition and reader reattachment remain to be measured.
+These were initial offline checks; the subsequent real acceptance is below.
 
 ## Real camera3 recovery trial L — 2026-10-29
 
@@ -76,3 +76,20 @@ The follow-up classifier also recognizes the worker's existing clean `transport`
 labels. Cleanup facts are still required; unknown resolver cleanup is not retried.
 168 focused regressions passed under192MiB/no swap/50% CPU (171.9MiB peak). These
 additional failure labels were tested synthetically, not by disrupting the LAN.
+
+## Control admission across reconnect gaps
+
+The Yoosee recovery adapter now retains a separate control-owner lease across the
+whole run, including backoff when no session is published. Same-camera PTZ/state
+reads report recovering rather than authenticating a legacy route; unsupported
+writes remain blocked and background PTZ warmup skips the reserved camera. STOP
+remains idempotent. A session for another camera cannot publish over that lease.
+The broker socket itself is not held while waiting: if another camera legitimately
+uses the shared account between clean epochs, a `busy` attempt is retried with the
+same bounded backoff rather than interpreted as permission to race authentication.
+
+A normal fully retired run releases the lease. An exception retains it with the
+registry's blocked reservation; no public reset bypass is introduced.97 focused
+offline tests passed under192MiB/no swap/50% CPU (142.8MiB peak), including legacy
+login/warmup exclusion during backoff, safe STOP and uncertain-exit retention.
+Mypy359 source files passed. These control-gap cases did not send physical actions.

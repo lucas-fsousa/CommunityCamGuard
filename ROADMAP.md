@@ -13,6 +13,10 @@ recovery, not unreachable-peer/missing-CLOSE recovery or native startup rollout.
 See docs/internal/native-clean-recovery.md.168 follow-up offline tests passed
 under192MiB/no swap/50% CPU (171.9MiB peak). Permanent startup selection, unsafe-loss
 handling and multiple native routes remain; don't repeat this acceptance as pending.
+The follow-up adapter retains same-camera control admission during reconnect
+backoff, so PTZ/warmup cannot open a separate login in that gap. Unknown cleanup
+retains the lease.97 focused offline tests passed (192MiB/no swap/50% CPU,
+142.8MiB peak); no additional physical action was sent for those guard tests.
 
 2026-10-28 recovery implementation: reviewed Yoosee native source offers now keep
 one camera/domain reservation across sequential clean retirements and reconnects.

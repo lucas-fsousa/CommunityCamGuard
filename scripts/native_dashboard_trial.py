@@ -156,7 +156,7 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                                          native_audio=native_av, archive=archive,
                                          motion_grants=grants, motion_valid=valid if grants else None)
             source = construct()
-            recovery = wrap(source, factory=construct, valid=valid) if recover_at is not None else None
+            recovery = wrap(source, camera_id=camera_id, factory=construct, valid=valid) if recover_at is not None else None
             def current_source():
                 return recovery.current if recovery is not None else source
             offer = NativeSourceOffer(camera_id, NativeVideoSource.admission_domain,
@@ -174,8 +174,9 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 reason = "unknown"
                 if result is not None and result.done() and result.exception() is None:
                     reason = getattr(result.result(), "reason", "unknown")
+                active = current_source()
                 status(event="native_start_failed", error_type=type(error).__name__, reason=reason,
-                       **(current_source().diagnostics() if isinstance(current_source(), NativeVideoSource) else {}))
+                       **(active.diagnostics() if isinstance(active, NativeVideoSource) else {}))
                 raise
             await asyncio.to_thread(containers.start_hub)
             if not await asyncio.to_thread(application.state.media.wait_healthy, timeout=15):

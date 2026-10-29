@@ -63,6 +63,6 @@ def offer(camera: Camera) -> NativeSourceOffer | None:
         return NativeVideoSource(camera_id, enrollment.device_id)
 
     def factory():
-        return wrap(construct(), factory=construct, valid=valid)
+        return wrap(construct(), camera_id=camera_id, factory=construct, valid=valid)
 
     return NativeSourceOffer(camera_id, NativeVideoSource.admission_domain, factory, valid)
