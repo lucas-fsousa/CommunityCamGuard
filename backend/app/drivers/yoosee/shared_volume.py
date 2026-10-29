@@ -1,11 +1,14 @@
 """Verified volume changes through the already authenticated native owner."""
 
+import logging
 import time
 
 from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult
 from .p2p.volume import VOLUME_RAW_BY_PERCENT
 from .shared_control_reads import read, session_for
+
+log = logging.getLogger(__name__)
 
 
 def write(entry: P2PEnrollment, percent: int) -> ControlResult | None:
@@ -40,11 +43,15 @@ def write(entry: P2PEnrollment, percent: int) -> ControlResult | None:
     finally:
         session.cancel_volume_write(ticket)
     if result is None or result.status != 'response' or result.error_code != 0:
+        log.warning('native volume unconfirmed camera_id=%s status=%s error_code=%s transport_ack=%s',
+            entry.camera_id, result.status if result else 'caller_timeout',
+            result.error_code if result else None, result.transport_acknowledged if result else False)
         raise ControlOperationError('native volume write unconfirmed; command was not repeated')
     if session_for(entry) is not session:
         raise ControlOperationError('native volume owner changed; command was not repeated')
     current = read(entry, 'speaker_volume')
     if current is None or current.native_previous_value != raw:
+        log.warning('native volume readback mismatch camera_id=%s', entry.camera_id)
         raise ControlOperationError('camera did not confirm the requested speaker volume')
     return ControlResult(key='speaker_volume', value=percent, previous_value=previous.value,
         changed=True, verified=True, authenticated=True,
