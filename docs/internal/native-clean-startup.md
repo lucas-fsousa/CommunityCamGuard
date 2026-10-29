@@ -77,12 +77,37 @@ numbers kept the previous assembly's age. The next message could expire less tha
 two seconds after real completed-message progress. Resetting the assembly origin
 only when a message completes fixes that case. Partial progress, duplicates/ACKs
 and out-of-order arrival alone still cannot renew it; byte/segment limits and
-the two-second timeout are unchanged. Repaired paired camera acceptance is pending.
+the two-second timeout are unchanged. The repaired paired acceptance then passed
+in Z below.
+
+## Repaired paired acceptance — Z
+
+Both60s server lifecycles completed with zero native reconnects or protocol errors.
+The normal second startup consumed the first clean checkpoint and published revision5
+after revision2. Independent authenticated player probes delivered H264/AAC in both
+lifecycles, with both other recorders active. Twelve10s samples kept both other
+recorders present and FDs31–33. Both clean stop markers, original-container restore
+and directory-owner restore are present. The private database ends at native/
+blocked revision6 with exactly one clean restart checkpoint for revision6: the old
+permission was spent and a new one issued only after the second confirmed stop.
+
+The original1920x1080 HEVC /16kHz mono AAC recordings survived as separate epochs,
+with video durations63.08s and62.68s. The complete group peaked at251.2MiB/no swap
+under768MiB/100% CPU,80.260 CPU seconds over147.416s wall time. The independent
+socket observer peaked at49.3MiB. Private artifacts are under ignored
+`temp/native-restart-20261029-z`. This is two fresh server lifecycles in one host
+process, not hard-kill/power-loss or multi-day acceptance.
+
+The KCP regression group passed79 tests under192MiB/no swap/50% CPU (122.8MiB peak).
+CI at `b21c8ca` passed5417 tests (1 unrelated existing skip), all Node contracts and
+Image smoke. Mypy366 files/Ruff passed. The bounded clean server-restart gate is
+now accepted; do not repeat V/W failures as though no restart ever worked.
 
 CI caught missing configuration-inventory classification and the old relocated
 launcher AST test; both were corrected in `0bdacd8`. CI then passed5412 tests
 (1 unrelated skip), Node contracts, with the runtime Image smoke already green.
 
-No primary native migration/boot opt-in is installed by this change. First migration,
-identity evidence maintenance, abrupt-loss recovery and multiple native routes remain
-separate gates. Existing short snapshot validity is deliberately not bypassed.
+No primary native selection/boot opt-in is installed by this change. Identity
+evidence maintenance is next before permanent use; production rollout, abrupt-loss
+recovery and multiple native routes remain separate gates. Existing short snapshot
+validity is deliberately not bypassed.

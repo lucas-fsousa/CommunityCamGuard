@@ -21,7 +21,7 @@ video/audio and original-codec recordings while horizontal PTZ used the same
 session; physical movement was confirmed. This remains experimental, not the
 default stream. Camera3 also passed [automatic recovery after confirmed session
 retirement](docs/internal/native-clean-recovery.md), with reader reattachment and
-separate archive epochs. Unconfirmed network-loss cleanup, permanent startup and
+separate archive epochs. Unconfirmed network-loss cleanup, permanent rollout and
 multiple native routes remain pending. The ordinary driver also passed a90s
 [A/V/archive admission trial](docs/internal/native-archive-admission.md), honoring
 the server's300s segment policy and recovering cleanly without stopping the other
@@ -29,9 +29,12 @@ two recorders. [Native storage pause/resume](docs/internal/native-storage-policy
 also passed a110s camera3 trial, retaining original HEVC/AAC recordings and live
 H264/AAC while paused. This exposed and fixed a duplicate archive-DTS failure.
 [Clean native startup](docs/internal/native-clean-startup.md) is implemented behind
-the default-off `NATIVE_RESUME_ON_START` option and resumed camera3 in a real paired
-trial. Sustained post-restart transport stability and identity maintenance remain
-required before default use; a missing clean-retirement checkpoint never enables fallback.
+the default-off `NATIVE_RESUME_ON_START` option. Camera3 passed two60s server
+lifecycles with native A/V, original recordings and confirmed retirement/restoration.
+This also exposed/fixed a KCP assembly-age defect. Identity maintenance and longer
+acceptance remain required before default use; a missing clean-retirement checkpoint
+never enables fallback. The paired trial used fresh lifecycles in one host process,
+not a power-loss test.
 See the [integration evidence](docs/internal/native-av-delivery.md).
 
 ## Documentation

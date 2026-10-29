@@ -18,11 +18,17 @@ or second legacy handoff was used for that restart. The second source later hit 
 protocol/missing-CLOSE failure, so full60s+60s clean endurance is NOT accepted.
 V similarly failed before restart and correctly issued no checkpoint. Rollback
 waited for process-group exit. See the exact evidence in native-clean-startup.md.
-Next: locate the account-worker protocol failure using safe code-site diagnostics;
-then repeat the full pair, followed by identity validity maintenance. Opt-in remains
-false in production and evidence expiry is not bypassed. The operator launcher/
-monitor are separate149/159-line modules. CI5412 tests/Node contracts and Image
-passed after configuration-inventory/relocated-launcher test fixes.
+Follow-up X/Y located `kcp_assembly_timeout`. A reproduced assembly-age bug kept a
+completed message's deadline while later sequence numbers stayed buffered. The
+fix refreshes only on completed messages; partial traffic/duplicates cannot extend
+it and limits/timeouts stay unchanged. Z then passed the full60s+60s pair, both
+H264/AAC probes, both clean shutdowns and rollback. The clone ends with a new
+revision6 checkpoint; old permission spent. Two original HEVC/AAC archives survived
+(63.08s/62.68s), zero native reconnects, FDs31–33, peak251.2MiB/no swap. This accepts
+bounded clean restart, not abrupt power loss or multi-day operation. Next: identity
+validity maintenance before permanent native use. Opt-in remains false in production.
+The operator launcher/monitor remain separate small modules. CI5417 tests/Node
+contracts and Image smoke passed; Mypy366/Ruff passed.
 
 2026-10-29 storage acceptance found/fixed a genuine muxing defect: duplicate video
 DTS after resume terminated the original-codec archive output and its shared live
