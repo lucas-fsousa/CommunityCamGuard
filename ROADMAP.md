@@ -30,6 +30,12 @@ confirmed outer release and closed sockets/consumer. Address this actual recover
 failure before adding features; do not treat initial readiness as continuous-use
 acceptance. The driver now narrowly classifies a retired decoder timeout for
 sequential reconnect, retaining all unknown-cleanup and protocol-failure barriers.
+Delivered `655d907` / `b-6272f03053d3`: camera3 native active revision17. A controlled
+encoder-only stall recovered automatically (old PID60→91, one observed encoder,
+no app restart), and the recovered MSE reader received H264/AAC fragments. Other
+two recorders stayed active. 69 focused tests, Ruff, Mypy369, GitHub CI and Image
+passed. No device sound/light/motion commands were used. Prolonged operation is
+still a follow-up; this closes the observed permanent-block-on-decoder-stall bug.
 
 2026-10-29 native clean-startup implementation: one-use camera/revision/domain
 checkpoints are saved only after confirmed source/viewer/executor retirement and

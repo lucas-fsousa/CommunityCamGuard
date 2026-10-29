@@ -72,3 +72,13 @@ release, unclosed sockets and unconfirmed motor STOP still do not retry. Recover
 is sequential under the existing reservation/backoff, not another capture or a
 larger buffer. This corrects the production failure; the initial readiness check
 above was not proof of continuous availability.
+
+The correction (`655d907`, build `b-6272f03053d3`) is deployed; camera3 resumed
+as native active revision17. A controlled stall targeted only its encoder PID60,
+which was retired and replaced by PID91 under the same source selection, with
+one encoder observed and no app restart. The recovered authenticated MSE player
+received H264/AAC and three binary fragments (573,401 bytes). Other two cameras
+kept recording during the test. No sound/light/motion/device configuration was
+sent. 69 focused tests, Ruff and Mypy369 passed under bounded memory/no swap;
+GitHub CI and Image both passed. This verifies the specific stall recovery,
+not a claim of multi-day endurance.
