@@ -171,6 +171,9 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
             await asyncio.to_thread(application.state.rec.start)
             status(event="native_ready", camera_id=camera_id, seconds=seconds,
                    other_recorders=len(application.state.rec._procs), frame_rate=planned.frame_rate,
+                   source_origin="driver" if driver_evidence is not None else "explicit-trial",
+                   archive_segment_seconds=(getattr(planned.current,"_archive_segment_seconds",None)
+                                            if native_av else None),
                    ptz_directions=sorted(ptz_directions))
             async def monitor():
                 started = time.monotonic()
