@@ -90,6 +90,26 @@ const controlWidgets = load("camera-control-actions.js", { el, api, t }, "contro
   assert.deepEqual(localState.nativeSources, []);
   console.log("Source recovery placeholder contracts passed");
 }
+{
+  const camera = { id: "cam_auto", mac: "auto", hd_stream_id: "cam_auto_hd" };
+  const localState = { cameras: [camera], sourceStates: {}, nativeSources: [] };
+  const [restore, update, tiles] = load("live-cameras.js", {
+    document: { addEventListener() {} }, state: localState, el, t, allowed: () => true,
+    localStorage: { getItem: () => "sharp" },
+  }, "[restoreAvailablePlayers, updateMediaSources, tiles]");
+  const tile = { firstChild: el("div", { className: "frame source-unavailable" }) };
+  let replacements = 0;
+  function replace(node) { tile.firstChild = node; node.replaceWith = replace; replacements++; }
+  tile.firstChild.replaceWith = replace;
+  tiles.set(camera.mac, { el: tile });
+  update({ source_states: { cam_auto: { available: false } } });
+  restore(); assert.equal(replacements, 0);
+  update({ source_states: { cam_auto: { available: true } } });
+  restore(); assert.equal(replacements, 1);
+  assert.equal(tile.firstChild.src, "/api/go2rtc/ws?src=cam_auto_hd");
+  restore(); assert.equal(replacements, 1); // no flapping healthy players
+  console.log("Recovered source automatically replaces its black placeholder");
+}
 (async () => {
   const camera = { id: "cam_recovery", mac: "test", hd_stream_id: "cam_recovery_hd" };
   const localState = { cameras: [camera], authentication: "primary", sourceStates: {

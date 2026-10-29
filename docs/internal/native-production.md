@@ -82,3 +82,12 @@ kept recording during the test. No sound/light/motion/device configuration was
 sent. 69 focused tests, Ruff and Mypy369 passed under bounded memory/no swap;
 GitHub CI and Image both passed. This verifies the specific stall recovery,
 not a claim of multi-day endurance.
+
+Dashboard follow-up: a source-unavailable placeholder was not included in the
+freeze watchdog (it has no player counters), and ordinary camera renders retained
+it even when the native source recovered. The live view now polls source metadata
+while such placeholders exist and replaces only the recovered camera's placeholder
+automatically. Healthy neighboring players are not replaced and this never calls
+camera/producer restart. EN/PT text no longer asks for a manual player refresh.
+The Node contract verifies unavailable→available replacement and no healthy-player
+flapping. The separate shared-volume implementation is not part of this UI fix.

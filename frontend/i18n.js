@@ -14,8 +14,8 @@
 
 const STRINGS = {
   en: {
-    "cam.sourceRecovery": "Stream unavailable: the server source needs verified recovery. Refresh the player after recovery.",
-    "cam.sourceChanging": "Changing stream source. Refresh the player when the change is complete.",
+    "cam.sourceRecovery": "Stream unavailable. Waiting for server recovery…",
+    "cam.sourceChanging": "Changing stream source. Video will resume automatically…",
     "panel.accessDenied": "Not permitted for this access.",
     "panel.loading": "Checking controls…",
     "panel.loadFailed": "Could not check this camera's controls. Try opening the panel again.",
@@ -404,8 +404,8 @@ const STRINGS = {
     "rec.playbackFailed": "The browser-compatible version could not be prepared.",
   },
   "pt-BR": {
-    "cam.sourceRecovery": "Streaming indisponível: a fonte no servidor precisa de recuperação verificada. Atualize o player após a recuperação.",
-    "cam.sourceChanging": "Alteração da fonte de vídeo em andamento. Atualize o player ao concluir.",
+    "cam.sourceRecovery": "Transmissão indisponível. Aguardando recuperação no servidor…",
+    "cam.sourceChanging": "Alterando a fonte de vídeo. O vídeo será retomado automaticamente…",
     "panel.accessDenied": "Não permitido para este acesso.",
     "rec.loadFailed": "Não foi possível carregar as gravações. Tente buscar novamente.",
     "settings.accessTab": "Acessos",

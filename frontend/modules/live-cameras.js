@@ -185,6 +185,17 @@ export function updateMediaSources(media) {
     && !Array.isArray(media.source_states) ? media.source_states : {};
 }
 
+function restoreAvailablePlayers() {
+  if (_playersSuspended || !allowed("live")) return;
+  for (const cam of state.cameras) {
+    const tile = tiles.get(cam.mac)?.el;
+    if (tile?.firstChild?.classList?.contains("source-unavailable") &&
+        state.sourceStates?.[cam.id]?.available === true) {
+      replacePlayerFrame(tile, cam);
+    }
+  }
+}
+
 function reportMediaEvent(cam, frame, detail) {
   if (state.authentication === "temporary") return;
   if (!cam || !detail.event || document.hidden) return;
@@ -410,10 +421,19 @@ function tileIsVisible(tile) {
     r.top < window.innerHeight && r.left < window.innerWidth;
 }
 export async function freezeWatchdog() {
-  if (_watchdogBusy || _playersSuspended || document.hidden) return;
+  if (_watchdogBusy || _playersSuspended || document.hidden || !allowed("live")) return;
   if (state.view !== "grid" && state.view !== "single") return;
   _watchdogBusy = true;
   try {
+    // Unavailable sources have no player counters. Reconcile their metadata so
+    // the placeholder cannot survive successful server recovery forever.
+    if ([...tiles.values()].some(({ el: tile }) =>
+      tile.firstChild?.classList?.contains("source-unavailable"))) {
+      try {
+        updateMediaSources(await api("/media/streams", { cache: "no-store" }));
+        restoreAvailablePlayers();
+      } catch { /* failed metadata is never permission to restart a source */ }
+    }
     let activity = null;
     try { activity = await api("/media/activity"); } catch { /* client counters still work */ }
     tiles.forEach((t, mac) => {
@@ -547,6 +567,7 @@ export function renderPlayers() {
       }
     }
   });
+  restoreAvailablePlayers();
 }
 
 function buildRail() {
