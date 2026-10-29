@@ -88,7 +88,8 @@ scope and rejecting subsequent motion when the A/V proof is revoked, without
 opening a camera connection. CI at `e5c8aeb` passed5370 tests (4 skipped); its
 runtime image workflow also passed at the preceding runtime-equivalent commit.
 
-Remaining permanent-use gates are storage pause/resume without losing live view,
-durable confirmed-retirement/bootstrap and identity validity maintenance. No
+Remaining permanent-use gates are camera-backed acceptance of the now implemented
+[storage pause/resume](native-storage-policy.md), durable confirmed-retirement/
+bootstrap and identity validity maintenance. No
 default native activation, unsafe-loss recovery or multi-native rollout is
 certified by this acceptance.

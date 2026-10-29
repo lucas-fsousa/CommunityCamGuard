@@ -14,7 +14,10 @@ largest measured peak150.8MiB, no swap/50% CPU. Mypy362/Ruff passed. See
 docs/internal/native-storage-policy.md. Next: camera-backed pause/resume acceptance,
 then durable retirement/bootstrap and identity maintenance. No native boot enabled.
 
-WSL checkpoint: validated `6e28bcb` deployed as `b-fc721562835f` after green CI.
+WSL checkpoint: storage integration `8da3fc2` is deployed as `b-3767f63eea2a`
+after green CI (5383 passed,4 skipped), Node contracts and Image smoke. Five
+isolated repeats of the10 new storage tests also passed (109.2MiB peak,192MiB
+cap/no swap/50% CPU). Previous validated image `6e28bcb` is retained for rollback.
 Local/public HTTPS health/build, login/unauthenticated rejection, three online
 recorders and growth of all three files passed. App-only replacement; shared hub
 and tunnel not restarted. Native selections remain inactive/legacy revision0.
@@ -26,7 +29,8 @@ back silently to video-only. Configured segment length now reaches native FFmpeg
 (not fixed60s).128 focused tests passed under256MiB/no swap/50% CPU,155.1MiB peak;
 Mypy360 files passed. See docs/internal/native-archive-admission.md.
 Permanent boot still needs durable retirement/bootstrap, identity maintenance and
-storage pause/resume wiring; this change alone is not default native activation.
+camera-backed storage pause/resume acceptance; this change alone is not default
+native activation. Storage policy wiring is implemented in the checkpoint above.
 The bounded host tool now has an explicit documentary review path that installs
 fresh identity/media evidence only in its private clone and uses the ordinary
 driver archive offer.46 focused tests passed (135.5MiB peak,192MiB/no swap/50% CPU).

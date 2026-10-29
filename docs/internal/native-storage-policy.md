@@ -35,3 +35,15 @@ Native production boot remains disabled. Camera-backed pause/resume acceptance,
 durable confirmed-retirement/bootstrap and identity maintenance remain required
 before permanent native rollout. This work connects actual storage policy to the
 normal source path; it does not certify those remaining lifecycle gates.
+
+## Saved delivery checkpoint
+
+Commit `8da3fc2` passed GitHub CI (5383 tests,4 skipped), all Node contracts and
+the image lifecycle smoke. Five additional isolated repetitions of all10 new
+storage-policy tests passed under192MiB/no swap/50% CPU (109.2MiB peak).
+The bounded local image is `community-cam-guard-app:wsl-8da3fc2`, deployed on WSL
+as build `b-3767f63eea2a` with only the app replaced. The previous image remains
+tagged `wsl-6e28bcb`. Local authentication/unauthenticated denial, public HTTPS
+health/build and three online recording statuses passed. Source policies remain
+legacy revision0 and native startup remains inactive. Shared hub and tunnel were
+not restarted, with no container OOM or unexpected restart observed.
