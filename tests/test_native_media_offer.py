@@ -186,7 +186,7 @@ def test_constructed_source_cannot_keep_using_an_expired_or_revoked_motion_grant
     offer = YooseeDriver().native_media_offer(camera)
     assert offer is not None
     source = offer.factory()  # construction only: no thread, decoder or connection
-    session = source._session
+    session = source.current._session
     session._active_entry = enrollment
     submit = Mock(return_value="synthetic-ticket")
     monkeypatch.setattr(session._lifecycle, "submit_motion", submit)

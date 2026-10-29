@@ -9,6 +9,7 @@ from ...media.source_registry import SourceUnavailable
 from . import capability_profiles as profiles
 from . import capability_rollout as rollout
 from . import capability_snapshot_store as snapshots
+from .native_recovery import wrap
 from .native_video_source import NativeVideoSource
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_protocol import DIRECTIONS
@@ -53,12 +54,15 @@ def offer(camera: Camera) -> NativeSourceOffer | None:
     def valid() -> bool:
         return scope() == captured
 
-    def factory():
+    def construct():
         if not valid():
             raise SourceUnavailable("native media evidence changed")
         if captured:
             return NativeVideoSource(camera_id, enrollment.device_id, motion_grants=captured,
                                      motion_valid=valid)
         return NativeVideoSource(camera_id, enrollment.device_id)
+
+    def factory():
+        return wrap(construct(), factory=construct, valid=valid)
 
     return NativeSourceOffer(camera_id, NativeVideoSource.admission_domain, factory, valid)

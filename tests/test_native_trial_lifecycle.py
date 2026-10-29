@@ -72,3 +72,16 @@ def test_motion_requires_native_av_before_any_container_operation(monkeypatch):
         "--directory", "unused", "--ptz-direction", "right", "--confirm-interruption"])
     with pytest.raises(SystemExit):
         module.main()
+
+
+@pytest.mark.parametrize("args", [
+    ["--recover-at", "20"],
+    ["--recover-at", "1", "--native-av"],
+    ["--recover-at", "890", "--native-av"],
+])
+def test_recovery_arguments_are_checked_before_container_operations(monkeypatch, args):
+    monkeypatch.setattr(module, "TrialContainers", lambda: pytest.fail("must reject before Docker"))
+    monkeypatch.setattr("sys.argv", ["trial", "--camera-id", ENROLLMENT.camera_id,
+        "--directory", "unused", "--confirm-interruption", *args])
+    with pytest.raises(SystemExit):
+        module.main()

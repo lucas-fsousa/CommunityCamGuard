@@ -31,6 +31,8 @@ def main():
     parser.add_argument("--native-av", action="store_true", help="test validated native AAC and original-codec archive")
     parser.add_argument("--ptz-direction", action="append", choices=("left", "right", "up", "down"), default=[],
                         help="explicit operator trial scope; permits only target-camera PTZ, no automatic motion")
+    parser.add_argument("--recover-at", type=int,
+                        help="cleanly retire the test media session at this second, then test automatic recovery")
     parser.add_argument("--seconds", type=int, default=900)
     parser.add_argument("--confirm-interruption", action="store_true")
     args = parser.parse_args()
@@ -41,6 +43,8 @@ def main():
             or not 30 <= args.seconds <= 900 or (args.sample_audio and args.native_av)
             or (args.ptz_direction and not args.native_av)):
         parser.error("explicit interruption approval and 30..900 seconds required")
+    if args.recover_at is not None and (not args.native_av or not 10 <= args.recover_at <= args.seconds-20):
+        parser.error("recovery requires native A/V and 20s remaining after retirement")
     original = get_settings()
     database = original.db_path.resolve()
     config_path = original.go2rtc_config.resolve()
@@ -102,7 +106,7 @@ def main():
         server_started = True
         run_server(args.camera_id, args.seconds, trial, containers, entry,
                    sample_audio=args.sample_audio, native_av=args.native_av,
-                   ptz_directions=frozenset(args.ptz_direction))
+                   ptz_directions=frozenset(args.ptz_direction), recover_at=args.recover_at)
     finally:
         owner.close()  # release the original DB before restarting its app
         if (trial / "rollback.json").exists():
@@ -115,11 +119,12 @@ def main():
 
 
 def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audio=False, native_av=False,
-               ptz_directions=frozenset()):
+               ptz_directions=frozenset(), recover_at=None):
     import uvicorn
 
     from backend.app.db import p2p
     from backend.app.diagnostics.native_audio_sample import NativeAudioSample
+    from backend.app.drivers.yoosee.native_recovery import wrap
     from backend.app.drivers.yoosee.native_video_source import NativeVideoSource
     from backend.app.main import app
     from backend.app.media.source_offer import NativeSourceOffer
@@ -146,11 +151,16 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
             def valid():
                 return p2p.read_registered_enrollment(camera_id) == enrollment
             grants = motion_grants(enrollment, ptz_directions)
-            source = NativeVideoSource(camera_id, enrollment.device_id, delivery=audio,
-                                       native_audio=native_av, archive=archive,
-                                       motion_grants=grants, motion_valid=valid if grants else None)
+            def construct():
+                return NativeVideoSource(camera_id, enrollment.device_id, delivery=audio,
+                                         native_audio=native_av, archive=archive,
+                                         motion_grants=grants, motion_valid=valid if grants else None)
+            source = construct()
+            recovery = wrap(source, factory=construct, valid=valid) if recover_at is not None else None
+            def current_source():
+                return recovery.current if recovery is not None else source
             offer = NativeSourceOffer(camera_id, NativeVideoSource.admission_domain,
-                lambda: source, valid)
+                lambda: recovery if recovery is not None else source, valid)
             receipt = await asyncio.to_thread(retirement.retire_legacy, camera_id,
                 expected_revision=0, retire_ingress=containers.confirm_closed)
             try:
@@ -165,7 +175,7 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 if result is not None and result.done() and result.exception() is None:
                     reason = getattr(result.result(), "reason", "unknown")
                 status(event="native_start_failed", error_type=type(error).__name__, reason=reason,
-                       **source.diagnostics())
+                       **(current_source().diagnostics() if isinstance(current_source(), NativeVideoSource) else {}))
                 raise
             await asyncio.to_thread(containers.start_hub)
             if not await asyncio.to_thread(application.state.media.wait_healthy, timeout=15):
@@ -177,8 +187,15 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
             async def monitor():
                 started = time.monotonic()
                 sampled = False
+                retired = False
                 while time.monotonic() - started < seconds:
                     await asyncio.sleep(10)
+                    if recover_at is not None and not retired and time.monotonic()-started >= recover_at:
+                        active = current_source()
+                        if isinstance(active, NativeVideoSource):
+                            active._session.stop()  # protocol CLOSE, no camera reset/reboot/network mutation
+                            retired = True
+                            status(event="native_retirement_requested", elapsed=round(time.monotonic()-started))
                     if audio is not None and not sampled:
                         metadata = await asyncio.to_thread(audio.save, trial)
                         status(event="native_audio_sample", **metadata)
@@ -190,11 +207,15 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                                    reason=result.reason, session_reason=result.session.reason,
                                    consumer_error=result.failure_type)
                         except Exception as error:
-                            status(event="native_ended", error_type=type(error).__name__, **source.diagnostics())
+                            active = current_source()
+                            status(event="native_ended", error_type=type(error).__name__,
+                                   **(active.diagnostics() if isinstance(active, NativeVideoSource) else {}))
                         break
                     status(event="native_running", elapsed=round(time.monotonic()-started),
                            reservations=list(runtime.sources.states().values()),
-                           other_recorders=len(application.state.rec._procs), frame_rate=source.frame_rate,
+                           other_recorders=len(application.state.rec._procs),
+                           frame_rate=getattr(current_source(), "frame_rate", None),
+                           restarts=recovery.restarts if recovery is not None else 0,
                            descriptors=len(list(Path('/proc/self/fd').iterdir())))
                 server.should_exit = True
             task = asyncio.create_task(monitor())

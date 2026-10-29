@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-28 recovery implementation: reviewed Yoosee native source offers now keep
+one camera/domain reservation across sequential clean retirements and reconnects.
+Backoff is capped; evidence/cancellation are rechecked; uncertain cleanup never
+opens a replacement.131 focused tests passed under192MiB/no swap/50% CPU
+(157.5MiB peak). See docs/internal/native-clean-recovery.md. Real controlled
+retirement/reader-reattachment trial is next. Abrupt network loss with missing
+CLOSE proof and permanent startup/multiple native routes are not completed.
+
 2026-10-28 real milestone: camera3 native video/audio/archive plus horizontal PTZ
 coexistence passed90s and60s trials. Owner confirmed the two physical movements
 in the repeat. The existing dashboard API reused the native session, media kept
