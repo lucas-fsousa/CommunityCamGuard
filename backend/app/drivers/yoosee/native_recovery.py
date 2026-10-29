@@ -18,7 +18,8 @@ def retryable(result: object, source: ManagedSource) -> bool:
         or (worker.motion is not None and worker.motion.start_attempted and not worker.motion.release_delivery_confirmed)
     ):
         return False
-    if result.reason in {"socket", "media_complete", "contended", "stopped"}:
+    if result.reason in {"socket", "media_complete", "contended", "stopped",
+                         "transport", "heartbeat_timeout", "lifetime"}:
         return True
     if result.reason == "connection":
         return source.diagnostics().get("session_connection_failure") in {

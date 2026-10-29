@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-29 actual recovery milestone: camera3 completed90s native A/V/archive with
+one controlled session retirement at20s and automatic reattachment on the same
+source revision. The real player socket received H264/AAC before/after; two original
+HEVC/AAC archive epochs survived, other two recorders stayed active and clean
+shutdown/rollback passed. Peak186.7MiB/no swap; FDs27–28. This is clean-retirement
+recovery, not unreachable-peer/missing-CLOSE recovery or native startup rollout.
+See docs/internal/native-clean-recovery.md.168 follow-up offline tests passed
+under192MiB/no swap/50% CPU (171.9MiB peak). Permanent startup selection, unsafe-loss
+handling and multiple native routes remain; don't repeat this acceptance as pending.
+
 2026-10-28 recovery implementation: reviewed Yoosee native source offers now keep
 one camera/domain reservation across sequential clean retirements and reconnects.
 Backoff is capped; evidence/cancellation are rechecked; uncertain cleanup never

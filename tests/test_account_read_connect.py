@@ -10,6 +10,9 @@ from tests.test_broker_model_reply import NODE
 
 @pytest.mark.parametrize("error,label", [
     (P2PProbeError("P2P list service could not be resolved"), "list_dns"),
+    (P2PProbeError("list-service resolver failed"), "list_dns"),
+    (P2PProbeError("list-service resolver deadline or cancellation"), "list_dns"),
+    (P2PProbeError("list-service resolver cleanup unconfirmed"), "transport_or_auth"),
     (InitInfoRejectedError(0x216B), "stale_access"),
     (TimeoutError("private peer details"), "socket_timeout"),
     (P2PProbeError("private token/endpoint"), "transport_or_auth"),

@@ -19,8 +19,10 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 Yoosee proprietary-streaming status: bounded90s/60s camera3 trials delivered native
 video/audio and original-codec recordings while horizontal PTZ used the same
 session; physical movement was confirmed. This remains experimental, not the
-default stream. Automatic reconnection, permanent startup and multiple native
-routes are still pending. See the [integration evidence](docs/internal/native-av-delivery.md).
+default stream. Camera3 also passed [automatic recovery after confirmed session
+retirement](docs/internal/native-clean-recovery.md), with reader reattachment and
+separate archive epochs. Unconfirmed network-loss cleanup, permanent startup and
+multiple native routes remain pending. See the [integration evidence](docs/internal/native-av-delivery.md).
 
 ## Documentation
 
