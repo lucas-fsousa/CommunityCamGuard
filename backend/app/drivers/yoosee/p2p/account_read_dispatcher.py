@@ -14,6 +14,7 @@ from .contracts import CertifiedNode
 from .lamp_read_job import LampReadJob, LampReadSpec
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .ptz_scheduler import PtzScheduler, PtzSpec
+from .volume_write_job import VolumeWriteJob, VolumeWriteSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,9 @@ class AccountReadDispatcher:
 
     def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
         return self._account.prepare_lamp_read(spec, deadline=deadline)
+
+    def prepare_volume_write(self, spec: VolumeWriteSpec, *, deadline: float) -> VolumeWriteJob:
+        return self._account.prepare_volume_write(spec, deadline=deadline)
 
     def _publish(self, events: AccountEvents) -> AccountEvents:
         for completion in events.reads:

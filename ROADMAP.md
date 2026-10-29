@@ -24,6 +24,13 @@ Next work is normal-use feedback, then additional shared native controls and
 multi-camera capacity. No new finite endurance gate is required for this delivery.
 The entries below describe historical checkpoints, not the current deployment.
 
+Native speaker-volume write integration is implemented with preflight, one D2,
+correlated D3 and exact raw readback on the existing stream owner, without another
+login. 121 targeted tests and Mypy373 passed; device acceptance/deployment is pending
+while prioritizing the owner's camera3 black-screen report. See
+docs/internal/native-shared-volume.md. The independent dashboard fix automatically
+replaces a recovered source's unavailable placeholder instead of requiring reload.
+
 Continuous-use follow-up: camera3 later blocked at revision12 following a decoder
 frame-progress timeout. A missing inner CLOSE receipt prevented retry despite
 confirmed outer release and closed sockets/consumer. Address this actual recovery

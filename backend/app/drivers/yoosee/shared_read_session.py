@@ -30,6 +30,8 @@ from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .p2p.video_delivery import VideoDelivery
+from .p2p.volume_write_inbox import VolumeWriteTicket
+from .p2p.volume_write_job import VolumeWriteResult, VolumeWriteSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +114,18 @@ class SharedReadSession:
         if entry is None:
             raise ValueError("active lamp-read enrollment required")
         return self._lifecycle.submit_lamp_read(LampReadSpec(entry.access_id, int(entry.device_id)))
+
+    def submit_volume_write(self, percent: int) -> VolumeWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active volume enrollment required')
+        return self._lifecycle.submit_volume_write(VolumeWriteSpec(int(entry.device_id), percent))
+
+    def take_volume_write(self, ticket: VolumeWriteTicket) -> VolumeWriteResult | None:
+        return self._lifecycle.take_volume_write(ticket)
+
+    def cancel_volume_write(self, ticket: VolumeWriteTicket) -> None:
+        self._lifecycle.cancel_volume_write(ticket)
 
     def take_lamp_read(self, ticket: LampReadTicket) -> LampReadResult | None:
         return self._lifecycle.take_lamp_read(ticket)

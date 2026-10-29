@@ -287,6 +287,13 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == SPEAKER_VOLUME:
+        from .shared_volume import write as write_shared_volume
+        if type(value) is not int:
+            raise ValueError('speaker volume must be an integer percentage')
+        shared = write_shared_volume(_enrollment(camera), value)
+        if shared is not None:
+            return shared
     from .shared_control_reads import require_legacy_available
     require_legacy_available(camera.camera_id)
     enrollment = _enrollment(camera)

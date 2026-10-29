@@ -19,6 +19,8 @@ from .ptz_authority import PtzAuthority, PtzGrant
 from .ptz_inbox import MotionTicket
 from .ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .video_delivery import VideoDelivery
+from .volume_write_inbox import VolumeWriteTicket
+from .volume_write_job import VolumeWriteResult, VolumeWriteSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +81,23 @@ class AccountReadLifecycle:
             if self._state != "active" or self._worker is None or self._worker.lamp_inbox is None:
                 raise ValueError("account not accepting lamp-state reads")
             return self._worker.lamp_inbox.submit(spec)
+
+    def submit_volume_write(self, spec: VolumeWriteSpec) -> VolumeWriteTicket:
+        with self._lock:
+            if self._state != 'active' or self._worker is None or self._worker.volume_inbox is None:
+                raise ValueError('account not accepting volume changes')
+            return self._worker.volume_inbox.submit(spec)
+
+    def take_volume_write(self, ticket: VolumeWriteTicket) -> VolumeWriteResult | None:
+        with self._lock:
+            if self._worker is None or self._worker.volume_inbox is None or ticket.generation != self._generation:
+                return None
+            return self._worker.volume_inbox.take(ticket)
+
+    def cancel_volume_write(self, ticket: VolumeWriteTicket) -> None:
+        with self._lock:
+            if self._worker is not None and self._worker.volume_inbox is not None and ticket.generation == self._generation:
+                self._worker.volume_inbox.cancel(ticket)
 
     def take_lamp_read(self, ticket: LampReadTicket) -> LampReadResult | None:
         with self._lock:
