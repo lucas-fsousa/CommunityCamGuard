@@ -20,6 +20,7 @@ from backend.app.diagnostics.trial_containers import TrialContainers, docker, re
 from backend.app.diagnostics.trial_driver_offer import evidence_reference
 from backend.app.diagnostics.trial_motion import motion_grants, write_allowed
 from backend.app.diagnostics.trial_sources import prepare_source
+from backend.app.diagnostics.trial_storage import TrialStorage
 from backend.app.media.config_file import write_private_config
 from backend.app.media.server_owner import ServerOwner
 
@@ -38,6 +39,8 @@ def main():
     parser.add_argument("--driver-av-evidence",type=Path,
                         help="explicit host review document for a normal driver A/V offer; private clone only")
     parser.add_argument("--seconds", type=int, default=900)
+    parser.add_argument("--storage-pause", action="store_true",
+                        help="pause only the target archive at20s, resume at50s; needs100s and reviewed driver")
     parser.add_argument("--confirm-interruption", action="store_true")
     args = parser.parse_args()
     if args.restore is not None:
@@ -49,6 +52,9 @@ def main():
         parser.error("explicit interruption approval and 30..900 seconds required")
     if args.recover_at is not None and (not args.native_av or not 10 <= args.recover_at <= args.seconds-20):
         parser.error("recovery requires native A/V and 20s remaining after retirement")
+    if args.storage_pause and (not args.native_av or args.driver_av_evidence is None
+            or args.ptz_direction or args.recover_at is not None or args.seconds < 100):
+        parser.error("storage trial requires reviewed driver A/V,100s, no motion or session retirement")
     if args.driver_av_evidence is not None:
         if not args.native_av or args.ptz_direction:
             parser.error("reviewed driver trial requires native A/V and no motion")
@@ -115,7 +121,7 @@ def main():
         run_server(args.camera_id, args.seconds, trial, containers, entry,
                    sample_audio=args.sample_audio, native_av=args.native_av,
                    ptz_directions=frozenset(args.ptz_direction), recover_at=args.recover_at,
-                   driver_evidence=args.driver_av_evidence)
+                   driver_evidence=args.driver_av_evidence, storage_pause=args.storage_pause)
     finally:
         owner.close()  # release the original DB before restarting its app
         if (trial / "rollback.json").exists():
@@ -128,7 +134,7 @@ def main():
 
 
 def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audio=False, native_av=False,
-               ptz_directions=frozenset(), recover_at=None,driver_evidence=None):
+               ptz_directions=frozenset(), recover_at=None,driver_evidence=None,storage_pause=False):
     import uvicorn
 
     from backend.app.main import app
@@ -145,7 +151,9 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
         async with ordinary(application):
             runtime = application.state.native_runtime
             retirement = application.state.owned_runtime.retirement
-            planned = await asyncio.to_thread(prepare_source,camera_id,enrollment,application.state.rec,
+            storage = TrialStorage(application.state.rec) if storage_pause else None
+            recorder = storage.recorder if storage is not None else application.state.rec
+            planned = await asyncio.to_thread(prepare_source,camera_id,enrollment,recorder,
                 sample_audio=sample_audio,native_av=native_av,ptz_directions=ptz_directions,
                 recover=recover_at is not None,driver_evidence=driver_evidence)
             audio = planned.audio
@@ -180,7 +188,12 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                 sampled = False
                 retired = False
                 while time.monotonic() - started < seconds:
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5 if storage is not None else 10)
+                    if storage is not None:
+                        changed = storage.advance(time.monotonic()-started)
+                        if changed is not None:
+                            status(event="native_storage_policy", policy=changed,
+                                   elapsed=round(time.monotonic()-started))
                     if recover_at is not None and not retired and time.monotonic()-started >= recover_at:
                         if planned.retire_session():
                             retired = True
@@ -203,6 +216,8 @@ def run_server(camera_id, seconds, trial, containers, enrollment, *, sample_audi
                            reservations=list(runtime.sources.states().values()),
                            other_recorders=len(application.state.rec._procs),
                            frame_rate=planned.frame_rate,restarts=planned.restarts,
+                           saving_paused=storage.paused if storage is not None else False,
+                           native_recording_allowed=getattr(planned.current,"_recording_allowed",None),
                            descriptors=len(list(Path('/proc/self/fd').iterdir())))
                 server.should_exit = True
             task = asyncio.create_task(monitor())
