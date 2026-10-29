@@ -24,6 +24,13 @@ Next work is normal-use feedback, then additional shared native controls and
 multi-camera capacity. No new finite endurance gate is required for this delivery.
 The entries below describe historical checkpoints, not the current deployment.
 
+Continuous-use follow-up: camera3 later blocked at revision12 following a decoder
+frame-progress timeout. A missing inner CLOSE receipt prevented retry despite
+confirmed outer release and closed sockets/consumer. Address this actual recovery
+failure before adding features; do not treat initial readiness as continuous-use
+acceptance. The driver now narrowly classifies a retired decoder timeout for
+sequential reconnect, retaining all unknown-cleanup and protocol-failure barriers.
+
 2026-10-29 native clean-startup implementation: one-use camera/revision/domain
 checkpoints are saved only after confirmed source/viewer/executor retirement and
 spent atomically before ordinary driver source birth. Opt-in startup checks disk

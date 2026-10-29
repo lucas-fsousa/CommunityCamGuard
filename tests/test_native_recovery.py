@@ -57,3 +57,16 @@ def test_timeout_reconnect_requires_closed_sockets_and_confirmed_outer_route(fau
         protocol_code='bad_format' if fault=='code' else 'kcp_assembly_timeout')
     source=NativeVideoSource('test','123')
     assert retryable(NativeVideoResult('transport',SharedReadResult('transport',worker)),source) is (fault is None)
+
+
+@pytest.mark.parametrize('fault', [None, 'broker', 'route', 'tcp', 'not_ready', 'motion', 'format', 'protocol'])
+def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(fault):
+    worker = WorkerSummary('protocol' if fault == 'protocol' else 'stopped', 0, 0, 0, fault == 'broker',
+        media=SimpleNamespace(opened=True, broker_release=fault != 'route'),
+        tcp=SimpleNamespace(ready=fault != 'not_ready', close_acknowledged=False,
+                            socket_close_failed=fault == 'tcp'),
+        motion=SimpleNamespace(start_attempted=True, release_delivery_confirmed=fault != 'motion'))
+    source = NativeVideoSource('test', '123')
+    result = NativeVideoResult('consumer_failed', SharedReadResult('stopped', worker),
+                               'ValueError' if fault == 'format' else 'TimeoutError')
+    assert retryable(result, source) is (fault is None)

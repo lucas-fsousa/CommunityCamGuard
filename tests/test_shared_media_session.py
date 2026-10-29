@@ -11,8 +11,10 @@ from backend.app.drivers.yoosee.p2p.account_read_lifecycle import (
     AccountReadLifecycle,
     ReadConnection,
 )
-from backend.app.drivers.yoosee.p2p.cooperative_tcp_media import CooperativeTcpMedia
+from backend.app.drivers.yoosee.p2p.account_read_worker import WorkerSummary
+from backend.app.drivers.yoosee.p2p.cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult
 from backend.app.drivers.yoosee.p2p.media_policy import MediaPolicy
+from backend.app.drivers.yoosee.p2p.media_route_job import MediaRouteResult
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from tests.test_account_media_route import SPEC, MediaSocket
 from tests.test_broker_reads import NODE
@@ -21,6 +23,26 @@ from tests.test_cooperative_tcp_media import OwnedSocket
 from tests.test_media_receive import PEER
 from tests.test_read_preparation import ENROLLMENT
 from tests.test_read_preparation import owner as owner
+
+
+@pytest.mark.parametrize('released', [True, False])
+def test_stopped_media_accepts_only_confirmed_outer_retirement(setup, monkeypatch, released):
+    session, delivery, *_ = setup
+    summary = WorkerSummary('stopped', 0, 0, 0, False,
+        media=MediaRouteResult(True, True, released),
+        tcp=TcpMediaResult(True, False, False, 10, 10, 1))
+    def stopped(*args, **kwargs):
+        session._lifecycle._state = 'blocked'
+        return summary
+    monkeypatch.setattr(session._lifecycle, 'run_media', stopped)
+    if released:
+        result = session.run(cancelled=lambda: False, video_delivery=delivery)
+        assert result.reason == 'stopped' and result.worker == summary
+        assert not control_ownership._cleanup_uncertain
+    else:
+        with pytest.raises(module.P2PProbeError, match='cleanup unconfirmed'):
+            session.run(cancelled=lambda: False, video_delivery=delivery)
+        assert control_ownership._cleanup_uncertain
 
 
 @pytest.fixture
@@ -114,10 +136,19 @@ def test_continuous_media_yields_and_closes_before_releasing_account(setup, monk
     assert not owner._paused and not control_ownership._cleanup_uncertain
 
 
-@pytest.mark.parametrize("fault", ["tcp_ack", "tcp_close", "broker_ack", "udp_close"])
+def test_stopped_stream_without_inner_receipt_releases_after_outer_ack(setup):
+    session, delivery, tcp_owner, udp, tcp, events, _, _ = setup
+    tcp.fault = 'close'
+    result = session.run(cancelled=lambda: tcp_owner.ready, video_delivery=delivery)
+    assert result.reason == 'stopped' and not result.worker.tcp.close_acknowledged
+    assert result.worker.media.broker_release and udp.closed == tcp.closed == 1
+    assert events == ['auth', 'tcp_open', 'tcp_close', 'broker_close', 'udp_close']
+    assert not control_ownership._cleanup_uncertain
+
+
+@pytest.mark.parametrize("fault", ["tcp_close", "broker_ack", "udp_close"])
 def test_unconfirmed_media_cleanup_blocks_legacy_auth(setup, fault):
     session, delivery, tcp_owner, udp, tcp, events, _, _ = setup
-    if fault == "tcp_ack": tcp.fault = "close"
     if fault == "tcp_close": tcp.fault = "physical_close"
     if fault == "broker_ack": udp.media_fault = "silent"
     if fault == "udp_close": udp.fault = "close"

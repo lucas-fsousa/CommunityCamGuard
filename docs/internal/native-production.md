@@ -59,3 +59,16 @@ all three recording destinations grew during the follow-up check. The installer
 exited (169.5MiB peak, no swap); only the ordinary containers remain serving.
 No sound, light or movement commands were sent. Existing shared native PTZ
 implementation/physical acceptance is retained, not retested as a release gate.
+
+### Continuous-use follow-up
+
+Subsequent use reached blocked revision12: the decoder reported a frame-progress
+`TimeoutError`, with consumer/decoder retired, both sockets closed, outer broker
+release confirmed and no motor command started. The missing inner CLOSE receipt
+incorrectly prevented any retry. The driver now accepts a stopped owner's confirmed
+outer retirement and retries only the known decoder timeout (or the existing KCP
+timeout classification). Format errors, unknown protocol failures, missing outer
+release, unclosed sockets and unconfirmed motor STOP still do not retry. Recovery
+is sequential under the existing reservation/backoff, not another capture or a
+larger buffer. This corrects the production failure; the initial readiness check
+above was not proof of continuous availability.
