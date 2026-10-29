@@ -1,10 +1,19 @@
 import pytest
 
-from backend.app.media.fragmented_mp4 import MAX_BYTES, MAX_CHUNKS, FragmentedMp4
+from backend.app.media.fragmented_mp4 import MAX_BYTES, MAX_CHUNKS, FragmentedMp4, Mp4OrderError
 
 
 def box(kind, payload=b"test"):
     return (len(payload) + 8).to_bytes(4, "big") + kind + payload
+
+
+@pytest.mark.parametrize("actual,label", [(b"free","free"),(b"pw!x","unknown")])
+def test_box_order_diagnostics_never_include_arbitrary_media_bytes(actual,label):
+    output=FragmentedMp4()
+    with pytest.raises(Mp4OrderError) as caught:
+        output.feed(box(actual))
+    assert caught.value.expected=="ftyp" and caught.value.actual==label
+    assert "pw!x" not in str(caught.value) and output.closed
 
 
 def test_split_boxes_emit_only_complete_initialization_and_fragment_pairs():

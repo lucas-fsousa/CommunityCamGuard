@@ -42,9 +42,15 @@ def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
             "-f", "mp4", "pipe:1"]
     if archive is not None:
         cmd += ["-map", "0:v:0", "-map", "0:a:0", "-c", "copy", "-bsf:a", "aac_adtstoasc",
+                # Native MPEG-TS may repeat a video DTS at a fresh decoder epoch.
+                # Repair only the archive packet clock, never re-encode/drop frames
+                # or replace the live/audio clocks. Keep valid PTS (including reorder).
+                "-bsf:v", "setts=dts='if(eq(N,0),DTS,max(DTS,PREV_OUTDTS+1))':"
+                "pts='if(eq(N,0),PTS,max(PTS,max(DTS,PREV_OUTDTS+1)))'",
                 "-max_muxing_queue_size", "128", "-muxing_queue_data_threshold", "1048576",
                 "-max_interleave_delta", "1000000", "-avoid_negative_ts", "make_zero",
                 "-f", "segment", "-segment_time", str(archive_segment_seconds), "-segment_format", "mp4",
                 "-reset_timestamps", "1", "-strftime", "1", "-segment_format_options",
-                "movflags=+frag_keyframe+empty_moov+delay_moov+default_base_moof", str(archive)]
+                "movflags=+frag_keyframe+empty_moov+delay_moov+default_base_moof:"
+                "video_track_timescale=90000", str(archive)]
     return cmd

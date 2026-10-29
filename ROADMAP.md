@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-29 storage acceptance found/fixed a genuine muxing defect: duplicate video
+DTS after resume terminated the original-codec archive output and its shared live
+encoder. Trial T captured the exact DTS collision; parser `moof→mfra` failure was
+the downstream symptom, not permission to skip validation. Archive-only packet
+clock repair plus90000Hz MP4 timescale now passes a real negative/positive FFmpeg
+regression, retaining original codecs/all five video packets and valid timing.
+75 focused tests passed (118.6MiB peak,256MiB/no swap/50% CPU), Mypy363/Ruff passed.
+See docs/internal/native-archive-timestamps.md. Repaired camera-backed acceptance
+is in progress; do not mark the earlier O/Q/R failures as passed.
+
 2026-10-29 storage integration: normal native archive offers now carry the server's
 live pause/resume policy. The existing consumer retires the old decoder, waits for
 a fresh IDR and replaces it with live-only A/V while paused, restoring a unique

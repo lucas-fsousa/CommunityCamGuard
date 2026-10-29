@@ -14,7 +14,7 @@ from pathlib import Path
 from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.archive_spec import validate_segment_seconds
-from ...media.fragmented_mp4 import FragmentedMp4
+from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError
 from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
 from ...media.native_av_decoder import NativeAvDecoder
@@ -81,12 +81,15 @@ class NativeVideoSource:
         self._thread: threading.Thread | None = None
         self._failure_type = ""
         self._failure_site = ""
+        self._mp4_expected = ""
+        self._mp4_actual = ""
         self.frame_rate: int | None = None
 
     def diagnostics(self) -> dict[str, str | bool]:
         """Safe local failure metadata, never exception messages, media or credentials."""
         return {**self._session.diagnostics(),
                 "consumer_error": self._failure_type, "consumer_site": self._failure_site,
+                "consumer_mp4_expected": self._mp4_expected, "consumer_mp4_actual": self._mp4_actual,
                 "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
                 "consumer_alive": self._thread is not None and self._thread.is_alive(),
                 "cleanup_failed": self._cleanup_failed.is_set()}
@@ -180,6 +183,8 @@ class NativeVideoSource:
                 self._failed.set()
         except BaseException as error:
             self._failure_type = type(error).__name__
+            if isinstance(error, Mp4OrderError):
+                self._mp4_expected, self._mp4_actual = error.expected, error.actual
             trace = error.__traceback__
             while trace is not None:
                 self._failure_site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"

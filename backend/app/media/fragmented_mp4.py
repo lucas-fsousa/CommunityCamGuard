@@ -11,6 +11,16 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_CHUNKS = 8
 
 
+class Mp4OrderError(ValueError):
+    """Fixed-label diagnostics only; never include arbitrary muxer/media bytes."""
+
+    def __init__(self, expected: bytes, actual: bytes):
+        super().__init__("unexpected MP4 box order")
+        known = {b"ftyp", b"moov", b"moof", b"mdat", b"free", b"sidx", b"styp", b"mfra", b"mfro"}
+        self.expected = expected.decode("ascii") if expected in known else "unknown"
+        self.actual = actual.decode("ascii") if actual in known else "unknown"
+
+
 @dataclass(frozen=True, slots=True)
 class Mp4Chunk:
     initialization: bool
@@ -54,7 +64,7 @@ class FragmentedMp4:
                 if not 8 <= size <= MAX_BYTES:
                     raise ValueError("unsupported MP4 box size")
                 if kind != self._expected:
-                    raise ValueError("unexpected MP4 box order")
+                    raise Mp4OrderError(self._expected, kind)
                 if len(self._buffer) < size:
                     return
                 boxes += 1
