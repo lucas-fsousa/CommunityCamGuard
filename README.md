@@ -28,7 +28,10 @@ the server's300s segment policy and recovering cleanly without stopping the othe
 two recorders. [Native storage pause/resume](docs/internal/native-storage-policy.md)
 also passed a110s camera3 trial, retaining original HEVC/AAC recordings and live
 H264/AAC while paused. This exposed and fixed a duplicate archive-DTS failure.
-Safe permanent startup and identity maintenance are still required before default use.
+[Clean native startup](docs/internal/native-clean-startup.md) is implemented behind
+the default-off `NATIVE_RESUME_ON_START` option and resumed camera3 in a real paired
+trial. Sustained post-restart transport stability and identity maintenance remain
+required before default use; a missing clean-retirement checkpoint never enables fallback.
 See the [integration evidence](docs/internal/native-av-delivery.md).
 
 ## Documentation
@@ -465,8 +468,11 @@ adapter, including primary and temporary sessions. Startup does not activate a
 native source; production switching and browser acceptance remain pending.
 The [native runtime lifecycle](docs/internal/native-runtime-lifecycle.md) now
 retains explicit activations before preparation, bounds source workers and joins
-them during shutdown without blocking the ASGI loop. Startup remains idle for
-native media: no automatic restoration, camera connection or production switch.
+them during shutdown without blocking the ASGI loop. Native startup is idle by
+default. An explicit opt-in can now restore a reviewed driver offer from a one-use
+clean-retirement checkpoint; it cannot migrate legacy sources or bypass uncertain
+cleanup. Actual restart evidence and its remaining transport gate are documented
+in [clean startup](docs/internal/native-clean-startup.md).
 The [explicit owned-RTSP runtime](docs/internal/owned-runtime-lifecycle.md) now
 shares empty bindings with hub/recorder and retains/reaps its submitted workers.
 Replacement requires a verified owned-retirement receipt, readiness and route

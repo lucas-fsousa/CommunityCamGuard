@@ -12,7 +12,7 @@ from scripts import native_dashboard_trial as module
 from tests.test_read_preparation import ENROLLMENT
 
 
-@pytest.mark.parametrize("clean", [True, False])
+@pytest.mark.parametrize("clean", [True, False, None])
 def test_original_owner_is_acquired_after_stop_and_released_before_safe_restore(tmp_path, monkeypatch, clean):
     database = tmp_path / "original.db"
     with sqlite3.connect(database) as conn:
@@ -36,9 +36,10 @@ def test_original_owner_is_acquired_after_stop_and_released_before_safe_restore(
     def run(*args, **kwargs):
         assert events == ["stop", "acquire"]
         assert kwargs["ptz_directions"] == frozenset({"right"})
-        if not clean:
+        if clean is False:
             raise RuntimeError("uncertain native shutdown")
-        module.write_private_config(trial / "server-stopped.json", '{"stopped":true}')
+        if clean is True:
+            module.write_private_config(trial / "server-stopped.json", '{"stopped":true}')
     def restore(path):
         assert events[-1] == "release"
         assert path == trial
@@ -61,7 +62,7 @@ def test_original_owner_is_acquired_after_stop_and_released_before_safe_restore(
         module.main()
         assert events == ["stop", "acquire", "release", "restore"]
     else:
-        with pytest.raises(RuntimeError, match="uncertain"):
+        with pytest.raises(RuntimeError, match=r"uncertain|unconfirmed"):
             module.main()
         assert events == ["stop", "acquire", "release"]  # ExecStopPost must reap first
 

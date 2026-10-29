@@ -1,4 +1,4 @@
-"""Server lifetime for explicit native activations; idle boot, no source scheduler."""
+"""Native owner lifetime, clean retirement checkpoints and explicitly admitted restart."""
 
 import math
 import threading

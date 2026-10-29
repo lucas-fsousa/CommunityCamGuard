@@ -111,6 +111,8 @@ def test_oversized_input_is_detected_and_closes(monkeypatch):
     monkeypatch.setattr(sock, "recvfrom", lambda size: (b"x" * 4097, NODE.address))
     result = worker(sock).run(sock)
     assert result.reason == "protocol" and result.received_datagrams == 1
+    assert result.protocol_site and ':' in result.protocol_site
+    assert 'xxxx' not in result.protocol_site
     assert sock.closed == 1
 
 

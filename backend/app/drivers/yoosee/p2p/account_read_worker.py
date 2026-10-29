@@ -36,6 +36,7 @@ class WorkerSummary:
     motion: ScheduledPtzResult | None = None
     media: MediaRouteResult | None = None
     tcp: TcpMediaResult | None = None
+    protocol_site: str = ""
 
 
 class _Stop(Exception):
@@ -123,6 +124,7 @@ class AccountReadWorker:
         sent = received = beats = 0
         output = AccountOutputBudget(policy=self._policy, clock=self._clock)
         reason = "stopped"
+        protocol_site = ""
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
@@ -293,8 +295,12 @@ class AccountReadWorker:
             reason = stopped.reason
         except OSError:
             reason = "socket"
-        except ValueError:
+        except ValueError as error:
             reason = "protocol"
+            trace=error.__traceback__
+            while trace is not None:
+                protocol_site=f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
+                trace=trace.tb_next
         finally:
             try:
                 if lamp is not None:
@@ -354,4 +360,4 @@ class AccountReadWorker:
         return WorkerSummary(reason, sent, received, beats, close_failed,
                              motion.result if motion is not None else last_motion,
                              media.result if media is not None else None,
-                             tcp.result if tcp is not None else None)
+                             tcp.result if tcp is not None else None,protocol_site)

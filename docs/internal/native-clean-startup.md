@@ -38,7 +38,40 @@ stop marker is moved aside before starting again, so it cannot certify cleanup o
 the second server. Retention deletion/pretranscoding stay disabled in the clone.
 Server/monitor code moved into a separate diagnostic module to keep the launcher
 small. These are two fresh server lifecycles in one bounded host process, not a
-hard-kill/power-loss acceptance. Actual camera-backed acceptance is pending here.
+hard-kill/power-loss acceptance.
+
+## Actual camera3 restart evidence — V/W
+
+V delivered initial H264/AAC but ended with an intermittent account-worker
+`protocol` failure and missing TCP CLOSE receipt before clean restart. It issued
+no checkpoint and no clean stop marker. Rollback waited for whole-group exit;
+production returned. This is negative fail-closed evidence, not a passing restart.
+
+W completed the first60s with source revision2, two other recorders and FDs31.
+The first server confirmed shutdown and saved its checkpoint. The second ordinary
+ASGI startup consumed it, prepared/published the reviewed driver source at revision5
+and delivered H264/AAC through the authenticated existing player socket. Independent
+observers received three binary messages in each lifecycle; both other recording
+statuses were active. No second legacy handoff, diagnostic source construction or
+new vendor-app login was used for the restored lifecycle.
+
+The second source later encountered the same protocol/missing-CLOSE condition
+after its10s sample. Consequently the complete60s+60s clean-shutdown acceptance
+did NOT pass, and no second clean checkpoint may be issued. The original deployment
+was restored only after the group exited. W peaked at225.1MiB/no swap under768MiB/
+100% CPU,42.062 CPU seconds over104.160s wall time; independent observation49.5MiB.
+Private artifacts are under ignored `temp/native-restart-20261029-v` and `...-w`.
+
+The real clean restart/readiness is established; sustained post-restart transport
+stability remains open. Added payload-free account protocol failure-site metadata
+for the next diagnosis without changing protocol validation/retry classification.
+The operator now exits with an error if Uvicorn returns without a confirmed clean
+stop marker, rather than letting a zero process status imply successful cleanup.
+No primary boot opt-in/profile/source-policy changes were made.
+
+CI caught missing configuration-inventory classification and the old relocated
+launcher AST test; both were corrected in `0bdacd8`. CI then passed5412 tests
+(1 unrelated skip), Node contracts, with the runtime Image smoke already green.
 
 No primary native migration/boot opt-in is installed by this change. First migration,
 identity evidence maintenance, abrupt-loss recovery and multiple native routes remain

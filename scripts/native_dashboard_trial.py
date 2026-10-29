@@ -124,6 +124,8 @@ def main():
                    sample_audio=args.sample_audio, native_av=args.native_av,
                    ptz_directions=frozenset(args.ptz_direction), recover_at=args.recover_at,
                    driver_evidence=args.driver_av_evidence, storage_pause=args.storage_pause)
+        if not (trial/'server-stopped.json').is_file():
+            raise RuntimeError('native server shutdown unconfirmed')
         if args.restart_server:
             stopped=trial/'server-stopped.json'
             if not stopped.is_file():
@@ -133,6 +135,8 @@ def main():
             get_settings.cache_clear()
             run_server(args.camera_id,args.seconds,trial,containers,entry,native_av=True,
                        driver_evidence=args.driver_av_evidence,resume=True)
+            if not (trial/'server-stopped.json').is_file():
+                raise RuntimeError('restarted native server shutdown unconfirmed')
     finally:
         owner.close()  # release the original DB before restarting its app
         if (trial / "rollback.json").exists():

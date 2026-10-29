@@ -11,8 +11,18 @@ policy, revalidates the normal driver A/V offer and uses existing readiness/rout
 Missing/expired proof or unknown shutdown never grants automatic RTSP fallback.
 98 focused tests passed under192MiB/no swap/50% CPU (146.7MiB peak), Mypy366/Ruff
 passed. See docs/internal/native-clean-startup.md. Paired actual camera3 lifecycle
-acceptance is next; opt-in remains false in production and evidence expiry is not
-bypassed. The operator launcher/monitor are now separate small modules.
+acceptance progressed in W: first60s completed cleanly, ordinary second startup
+consumed the checkpoint, advanced revision2→5 and delivered H264/AAC to an independent
+authenticated player with both other recorders active. No diagnostic source factory
+or second legacy handoff was used for that restart. The second source later hit a
+protocol/missing-CLOSE failure, so full60s+60s clean endurance is NOT accepted.
+V similarly failed before restart and correctly issued no checkpoint. Rollback
+waited for process-group exit. See the exact evidence in native-clean-startup.md.
+Next: locate the account-worker protocol failure using safe code-site diagnostics;
+then repeat the full pair, followed by identity validity maintenance. Opt-in remains
+false in production and evidence expiry is not bypassed. The operator launcher/
+monitor are separate149/159-line modules. CI5412 tests/Node contracts and Image
+passed after configuration-inventory/relocated-launcher test fixes.
 
 2026-10-29 storage acceptance found/fixed a genuine muxing defect: duplicate video
 DTS after resume terminated the original-codec archive output and its shared live

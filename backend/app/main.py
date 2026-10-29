@@ -2,7 +2,7 @@
 
 Wires the REST API and, on startup, brings up the media + recording stack (unless
 ``autostart_services`` is off): go2rtc pulls the registry's cameras and restreams them, the
-recorder writes 60s segments, and the storage monitor enforces the disk policy. All three
+recorder writes configured UTC segments, and the storage monitor enforces the disk policy. All three
 are stopped cleanly on shutdown. Startup is best-effort — if go2rtc's binary is missing the
 API still serves so cameras can be managed.
 
