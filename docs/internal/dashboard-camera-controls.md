@@ -9,6 +9,12 @@ its own record/preview/send dialog. Speaker volume stays in settings. The driver
 capability flags and intercom permission gate each quick action; there is no
 brand/model shortcut or new backend/audio transport.
 
+Per the owner's follow-up, both quick actions and the settings trigger are
+icon-only, with localized hover titles and accessible labels. Icons use the
+existing SVG sprite; no emoji/font or external asset dependency. Inline talk
+status remains announced to assistive technology and appears in its tooltip,
+without adding a permanent text row. Touch targets remain44px on mobile.
+
 No microphone is requested when rendering a tile or opening the recording dialog.
 Inline talk stops on release/cancel/lost capture, blur and tab hiding, and cancels
 on control removal/session end. Its existing10-second limit is unchanged. The

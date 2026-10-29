@@ -25,6 +25,7 @@ class Element {
 const el = (tag, props = {}, ...nodes) => { const node = new Element(tag, props); node.append(...nodes); return node; };
 const t = key => key;
 function load(file, bindings, names) {
+  bindings = { svgIcon: id => `<svg><use href="#${id}" /></svg>`, ...bindings };
   const code = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export (async )?function /g, "$1function ");
   return new Function(...Object.keys(bindings), code + `\nreturn ${names};`)(...Object.values(bindings));
@@ -52,7 +53,10 @@ const onSessionEnd = fn => { ends.add(fn); return () => ends.delete(fn); };
   permitted = false; assert.equal(quick(cam), null); assert.equal(creations, 0);
   permitted = true;
   const group = quick(cam); assert.equal(group.children.length, 2);
-  assert.equal(group.children[1].textContent, "intercom.open");
+  assert.equal(group.children[1].textContent, "");
+  assert.equal(group.children[1].title, "intercom.open");
+  assert.equal(group.children[1].attributes['aria-label'], "intercom.open");
+  assert(group.children[1].innerHTML.includes('i-voice-message'));
   assert.equal(quick({ audio_streams: true }).children.length, 1);
   assert.equal(quick({ audio_messages: true }).children.length, 1);
   assert.equal(cam.audio_messages, true); // Never mutate driver evidence.
@@ -68,6 +72,8 @@ const onSessionEnd = fn => { ends.add(fn); return () => ends.delete(fn); };
   const widget = button({ id: "synthetic" }, { inline: true }); document.body.append(widget);
   assert.equal(widget.className, "quick-talk"); assert.equal(starts, 0);
   const talk = widget.children[0];
+  assert.equal(talk.textContent, ""); assert.equal(talk.title, "talk.hold");
+  assert.equal(talk.attributes['aria-label'], "talk.hold"); assert(talk.innerHTML.includes('i-mic'));
   await talk.dispatch("pointerdown", { button: 2 }); assert.equal(starts, 0);
   await talk.dispatch("pointerdown", { button: 0, pointerId: 1 }); await flush();
   assert.equal(starts, 1); assert.equal(talk.disabled, false);

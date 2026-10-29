@@ -1,5 +1,5 @@
 // Presentation only: the driver catalogue remains the authority for every active control.
-import { api, el, onSessionEnd, state } from "ccg/core";
+import { api, el, onSessionEnd, state, svgIcon } from "ccg/core";
 import { notify } from "ccg/notifications";
 import { t } from "ccg/i18n";
 import { controlWidgets } from "ccg/control-actions";
@@ -27,15 +27,18 @@ function row(label, widget, reason = "panel.unavailable") {
 
 export function cameraControls(camera, extras = {}) {
   const trigger = el("button", {
-    className: "camera-panel-trigger", type: "button", textContent: t("control.menu"),
+    className: "camera-panel-trigger icon-btn", type: "button", innerHTML: svgIcon("i-settings"),
     title: t("control.menu"),
   });
   trigger.setAttribute("aria-haspopup", "dialog");
+  trigger.setAttribute("aria-label", t("control.menu"));
   trigger.addEventListener("click", async (event) => {
     event.stopPropagation();
     if (trigger.disabled) return;
     trigger.disabled = true;
-    trigger.textContent = t("panel.loading");
+    trigger.classList.add("spin");
+    trigger.title = t("panel.loading");
+    trigger.setAttribute("aria-busy", "true");
     const controller = new AbortController();
     let active = true;
     const cancel = onSessionEnd(() => { active = false; controller.abort(); });
@@ -55,7 +58,9 @@ export function cameraControls(camera, extras = {}) {
       clearTimeout(timeout);
       cancel();
       trigger.disabled = false;
-      trigger.textContent = t("control.menu");
+      trigger.classList.remove("spin");
+      trigger.title = t("control.menu");
+      trigger.setAttribute("aria-busy", "false");
     }
     const status = el("small", { className: "camera-control-status" });
     status.setAttribute("role", "status");

@@ -1,4 +1,4 @@
-import { el, onSessionEnd } from "ccg/core";
+import { el, onSessionEnd, svgIcon } from "ccg/core";
 import { t } from "ccg/i18n";
 
 const TARGET_RATE = 16000;
@@ -195,6 +195,12 @@ export function pushToTalkButton(cam, { inline = false } = {}) {
       className: "btn-primary push-talk-button", textContent: t("talk.hold"), type: "button",
     });
     talk.setAttribute("aria-label", t("talk.hold"));
+    if (inline) {
+      talk.className = "icon-btn push-talk-button";
+      talk.textContent = "";
+      talk.innerHTML = svgIcon("i-mic");
+      talk.title = t("talk.hold");
+    }
     status.setAttribute("role", "status");
     const close = el("button", {
       className: "icon-btn", textContent: "×", title: t("scan.close"), type: "button",
@@ -202,6 +208,7 @@ export function pushToTalkButton(cam, { inline = false } = {}) {
     const setStatus = (key, error = false) => {
       status.classList.toggle("error", error);
       status.textContent = t(key);
+      if (inline) talk.title = status.textContent;
     };
     const stop = async () => {
       held = false;
@@ -215,6 +222,7 @@ export function pushToTalkButton(cam, { inline = false } = {}) {
       } catch (error) {
         status.classList.add("error");
         status.textContent = t("talk.failedDetail", { msg: error.message });
+        if (inline) talk.title = status.textContent;
       } finally {
         if (session === current) session = null;
         stopping = false;
@@ -239,6 +247,7 @@ export function pushToTalkButton(cam, { inline = false } = {}) {
         if (session === current) session = null;
         setStatus("talk.failedDetail", true);
         status.textContent = t("talk.failedDetail", { msg: error.message });
+        if (inline) talk.title = status.textContent;
         talk.disabled = false;
       } finally {
         starting = false;

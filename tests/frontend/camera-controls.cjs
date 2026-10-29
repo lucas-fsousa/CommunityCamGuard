@@ -61,7 +61,7 @@ const api = async (...args) => { requests.push(args); return pending ? await pen
 const t = (key) => key;
 const notifications = [];
 function load(file, bindings, exported) {
-  bindings = { onSessionEnd: () => () => {}, notify: (message, options) => notifications.push({ message, options }), ...bindings };
+  bindings = { svgIcon: id => `<svg><use href="#${id}" /></svg>`, onSessionEnd: () => () => {}, notify: (message, options) => notifications.push({ message, options }), ...bindings };
   const source = fs.readFileSync(path.join(__dirname, "../../frontend/modules", file), "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export (async )?function /g, "$1function ")
     .replace(/export const /g, "const ");
@@ -213,7 +213,8 @@ const cameraControls = load("camera-controls.js", {
     else resolve(mode === "missing" ? [] : [{ id: "race", controls: {} }]);
     await opening;
     assert.equal(button.disabled, false);
-    assert.equal(button.textContent, "control.menu");
+    assert.equal(button.title, "control.menu");
+    assert.equal(button.attributes['aria-label'], "control.menu");
     if (mode === "fresh") {
       const panel = document.body.children.at(-1);
       assert.equal(document.body.children.length, count + 1);

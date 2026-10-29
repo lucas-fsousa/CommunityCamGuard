@@ -1,5 +1,5 @@
 // Direct live-view intercom actions; capabilities and permissions stay authoritative.
-import { el } from "ccg/core";
+import { el, svgIcon } from "ccg/core";
 import { t } from "ccg/i18n";
 import { audioMessageButton } from "ccg/audio-message";
 import { pushToTalkButton } from "ccg/push-to-talk";
@@ -15,8 +15,10 @@ export function quickAudioControls(camera) {
   if (cam.audio_streams) group.append(pushToTalkButton(cam, { inline: true }));
   if (cam.audio_messages) {
     const record = audioMessageButton(cam);
-    record.className = "quick-audio-button";
-    record.textContent = t("intercom.open");
+    record.className = "icon-btn quick-audio-button";
+    record.textContent = "";
+    record.innerHTML = svgIcon("i-voice-message");
+    record.title = t("intercom.open");
     record.setAttribute("aria-label", t("intercom.open"));
     group.append(record);
   }
