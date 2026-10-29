@@ -17,6 +17,12 @@ The follow-up adapter retains same-camera control admission during reconnect
 backoff, so PTZ/warmup cannot open a separate login in that gap. Unknown cleanup
 retains the lease.97 focused offline tests passed (192MiB/no swap/50% CPU,
 142.8MiB peak); no additional physical action was sent for those guard tests.
+The final control-lease adapter also passed a60s real repeat with one automatic
+restart and successful H264/AAC reader reattachment. CI5334 tests (3 skipped),
+Node contracts and image checks passed. Runtime is deployed on WSL as
+`b-eb39b86f2524`; HTTPS/authentication and all three recording files growing were
+verified. Existing production policies remain legacy revision0, with no default
+native activation. No OOM/unexpected restart or physical control action in this step.
 
 2026-10-28 recovery implementation: reviewed Yoosee native source offers now keep
 one camera/domain reservation across sequential clean retirements and reconnects.

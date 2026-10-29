@@ -93,3 +93,22 @@ registry's blocked reservation; no public reset bypass is introduced.97 focused
 offline tests passed under192MiB/no swap/50% CPU (142.8MiB peak), including legacy
 login/warmup exclusion during backoff, safe STOP and uncertain-exit retention.
 Mypy359 source files passed. These control-gap cases did not send physical actions.
+
+### Repeat M and rollout — 2026-10-29
+
+The final adapter (`bf05f93`) passed CI5334 tests (3 skipped), Node contracts and
+the image workflow. A second real camera3 trial ran60s, retiring its media session
+at20s with the control-owner lease enabled. The wire client again observed
+`running → recovering → running` on revision2, four binary messages before
+(983,928 bytes) and four after (951,057 bytes), with H264/AAC MIME. The monitor
+reported one restart at30s, both other recorders active throughout and27–29 FDs.
+Clean service-stop/rollback markers exist. The process group used185.7MiB peak,
+24.706 CPU seconds over77.505s total, under768MiB/no swap/one CPU. No camera action
+or simulated unreachable-peer failure was sent for this repeat.
+
+The validated runtime was then built with512MiB/no extra swap/50% CPU and deployed
+to the WSL app only, build `b-eb39b86f2524`. HTTPS health/build, primary login and
+unauthenticated rejection passed; all three cameras were online and their current
+recording files grew. Native sources remained inactive and original primary
+source policies stayed legacy revision0. No container OOM or unexpected restart
+was observed. This ships the recovery implementation, not automatic native startup.
