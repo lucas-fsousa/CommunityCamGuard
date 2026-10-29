@@ -40,6 +40,7 @@ from ..config import get_settings
 from ..db import connect, registry, source_policy
 from ..media import go2rtc
 from ..media.archive_names import started_at as archive_started_at
+from ..media.archive_spec import NativeArchiveSpec
 from ..media.owned_bindings import OwnedIngressBindings
 from ..services.thread_shutdown import join_thread, require_retired
 from .ingress_gate import RecordingIngressGate
@@ -182,6 +183,10 @@ class Recorder:
         # a fixed UTC timezone so this path cannot drift when the host/container/camera timezone
         # changes.  Camera packet timestamps are separately replaced with server wall-clock time.
         return str(self._cam_dir(camera_id) / "%Y-%m-%d" / "%H" / "%Y%m%d_%H%M%S.mp4")
+
+    def native_archive(self, camera_id: str) -> NativeArchiveSpec:
+        """Plan a driver's archive without starting a recorder or touching the filesystem."""
+        return NativeArchiveSpec(camera_id, self.root, self.segment_seconds)
 
     def _ensure_dirs(self, camera_ids: list[str]) -> None:
         # Must use the same clock basis as ffmpeg's UTC strftime expansion below.  Using naive

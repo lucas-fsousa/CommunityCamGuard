@@ -7,7 +7,8 @@ from backend.app.media.decoder_command import decoder_command
 from backend.app.media.fragmented_mp4 import FragmentedMp4
 
 
-def test_one_decoder_owns_both_tracks_and_retains_backpressure(monkeypatch):
+@pytest.mark.parametrize("segment_seconds", [60,300])
+def test_one_decoder_owns_both_tracks_and_retains_backpressure(monkeypatch,segment_seconds):
     calls = []
 
     class Decoder:
@@ -19,8 +20,10 @@ def test_one_decoder_owns_both_tracks_and_retains_backpressure(monkeypatch):
 
     monkeypatch.setattr(module, "HevcDecoder", Decoder)
     output = FragmentedMp4()
-    value = module.NativeAvDecoder(origin_us=1_000_000, output=output)
-    assert calls == [{"output":output, "transport":"mpegts", "audio":True, "archive":None}]
+    value = module.NativeAvDecoder(origin_us=1_000_000, output=output,
+                                   archive_segment_seconds=segment_seconds)
+    assert calls == [{"output":output, "transport":"mpegts", "audio":True, "archive":None,
+                      "archive_segment_seconds":segment_seconds}]
     assert value.offer_audio(b"old", 999999)
     assert len(calls) == 1
     with pytest.raises(ValueError, match="PTS"):

@@ -2,9 +2,13 @@
 
 from pathlib import Path
 
+from .archive_spec import validate_segment_seconds
+
 
 def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
-                    transport: str = "hevc", audio: bool = False, archive: Path | None = None) -> list[str]:
+                    transport: str = "hevc", audio: bool = False, archive: Path | None = None,
+                    archive_segment_seconds: int = 60) -> list[str]:
+    validate_segment_seconds(archive_segment_seconds)
     if transport not in {"hevc", "mpegts"} or (audio and (transport != "mpegts" or not output)):
         raise ValueError("supported local media transport required")
     if archive is not None and (not audio or ":" in str(archive)):
@@ -40,7 +44,7 @@ def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
         cmd += ["-map", "0:v:0", "-map", "0:a:0", "-c", "copy", "-bsf:a", "aac_adtstoasc",
                 "-max_muxing_queue_size", "128", "-muxing_queue_data_threshold", "1048576",
                 "-max_interleave_delta", "1000000", "-avoid_negative_ts", "make_zero",
-                "-f", "segment", "-segment_time", "60", "-segment_format", "mp4",
+                "-f", "segment", "-segment_time", str(archive_segment_seconds), "-segment_format", "mp4",
                 "-reset_timestamps", "1", "-strftime", "1", "-segment_format_options",
                 "movflags=+frag_keyframe+empty_moov+delay_moov+default_base_moof", str(archive)]
     return cmd

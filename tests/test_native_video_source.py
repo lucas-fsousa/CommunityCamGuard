@@ -146,7 +146,8 @@ def test_stop_before_run_creates_no_thread_account_or_decoder(setup):
 
 
 @pytest.mark.parametrize("failed_close", [False, True])
-def test_native_archive_epochs_replace_only_after_confirmed_close(tmp_path, monkeypatch, failed_close):
+@pytest.mark.parametrize("segment_seconds", [60,300])
+def test_native_archive_epochs_replace_only_after_confirmed_close(tmp_path, monkeypatch, failed_close, segment_seconds):
     calls = []
     decoders = []
     class Decoder:
@@ -164,7 +165,8 @@ def test_native_archive_epochs_replace_only_after_confirmed_close(tmp_path, monk
                 raise RuntimeError("shutdown unconfirmed")
             self.closed = True
     monkeypatch.setattr(module, "NativeAvDecoder", Decoder)
-    source = module.NativeVideoSource("test", "123", native_audio=True, archive=tmp_path / "%Y%m%d_%H%M%S.mp4")
+    source = module.NativeVideoSource("test", "123", native_audio=True, archive=tmp_path / "%Y%m%d_%H%M%S.mp4",
+                                      archive_segment_seconds=segment_seconds)
     consumer = VideoConsumer(source._delivery, factory=source._decoder)
     source._delivery.consume(V1Record(encoding=unpack_v1_encoding_header(header()),
                                     video=idr(), video_timestamp=10_000_000))
@@ -182,6 +184,7 @@ def test_native_archive_epochs_replace_only_after_confirmed_close(tmp_path, monk
         assert calls[0]["origin_us"] == 10_000_000 and calls[1]["origin_us"] == 1_000_000
         assert calls[0]["archive"] != calls[1]["archive"]
         assert all(call["archive"].parent == tmp_path for call in calls)
+        assert all(call["archive_segment_seconds"] == segment_seconds for call in calls)
     consumer.close()
     source.stop()
     assert source._delivery.closed

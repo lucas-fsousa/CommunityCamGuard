@@ -4,6 +4,7 @@ from time import time
 
 from ...db import p2p
 from ...db.registry import Camera
+from ...media.archive_spec import NativeArchiveSpec
 from ...media.source_offer import NativeSourceOffer
 from ...media.source_registry import SourceUnavailable
 from . import capability_profiles as profiles
@@ -15,8 +16,10 @@ from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_protocol import DIRECTIONS
 
 
-def offer(camera: Camera) -> NativeSourceOffer | None:
+def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
     camera_id = camera.camera_id
+    if archive is not None and archive.camera_id != camera_id:
+        raise ValueError("archive must belong to the selected camera")
     selected = rollout.selected(camera_id)
     if selected is None or "native_video" not in selected[1]:
         return None
@@ -37,6 +40,12 @@ def offer(camera: Camera) -> NativeSourceOffer | None:
         if not (len(proofs) == 1 and proofs[0].readable is True and proofs[0].writable is False
                 and "hevc" in proofs[0].options):
             return None
+        if archive is not None:
+            av = [item for item in profile.operations if item.key == "native_av"] if profile else []
+            if ("native_av" not in selected[1] or len(av) != 1 or av[0].readable is not True
+                    or av[0].writable is not False
+                    or not {"hevc", "aac_lc_16k_mono", "original_archive"} <= av[0].options):
+                return None
         # Separate combined-session proof: enrollment or ordinary PTZ support does
         # not establish motor safety while the native media reader is active.
         if "native_media_ptz" not in selected[1]:
@@ -57,6 +66,10 @@ def offer(camera: Camera) -> NativeSourceOffer | None:
     def construct():
         if not valid():
             raise SourceUnavailable("native media evidence changed")
+        if archive is not None:
+            return NativeVideoSource(camera_id, enrollment.device_id, native_audio=True,
+                                     archive=archive.template, archive_segment_seconds=archive.segment_seconds,
+                                     motion_grants=captured, motion_valid=valid if captured else None)
         if captured:
             return NativeVideoSource(camera_id, enrollment.device_id, motion_grants=captured,
                                      motion_valid=valid)

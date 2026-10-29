@@ -21,7 +21,7 @@ class HevcDecoder:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
                  output: FragmentedMp4 | None = None, frame_rate: int | None = None,
                  live_timing: bool = False, transport: str = "hevc", audio: bool = False,
-                 archive: Path | None = None):
+                 archive: Path | None = None, archive_segment_seconds: int = 60):
         if type(live_timing) is not bool:
             raise ValueError("explicit live timing mode required")
         if frame_rate is not None and (type(frame_rate) is not int or not 1 <= frame_rate <= 60):
@@ -42,7 +42,8 @@ class HevcDecoder:
         self._output = output
         self._archive = archive is not None
         command = decoder_command(output=output is not None, live_timing=live_timing,
-                                  frame_rate=frame_rate, transport=transport, audio=audio, archive=archive)
+                                  frame_rate=frame_rate, transport=transport, audio=audio, archive=archive,
+                                  archive_segment_seconds=archive_segment_seconds)
         if output is not None:
             output.claim()
         try:

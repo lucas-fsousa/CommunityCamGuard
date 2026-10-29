@@ -11,7 +11,8 @@ from backend.app.media.decoder_command import decoder_command
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg") or not shutil.which("prlimit"), reason="local media tools required")
-def test_original_av_survives_two_epochs_at_the_same_utc_second(tmp_path):
+@pytest.mark.parametrize("segment_seconds", [60,300])
+def test_original_av_survives_two_epochs_at_the_same_utc_second(tmp_path,segment_seconds):
     fixture = subprocess.run([
         "ffmpeg", "-v", "error", "-nostdin", "-filter_threads", "1",
         "-f", "lavfi", "-i", "testsrc=size=64x64:rate=5",
@@ -26,7 +27,8 @@ def test_original_av_survives_two_epochs_at_the_same_utc_second(tmp_path):
     for _ in range(2):
         path = tmp_path / instant.strftime(epoch_template(tmp_path / "%Y%m%d_%H%M%S.mp4").name)
         command = decoder_command(output=True, live_timing=False, frame_rate=5,
-                                  transport="mpegts", audio=True, archive=path)
+                                  transport="mpegts", audio=True, archive=path,
+                                  archive_segment_seconds=segment_seconds)
         result = subprocess.run(command, input=fixture, capture_output=True, timeout=15, check=True)
         assert b"ftyp" in result.stdout[:32]
         assert path.is_file() and started_at(path) == instant

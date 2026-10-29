@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
+from ...media.archive_spec import validate_segment_seconds
 from ...media.fragmented_mp4 import FragmentedMp4
 from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
@@ -40,6 +41,7 @@ class NativeVideoSource:
 
     def __init__(self, camera_id: str, device_id: str, *, delivery: VideoDelivery | None = None,
                  native_audio: bool = False, archive: Path | None = None,
+                 archive_segment_seconds: int = 60,
                  motion_grants: tuple[PtzGrant, ...] = (),
                  motion_valid: Callable[[], bool] | None = None):
         if not isinstance(motion_grants, tuple):
@@ -50,6 +52,7 @@ class NativeVideoSource:
             raise ValueError("native archive requires validated A/V ingress")
         if archive is not None and archive.name != ARCHIVE_TEMPLATE:
             raise ValueError("timestamped UTC archive template required")
+        validate_segment_seconds(archive_segment_seconds)
         if native_audio and delivery is not None:
             raise ValueError("native A/V owns its delivery")
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
@@ -60,6 +63,7 @@ class NativeVideoSource:
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()
         self._archive = archive
+        self._archive_segment_seconds = archive_segment_seconds
         self._archive_dirs = ArchiveDirectories(archive) if archive is not None else None
         self._stop = threading.Event()
         self._failed = threading.Event()
@@ -114,7 +118,8 @@ class NativeVideoSource:
             if self._archive_dirs is not None:
                 self._archive_dirs.prepare(force=True)
             archive = epoch_template(self._archive) if self._archive is not None else None
-            decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive)
+            decoder = NativeAvDecoder(origin_us=frame.timestamp, output=output, archive=archive,
+                                       archive_segment_seconds=self._archive_segment_seconds)
         else:
             decoder = HevcDecoder(output=output, frame_rate=self.frame_rate, live_timing=True)
         self._output = output

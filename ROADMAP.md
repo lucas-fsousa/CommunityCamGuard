@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-29 production-path integration: the ordinary driver offer now accepts a
+generic server-owned archive plan and admits original-codec native A/V only with
+its own explicit per-device proof. Missing/revoked recording support cannot fall
+back silently to video-only. Configured segment length now reaches native FFmpeg
+(not fixed60s).128 focused tests passed under256MiB/no swap/50% CPU,155.1MiB peak;
+Mypy360 files passed. See docs/internal/native-archive-admission.md. The next step
+is exercising this normal driver offer instead of constructing a source by hand.
+Permanent boot still needs durable retirement/bootstrap, identity maintenance and
+storage pause/resume wiring; this change alone is not default native activation.
+
 2026-10-29 actual recovery milestone: camera3 completed90s native A/V/archive with
 one controlled session retirement at20s and automatic reattachment on the same
 source revision. The real player socket received H264/AAC before/after; two original

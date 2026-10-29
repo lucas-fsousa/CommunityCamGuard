@@ -8,10 +8,12 @@ from .hevc_decoder import HevcDecoder
 
 
 class NativeAvDecoder:
-    def __init__(self, *, origin_us: int, output: FragmentedMp4, archive: Path | None = None):
+    def __init__(self, *, origin_us: int, output: FragmentedMp4, archive: Path | None = None,
+                 archive_segment_seconds: int = 60):
         self._origin = origin_us
         self._mux = AvTransport(origin_us)
-        self._decoder = HevcDecoder(output=output, transport="mpegts", audio=True, archive=archive)
+        self._decoder = HevcDecoder(output=output, transport="mpegts", audio=True, archive=archive,
+                                    archive_segment_seconds=archive_segment_seconds)
 
     @property
     def pending_bytes(self) -> int:

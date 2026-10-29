@@ -9,10 +9,16 @@ The first legacy shared-hub migration remains separate.
 
 ## Driver boundary
 
-`CameraDriver.native_media_offer(camera)` defaults to `None`. A driver may return
+`CameraDriver.native_media_offer(camera, archive=None)` defaults to `None`. A driver may return
 a `NativeSourceOffer` with the opaque camera ID, resource domain, lazy factory and
 a bounded local evidence validator. Core never sees vendor credentials or infers
 support from brand, MAC, port, browser input or a generic capability boolean.
+
+For a source that must record, the server now supplies an immutable
+`NativeArchiveSpec` from the generic recorder. The driver must admit the complete
+recording request or decline it, never silently downgrade it to live-only.
+See [native archive admission](native-archive-admission.md) for the implemented
+A/V proof and segment-policy boundary; automatic production boot remains separate.
 
 Yoosee's offer requires all of:
 
