@@ -15,15 +15,26 @@ from .trial_driver_offer import evidence_reference
 
 
 async def bootstrap(camera_id: str, containers: TrialContainers, reference: str) -> None:
+    from ..db import native_restart, source_policy
     from ..main import app
     async with app.router.lifespan_context(app):
         app.state.rec.pause()  # readiness only; avoid host writes into Docker-owned folders
         offer=await asyncio.to_thread(prepare,camera_id,app.state.rec.native_archive(camera_id),reference)
         retirement=app.state.owned_runtime.retirement
-        receipt=await asyncio.to_thread(retirement.retire_legacy,camera_id,
-            expected_revision=0,retire_ingress=containers.confirm_closed)
-        await asyncio.to_thread(app.state.native_runtime.activate,retirement=retirement,receipt=receipt,
-            offer=offer,apply_routes=lambda:app.state.media.write_config(),ready_timeout=30)
+        previous=source_policy.read_for((camera_id,))[camera_id]
+        if previous.mode=='native' and previous.phase=='blocked':
+            # Trusted host operator has just confirmed the entire old PID namespace
+            # is gone. No old socket/decoder can overlap this replacement.
+            containers.confirm_closed()
+            checkpoint=native_restart.CleanRestart(camera_id,previous.revision,offer.domain)
+            native_restart.save((checkpoint,))
+            await asyncio.to_thread(app.state.native_runtime.restore,retirement=retirement,checkpoint=checkpoint,
+                offer=offer,apply_routes=lambda:app.state.media.write_config(),ready_timeout=30)
+        else:
+            receipt=await asyncio.to_thread(retirement.retire_legacy,camera_id,
+                expected_revision=previous.revision,retire_ingress=containers.confirm_closed)
+            await asyncio.to_thread(app.state.native_runtime.activate,retirement=retirement,receipt=receipt,
+                offer=offer,apply_routes=lambda:app.state.media.write_config(),ready_timeout=30)
     if app.state.service_lifetime.owner.acquired:
         raise RuntimeError('native bootstrap cleanup unconfirmed')
 

@@ -46,3 +46,14 @@ def test_unconfirmed_cleanup_cannot_be_classified_retryable(fault):
         worker = replace(worker, media=SimpleNamespace(opened=True, broker_release=False))
     source = NativeVideoSource("test","123")
     assert not retryable(NativeVideoResult("socket", SharedReadResult("socket",worker)),source)
+
+
+@pytest.mark.parametrize('fault',[None,'route','socket','motion','code'])
+def test_timeout_reconnect_requires_closed_sockets_and_confirmed_outer_route(fault):
+    worker=WorkerSummary('protocol',0,0,0,False,
+        media=SimpleNamespace(opened=True,broker_release=fault!='route'),
+        tcp=SimpleNamespace(ready=True,close_acknowledged=False,socket_close_failed=fault=='socket'),
+        motion=SimpleNamespace(start_attempted=True,release_delivery_confirmed=fault!='motion'),
+        protocol_code='bad_format' if fault=='code' else 'kcp_assembly_timeout')
+    source=NativeVideoSource('test','123')
+    assert retryable(NativeVideoResult('transport',SharedReadResult('transport',worker)),source) is (fault is None)

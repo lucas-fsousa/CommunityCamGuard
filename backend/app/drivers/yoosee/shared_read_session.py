@@ -24,6 +24,7 @@ from .p2p.contracts import P2PProbeError
 from .p2p.control_ownership import ControlChannelBusy, control_channel_contended
 from .p2p.lamp_read_inbox import LampReadTicket
 from .p2p.lamp_read_job import LampReadResult, LampReadSpec
+from .p2p.media_retirement import retired_assembly_timeout
 from .p2p.media_route_job import MediaRouteSpec
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
@@ -227,6 +228,8 @@ class SharedReadSession:
             self._connection_failure = error.reason
             return SharedReadResult(reason or "connection")
         self._last_worker = result
+        if delivery is not None and retired_assembly_timeout(result):
+            return SharedReadResult('transport',result)
         if self._lifecycle.state == "blocked":
             raise P2PProbeError("shared read/media cleanup unconfirmed")
         return SharedReadResult(reason or result.reason, result)

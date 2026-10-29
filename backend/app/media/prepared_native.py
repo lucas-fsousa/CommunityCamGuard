@@ -1,5 +1,6 @@
 """Owned native run, evidence heartbeat and fail-closed publication/cleanup."""
 
+import logging
 import math
 import threading
 import time
@@ -16,6 +17,8 @@ from .source_registry import (
     SourceUnavailable,
 )
 from .viewer_gate import ViewerGate
+
+log=logging.getLogger(__name__)
 
 
 class PreparedNative:
@@ -100,6 +103,16 @@ class PreparedNative:
         # Serialize with publication so a finished source cannot reopen the gate.
         with self._lock:
             if not self._closed:
+                if not self._stop.is_set():
+                    error=_future.exception() if not _future.cancelled() else None
+                    active=getattr(self.source,'current',self.source)
+                    try: details=getattr(active,'diagnostics',lambda:{})()
+                    except Exception: details={}
+                    code=details.get('session_protocol_code','')
+                    if code not in {'kcp_assembly_timeout','kcp_invalid_segment','kcp_conflicting_duplicate',
+                                    'kcp_receive_budget','kcp_fragment_chain'}: code=''
+                    log.warning('native source ended camera_id=%s error_type=%s protocol_code=%s',self.offer.camera_id,
+                                type(error).__name__ if error is not None else 'source_returned',code)
                 self._block_locked()
 
     def publish(self, apply_routes: Callable[[], None]) -> None:
