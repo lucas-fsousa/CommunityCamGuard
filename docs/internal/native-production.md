@@ -32,3 +32,30 @@ owner. Features that still require a separate account connection remain subject
 to the existing shared-account exclusion; this delivery does not pretend all
 native shared-write features have been implemented. Other-camera foreground
 controls can cause a clean native-session yield/reconnect through existing logic.
+
+## Deployment follow-up (2026-10-29)
+
+The first ordinary-container installation reached readiness but then blocked;
+the follow-up installation rolled back because the container did not stay ready.
+Do not confuse an installation marker or a passing finite trial with current
+production availability. The other two cameras retain their legacy transports.
+
+The native failure log now records only local closure facts and fixed protocol
+classifications. TCP/AV error sanitization previously hid the underlying KCP
+classification, so the narrow, already implemented timeout reconnection could
+not run for failures raised during receive. The worker now walks a bounded
+exception-context chain to recover that classification, without logging messages
+or payloads. Reconnection still requires confirmed outer route release, both
+sockets closed, confirmed motor stop when applicable and retired consumers.
+Unknown protocol failures remain blocked. This correction passed 51 targeted
+worker/recovery tests.
+
+The corrected installation committed successfully in the ordinary app container
+(`5de4e7f`, build `b-6932aecc11d2`). Camera3 is native/active at revision11;
+the other two cameras remain legacy/active at revision0. An authenticated request
+to the existing dashboard MSE WebSocket received H264/AAC initialization and three
+binary fragments (1,165,374 bytes). All three cameras report online/recording and
+all three recording destinations grew during the follow-up check. The installer
+exited (169.5MiB peak, no swap); only the ordinary containers remain serving.
+No sound, light or movement commands were sent. Existing shared native PTZ
+implementation/physical acceptance is retained, not retested as a release gate.

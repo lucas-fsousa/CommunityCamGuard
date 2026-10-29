@@ -12,6 +12,18 @@ with a private backup and rollback. Media support is not a30-minute control-cach
 lease; explicit invalidation/authentication/ownership checks remain. Generic native
 online/recording indicators are wired. See docs/internal/native-production.md.
 
+Current delivery (2026-10-29): camera3 now runs native A/V plus reviewed shared
+PTZ in the normal Docker app (`5de4e7f`, `b-6932aecc11d2`, native active revision11).
+Existing authenticated dashboard MSE delivered H264/AAC; all three recording
+destinations grew and all three cameras report online/recording. Other cameras
+remain legacy revision0. `NATIVE_RESUME_ON_START=true` is enabled locally, with
+no separate test server. Initial installations exposed wrapped KCP errors hiding
+the retry classification; fixed and covered by51 worker/recovery tests. Those
+failed attempts remain documented, not counted as successful deployments.
+Next work is normal-use feedback, then additional shared native controls and
+multi-camera capacity. No new finite endurance gate is required for this delivery.
+The entries below describe historical checkpoints, not the current deployment.
+
 2026-10-29 native clean-startup implementation: one-use camera/revision/domain
 checkpoints are saved only after confirmed source/viewer/executor retirement and
 spent atomically before ordinary driver source birth. Opt-in startup checks disk

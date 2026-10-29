@@ -13,6 +13,8 @@ Docs are split by audience:
 
 ## `internal/` — for contributors
 
+- **[Native production deployment](internal/native-production.md)** — current camera3
+  Docker streaming/shared PTZ installation, persistent support, recovery and limitations.
 - **[Yoosee SDK platform provenance](internal/yoosee-platform-sdk-versions.md)** —
   version-specific MTP/E4 evidence, correlated passive MTP collection, unknown-platform preservation, A4 relay
   advertisement and remaining native-HD gate.
