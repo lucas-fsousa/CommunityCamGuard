@@ -16,9 +16,9 @@ from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
 from .lamp_read_job import LampReadJob, LampReadSpec
 from .media_route_job import MediaRouteJob, MediaRouteSpec
+from .model_control_job import ControlWriteJob, ControlWriteSpec
 from .model_protocol import build_model_read
 from .ptz_scheduler import PtzScheduler
-from .volume_write_job import VolumeWriteJob, VolumeWriteSpec
 
 Retirement = Literal["closed", "transport", "lifetime", "heartbeat_timeout",
                      "input_budget", "drained", "drain_timeout", "prepare"]
@@ -147,13 +147,13 @@ class BrokerAccount:
         return LampReadJob(self._node, self._source, spec, generation=self._generation,
                            deadline=deadline, clock=self._clock)
 
-    def prepare_volume_write(self, spec: VolumeWriteSpec, *, deadline: float) -> VolumeWriteJob:
+    def prepare_control_write(self, spec: ControlWriteSpec, *, deadline: float) -> ControlWriteJob:
         if (self.state != 'active' or self._media_release_uncertain or self._node is None
                 or deadline > self._deadline or self.motion_cleanup_pending
                 or (self._ptz is not None and self._ptz.result is not None
                     and self._ptz.result.start_attempted and not self._ptz.result.release_delivery_confirmed)):
             raise ValueError('account not accepting volume changes')
-        return VolumeWriteJob(self._node, self._source, spec, generation=self._generation,
+        return ControlWriteJob(self._node, self._source, spec, generation=self._generation,
                               deadline=deadline, clock=self._clock)
 
     def retire(self, reason: Retirement = "closed") -> AccountEvents:

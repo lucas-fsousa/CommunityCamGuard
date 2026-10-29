@@ -26,12 +26,12 @@ from .p2p.lamp_read_inbox import LampReadTicket
 from .p2p.lamp_read_job import LampReadResult, LampReadSpec
 from .p2p.media_retirement import retired_media_route, retired_transport_failure
 from .p2p.media_route_job import MediaRouteSpec
+from .p2p.model_control_inbox import ControlWriteTicket
+from .p2p.model_control_job import ControlWriteResult, OrientationWriteSpec, VolumeWriteSpec
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .p2p.video_delivery import VideoDelivery
-from .p2p.volume_write_inbox import VolumeWriteTicket
-from .p2p.volume_write_job import VolumeWriteResult, VolumeWriteSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,17 +115,23 @@ class SharedReadSession:
             raise ValueError("active lamp-read enrollment required")
         return self._lifecycle.submit_lamp_read(LampReadSpec(entry.access_id, int(entry.device_id)))
 
-    def submit_volume_write(self, percent: int) -> VolumeWriteTicket:
+    def submit_volume_write(self, percent: int) -> ControlWriteTicket:
         entry = self._active_entry
         if entry is None:
             raise ValueError('active volume enrollment required')
-        return self._lifecycle.submit_volume_write(VolumeWriteSpec(int(entry.device_id), percent))
+        return self._lifecycle.submit_control_write(VolumeWriteSpec(int(entry.device_id), percent))
 
-    def take_volume_write(self, ticket: VolumeWriteTicket) -> VolumeWriteResult | None:
-        return self._lifecycle.take_volume_write(ticket)
+    def submit_orientation_write(self, orientation: str) -> ControlWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active orientation enrollment required')
+        return self._lifecycle.submit_control_write(OrientationWriteSpec(int(entry.device_id), orientation))
 
-    def cancel_volume_write(self, ticket: VolumeWriteTicket) -> None:
-        self._lifecycle.cancel_volume_write(ticket)
+    def take_control_write(self, ticket: ControlWriteTicket) -> ControlWriteResult | None:
+        return self._lifecycle.take_control_write(ticket)
+
+    def cancel_control_write(self, ticket: ControlWriteTicket) -> None:
+        self._lifecycle.cancel_control_write(ticket)
 
     def take_lamp_read(self, ticket: LampReadTicket) -> LampReadResult | None:
         return self._lifecycle.take_lamp_read(ticket)

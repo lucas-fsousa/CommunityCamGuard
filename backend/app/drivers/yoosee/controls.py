@@ -287,6 +287,13 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == ORIENTATION:
+        from .shared_orientation import write as write_shared_orientation
+        if type(value) is not str:
+            raise ValueError('orientation must be normal or inverted')
+        shared_orientation = write_shared_orientation(_enrollment(camera), value)
+        if shared_orientation is not None:
+            return shared_orientation
     if key == SPEAKER_VOLUME:
         from .shared_volume import write as write_shared_volume
         if type(value) is not int:

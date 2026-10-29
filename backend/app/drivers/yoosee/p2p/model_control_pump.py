@@ -1,19 +1,19 @@
-"""Volume writes are driven only by the account's existing sole socket reader."""
+"""Typed writes are driven only by the account's existing sole socket reader."""
 
 import time
 from collections.abc import Callable
 
 from .account_read_dispatcher import AccountReadDispatcher
-from .volume_write_inbox import VolumeWriteInbox, VolumeWriteTicket
-from .volume_write_job import VolumeWriteJob, VolumeWriteResult
+from .model_control_inbox import ControlWriteInbox, ControlWriteTicket
+from .model_control_job import ControlWriteJob, ControlWriteResult
 
 
-class VolumeWritePump:
-    def __init__(self, dispatcher: AccountReadDispatcher, inbox: VolumeWriteInbox, *,
+class ControlWritePump:
+    def __init__(self, dispatcher: AccountReadDispatcher, inbox: ControlWriteInbox, *,
                  clock: Callable[[], float] = time.monotonic):
         self._dispatcher, self._inbox, self._clock = dispatcher, inbox, clock
-        self._job: VolumeWriteJob | None = None
-        self._ticket: VolumeWriteTicket | None = None
+        self._job: ControlWriteJob | None = None
+        self._ticket: ControlWriteTicket | None = None
 
     def poll(self) -> tuple[bytes, ...]:
         if self._job is not None and self._ticket is not None:
@@ -26,9 +26,9 @@ class VolumeWritePump:
             ticket = self._inbox.claim()
             if ticket is not None:
                 try:
-                    self._job = self._dispatcher.prepare_volume_write(ticket.spec, deadline=ticket.deadline)
+                    self._job = self._dispatcher.prepare_control_write(ticket.spec, deadline=ticket.deadline)
                 except ValueError:
-                    self._inbox.finish(ticket, VolumeWriteResult('unavailable'))
+                    self._inbox.finish(ticket, ControlWriteResult('unavailable'))
                     return ()
                 self._ticket = ticket
                 if ticket.completion.cancelled():

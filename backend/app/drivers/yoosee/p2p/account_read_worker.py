@@ -21,12 +21,12 @@ from .media_failures import PROTOCOL_CODES
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
+from .model_control_inbox import ControlWriteInbox
+from .model_control_pump import ControlWritePump
 from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
 from .video_delivery import VideoDelivery
-from .volume_write_inbox import VolumeWriteInbox
-from .volume_write_pump import VolumeWritePump
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +71,7 @@ class AccountReadWorker:
                                                  clock=clock, policy=policy, state_reads=state_reads)
         self.mailbox = self._dispatcher.mailbox
         self.lamp_inbox = LampReadInbox(generation, clock=clock) if state_reads else None
-        self.volume_inbox = VolumeWriteInbox(generation, clock=clock) if state_reads else None
+        self.control_inbox = ControlWriteInbox(generation, clock=clock) if state_reads else None
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
         self._generation, self._clock = generation, clock
@@ -82,8 +82,8 @@ class AccountReadWorker:
         self._socket: ReadSocket | None = None
 
     def stop(self) -> None:
-        if self.volume_inbox is not None:
-            self.volume_inbox.close()
+        if self.control_inbox is not None:
+            self.control_inbox.close()
         if self.lamp_inbox is not None:
             self.lamp_inbox.close()
         if self.motion_inbox is not None:
@@ -96,8 +96,8 @@ class AccountReadWorker:
             self.motion_inbox.close()
         if self.lamp_inbox is not None:
             self.lamp_inbox.close()
-        if self.volume_inbox is not None:
-            self.volume_inbox.close()
+        if self.control_inbox is not None:
+            self.control_inbox.close()
         self._drain.set()
 
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
@@ -145,7 +145,7 @@ class AccountReadWorker:
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         lamp = LampReadPump(self._dispatcher, self.lamp_inbox, clock=self._clock) if self.lamp_inbox is not None else None
-        volume = VolumeWritePump(self._dispatcher, self.volume_inbox, clock=self._clock) if self.volume_inbox is not None else None
+        control_writes = ControlWritePump(self._dispatcher, self.control_inbox, clock=self._clock) if self.control_inbox is not None else None
         mixed = initial_motion is not None or self.motion_inbox is not None
         manual_acks = mixed or lamp is not None
         node = self._node
@@ -269,9 +269,9 @@ class AccountReadWorker:
                 if lamp is not None:
                     for packet_lamp in lamp.poll():
                         send(packet_lamp)
-                if volume is not None:
-                    for packet_volume in volume.poll():
-                        send(packet_volume)
+                if control_writes is not None:
+                    for packet_control in control_writes.poll():
+                        send(packet_control)
                 for item in batch.reads:
                     check()
                     if self.mailbox.ready(item.ticket):
@@ -289,8 +289,8 @@ class AccountReadWorker:
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
-                    if volume is not None:
-                        volume.observe(plain, peer, generation=self._generation)
+                    if control_writes is not None:
+                        control_writes.observe(plain, peer, generation=self._generation)
                     lamp_packets = lamp.observe(plain, peer, generation=self._generation) if lamp is not None else ()
                     for packet_lamp in lamp_packets:
                         send(packet_lamp)
@@ -329,8 +329,8 @@ class AccountReadWorker:
             protocol_code=PROTOCOL_CODES.get(str(error),'')
         finally:
             try:
-                if volume is not None:
-                    volume.close()
+                if control_writes is not None:
+                    control_writes.close()
                 if lamp is not None:
                     lamp.close()
                 self.mailbox.close()

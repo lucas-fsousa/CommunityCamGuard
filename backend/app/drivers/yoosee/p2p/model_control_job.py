@@ -1,4 +1,4 @@
-"""One typed D2 volume change on an existing owner; no socket, login or replay."""
+"""Fixed typed scalar controls on an existing owner; no raw path, socket or replay."""
 
 import math
 import secrets
@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from .broker_sequences import BrokerSequences
 from .broker_transactions import BrokerTransactions
 from .contracts import CertifiedNode
-from .volume import VOLUME_RAW_BY_PERCENT, build_volume_write, parse_volume_write_response
+from .model_write_protocol import parse_model_write_response
+from .orientation import ORIENTATION_VALUES, build_orientation_write
+from .volume import VOLUME_RAW_BY_PERCENT, build_volume_write
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,33 +27,49 @@ class VolumeWriteSpec:
 
 
 @dataclass(frozen=True, slots=True)
-class VolumeWriteResult:
+class OrientationWriteSpec:
+    device_id: int
+    orientation: str
+
+    def __post_init__(self):
+        if (type(self.device_id) is not int or not 0 < self.device_id < 1 << 64
+                or type(self.orientation) is not str or self.orientation not in ORIENTATION_VALUES):
+            raise ValueError('typed camera orientation required')
+
+
+ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec
+
+
+@dataclass(frozen=True, slots=True)
+class ControlWriteResult:
     status: str
     error_code: int | None = None
     transport_acknowledged: bool = False
 
 
-class VolumeWriteJob:
-    def __init__(self, node: CertifiedNode, sequences: BrokerSequences, spec: VolumeWriteSpec, *,
+class ControlWriteJob:
+    def __init__(self, node: CertifiedNode, sequences: BrokerSequences, spec: ControlWriteSpec, *,
                  generation: int, deadline: float, clock: Callable[[], float] = time.monotonic):
-        if not isinstance(spec, VolumeWriteSpec) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
-            raise ValueError('bounded volume write required')
+        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec)) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
+            raise ValueError('bounded typed control write required')
         self._receipts = BrokerTransactions(node.session_id, generation, node.next_sequence,
                                             sequences=sequences, clock=clock)
         self._message_id = secrets.randbits(31)
         try:
             ticket = self._receipts.register(0xD2, deadline-clock())
-            self._wire = build_volume_write(node, spec.device_id, spec.percent, ticket.sequence, self._message_id)
+            self._wire = (build_volume_write(node, spec.device_id, spec.percent, ticket.sequence, self._message_id)
+                if isinstance(spec, VolumeWriteSpec) else
+                build_orientation_write(node, spec.device_id, spec.orientation, ticket.sequence, self._message_id))
         except BaseException:
             self._receipts.close()
             raise
         self._node: CertifiedNode | None = node
         self._generation, self._deadline, self._clock = generation, deadline, clock
         self._sent = self._ack = False
-        self.result: VolumeWriteResult | None = None
+        self.result: ControlWriteResult | None = None
 
     def _finish(self, status: str, error: int | None = None) -> None:
-        self.result = VolumeWriteResult(status, error, self._ack)
+        self.result = ControlWriteResult(status, error, self._ack)
         self._receipts.close()  # Never close the account-wide sequence allocator.
         self._node = None
         self._wire = b''
@@ -87,6 +105,6 @@ class VolumeWriteJob:
         flags = struct.unpack_from('<I', plain, 20)[0]
         if struct.unpack_from('<Q', plain, 4)[0] != node.session_id or (flags >> 16) & 3 != 2 or flags & (1 << 20):
             return
-        code = parse_volume_write_response(plain, self._message_id)
+        code = parse_model_write_response(plain, self._message_id)
         if code is not None:
             self._finish('response', code)

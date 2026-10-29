@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.drivers.contracts import ControlNotReady, ControlOperationError
-from backend.app.drivers.yoosee import controls, shared_control_reads, shared_volume
+from backend.app.drivers.yoosee import controls, shared_control_reads, shared_control_write
+from backend.app.drivers.yoosee.p2p.model_control_job import ControlWriteResult
 from backend.app.drivers.yoosee.p2p.volume import VOLUME_RAW_BY_PERCENT
-from backend.app.drivers.yoosee.p2p.volume_write_job import VolumeWriteResult
 from tests.test_shared_control_reads import ENROLLMENT, Session
 
 
@@ -19,10 +19,10 @@ class VolumeSession(Session):
             self.result = replace(self.result, completion=replace(self.result.completion,
                 value={'setVal':VOLUME_RAW_BY_PERCENT[percent]}))
         return object()
-    def take_volume_write(self, ticket):
+    def take_control_write(self, ticket):
         if self.fault == 'generation':self.ready=False
-        return VolumeWriteResult('response', 7 if self.fault == 'rejected' else 0, True)
-    def cancel_volume_write(self, ticket):self.cancelled.append(ticket)
+        return ControlWriteResult('response', 7 if self.fault == 'rejected' else 0, True)
+    def cancel_control_write(self, ticket):self.cancelled.append(ticket)
 
 
 @pytest.fixture
@@ -60,15 +60,15 @@ def test_failed_confirmation_never_repeats_or_falls_back(camera, fault):
 def test_delayed_readback_is_polled_without_repeating_write(camera, monkeypatch):
     session = VolumeSession('readback')
     calls = []
-    original = shared_volume.read
+    original = shared_control_write.read
     def read(*args):
         calls.append(True)
         if len(calls) == 3:
             session.result = replace(session.result, completion=replace(session.result.completion,
                 value={'setVal':7}))
         return original(*args)
-    monkeypatch.setattr(shared_volume, 'read', read)
-    monkeypatch.setattr(shared_volume.time, 'sleep', lambda _: None)
+    monkeypatch.setattr(shared_control_write, 'read', read)
+    monkeypatch.setattr(shared_control_write.time, 'sleep', lambda _: None)
     with shared_control_reads.publish(ENROLLMENT.camera_id, session):
         result = controls.write(camera, 'speaker_volume', 75)
     assert result.verified and len(calls) == 3 and session.writes == [75]
