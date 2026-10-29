@@ -26,6 +26,15 @@ jobs:
           build_tools/install_go2rtc.py
       - name: Type-check (mypy)
         run: mypy backend/app
+      - name: Local media fixture tools (FFmpeg)
+        # Runner images may omit FFmpeg. Do not silently skip archive/muxing
+        # regressions that exercise the same binary used in the server image.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
+          command -v prlimit
       - name: Pinned go2rtc fixture for owned RTSP ingress
         run: python build_tools/install_go2rtc.py --arch amd64 --output bin/go2rtc
       - name: Test (pytest)
