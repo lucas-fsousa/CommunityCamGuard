@@ -28,5 +28,16 @@ Offline coverage uses an actual bounded broker mailbox with synthetic completion
 same-owner collection, OFF lamp state, optional siren metadata, errors, deadlines,
 enrollment/owner changes, waiter cleanup, CAS supersession/invalidation and expired
 evidence. 211 focused tests passed under192MiB/no swap/50% CPU (157.2MiB peak).
-Mypy377 files and Ruff passed. No physical commands were used. Deployment and
-read-only production observation are recorded below when completed.
+Mypy377 files and Ruff passed. No physical commands were used.
+
+Deployed `99054a5` / build `b-60098c08f859` via an app-only clean replacement.
+Camera3 resumed normally at native revision56; the other two cameras stayed on
+legacy revision0. Before the ordinary catalogue request its snapshot was over
+two hours expired (generation85), and the catalogue exposed no controls/audio.
+The same public catalogue demand refreshed the snapshot to generation86 with a
+one-hour expiry. A second request exposed the seven validated controls and both
+intercom flags again. Native source revision56 remained available throughout;
+authenticated H264/AAC MSE delivered fragments1355/550998/575515/593105bytes.
+No sound/light/motion commands, OOM or unexpected app restart. CI40995882612 and
+Image40995882584 passed. This verifies read-only capability maintenance, not new
+physical actuation acceptance for every advertised control.

@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 def apply(entry: P2PEnrollment, key: str, value: ControlValue, raw: int,
           submit: Callable[[SharedReadSession], ControlWriteTicket]) -> ControlResult | None:
-    if key not in {'speaker_volume', 'orientation'}:
+    if key not in {'speaker_volume', 'orientation', 'night_vision'}:
         raise ValueError('supported typed shared control required')
     session = session_for(entry)
     if session is None:

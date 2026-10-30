@@ -4,13 +4,22 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-30 next shared control: the mapped automatic/day/night scalar now has a
+typed native-owner writer with preflight, one D2, correlated D3 and bounded exact
+readback. No-op is read-only; ownership loss/rejection never logs in again or
+replays. Only synthetic tests; no physical mode change, visual acceptance or new
+brand/model grants. See docs/internal/native-shared-night-vision.md.
+
 2026-10-30 implementation: capability refresh can reuse the active native owner
 instead of attempting a second account. Fixed read-only roots and lamp STATUS,
 bounded sequential batch, same-enrollment checks and atomic generation replacement
 preserve video identity without extending stale grants or overriding invalidation.
 211 focused tests passed under192MiB/no swap (157.2MiB peak), Mypy377/Ruff passed.
-No sound/light/motion commands. Deployment/read-only observation follow; see
-docs/internal/native-capability-refresh.md. Remaining shared writes and native
+Deployed `99054a5` / `b-60098c08f859`: ordinary catalogue demand renewed camera3
+generation85→86 and restored seven controls plus both audio flags, with native
+revision56 unchanged and real MSE fragments still arriving. CI/Image passed, no
+sound/light/motion commands or OOM. See docs/internal/native-capability-refresh.md.
+Remaining shared writes and native
 multi-camera capacity remain separate work, not claims of this implementation.
 
 User-reported regression: intercom wrongly rejected the configured HTTPS origin

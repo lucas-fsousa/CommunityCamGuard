@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult, ControlValue
+from .p2p.night_vision import NIGHT_VISION_READ_PATH, NIGHT_VISION_VALUES, extract_night_vision_mode
 from .p2p.orientation import ORIENTATION_READ_PATH, ORIENTATION_VALUES, extract_orientation
 from .p2p.smart_protection import SMART_PROTECTION_READ_PATH, extract_smart_protection_enabled
 from .p2p.smart_protection_schedule import extract_smart_protection_schedule
@@ -17,7 +18,8 @@ _lock = threading.Lock()
 _sessions: dict[str, SharedReadSession] = {}
 _owners: dict[str, object] = {}  # retain control admission across clean reconnect gaps
 _paths = {"speaker_volume": VOLUME_READ_PATH, "smart_protection": SMART_PROTECTION_READ_PATH,
-          "smart_protection_schedule": SMART_PROTECTION_READ_PATH, "orientation": ORIENTATION_READ_PATH}
+          "smart_protection_schedule": SMART_PROTECTION_READ_PATH, "orientation": ORIENTATION_READ_PATH,
+          "night_vision": NIGHT_VISION_READ_PATH}
 
 
 def has_session(camera_id: str | None) -> bool:
@@ -110,6 +112,9 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
                 elif key == 'orientation':
                     raw = extract_orientation(completion.value)
                     value = next((name for name, number in ORIENTATION_VALUES.items() if number == raw), None)
+                elif key == 'night_vision':
+                    raw = extract_night_vision_mode(completion.value)
+                    value = next((name for name, number in NIGHT_VISION_VALUES.items() if number == raw), None)
                 elif key == "smart_protection":
                     value = extract_smart_protection_enabled(completion.value)
                 else:

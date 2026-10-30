@@ -13,6 +13,8 @@ Current ordinary-Docker deployment and limitations:
 [native production](native-production.md),
 [remote intercom / native MP4 recovery](intercom-origin-native-mp4.md), and
 [same-owner capability refresh](native-capability-refresh.md).
+The [shared night-mode adapter](native-shared-night-vision.md) documents the next
+implemented control and explicitly separates offline tests from physical acceptance.
 The checkpoints below are historical and do not override that delivery status.
 
 Latest usable delivery: [real camera3 native dashboard trial](native-dashboard-live-trial.md),

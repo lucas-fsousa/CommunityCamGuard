@@ -27,7 +27,12 @@ from .p2p.lamp_read_job import LampReadResult, LampReadSpec
 from .p2p.media_retirement import retired_media_route, retired_transport_failure
 from .p2p.media_route_job import MediaRouteSpec
 from .p2p.model_control_inbox import ControlWriteTicket
-from .p2p.model_control_job import ControlWriteResult, OrientationWriteSpec, VolumeWriteSpec
+from .p2p.model_control_job import (
+    ControlWriteResult,
+    NightVisionWriteSpec,
+    OrientationWriteSpec,
+    VolumeWriteSpec,
+)
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
@@ -129,6 +134,12 @@ class SharedReadSession:
 
     def take_control_write(self, ticket: ControlWriteTicket) -> ControlWriteResult | None:
         return self._lifecycle.take_control_write(ticket)
+
+    def submit_night_vision_write(self, mode: str) -> ControlWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active night-vision enrollment required')
+        return self._lifecycle.submit_control_write(NightVisionWriteSpec(int(entry.device_id), mode))
 
     def cancel_control_write(self, ticket: ControlWriteTicket) -> None:
         self._lifecycle.cancel_control_write(ticket)

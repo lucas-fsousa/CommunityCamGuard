@@ -85,7 +85,7 @@ class AccountReadLifecycle:
     def submit_control_write(self, spec: ControlWriteSpec) -> ControlWriteTicket:
         with self._lock:
             if self._state != 'active' or self._worker is None or self._worker.control_inbox is None:
-                raise ValueError('account not accepting volume changes')
+                raise ValueError('account not accepting control changes')
             return self._worker.control_inbox.submit(spec)
 
     def take_control_write(self, ticket: ControlWriteTicket) -> ControlWriteResult | None:

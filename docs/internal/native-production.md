@@ -39,6 +39,11 @@ to the existing shared-account exclusion; this delivery does not pretend all
 native shared-write features have been implemented. Other-camera foreground
 controls can cause a clean native-session yield/reconnect through existing logic.
 
+The existing three-state night-mode control also has a typed shared-owner adapter
+with one-send/D3/readback semantics. This integration was tested with synthetic
+responses only; no physical night/IR mode change was made for that implementation.
+See [shared night mode](native-shared-night-vision.md).
+
 ## Deployment follow-up (2026-10-29)
 
 The first ordinary-container installation reached readiness but then blocked;

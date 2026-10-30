@@ -9,6 +9,7 @@ from backend.app.drivers.yoosee.p2p.model_control_inbox import ControlWriteInbox
 from backend.app.drivers.yoosee.p2p.model_control_job import (
     ControlWriteJob,
     ControlWriteResult,
+    NightVisionWriteSpec,
     OrientationWriteSpec,
     VolumeWriteSpec,
 )
@@ -19,10 +20,10 @@ from tests.test_broker_transactions import ack
 from tests.test_lamp_read_job import NODE
 
 
-def fixture():
+def fixture(spec=None):
     now = [0.0]
     seq = BrokerSequences(NODE.session_id, 1, 40)
-    job = ControlWriteJob(NODE, seq, VolumeWriteSpec(7000000002, 50),
+    job = ControlWriteJob(NODE, seq, spec or VolumeWriteSpec(7000000002, 50),
                          generation=1, deadline=2, clock=lambda: now[0])
     return job, seq, now
 
@@ -48,8 +49,9 @@ def test_typed_write_sends_once_and_transport_ack_is_not_success():
 
 
 @pytest.mark.parametrize('fault', ['peer', 'generation', 'session', 'message', 'unsent', 'expired'])
-def test_unrelated_or_late_reply_does_not_confirm_write(fault):
-    job, _, now = fixture()
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night')])
+def test_unrelated_or_late_reply_does_not_confirm_write(fault, spec):
+    job, _, now = fixture(spec)
     if fault != 'unsent':job.next_packet()
     if fault == 'expired':now[0] = 2
     wire = response(job, session=18 if fault == 'session' else 17,
@@ -86,7 +88,7 @@ def test_only_five_integer_volume_positions_are_accepted(percent):
     with pytest.raises(ValueError):VolumeWriteSpec(123, percent)
 
 
-@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted')])
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night')])
 def test_existing_worker_sends_typed_control_on_its_only_socket_and_shared_sequences(monkeypatch, spec):
     sock = WorkerSocket()
     owner = AccountReadWorker(WORKER_NODE, 1, '192.0.2.1', 1234,
@@ -136,3 +138,36 @@ def test_volume_and_orientation_share_one_inbox_slot():
     with pytest.raises(ValueError):inbox.submit(OrientationWriteSpec(123, 'inverted'))
     inbox.cancel(ticket)
     assert inbox.submit(OrientationWriteSpec(123, 'inverted')).spec.orientation == 'inverted'
+
+
+@pytest.mark.parametrize('mode,raw', [('automatic', 0), ('daytime', 1), ('night', 2)])
+def test_shared_job_only_writes_night_mode_not_adjacent_video_fields(mode, raw):
+    job, seq, _ = fixture(NightVisionWriteSpec(7000000002, mode))
+    plain = gute_mode2_decrypt(job.next_packet(), NODE.session_key)
+    assert plain[1] == 0xD2
+    assert b'ProWritable.videoParm.setVal.nightViewMode\0' in plain
+    assert b'multiFlip' not in plain and b'nightViewModeV2' not in plain
+    assert plain.endswith(str(raw).encode() + b'\0')
+    assert job.next_packet() is None
+    job.observe(response(job), NODE.address, generation=1)
+    assert job.result == ControlWriteResult('response', 0, False)
+    assert seq.matches(17, 1)
+
+
+@pytest.mark.parametrize('mode', [True, 0, 2, 'infrared', 'auto', '', None])
+def test_night_mode_rejects_unreviewed_states(mode):
+    with pytest.raises(ValueError):
+        NightVisionWriteSpec(123, mode)
+
+
+def test_night_mode_uses_the_same_single_slot_as_other_controls():
+    inbox = ControlWriteInbox(1)
+    first = inbox.submit(NightVisionWriteSpec(123, 'night'))
+    assert inbox.claim() is first
+    with pytest.raises(ValueError):
+        inbox.submit(OrientationWriteSpec(123, 'normal'))
+    inbox.cancel(first)
+    with pytest.raises(ValueError):
+        inbox.submit(VolumeWriteSpec(123, 50))
+    inbox.finish(first, ControlWriteResult('cancelled'))
+    assert inbox.submit(VolumeWriteSpec(123, 50)).spec.percent == 50

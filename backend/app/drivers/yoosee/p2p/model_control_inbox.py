@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from .model_control_job import (
     ControlWriteResult,
     ControlWriteSpec,
+    NightVisionWriteSpec,
     OrientationWriteSpec,
     VolumeWriteSpec,
 )
@@ -26,18 +27,18 @@ class ControlWriteTicket:
 class ControlWriteInbox:
     def __init__(self, generation: int, *, clock: Callable[[], float] = time.monotonic):
         if type(generation) is not int or not 0 < generation < 1 << 64:
-            raise ValueError('volume generation required')
+            raise ValueError('control generation required')
         self._generation, self._clock = generation, clock
         self._lock = threading.Lock()
         self._slot: ControlWriteTicket | None = None
         self._closed = False
 
     def submit(self, spec: ControlWriteSpec) -> ControlWriteTicket:
-        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec)):
+        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec)):
             raise ValueError('typed control required')
         with self._lock:
             if self._closed or self._slot is not None:
-                raise ValueError('volume write admission unavailable')
+                raise ValueError('control write admission unavailable')
             self._slot = ControlWriteTicket(self._generation, spec, self._clock()+2)
             return self._slot
 

@@ -294,6 +294,13 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
         shared_orientation = write_shared_orientation(_enrollment(camera), value)
         if shared_orientation is not None:
             return shared_orientation
+    if key == NIGHT_VISION:
+        from .shared_night_vision import write as write_shared_night_vision
+        if type(value) is not str:
+            raise ValueError('night-vision mode must be automatic, daytime or night')
+        shared_night = write_shared_night_vision(_enrollment(camera), value)
+        if shared_night is not None:
+            return shared_night
     if key == SPEAKER_VOLUME:
         from .shared_volume import write as write_shared_volume
         if type(value) is not int:

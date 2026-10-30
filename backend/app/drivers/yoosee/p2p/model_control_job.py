@@ -11,6 +11,7 @@ from .broker_sequences import BrokerSequences
 from .broker_transactions import BrokerTransactions
 from .contracts import CertifiedNode
 from .model_write_protocol import parse_model_write_response
+from .night_vision import NIGHT_VISION_VALUES, build_night_vision_write
 from .orientation import ORIENTATION_VALUES, build_orientation_write
 from .volume import VOLUME_RAW_BY_PERCENT, build_volume_write
 
@@ -37,7 +38,18 @@ class OrientationWriteSpec:
             raise ValueError('typed camera orientation required')
 
 
-ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec
+@dataclass(frozen=True, slots=True)
+class NightVisionWriteSpec:
+    device_id: int
+    mode: str
+
+    def __post_init__(self):
+        if (type(self.device_id) is not int or not 0 < self.device_id < 1 << 64
+                or type(self.mode) is not str or self.mode not in NIGHT_VISION_VALUES):
+            raise ValueError('typed camera night-vision mode required')
+
+
+ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec | NightVisionWriteSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,16 +62,19 @@ class ControlWriteResult:
 class ControlWriteJob:
     def __init__(self, node: CertifiedNode, sequences: BrokerSequences, spec: ControlWriteSpec, *,
                  generation: int, deadline: float, clock: Callable[[], float] = time.monotonic):
-        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec)) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
+        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec)) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
             raise ValueError('bounded typed control write required')
         self._receipts = BrokerTransactions(node.session_id, generation, node.next_sequence,
                                             sequences=sequences, clock=clock)
         self._message_id = secrets.randbits(31)
         try:
             ticket = self._receipts.register(0xD2, deadline-clock())
-            self._wire = (build_volume_write(node, spec.device_id, spec.percent, ticket.sequence, self._message_id)
-                if isinstance(spec, VolumeWriteSpec) else
-                build_orientation_write(node, spec.device_id, spec.orientation, ticket.sequence, self._message_id))
+            if isinstance(spec, VolumeWriteSpec):
+                self._wire = build_volume_write(node, spec.device_id, spec.percent, ticket.sequence, self._message_id)
+            elif isinstance(spec, OrientationWriteSpec):
+                self._wire = build_orientation_write(node, spec.device_id, spec.orientation, ticket.sequence, self._message_id)
+            else:
+                self._wire = build_night_vision_write(node, spec.device_id, spec.mode, ticket.sequence, self._message_id)
         except BaseException:
             self._receipts.close()
             raise
