@@ -22,6 +22,12 @@ invalidation, different identity/enrollment, revoked catalogue, authentication,
 packet validation, scoped motion/STOP and single-capture exclusion remain enforced.
 Other control-state freshness policy is unchanged.
 
+Demand-driven control-capability refresh can now query the same native account,
+without a second login or clearing the running source's identity mid-collection.
+Publication is atomic and superseded/invalidated batches cannot overwrite newer
+evidence. This does not extend failed/expired grants or add shared writes. See
+[native capability refresh](native-capability-refresh.md).
+
 The native source reports recording activity through the generic source registry,
 so dashboard online/recording indicators do not depend on a legacy go2rtc producer.
 Docker gives the app45s for a clean stop. Clean restart is supported; abrupt-kill

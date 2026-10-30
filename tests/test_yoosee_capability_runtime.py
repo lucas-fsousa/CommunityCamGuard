@@ -131,3 +131,34 @@ def test_background_refresh_never_displaces_an_existing_account_owner(monkeypatc
         assert not threads[0].is_alive()
         assert not control_channel_contended()
         assert not calls and not runtime._busy
+
+
+@pytest.mark.parametrize('failure', [False, True])
+def test_native_refresh_uses_existing_session_without_reserving_or_legacy_fallback(monkeypatch, failure):
+    from backend.app.drivers.contracts import ControlNotReady
+    tasks, calls = [], []
+    class Thread:
+        def __init__(self, *, target, **kwargs):
+            self.target = target
+        def start(self):
+            tasks.append(self.target)
+    monkeypatch.setattr(runtime.threading, 'Thread', Thread)
+    monkeypatch.setattr(runtime, '_busy', False)
+    monkeypatch.setattr(runtime, '_attempts', {})
+    monkeypatch.setattr(runtime.p2p, 'get_enrollment_for_camera', lambda _: SimpleNamespace(device_id=IDENTITY.device_id))
+    monkeypatch.setattr(runtime, 'has_session', lambda camera_id: camera_id == CAMERA)
+    monkeypatch.setattr(runtime, 'selected', lambda _: (IDENTITY, frozenset({'siren_pulse'})))
+    def forbidden(*args, **kwargs):
+        raise AssertionError('native refresh attempted a second account')
+    def existing(entry, **kwargs):
+        calls.append(kwargs)
+        if failure:
+            raise ControlNotReady('owner recovering')
+        return True
+    monkeypatch.setattr(runtime, 'own_control_channel', forbidden)
+    monkeypatch.setattr(runtime, 'refresh', forbidden)
+    monkeypatch.setattr(runtime, 'refresh_shared', existing)
+    runtime.request_refresh(CAMERA, IDENTITY.device_id)
+    tasks[0]()
+    assert calls == [{'validity_seconds': runtime.VALIDITY_SECONDS, 'include_siren': True}]
+    assert not runtime._busy

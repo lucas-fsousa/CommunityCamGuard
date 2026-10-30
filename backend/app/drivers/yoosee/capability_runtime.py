@@ -14,6 +14,8 @@ from ...db import p2p
 from .capability_refresh import refresh
 from .capability_rollout import selected
 from .p2p.control_ownership import ControlChannelBusy, own_control_channel
+from .shared_capability_refresh import refresh as refresh_shared
+from .shared_control_reads import has_session
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -45,6 +47,12 @@ def request_refresh(camera_id: str, device_id: str) -> None:
                     rollout is not None and rollout[0].device_id == device_id
                     and "siren_pulse" in rollout[1]
                 )
+                if has_session(camera_id):
+                    # Never reserve/login a second account or fall back if the
+                    # existing owner is reconnecting or loses this batch.
+                    refresh_shared(enrollment, validity_seconds=VALIDITY_SECONDS,
+                                   include_siren=include_siren)
+                    return
                 # Opportunistic metadata must not signal foreground contention,
                 # invalidate snapshots or displace an existing media/account owner.
                 # The collector's nested reservation is reentrant on this thread.

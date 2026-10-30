@@ -25,6 +25,9 @@ Docker dashboard: one native A/V connection supplies H264/AAC to the existing
 player, original HEVC/AAC recordings and reviewed PTZ on the same session. Speaker
 volume and normal/inverted image orientation can also be adjusted and verified on
 that owner without interrupting video.
+Control-capability refresh also reuses that account for read-only queries rather
+than opening another login. Failed refreshes do not extend expired permissions;
+see [capability refresh](docs/internal/native-capability-refresh.md).
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

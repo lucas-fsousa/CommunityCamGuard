@@ -61,6 +61,54 @@ def begin(camera_id: str) -> int:
 
 def save(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) -> bool:
     """Publish all sanitized evidence and exact identity in one conditional update."""
+    evidence = _validated_evidence(snapshot, generation=generation, expires_at=expires_at)
+    with connect() as conn:
+        conn.execute(_SCHEMA)
+        result = conn.execute(
+            """UPDATE yoosee_capability_snapshots SET identity=?, evidence=?,
+                collected_at=?, expires_at=?, revision=?
+            WHERE camera_id=? AND generation=? AND evidence IS NULL""",
+            (
+                _identity(snapshot.identity), evidence, snapshot.collected_at,
+                expires_at, RULE_REVISION, snapshot.camera_id, generation,
+            ),
+        )
+        return result.rowcount == 1
+
+
+def refresh_generation(camera_id: str) -> int | None:
+    """Read a CAS ticket without clearing the live owner's identity evidence.
+
+    This cannot initialize missing evidence or bypass explicit begin() invalidation.
+    """
+    _camera(camera_id)
+    with closing(connect()) as conn:
+        conn.execute(_SCHEMA)
+        row = conn.execute("""SELECT generation FROM yoosee_capability_snapshots
+            WHERE camera_id=? AND evidence IS NOT NULL AND revision=?""",
+            (camera_id, RULE_REVISION)).fetchone()
+    return int(row['generation']) if row is not None else None
+
+
+def replace_current(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) -> bool:
+    """Atomically replace an existing batch, unless invalidated/superseded meanwhile.
+
+    Unlike begin()/save(), a failed read leaves the original expiry untouched; it
+    never extends stale grants or temporarily revokes a running native media owner.
+    """
+    evidence = _validated_evidence(snapshot, generation=generation, expires_at=expires_at)
+    with connect() as conn:
+        conn.execute(_SCHEMA)
+        result = conn.execute("""UPDATE yoosee_capability_snapshots
+            SET generation=generation+1, identity=?, evidence=?, collected_at=?, expires_at=?, revision=?
+            WHERE camera_id=? AND generation=? AND evidence IS NOT NULL AND revision=?
+                AND collected_at<=?""",
+            (_identity(snapshot.identity), evidence, snapshot.collected_at, expires_at,
+             RULE_REVISION, snapshot.camera_id, generation, RULE_REVISION, snapshot.collected_at))
+        return result.rowcount == 1
+
+
+def _validated_evidence(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) -> str:
     _camera(snapshot.camera_id)
     if (
         type(generation) is not int
@@ -80,23 +128,7 @@ def save(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) ->
             raise ValueError("invalid snapshot evidence")
         # Camera timestamps deliberately excluded from persistence/ordering.
         evidence[item.feature] = item.state.value
-    with connect() as conn:
-        conn.execute(_SCHEMA)
-        result = conn.execute(
-            """UPDATE yoosee_capability_snapshots SET identity=?, evidence=?,
-                collected_at=?, expires_at=?, revision=?
-            WHERE camera_id=? AND generation=? AND evidence IS NULL""",
-            (
-                _identity(snapshot.identity),
-                json.dumps(evidence, sort_keys=True),
-                snapshot.collected_at,
-                expires_at,
-                RULE_REVISION,
-                snapshot.camera_id,
-                generation,
-            ),
-        )
-        return result.rowcount == 1
+    return json.dumps(evidence, sort_keys=True)
 
 
 def resolve(

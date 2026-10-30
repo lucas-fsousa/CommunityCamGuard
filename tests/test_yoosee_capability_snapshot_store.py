@@ -59,6 +59,21 @@ def test_newer_started_job_wins_even_if_older_finishes_later():
     assert resolve(now=200) == State.UNKNOWN
 
 
+def test_atomic_refresh_is_single_use_cannot_overwrite_newer_or_invalidated_evidence():
+    assert store.refresh_generation(CAMERA) is None
+    assert store.save(SNAPSHOT, generation=store.begin(CAMERA), expires_at=200)
+    ticket = store.refresh_generation(CAMERA)
+    new = replace(SNAPSHOT, collected_at=160, evidence=())
+    assert not store.replace_current(replace(new, collected_at=99), generation=ticket, expires_at=300)
+    assert store.replace_current(new, generation=ticket, expires_at=300)
+    assert not store.replace_current(SNAPSHOT, generation=ticket, expires_at=999)
+    assert resolve() == State.UNKNOWN  # replace all fields; never merge old support.
+    ticket = store.refresh_generation(CAMERA)
+    store.begin(CAMERA)
+    assert not store.replace_current(new, generation=ticket, expires_at=300)
+    assert store.refresh_generation(CAMERA) is None
+
+
 def test_start_invalidates_all_old_evidence_and_partial_new_snapshot_does_not_merge():
     assert store.save(SNAPSHOT, generation=store.begin(CAMERA), expires_at=200)
     ticket = store.begin(CAMERA)

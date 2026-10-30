@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-10-30 implementation: capability refresh can reuse the active native owner
+instead of attempting a second account. Fixed read-only roots and lamp STATUS,
+bounded sequential batch, same-enrollment checks and atomic generation replacement
+preserve video identity without extending stale grants or overriding invalidation.
+211 focused tests passed under192MiB/no swap (157.2MiB peak), Mypy377/Ruff passed.
+No sound/light/motion commands. Deployment/read-only observation follow; see
+docs/internal/native-capability-refresh.md. Remaining shared writes and native
+multi-camera capacity remain separate work, not claims of this implementation.
+
 User-reported regression: intercom wrongly rejected the configured HTTPS origin
 using provisioning's LAN guard; normal authenticated/origin/permission policy now
 applies to audio, while provisioning remains restricted. Camera3 separately blocked

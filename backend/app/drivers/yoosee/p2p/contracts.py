@@ -9,7 +9,10 @@ ACCOUNT_IDENTITY_READ_PATHS = (
     "ProConst._productInfo", "ProConst._versionInfo", "ProReadonly.devInfo",
 )
 # Explicit shared-stream state queries, never writes/actions or generic model access.
-ACCOUNT_STATE_READ_PATHS = frozenset({"ProWritable.volume", "ProWritable.guardParm", "ProWritable.videoParm"})
+ACCOUNT_STATE_READ_PATHS = frozenset({
+    "ProWritable.volume", "ProWritable.guardParm", "ProWritable.videoParm",
+    "ProWritable.resFile", "Action.expelCtrl",  # B7 metadata only, never AC invocation.
+})
 
 # Every entry is queried with the read-only B7 family. Action roots describe capabilities here;
 # they are never invoked with the AC action family by the generic property reader.

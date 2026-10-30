@@ -9,6 +9,12 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Current ordinary-Docker deployment and limitations:
+[native production](native-production.md),
+[remote intercom / native MP4 recovery](intercom-origin-native-mp4.md), and
+[same-owner capability refresh](native-capability-refresh.md).
+The checkpoints below are historical and do not override that delivery status.
+
 Latest usable delivery: [real camera3 native dashboard trial](native-dashboard-live-trial.md),
 900s with the existing player and two other recorders active. This supersedes earlier
 "synthetic-only" integration status, not the remaining native audio/recording and

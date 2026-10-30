@@ -201,7 +201,9 @@ def test_explicit_state_scope_adds_only_reviewed_state_roots_and_never_a_write_o
     assert box.poll().submissions[0].ticket == ticket
     box.submit(DEVICE.device_id, "ProWritable.guardParm")
     box.submit(DEVICE.device_id, "ProWritable.videoParm")
-    for path in (MODEL_READ_PATHS - set(ACCOUNT_IDENTITY_READ_PATHS) - {"ProWritable.volume", "ProWritable.guardParm", "ProWritable.videoParm"}) | {"ProWritable.volume.setVal", "ProWritable.guardParm.setVal", "ProWritable.videoParm.setVal.multiFlip"}:
+    box.submit(DEVICE.device_id, "ProWritable.resFile")
+    box.submit(DEVICE.device_id, "Action.expelCtrl")  # B7 metadata, never AC siren activation.
+    for path in (MODEL_READ_PATHS - set(ACCOUNT_IDENTITY_READ_PATHS) - {"ProWritable.volume", "ProWritable.guardParm", "ProWritable.videoParm", "ProWritable.resFile", "Action.expelCtrl"}) | {"ProWritable.volume.setVal", "ProWritable.guardParm.setVal", "ProWritable.videoParm.setVal.multiFlip", "Action.expelCtrl.stVal"}:
         with pytest.raises(ValueError):
             box.submit(DEVICE.device_id, path)
     with pytest.raises(ValueError):
