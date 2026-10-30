@@ -28,5 +28,21 @@ with the prior command. The new command preserves all six frames/resolution and
 fits the existing parser. This fixture suppresses only its finite EOF mfra trailer;
 it does not relax production framing. Two real-FFmpeg tests passed under384MiB/no
 swap/50% CPU (182.7MiB peak). 194 targeted tests passed under192MiB (118.6MiB peak),
-and Mypy376/Ruff passed. Production deployment/recovery and a non-audible HTTPS
-admission check follow; this does not claim a new physical audio test.
+and Mypy376/Ruff passed.
+
+Deployed image `a74e902`, dashboard build `b-f7845836ef1f`. CI40978266990 and
+Image40978267040 both passed. The first trusted recovery attempt rejected an MTP
+TCP checksum before media readiness (`feed:47/_fail:31`) and rolled back. No wire
+validation was relaxed. A second operator recovery completed normally (147.2MiB
+host peak), publishing camera3 native revision53. All three cameras report online
+and recording; current original MP4 files were nonempty and updated5/1.2/1.4s ago.
+The app reports no OOM and zero restarts. A real authenticated MSE connection
+received H264/AAC metadata plus initialization and three media fragments
+(1355,250562,251213,248093bytes), within the unchanged2MiB bound.
+
+On `https://ls-ccg.bytec.cloud`, login returned200 and authenticated empty PCM
+returned422 (body validation, before driver dispatch), rather than the former403.
+Cross-origin empty PCM returned403 and unauthenticated empty PCM401. Public and
+local build IDs match. These production checks emitted no audio and do not claim
+a new physical microphone/speaker confirmation. The short MSE check demonstrates
+current recovery, not indefinite stability or the exact historical bad box size.

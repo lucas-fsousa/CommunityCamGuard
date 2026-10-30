@@ -322,9 +322,10 @@ does not claim real-time push-to-talk and deliberately rejects WAV, compressed b
 partial samples and ambiguous content types. The bundled client records only in memory through an
 AudioWorklet, downsamples to the fixed contract, offers a local preview and requires a separate
 confirmed send. Browser microphone access requires a secure context (`localhost` or trusted HTTPS);
-ordinary LAN HTTP pages cannot request it even though the authenticated API itself remains LAN-only.
+ordinary LAN HTTP pages cannot request it. Use localhost or the configured trusted
+HTTPS dashboard origin for microphone capture.
 
-### Bounded push-to-talk WebSocket (authenticated trusted LAN only)
+### Bounded push-to-talk WebSocket (authenticated local or configured HTTPS origin)
 
 `WS /api/cameras/{camera_id}/intercom/stream` is advertised by `audio_streams` separately from
 recorded messages. After the server completes the driver-owned camera setup it sends
@@ -336,8 +337,8 @@ as a bounded message; errors use `type: "error"` and a `detail` string.
 The server retains at most 25 frames (500 ms) between the event loop and its blocking driver worker,
 stops an idle source after two seconds and caps the complete utterance at 500 frames/10 seconds.
 Congestion fails closed instead of accumulating delayed speech, and disconnect/timeout/error signals
-the worker to release the camera lock, talk/AV state, direct route and socket. Authentication and the
-strict client/Host/Origin/forwarding LAN checks run before WebSocket acceptance. Browser microphone
+the worker to release the camera lock, talk/AV state, direct route and socket. Authentication,
+the intercom permission and configured Host/Origin checks run before WebSocket acceptance. Browser microphone
 policy still independently requires `localhost` or trusted HTTPS.
 
 The generic control service resolves the opaque camera ID and delegates only to that camera's

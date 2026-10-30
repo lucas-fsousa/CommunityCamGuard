@@ -10,7 +10,12 @@ applies to audio, while provisioning remains restricted. Camera3 separately bloc
 at revision42 on local MP4 size validation. Browser-only rate/keyframe bounds and
 typed local-muxer recovery address it without changing HD resolution or original
 archives, or enlarging memory limits. Real noisy-HD negative/positive regression
-and194 targeted tests pass. See docs/internal/intercom-origin-native-mp4.md.
+and194 targeted tests pass. Deployed `a74e902` / `b-f7845836ef1f`: camera3 native
+revision53 available with real MSE fragments, all3online/recording, no OOM/restarts.
+Silent public HTTPS checks: authenticated empty audio422, no session401, bad
+origin403; no physical audio retest. CI and Image passed. One initial MTP checksum
+failure rolled back; the second recovery succeeded without weakening validation.
+See docs/internal/intercom-origin-native-mp4.md.
 
 Dashboard request: intercom quick actions moved out of settings. Hold-to-speak is
 inline on the live camera bar; recorded voice opens its own preview/send dialog.
