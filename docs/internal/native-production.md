@@ -1,5 +1,12 @@
 # Native media delivery, not another finite trial
 
+Latest runtime (2026-10-30): `575ed76`, dashboard `b-3422b2883cd9`, camera3 native
+active revision62. All three cameras online/recording, others legacy0; no OOM or
+unexpected app restarts. Capability renewal on the native owner was observed
+read-only in production. Shared night-mode integration passed offline tests;
+no physical night-mode command was sent. Full CI/Image passed. Earlier versions
+and revision numbers below are historical deployment evidence.
+
 The delivery target is camera3 on the ordinary Docker app and existing dashboard,
 with persistent source selection, original HEVC/AAC recording and shared native
 PTZ. Other cameras remain on their existing transports. No sound/light/motion

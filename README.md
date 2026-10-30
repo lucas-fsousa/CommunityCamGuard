@@ -28,6 +28,9 @@ that owner without interrupting video.
 Control-capability refresh also reuses that account for read-only queries rather
 than opening another login. Failed refreshes do not extend expired permissions;
 see [capability refresh](docs/internal/native-capability-refresh.md).
+The mapped automatic/day/night control now has a shared-session adapter too;
+its integration is covered by simulated protocol tests, not a new physical IR
+check. See [night-mode integration](docs/internal/native-shared-night-vision.md).
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

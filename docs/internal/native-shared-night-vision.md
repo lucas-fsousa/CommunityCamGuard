@@ -39,3 +39,11 @@ Passive H264/AAC MSE received1355/551201/598946byte fragments and all original
 recordings were nonempty/recent (2.9/1.5/1.3s). Public/local builds matched, no OOM
 or unexpected app restarts. No night-mode write or sound/light/motion test was
 sent. The error-contract follow-up is required before calling its full CI green.
+
+Follow-up `575ed76` is deployed as `b-3422b2883cd9`. Full CI40996808966 passed
+5586 tests (one existing skip) plus all Node contracts, Ruff and Mypy. Image
+40996808948 passed. Clean startup resumed camera3 native revision62; all three
+cameras report online/recording, other cameras remain legacy0. App reports no
+OOM and zero restarts. The preceding failed CI remains recorded above rather
+than being counted as successful. No physical control was actuated for either
+deployment; the pending visual/IR observation is unchanged.

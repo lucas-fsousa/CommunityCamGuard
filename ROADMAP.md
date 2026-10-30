@@ -4,11 +4,18 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-2026-10-30 next shared control: the mapped automatic/day/night scalar now has a
+2026-10-30 delivered shared control: the mapped automatic/day/night scalar now has a
 typed native-owner writer with preflight, one D2, correlated D3 and bounded exact
 readback. No-op is read-only; ownership loss/rejection never logs in again or
 replays. Only synthetic tests; no physical mode change, visual acceptance or new
 brand/model grants. See docs/internal/native-shared-night-vision.md.
+Deployed `575ed76` / `b-3422b2883cd9`, native revision62 available and3online/
+recording; other cameras legacy0, no OOM/restarts. Full CI5586 passed/1existing
+skip plus Node/Ruff/Mypy, Image passed. The first CI exposed an error-contract
+regression on invalid modes; fixed before this accepted follow-up. Remaining
+work: other shared native controls (floodlight, guard/schedule, siren/resource
+operations), multi-camera native capacity and deferred interruption recovery.
+Physical/sound/light acceptance is not being executed during this session.
 
 2026-10-30 implementation: capability refresh can reuse the active native owner
 instead of attempting a second account. Fixed read-only roots and lamp STATUS,
