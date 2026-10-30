@@ -124,6 +124,7 @@ class PreparedNative:
                                     'session_broker_release', 'session_tcp_receipt', 'session_tcp_socket_closed',
                                     'session_motion_started', 'session_motion_cleanup_confirmed',
                                     'consumer_error', 'consumer_site', 'consumer_alive', 'cleanup_failed',
+                                    'consumer_mp4_size', 'consumer_mp4_box',
                                     'audio_error'}})
                 self._block_locked()
 

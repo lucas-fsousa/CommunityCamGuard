@@ -22,7 +22,6 @@ from ..origin_policy import browser_origin_allowed
 from ..services import CameraNotFound, ControlBusy, send_audio_message, send_audio_stream
 from ..session_channels import close_channel, run_guarded
 from .control_errors import control_failure
-from .local_only import require_local_request, require_local_websocket
 
 STREAM_QUEUE_FRAMES = 25  # At most 500 ms of camera-bound PCM backlog.
 STREAM_IDLE_SECONDS = 2.0
@@ -34,7 +33,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/cameras/{camera_id}/intercom",
-    dependencies=[Depends(require_auth), Depends(require_local_request)],
+    dependencies=[Depends(require_auth)],
     tags=["cameras"],
 )
 stream_router = APIRouter(prefix="/api/cameras/{camera_id}/intercom", tags=["cameras"])
@@ -156,12 +155,6 @@ async def stream_audio(websocket: WebSocket, camera_id: str) -> None:
 
 
 async def _stream_audio(websocket: WebSocket, camera_id: str, stop: threading.Event) -> None:
-    try:
-        require_local_websocket(websocket)
-    except HTTPException:
-        await websocket.close(code=1008)
-        return
-
     chunks: queue.Queue[bytes | object] = queue.Queue(maxsize=STREAM_QUEUE_FRAMES)
     ready = threading.Event()
     iterator = _pcm_queue_iterator(chunks, stop, ready)

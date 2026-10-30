@@ -11,6 +11,15 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_CHUNKS = 8
 
 
+class Mp4SizeError(ValueError):
+    """Trusted local muxer failure; retain only bounded size/type diagnostics."""
+
+    def __init__(self, declared_size: int, kind: bytes):
+        super().__init__('unsupported MP4 box size')
+        self.declared_size = declared_size
+        self.box_type = kind.decode('ascii') if kind in {b'ftyp', b'moov', b'moof', b'mdat'} else 'unknown'
+
+
 class Mp4OrderError(ValueError):
     """Fixed-label diagnostics only; never include arbitrary muxer/media bytes."""
 
@@ -62,7 +71,7 @@ class FragmentedMp4:
                 size = int.from_bytes(self._buffer[:4], "big")
                 kind = bytes(self._buffer[4:8])
                 if not 8 <= size <= MAX_BYTES:
-                    raise ValueError("unsupported MP4 box size")
+                    raise Mp4SizeError(size, kind)
                 if kind != self._expected:
                     raise Mp4OrderError(self._expected, kind)
                 if len(self._buffer) < size:

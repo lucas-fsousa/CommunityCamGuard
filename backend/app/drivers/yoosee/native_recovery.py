@@ -25,18 +25,18 @@ def retryable(result: object, source: ManagedSource) -> bool:
         return False
     worker = result.session.worker
     released_timeout=worker is not None and result.reason=='transport' and retired_transport_failure(worker)
-    decoder_timeout = (worker is not None and result.reason == 'consumer_failed'
-        and result.failure_type == 'TimeoutError' and worker.reason == 'stopped'
+    local_decoder_failure = (worker is not None and result.reason == 'consumer_failed'
+        and result.failure_type in {'TimeoutError', 'Mp4SizeError'} and worker.reason == 'stopped'
         and retired_media_route(worker))
     if worker is not None and (
         worker.socket_close_failed
         or (worker.media is not None and worker.media.opened and not worker.media.broker_release)
         or (worker.tcp is not None and (worker.tcp.socket_close_failed
-            or (not worker.tcp.close_acknowledged and not (released_timeout or decoder_timeout))))
+            or (not worker.tcp.close_acknowledged and not (released_timeout or local_decoder_failure))))
         or (worker.motion is not None and worker.motion.start_attempted and not worker.motion.release_delivery_confirmed)
     ):
         return False
-    if decoder_timeout:
+    if local_decoder_failure:
         return True  # run() already joined the consumer and confirmed decoder exit.
     if result.reason in {"socket", "media_complete", "contended", "stopped", "busy",
                          "transport", "heartbeat_timeout", "lifetime"}:

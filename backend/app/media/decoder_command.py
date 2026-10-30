@@ -33,7 +33,12 @@ def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
             "-profile:v", "baseline", "-g", "10" if live_timing or audio else "25",
             "-keyint_min", "10" if live_timing or audio else "25", "-sc_threshold", "0"]
     if live_timing or audio:
-        cmd += ["-fps_mode", "vfr"]
+        # Keep full resolution/frame timing, but bound each keyframe fragment for
+        # the existing2MiB parser/fanout budget. Size-based muxer fragmentation
+        # would create non-keyframe joining points, so force time-based IDRs.
+        # These options apply only to the browser encoder, not the copied archive.
+        cmd += ["-fps_mode", "vfr", "-force_key_frames", "expr:gte(t,n_forced*1)",
+                "-maxrate", "8M", "-bufsize", "2M"]
     if audio:
         cmd += ["-c:a", "copy", "-bsf:a", "aac_adtstoasc", "-max_muxing_queue_size", "128",
                 "-muxing_queue_data_threshold", "1048576", "-max_interleave_delta", "1000000"]

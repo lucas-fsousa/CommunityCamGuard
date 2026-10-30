@@ -82,11 +82,11 @@ def test_audio_message_rejects_ambiguous_or_unbounded_payloads(request_obj, stat
     assert caught.value.status_code == status
 
 
-def test_audio_message_routes_are_authenticated_and_lan_only() -> None:
+def test_audio_message_routes_use_authenticated_origin_policy_not_provisioning_lan_guard() -> None:
     for route in intercom.router.routes:
         dependencies = {dependency.call for dependency in route.dependant.dependencies}
         assert intercom.require_auth in dependencies
-        assert require_local_request in dependencies
+        assert require_local_request not in dependencies
 
 
 def test_incomplete_camera_delivery_is_an_http_failure(monkeypatch) -> None:
@@ -139,7 +139,6 @@ def test_audio_websocket_sanitizes_receive_errors(monkeypatch) -> None:
         return AudioMessageResult(20, 0, 0, 0, True, True, True)
     monkeypatch.setattr(browser, "receive", fail_receive)
     monkeypatch.setattr(intercom, "verify_token", lambda _: True)
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _: None)
     monkeypatch.setattr(intercom, "send_audio_stream", dispatch)
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))
     assert browser.sent == [{"type": "ready", "max_ms": 10000},
@@ -162,7 +161,6 @@ def test_audio_websocket_bridges_bounded_pcm_to_generic_stream_service(monkeypat
         return AudioMessageResult(len(payload) // 32, frames, frames, frames, True, True, True)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
     monkeypatch.setattr(intercom, "send_audio_stream", dispatch)
 
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
@@ -196,7 +194,6 @@ def test_audio_websocket_bounds_a_stuck_camera_setup(monkeypatch) -> None:
         return AudioMessageResult(0, 0, 0, 0, False, False, False)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
     monkeypatch.setattr(intercom, "send_audio_stream", stuck_setup)
     monkeypatch.setattr(intercom, "STREAM_SETUP_SECONDS", 0.0)
 
@@ -221,7 +218,6 @@ def test_audio_websocket_reports_incomplete_driver_teardown(monkeypatch) -> None
         return AudioMessageResult(len(payload) // 32, frames, frames, frames, True, False, True)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
     monkeypatch.setattr(intercom, "send_audio_stream", incomplete)
 
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]
@@ -254,7 +250,6 @@ def test_audio_websocket_drains_frames_queued_before_graceful_stop(monkeypatch) 
         return AudioMessageResult(frames * 20, frames, frames, frames, True, True, True)
 
     monkeypatch.setattr(intercom, "verify_token", lambda _token: True)
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _websocket: None)
     monkeypatch.setattr(intercom, "send_audio_stream", slow_dispatch)
 
     asyncio.run(intercom.stream_audio(browser, CAMERA_ID))  # type: ignore[arg-type]

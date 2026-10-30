@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+User-reported regression: intercom wrongly rejected the configured HTTPS origin
+using provisioning's LAN guard; normal authenticated/origin/permission policy now
+applies to audio, while provisioning remains restricted. Camera3 separately blocked
+at revision42 on local MP4 size validation. Browser-only rate/keyframe bounds and
+typed local-muxer recovery address it without changing HD resolution or original
+archives, or enlarging memory limits. Real noisy-HD negative/positive regression
+and194 targeted tests pass. See docs/internal/intercom-origin-native-mp4.md.
+
 Dashboard request: intercom quick actions moved out of settings. Hold-to-speak is
 inline on the live camera bar; recorded voice opens its own preview/send dialog.
 Both obey driver capability flags/intercom permission. Volume and other settings

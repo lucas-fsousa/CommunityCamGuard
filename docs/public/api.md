@@ -192,8 +192,8 @@ see [deployment evidence and operator check](../internal/delegated-access-activa
 | POST | `/api/cameras/{camera_id}/probe` | — | Re-probe capabilities (codecs, PTZ, substream…). |
 | POST | `/api/cameras/{camera_id}/ptz` | `PtzIn` | Pan/tilt. See PTZ below. |
 | POST | `/api/cameras/{camera_id}/reboot` | — | Reboot the camera (driver-dependent; `501` if unsupported). |
-| POST | `/api/cameras/{camera_id}/intercom/messages` | raw `audio/pcm` | Play one bounded voice message through a supporting driver; authenticated trusted LAN only. |
-| WS | `/api/cameras/{camera_id}/intercom/stream` | binary PCM frames | Bounded push-to-talk session through a supporting driver; authenticated trusted LAN only. |
+| POST | `/api/cameras/{camera_id}/intercom/messages` | raw `audio/pcm` | Bounded voice message; authenticated, permitted local/configured HTTPS origin. |
+| WS | `/api/cameras/{camera_id}/intercom/stream` | binary PCM frames | Bounded push-to-talk; authenticated, permitted local/configured HTTPS origin. |
 
 **`CameraIn`** (fields other than `mac` are optional; omitted fields are left unchanged on update):
 
@@ -302,7 +302,12 @@ ID. A write must resolve it again against fresh driver metadata before using any
 The previous white-light/orientation-specific `/api/vendor-controls/...` routes remain available
 as a deprecated compatibility surface while older dashboard builds are phased out.
 
-### Bounded audio messages (authenticated trusted LAN only)
+### Bounded audio messages (authenticated local or configured HTTPS origin)
+
+Intercom follows normal dashboard authentication, same-origin policy and the
+`intercom` permission for temporary sessions. It is not restricted by the
+factory-provisioning LAN guard. Cross-origin, unauthenticated, expired/revoked and
+unpermitted sessions remain rejected; provisioning retains its separate guards.
 
 `POST /api/cameras/{camera_id}/intercom/messages` accepts `Content-Type: audio/pcm` containing
 signed 16-bit little-endian, mono, 16 kHz PCM. The body must contain complete 640-byte/20 ms frames

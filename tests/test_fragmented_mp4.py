@@ -1,6 +1,12 @@
 import pytest
 
-from backend.app.media.fragmented_mp4 import MAX_BYTES, MAX_CHUNKS, FragmentedMp4, Mp4OrderError
+from backend.app.media.fragmented_mp4 import (
+    MAX_BYTES,
+    MAX_CHUNKS,
+    FragmentedMp4,
+    Mp4OrderError,
+    Mp4SizeError,
+)
 
 
 def box(kind, payload=b"test"):
@@ -84,3 +90,12 @@ def test_output_can_only_be_claimed_once_even_before_first_bytes():
     output.claim()
     with pytest.raises(ValueError, match="fresh"):
         output.claim()
+
+
+@pytest.mark.parametrize('size,kind,label', [(0,b'mdat','mdat'),(MAX_BYTES+1,b'mdat','mdat'),(1,b'priv','unknown')])
+def test_size_failure_retains_only_numeric_size_and_allowlisted_type(size,kind,label):
+    output = FragmentedMp4()
+    with pytest.raises(Mp4SizeError) as caught:
+        output.feed(size.to_bytes(4,'big')+kind)
+    assert caught.value.declared_size == size and caught.value.box_type == label
+    assert 'priv' not in str(caught.value) and output.closed

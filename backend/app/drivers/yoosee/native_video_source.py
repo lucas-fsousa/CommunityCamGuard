@@ -6,6 +6,7 @@ fallback or capabilities are inferred by this adapter. Optional motion requires
 explicit driver-reviewed grants; default sources remain read-only.
 """
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from pathlib import Path
 from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.archive_spec import validate_segment_seconds
-from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError
+from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError, Mp4SizeError
 from ...media.hevc_decoder import HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
 from ...media.native_av_decoder import NativeAvDecoder
@@ -25,6 +26,8 @@ from .p2p.video_consumer import VideoConsumer
 from .p2p.video_delivery import VideoDelivery, VideoFrame
 from .shared_control_reads import publish
 from .shared_read_session import SharedReadResult, SharedReadSession
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +87,8 @@ class NativeVideoSource:
         self._failure_site = ""
         self._mp4_expected = ""
         self._mp4_actual = ""
+        self._mp4_size = ""
+        self._mp4_box = ""
         self.frame_rate: int | None = None
 
     def diagnostics(self) -> dict[str, str | bool]:
@@ -91,6 +96,7 @@ class NativeVideoSource:
         return {**self._session.diagnostics(),
                 "consumer_error": self._failure_type, "consumer_site": self._failure_site,
                 "consumer_mp4_expected": self._mp4_expected, "consumer_mp4_actual": self._mp4_actual,
+                "consumer_mp4_size": self._mp4_size, "consumer_mp4_box": self._mp4_box,
                 "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
                 "consumer_alive": self._thread is not None and self._thread.is_alive(),
                 "cleanup_failed": self._cleanup_failed.is_set()}
@@ -192,6 +198,10 @@ class NativeVideoSource:
             self._failure_type = type(error).__name__
             if isinstance(error, Mp4OrderError):
                 self._mp4_expected, self._mp4_actual = error.expected, error.actual
+            if isinstance(error, Mp4SizeError):
+                self._mp4_size, self._mp4_box = str(error.declared_size), error.box_type
+                log.warning('native local MP4 rejected camera_id=%s declared_size=%d box=%s',
+                            self._camera_id, error.declared_size, error.box_type)
             trace = error.__traceback__
             while trace is not None:
                 self._failure_site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"

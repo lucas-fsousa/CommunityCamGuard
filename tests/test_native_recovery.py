@@ -59,8 +59,9 @@ def test_timeout_reconnect_requires_closed_sockets_and_confirmed_outer_route(fau
     assert retryable(NativeVideoResult('transport',SharedReadResult('transport',worker)),source) is (fault is None)
 
 
+@pytest.mark.parametrize('failure_type', ['TimeoutError', 'Mp4SizeError'])
 @pytest.mark.parametrize('fault', [None, 'broker', 'route', 'tcp', 'not_ready', 'motion', 'format', 'protocol'])
-def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(fault):
+def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(fault, failure_type):
     worker = WorkerSummary('protocol' if fault == 'protocol' else 'stopped', 0, 0, 0, fault == 'broker',
         media=SimpleNamespace(opened=True, broker_release=fault != 'route'),
         tcp=SimpleNamespace(ready=fault != 'not_ready', close_acknowledged=False,
@@ -68,7 +69,7 @@ def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(
         motion=SimpleNamespace(start_attempted=True, release_delivery_confirmed=fault != 'motion'))
     source = NativeVideoSource('test', '123')
     result = NativeVideoResult('consumer_failed', SharedReadResult('stopped', worker),
-                               'ValueError' if fault == 'format' else 'TimeoutError')
+                               'ValueError' if fault == 'format' else failure_type)
     assert retryable(result, source) is (fault is None)
 
 

@@ -268,7 +268,6 @@ def test_intercom_invalidated_session_stops_idle_driver(monkeypatch):
             stopped.set()
         return AudioMessageResult(0, 0, 0, 0, True, True, True)
     monkeypatch.setattr(intercom, "verify_token", lambda _: valid[0])
-    monkeypatch.setattr(intercom, "require_local_websocket", lambda _: None)
     monkeypatch.setattr(intercom, "send_audio_stream", driver)
     camera_id = stable_camera_id("mac", "aa:bb:cc:dd:ee:03")
     asyncio.run(asyncio.wait_for(intercom.stream_audio(socket, camera_id), 1))
