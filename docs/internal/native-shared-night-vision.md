@@ -26,3 +26,16 @@ No physical mode change or visual acceptance was performed in this session.
 IR illumination still depends on ambient light/firmware and is not proven by a
 successful D3/model response. This is shared-account implementation, not a claim
 that daylight IR behavior changed or has been physically revalidated.
+
+The first full CI run (`40996516375`) found five existing driver-contract tests:
+invalid inputs escaped as ValueError instead of ControlOperationError. The adapter
+now preserves the prior public error contract before preflight and additional
+native-owner tests assert no read/write for those inputs. The133 focused driver,
+adapter, API and worker regressions pass under192MiB/no swap (110.2MiB peak).
+
+The initial deployed integration (`eeea561`, `b-cf593ab9f6ca`) resumed camera3 at
+native revision59, kept both other cameras legacy0 and reported3online/recording.
+Passive H264/AAC MSE received1355/551201/598946byte fragments and all original
+recordings were nonempty/recent (2.9/1.5/1.3s). Public/local builds matched, no OOM
+or unexpected app restarts. No night-mode write or sound/light/motion test was
+sent. The error-contract follow-up is required before calling its full CI green.

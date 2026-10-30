@@ -296,8 +296,8 @@ def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
             return shared_orientation
     if key == NIGHT_VISION:
         from .shared_night_vision import write as write_shared_night_vision
-        if type(value) is not str:
-            raise ValueError('night-vision mode must be automatic, daytime or night')
+        if type(value) is not str or value not in NIGHT_VISION_VALUES:
+            raise ControlOperationError('night-vision mode must be automatic, daytime or night')
         shared_night = write_shared_night_vision(_enrollment(camera), value)
         if shared_night is not None:
             return shared_night

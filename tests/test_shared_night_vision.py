@@ -68,3 +68,12 @@ def test_recovering_owner_cannot_fall_back_to_legacy(camera):
     with shared_control_reads.reserve_native_owner(ENROLLMENT.camera_id):
         with pytest.raises(ControlNotReady):
             controls.write(camera, 'night_vision', 'night')
+
+
+@pytest.mark.parametrize('mode', [True, 0, 'auto', 'day', 'ir'])
+def test_invalid_mode_preserves_driver_error_contract_before_preflight(camera, mode):
+    session = NightSession()
+    with shared_control_reads.publish(ENROLLMENT.camera_id, session):
+        with pytest.raises(ControlOperationError, match='automatic, daytime or night'):
+            controls.write(camera, 'night_vision', mode)
+    assert not session.paths and not session.writes
