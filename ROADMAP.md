@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-04 regression: camera3 native/blocked68 and snapshot90 without evidence,
+while both other cameras were online/recording. Local muxer/child-exit recovery and
+non-destructive background metadata publication now address two reproduced dead
+ends. Dedicated bounded persistent failure history added; old rotated logs do not
+prove the initial event.302 focused tests, Mypy379/Ruff passed; deployment and
+encoder-only recovery verification follow. No sound/light/motion tests. See
+docs/internal/native-permanent-recovery.md.
+
 2026-10-30 delivered shared control: the mapped automatic/day/night scalar now has a
 typed native-owner writer with preflight, one D2, correlated D3 and bounded exact
 readback. No-op is read-only; ownership loss/rejection never logs in again or

@@ -11,6 +11,10 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_CHUNKS = 8
 
 
+class Mp4CapacityError(ValueError):
+    """Local muxer/backpressure epoch exceeded its fixed memory/output budget."""
+
+
 class Mp4SizeError(ValueError):
     """Trusted local muxer failure; retain only bounded size/type diagnostics."""
 
@@ -62,7 +66,7 @@ class FragmentedMp4:
             raise ValueError("MP4 output closed")
         try:
             if type(data) is not bytes or self.buffered_bytes + len(data) > MAX_BYTES:
-                raise ValueError("MP4 output capacity exceeded")
+                raise Mp4CapacityError("MP4 output capacity exceeded")
             self.started = self.started or bool(data)
             self._buffer.extend(data)
             # Caller reads at most16KiB per step; parsing also has a finite box budget.
@@ -78,7 +82,7 @@ class FragmentedMp4:
                     return
                 boxes += 1
                 if boxes > 64:
-                    raise ValueError("MP4 box budget exceeded")
+                    raise Mp4CapacityError("MP4 box budget exceeded")
                 box = bytes(self._buffer[:size])
                 del self._buffer[:size]
                 if kind in (b"ftyp", b"moof"):
@@ -86,7 +90,7 @@ class FragmentedMp4:
                     self._expected = b"moov" if kind == b"ftyp" else b"mdat"
                 else:
                     if len(self._chunks) >= MAX_CHUNKS:
-                        raise ValueError("MP4 consumer stalled")
+                        raise Mp4CapacityError("MP4 consumer stalled")
                     chunk = Mp4Chunk(kind == b"moov", self._pair + box)
                     self._pair = b""
                     self._chunks.append(chunk)

@@ -90,6 +90,36 @@ def refresh_generation(camera_id: str) -> int | None:
     return int(row['generation']) if row is not None else None
 
 
+def observed_generation(camera_id: str) -> int:
+    """CAS version for a non-destructive background observation, including missing data."""
+    _camera(camera_id)
+    with closing(connect()) as conn:
+        conn.execute(_SCHEMA)
+        row = conn.execute('SELECT generation FROM yoosee_capability_snapshots WHERE camera_id=?',
+                           (camera_id,)).fetchone()
+    return int(row['generation']) if row is not None else 0
+
+
+def publish_observation(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) -> bool:
+    """Background reads never erase evidence before I/O; invalidation during I/O wins."""
+    if type(generation) is not int or generation < 0:
+        raise ValueError('valid observation generation required')
+    evidence = _validated_evidence(snapshot, generation=generation + 1, expires_at=expires_at)
+    with connect() as conn:
+        conn.execute(_SCHEMA)
+        values = (_identity(snapshot.identity), evidence, snapshot.collected_at, expires_at, RULE_REVISION)
+        if generation == 0:
+            result = conn.execute('''INSERT OR IGNORE INTO yoosee_capability_snapshots
+                (camera_id,generation,identity,evidence,collected_at,expires_at,revision)
+                VALUES (?,1,?,?,?,?,?)''', (snapshot.camera_id, *values))
+        else:
+            result = conn.execute('''UPDATE yoosee_capability_snapshots
+                SET generation=generation+1,identity=?,evidence=?,collected_at=?,expires_at=?,revision=?
+                WHERE camera_id=? AND generation=? AND (collected_at IS NULL OR collected_at<=?)''',
+                (*values, snapshot.camera_id, generation, snapshot.collected_at))
+        return result.rowcount == 1
+
+
 def replace_current(snapshot: CapabilitySnapshot, *, generation: int, expires_at: float) -> bool:
     """Atomically replace an existing batch, unless invalidated/superseded meanwhile.
 

@@ -26,7 +26,9 @@ def retryable(result: object, source: ManagedSource) -> bool:
     worker = result.session.worker
     released_timeout=worker is not None and result.reason=='transport' and retired_transport_failure(worker)
     local_decoder_failure = (worker is not None and result.reason == 'consumer_failed'
-        and result.failure_type in {'TimeoutError', 'Mp4SizeError'} and worker.reason == 'stopped'
+        and result.failure_type in {'TimeoutError', 'Mp4SizeError', 'Mp4OrderError',
+                                   'Mp4CapacityError', 'DecoderExitedError', 'BrokenPipeError', 'OSError'}
+        and worker.reason == 'stopped'
         and retired_media_route(worker))
     if worker is not None and (
         worker.socket_close_failed
@@ -44,6 +46,8 @@ def retryable(result: object, source: ManagedSource) -> bool:
     if result.reason == "connection":
         return source.diagnostics().get("session_connection_failure") in {
             "offline", "socket_timeout", "socket_error", "list_dns", "list_timeout",
+            "broker_heartbeat", "certification_unavailable", "inventory_timeout",
+            "inventory_unavailable", "preparation_budget",
         }
     # Format/protocol/evidence failures and stale authentication are not retried.
     return False

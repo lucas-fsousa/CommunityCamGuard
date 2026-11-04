@@ -57,7 +57,8 @@ def request_refresh(camera_id: str, device_id: str) -> None:
                 # invalidate snapshots or displace an existing media/account owner.
                 # The collector's nested reservation is reentrant on this thread.
                 with own_control_channel(wait=False):
-                    refresh(enrollment, validity_seconds=VALIDITY_SECONDS, include_siren=include_siren)
+                    refresh(enrollment, validity_seconds=VALIDITY_SECONDS, include_siren=include_siren,
+                            preserve_current=True)
         except ControlChannelBusy:
             pass  # Evidence remains unknown/stale, not a grant to bypass validation.
         except Exception as exc:

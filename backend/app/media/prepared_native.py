@@ -8,6 +8,7 @@ from collections.abc import Callable
 from concurrent.futures import Executor, Future
 
 from ..db import source_policy
+from .native_events import ended as record_ended
 from .retirement_wait import locked_until, remaining
 from .source_offer import NativeSourceOffer
 from .source_registry import (
@@ -103,6 +104,16 @@ class PreparedNative:
         # Serialize with publication so a finished source cannot reopen the gate.
         with self._lock:
             if not self._closed:
+                error=_future.exception() if not _future.cancelled() else None
+                active=getattr(self.source,'current',self.source)
+                end_details: dict[str, str | bool]
+                try: end_details=getattr(active,'diagnostics',lambda:{})()
+                except Exception: end_details={}
+                try: evidence_valid=self.offer.valid() is True
+                except Exception: evidence_valid=False
+                record_ended(self.offer.camera_id,
+                    error=type(error).__name__ if error is not None else 'source_returned',
+                    evidence_valid=evidence_valid, details=end_details)
                 if not self._stop.is_set():
                     error=_future.exception() if not _future.cancelled() else None
                     active=getattr(self.source,'current',self.source)

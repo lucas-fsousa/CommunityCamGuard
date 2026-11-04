@@ -17,6 +17,10 @@ from .fragmented_mp4 import FragmentedMp4
 from .nonblocking_input import NonblockingInput
 
 
+class DecoderExitedError(RuntimeError):
+    """The local owned decoder exited; never a camera authentication error."""
+
+
 class HevcDecoder:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic,
                  output: FragmentedMp4 | None = None, frame_rate: int | None = None,
@@ -88,7 +92,7 @@ class HevcDecoder:
                 raise ValueError("invalid decoder clock")
             self._last_time = now
             if self._process.poll() is not None:
-                raise RuntimeError("continuous decoder exited")
+                raise DecoderExitedError("continuous decoder exited")
             assert self._process.stdout is not None and self._input is not None
             assert self._progress is not None
             if self._output is not None:

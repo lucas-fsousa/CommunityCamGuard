@@ -127,3 +127,33 @@ def test_refresh_reserves_before_io_and_failure_leaves_unknown(monkeypatch):
     with pytest.raises(OSError):
         refresh.refresh(enrollment, validity_seconds=100)
     assert resolve() == State.UNKNOWN
+
+
+@pytest.mark.parametrize('failure', [None, 'timeout', 'invalidation'])
+def test_background_refresh_never_erases_live_identity_while_collecting(monkeypatch, failure):
+    assert store.save(SNAPSHOT, generation=store.begin(CAMERA), expires_at=200)
+    entry = P2PEnrollment(IDENTITY.device_id, 1, bytes(64), None, '', '', CAMERA)
+    def collect(_entry):
+        assert resolve() == State.SUPPORTED
+        assert store.matches_recorded_identity(camera_id=CAMERA, identity=IDENTITY, now=150)
+        if failure == 'timeout':
+            return None
+        if failure == 'invalidation':
+            store.begin(CAMERA)
+        return replace(SNAPSHOT, collected_at=160)
+    monkeypatch.setattr(refresh, 'collect_snapshot', collect)
+    assert refresh.refresh(entry, validity_seconds=100, preserve_current=True) is (failure is None)
+    assert resolve(now=170) == (State.UNKNOWN if failure == 'invalidation' else State.SUPPORTED)
+    assert resolve(now=210) == (State.SUPPORTED if failure is None else State.UNKNOWN)
+
+
+def test_background_observation_initializes_and_repairs_only_its_original_generation():
+    ticket = store.observed_generation(CAMERA)
+    assert ticket == 0
+    assert store.publish_observation(SNAPSHOT, generation=ticket, expires_at=200)
+    assert not store.publish_observation(SNAPSHOT, generation=ticket, expires_at=200)
+    ticket = store.begin(CAMERA)  # previous failed explicit collection
+    assert store.publish_observation(SNAPSHOT, generation=ticket, expires_at=200)
+    ticket = store.observed_generation(CAMERA)
+    store.begin(CAMERA)
+    assert not store.publish_observation(SNAPSHOT, generation=ticket, expires_at=200)

@@ -48,6 +48,7 @@ from .diagnostics.yoosee_broker_reads_api import router as broker_read_diagnosti
 from .frontend_build import build_version
 from .frontend_static import DashboardFiles
 from .media.go2rtc import Go2rtc
+from .media.native_events import configure as configure_native_events
 from .media.native_runtime import NativeSourceRuntime
 from .media.owned_bindings import OwnedIngressBindings
 from .media.owned_runtime import OwnedSourceRuntime
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
     try:
         configure_playback_logging()
         configure_control_diagnostics(settings.db_path.parent / "logs")
+        configure_native_events(settings.db_path.parent / 'logs')
         registry.init_db()
         source_policy.init_db()
         p2p.init_db()

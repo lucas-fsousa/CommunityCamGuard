@@ -26,6 +26,8 @@ def test_only_explicit_driver_reasons_are_retried(reason, allowed):
     ("offline",True),("socket_timeout",True),("socket_error",True),
     ("list_dns",True),("list_timeout",True),("stale_access",False),
     ("access_rejected",False),("transport_or_auth",False),
+    ("broker_heartbeat",True),("certification_unavailable",True),
+    ("inventory_timeout",True),("inventory_unavailable",True),("preparation_budget",True),
 ])
 def test_authentication_rejection_does_not_trigger_renewal_or_retry(label, allowed):
     source = NativeVideoSource("test", "123")
@@ -59,7 +61,8 @@ def test_timeout_reconnect_requires_closed_sockets_and_confirmed_outer_route(fau
     assert retryable(NativeVideoResult('transport',SharedReadResult('transport',worker)),source) is (fault is None)
 
 
-@pytest.mark.parametrize('failure_type', ['TimeoutError', 'Mp4SizeError'])
+@pytest.mark.parametrize('failure_type', ['TimeoutError', 'Mp4SizeError', 'Mp4OrderError',
+    'Mp4CapacityError', 'DecoderExitedError', 'BrokenPipeError', 'OSError'])
 @pytest.mark.parametrize('fault', [None, 'broker', 'route', 'tcp', 'not_ready', 'motion', 'format', 'protocol'])
 def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(fault, failure_type):
     worker = WorkerSummary('protocol' if fault == 'protocol' else 'stopped', 0, 0, 0, fault == 'broker',
