@@ -1,5 +1,10 @@
 # Native media delivery, not another finite trial
 
+The repeated2026-11-04 unavailable report exposed a separate startup gap, not
+another measured encoder failure. See [abrupt Docker startup](native-abrupt-startup.md)
+for namespace fencing, delayed readiness, supported layouts and actual acceptance.
+The earlier encoder-recovery evidence below does not cover container death.
+
 Latest runtime (2026-10-30): `575ed76`, dashboard `b-3422b2883cd9`, camera3 native
 active revision62. All three cameras online/recording, others legacy0; no OOM or
 unexpected app restarts. Capability renewal on the native owner was observed

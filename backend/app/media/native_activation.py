@@ -9,6 +9,7 @@ from concurrent.futures import Executor
 from ..db import native_restart
 from .mp4_codec import h264_mime
 from .mp4_fanout import StreamClosedError
+from .native_publication import NativePublication
 from .owned_retirement import OwnedRetirementCoordinator, RetiredIngress
 from .prepared_native import PreparedNative
 from .source_offer import NativeSourceOffer
@@ -42,16 +43,21 @@ class NativeActivation:
         self._used = False
         self._cancel = threading.Event()
         self.session: PreparedNative | None = None  # retain ownership even after failure
+        self._publication: NativePublication | None = None
 
     def request_stop(self) -> None:
         """Shutdown may race with preparation, including before a session exists."""
         self._cancel.set()
+        if self._publication is not None:
+            self._publication.stop()
         session = self.session
         if session is not None:
             session.request_stop()
 
     def start(self, receipt: RetiredIngress, offer: NativeSourceOffer, *,
-              ready_timeout: float = 5.0) -> PreparedNative:
+              ready_timeout: float = 5.0, background: bool = False) -> PreparedNative:
+        if type(background) is not bool:
+            raise ValueError('explicit readiness policy required')
         if (isinstance(ready_timeout, bool) or not math.isfinite(ready_timeout)
                 or not 0 < ready_timeout <= 30):
             raise ValueError("bounded native preparation timeout required")
@@ -71,6 +77,13 @@ class NativeActivation:
                 if self._cancel.is_set():
                     session.request_stop()
                 future = session.launch(self._executor)
+                if background:
+                    publication = NativePublication(session,
+                        ready=lambda: ready_video(self._sources, offer.camera_id, session.owner),
+                        publish=lambda: session.publish(self._apply_routes), cancelled=self._cancel.is_set)
+                    self._publication = publication
+                    publication.start()
+                    return session
                 deadline = time.monotonic() + ready_timeout
                 while not future.done():
                     if self._cancel.is_set():
@@ -85,3 +98,7 @@ class NativeActivation:
             except BaseException:
                 session.close()  # uncertain cleanup propagates; session/handles retained
                 raise
+
+    def join_publication(self, timeout: float) -> None:
+        if self._publication is not None:
+            self._publication.join(timeout)

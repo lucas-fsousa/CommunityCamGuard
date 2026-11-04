@@ -114,7 +114,7 @@ async def lifespan(app: FastAPI):
                     def publish_native_routes() -> None:
                         media.write_config()
                     app.state.native_startup = await asyncio.to_thread(restore_reviewed,native_runtime,
-                        owned_runtime.retirement,rec,publish_native_routes)
+                        owned_runtime.retirement,rec,publish_native_routes,owner=owner)
                 except Exception:
                     # Broken native state must not prevent the other legacy cameras
                     # from starting. Source policy still excludes native fallback.

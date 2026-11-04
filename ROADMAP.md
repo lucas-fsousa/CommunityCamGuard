@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-04 repeated report, distinct observed cause: native/active73 but
+runtime_missing after app startup, snapshot92 intact and no clean checkpoint.
+The encoder-only acceptance did not cover this. Default Linux PID1 Docker startup
+now has OS-lock/namespace-lifetime fencing for abandoned reviewed native intent,
+plus owned background readiness so camera warmup cannot expire preparation.
+84 focused tests, Mypy382/Ruff passed; actual abrupt-container restart acceptance
+follows. No new user capture is required. See docs/internal/native-abrupt-startup.md.
+
 2026-11-04 regression: camera3 native/blocked68 and snapshot90 without evidence,
 while both other cameras were online/recording. Local muxer/child-exit recovery and
 non-destructive background metadata publication now address two reproduced dead

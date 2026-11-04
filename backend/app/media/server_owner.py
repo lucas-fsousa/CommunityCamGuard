@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from . import owner_scope
 from .source_registry import SourceCleanupUnconfirmed, SourceUnavailable
 
 
@@ -44,11 +45,25 @@ class ServerOwner:
         self._fd: int | None = None
         self._used = False
         self._release_failed = False
+        self._scope: owner_scope.InitScope | None = None
+        self._previous_scope: owner_scope.InitScope | None = None
 
     @property
     def acquired(self) -> bool:
         with self._lock:
             return self._fd is not None
+
+    @property
+    def namespace_init(self) -> bool:
+        with self._lock:
+            return self._fd is not None and self._scope is not None
+
+    @property
+    def abandoned_namespace_retired(self) -> bool:
+        """Only under the new exclusive OS lock, never from persisted intent alone."""
+        with self._lock:
+            return (self._fd is not None and not self._release_failed and self._scope is not None
+                    and self._previous_scope is not None and self._scope != self._previous_scope)
 
     def acquire(self) -> None:
         with self._lock:
@@ -73,6 +88,15 @@ class ServerOwner:
                 current = self._path.lstat()
                 if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
                     raise SourceUnavailable("server ownership file changed")
+                os.lseek(fd, 0, os.SEEK_SET)
+                self._previous_scope = owner_scope.decode(os.read(fd, 2049))
+                self._scope = owner_scope.current()
+                data = owner_scope.encode(self._scope)
+                os.lseek(fd, 0, os.SEEK_SET)
+                if os.write(fd, data) != len(data):
+                    raise SourceUnavailable('server lifetime receipt write incomplete')
+                os.ftruncate(fd, len(data))
+                os.fsync(fd)
                 self._fd, fd = fd, None
             except OSError as exc:
                 if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK}:

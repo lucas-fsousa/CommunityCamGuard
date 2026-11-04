@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Recurring offline / app startup without a live capture:
+[abrupt native startup](native-abrupt-startup.md), distinct from encoder recovery.
+
 Latest native recovery correction and encoder-only fault injection:
 [permanent offline recovery](native-permanent-recovery.md).
 
