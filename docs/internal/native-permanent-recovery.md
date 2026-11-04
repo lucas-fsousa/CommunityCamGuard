@@ -55,7 +55,10 @@ reboot or physical action was used for this fault injection/recovery.
 The original full CI found four test expectations that omitted the new background
 `preserve_current=True` argument. Updated that contract without weakening siren
 scope assertions;11 migration tests passed (97.2MiB). Image41805651733 passed.
-The final full CI result is recorded after the follow-up run completes. This
+Follow-up `5f8f774` passed full CI41806410030:5639 tests, one existing skip,
+all Node contracts, Ruff and Mypy. The newest camera3 original archive was
+1,572,944bytes and updated2.7s ago on the preserved recordings volume, confirming
+recording resumed after the encoder fault as well as live view. This
 accepts local-encoder recovery, not all possible auth/unknown-cleanup failures or
 multi-day stability. The unavailable message still legitimately applies when
 credentials/review are revoked or ownership retirement cannot be confirmed.
