@@ -14,20 +14,32 @@ from .trial_containers import TrialContainers, docker
 from .trial_driver_offer import evidence_reference
 
 
-async def bootstrap(camera_id: str, containers: TrialContainers, reference: str) -> None:
+def operator_checkpoint(camera_id: str, domain: str, containers: TrialContainers):
+    """One-time upgrade recovery: actual stopped Docker namespaces, not an inferred receipt."""
     from ..db import native_restart, source_policy
+    containers.confirm_closed()
+    previous = source_policy.read_for((camera_id,))[camera_id]
+    if previous.mode != 'native':
+        raise RuntimeError('previous native intent required')
+    if previous.phase != 'blocked':
+        previous = source_policy.block(camera_id, expected_revision=previous.revision)
+    checkpoint = native_restart.CleanRestart(camera_id, previous.revision, domain)
+    native_restart.save((checkpoint,))
+    return checkpoint
+
+
+async def bootstrap(camera_id: str, containers: TrialContainers, reference: str) -> None:
+    from ..db import source_policy
     from ..main import app
     async with app.router.lifespan_context(app):
         app.state.rec.pause()  # readiness only; avoid host writes into Docker-owned folders
         offer=await asyncio.to_thread(prepare,camera_id,app.state.rec.native_archive(camera_id),reference)
         retirement=app.state.owned_runtime.retirement
         previous=source_policy.read_for((camera_id,))[camera_id]
-        if previous.mode=='native' and previous.phase=='blocked':
+        if previous.mode=='native':
             # Trusted host operator has just confirmed the entire old PID namespace
             # is gone. No old socket/decoder can overlap this replacement.
-            containers.confirm_closed()
-            checkpoint=native_restart.CleanRestart(camera_id,previous.revision,offer.domain)
-            native_restart.save((checkpoint,))
+            checkpoint=operator_checkpoint(camera_id,offer.domain,containers)
             await asyncio.to_thread(app.state.native_runtime.restore,retirement=retirement,checkpoint=checkpoint,
                 offer=offer,apply_routes=lambda:app.state.media.write_config(),ready_timeout=30)
         else:
