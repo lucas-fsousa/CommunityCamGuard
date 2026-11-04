@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Latest native recovery correction and encoder-only fault injection:
+[permanent offline recovery](native-permanent-recovery.md).
+
 Current ordinary-Docker deployment and limitations:
 [native production](native-production.md),
 [remote intercom / native MP4 recovery](intercom-origin-native-mp4.md), and

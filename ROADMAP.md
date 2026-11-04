@@ -11,6 +11,14 @@ ends. Dedicated bounded persistent failure history added; old rotated logs do no
 prove the initial event.302 focused tests, Mypy379/Ruff passed; deployment and
 encoder-only recovery verification follow. No sound/light/motion tests. See
 docs/internal/native-permanent-recovery.md.
+Deployed `f206f6e` / `b-fd856a627844`: camera3 native/active73. Precisely matched
+local-encoder SIGTERM recovered automatically (PID11→99, one matching encoder,
+H264/AAC MSE after recovery), same app StartedAt/restart0, other cameras still
+online/recording. No camera reboot, sound, light or motor commands. Initial reader
+raced warmup/1013 before successful retry; no claim of measured outage duration.
+Original CI exposed four old refresh-call expectations; updated with preservation
+explicitly required. Full follow-up CI pending, Image passed. Unknown cleanup and
+revoked authentication/evidence remain explicit safety barriers.
 
 2026-10-30 delivered shared control: the mapped automatic/day/night scalar now has a
 typed native-owner writer with preflight, one D2, correlated D3 and bounded exact

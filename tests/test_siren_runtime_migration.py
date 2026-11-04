@@ -65,6 +65,7 @@ def test_runtime_collection_opt_in_is_rechecked_for_exact_device(monkeypatch, mo
     tasks[0]()
     assert calls == [(enrollment, {
         "validity_seconds": runtime.VALIDITY_SECONDS, "include_siren": mode == "siren",
+        "preserve_current": True,
     })]
     assert not runtime._busy
 
