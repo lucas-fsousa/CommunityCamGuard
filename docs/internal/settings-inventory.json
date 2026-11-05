@@ -23,6 +23,7 @@
         "broker_read_diagnostic_enabled", "broker_read_diagnostic_camera_id",
         "broker_read_diagnostic_heartbeat",
         "broker_read_diagnostic_worker",
+        "broker_read_diagnostic_catalog",
         "broker_read_diagnostic_device_id",
         "native_av_diagnostic_enabled", "native_av_diagnostic_decode_video",
         "native_av_diagnostic_platform_only",

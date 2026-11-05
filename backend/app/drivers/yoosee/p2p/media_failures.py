@@ -16,10 +16,11 @@ PROTOCOL_CODES = {
     'cooperative TCP step deadline exceeded': 'tcp_io_timeout',
     'TCP media read exceeded deadline': 'tcp_io_timeout',
     'TCP media EOF before CLOSE receipt': 'tcp_eof',
+    'invalid MTP TCP record length': 'mtp_record_length',
 }
 
 TRANSIENT_CODES = frozenset({
     'kcp_assembly_timeout', 'tcp_session_timeout', 'av_handshake_timeout',
     'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout',
-    'tcp_io_timeout', 'tcp_eof',
+    'tcp_io_timeout', 'tcp_eof', 'mtp_record_length',
 })

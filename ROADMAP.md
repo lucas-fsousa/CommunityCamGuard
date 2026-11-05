@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Native catalogue review succeeded on camera3 (system4/custom0, revision102).
+The two already-proven resource digests matched; explicit operator review renewed
+only those until2026-12-05. A later strict invalid-MTP-record-length rejection
+blocked103 despite closed sockets/confirmed outer release. Exact transport-error
+classification now permits sequential backoff after that confirmed retirement,
+without accepting malformed data or retrying unknown protocol/auth failures.
+182 focused tests passed. Diagnostic flag's missing server-only inventory entry
+also fixed after CI caught it. Deployment/public-selector recheck follows.
+
 2026-11-05 implementation: alarm-resource listing and selection now share the
 native owner. Fixed bounded C0/C1 catalogue reads, sole-reader fragments/QuickLZ,
 one typed D2 selection, exact resource readback and fresh per-unit proofs; no

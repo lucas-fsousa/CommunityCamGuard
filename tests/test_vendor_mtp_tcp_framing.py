@@ -55,6 +55,18 @@ def test_invalid_length_rejected_from_prefix_only(size):
         framer.feed(b"")
 
 
+def test_invalid_length_remains_terminal_and_has_a_narrow_transport_recovery_code():
+    from backend.app.drivers.yoosee.p2p.media_failures import PROTOCOL_CODES, TRANSIENT_CODES
+    framer = MtpTcpFramer()
+    with pytest.raises(MtpTcpFrameError) as failure:
+        framer.feed(bytes((0xC0, 0x50, 0, 0)))
+    assert PROTOCOL_CODES[str(failure.value)] == 'mtp_record_length'
+    assert 'mtp_record_length' in TRANSIENT_CODES
+    assert 'unmapped inbound MTP TCP prefix' not in PROTOCOL_CODES
+    assert 'invalid MTP TCP record checksum' not in PROTOCOL_CODES
+    assert framer.buffered_bytes == 0
+
+
 @pytest.mark.parametrize("prefix", [0, 0x60, 0x80, 0xE0, 0x30, 0x70])
 def test_unknown_or_outgoing_prefix_never_resynchronizes(prefix):
     framer = MtpTcpFramer()

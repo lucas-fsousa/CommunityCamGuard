@@ -41,8 +41,8 @@ Alarm-sound enumeration and selection also have shared-session adapters, without
 playing audio or opening another login. Selection requires a fresh catalogue and
 exact resource readback; see [alarm resources](docs/internal/native-shared-alarm-resources.md)
 for the distinction between simulated writes and live read-only checks.
-Camera3's sound selector remains unavailable until its expired resource-specific
-review is explicitly renewed; integration alone does not renew device permissions.
+Camera3's expired resource review was explicitly renewed for its two unchanged,
+previously proven sounds; application code never renews these permissions automatically.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

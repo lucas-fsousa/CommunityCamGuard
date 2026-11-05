@@ -83,3 +83,31 @@ profiles cannot be mixed with it. This profile requires the existing native owne
 it never falls back, authenticates, writes a camera setting or registers/renews a
 proof. Its output contains sanitized options and resource identity digests only.
 Disable temporary diagnostic settings after the deliberate review.
+
+The actual native-owner review returned200 with complete system4/custom0 at
+native revision102 unchanged. The two previously proven resource identity digests
+matched exactly; a deliberate operator re-review renewed ONLY those two until
+2026-12-05T13:30:24Z. No automatic expiry extension was added to the application.
+Private provenance: `re/notes/native-alarm-resource-review-2026-11-05.md`.
+No resource-selection write or playback was performed. The first deployment's
+expired-profile gate is thus resolved; repeat the public option/MSE check after
+the separate transport failure below is recovered.
+
+## Separate observed transport failure
+
+Camera3 later blocked103 after native/active102: worker protocol site
+`feed:47/_fail:31` identifies the strict MTP TCP framer's invalid record-length
+rejection. Socket closure and outer broker release were confirmed; the inner
+CLOSE receipt was not. The former classifier lacked this exact label and left
+the source blocked. Wire contents were not retained, so no offending length,
+underlying firmware cause or causal link to the catalogue query is asserted.
+
+The follow-up maps ONLY `invalid MTP TCP record length` to `mtp_record_length`.
+The parser still rejects it and discards the entire connection. Sequential
+backoff/reconnect is admitted only after confirmed outer release, physically
+closed broker/TCP sockets and confirmed motion cleanup. Unknown framing/checksum,
+authentication/evidence failures and uncertain cleanup remain blocked. This does
+not make malformed bytes valid or expand packet/memory limits.182 focused tests
+passed under192MiB/no swap/50% CPU, peak110.8MiB. CI also exposed an omitted
+server-only settings-inventory classification for the new diagnostic flag;
+that explicit classification is fixed without exposing it through the dashboard.
