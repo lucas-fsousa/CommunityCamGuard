@@ -24,7 +24,10 @@ def test_pulse_dispatch_uses_strict_transport_only_for_selected_control(monkeypa
     monkeypatch.setattr(rollout, "selected", lambda _: (
         None if selected_controls is None else (None, selected_controls)
     ))
-    monkeypatch.setattr(controls, "_enrollment", lambda _: object())
+    # The shared-owner admission check now inspects the enrollment's camera ID
+    # before deciding whether this legacy dispatch is allowed. Keep that real
+    # enrollment contract instead of an attribute-less sentinel.
+    monkeypatch.setattr(controls, "_enrollment", lambda _: SimpleNamespace(camera_id="test"))
     monkeypatch.setattr(controls, "run_with_fresh_access", lambda access, fn: fn(access))
 
     def pulse(_access, duration, **kwargs):

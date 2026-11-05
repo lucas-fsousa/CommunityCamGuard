@@ -4,6 +4,13 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Deployed siren integration `4f05980` / `b-d14a329db286`, native/active114.
+Passive options200/MSE3→6 passed with all3online/recording; no pulse/audio/light/
+motor command. Full CI found three legacy-dispatch fixtures missing the newly
+required enrollment.camera_id; fixtures corrected, dispatch assertions unchanged.
+Image passed. Follow-up CI remains to be checked; audible native pulse acceptance
+is still pending, not inferred from simulated tests or passive video.
+
 Shared-native siren pulse implemented: typed2/5/10s, preflightOFF, sole-owner timer,
 oneON, reserved OFF/readback cleanup on cancel/shutdown, AD0+exact independent B7OFF
 confirmation, and quarantine/recovery barriers for unknown OFF. No extra account,

@@ -54,3 +54,12 @@ one ON, exact OFF/state receipts, failed/ambiguous sends, unknown OFF, cancellat
 interruption, shutdown and competing PTZ. The driver adapter and recovery guards
 also have positive/negative tests. No real native siren/audio/light/motor action
 was executed: audible/physical acceptance remains pending.
+
+Deployed `4f05980`, image `c5cb6f0e8932`, build `b-d14a329db286`.
+Camera3 resumed native/active114. Existing sound options GET200 and the same MSE
+socket3→6chunks (1355/491298/245518/522151/247830/492299bytes) passed, revision114
+unchanged. All3online/recording, internal diagnostic404/disabled. No pulse was sent.
+Image42046396602 passed. Full CI42046396512 exposed three old legacy-only test
+fixtures using `object()` as enrollment; the new owner check legitimately needs
+camera_id. Those fixtures are corrected without changing strict/compatibility
+dispatch expectations or weakening native admission. Follow-up full CI required.
