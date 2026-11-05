@@ -17,6 +17,7 @@ def setup(monkeypatch):
     settings = SimpleNamespace(broker_read_diagnostic_enabled=True,
         broker_read_diagnostic_heartbeat=False,
         broker_read_diagnostic_worker=False,
+        broker_read_diagnostic_catalog=False,
         broker_read_diagnostic_camera_id=CAMERA, broker_read_diagnostic_device_id="123")
     monkeypatch.setattr(api, "get_settings", lambda: settings)
     calls = []
@@ -72,6 +73,27 @@ def test_worker_profile_is_server_only(setup):
     assert client.post(PATH).status_code == 200
     assert calls[0]["with_worker"] is True
     assert client.post(PATH).status_code == 409
+
+
+def test_native_catalogue_profile_is_fixed_silent_and_single_use(setup, monkeypatch):
+    client, settings, calls = setup
+    settings.broker_read_diagnostic_catalog = True
+    reviewed = []
+    def review(**kwargs):
+        reviewed.append(kwargs)
+        return {'system_total':4, 'custom_total':0, 'resources':[]}
+    monkeypatch.setattr(api, 'review_native_catalog', review)
+    assert client.post(PATH).json() == {'system_total':4, 'custom_total':0, 'resources':[]}
+    assert reviewed == [{'camera_id':CAMERA, 'device_id':'123'}] and not calls
+    assert client.post(PATH).status_code == 409
+
+
+def test_catalogue_review_cannot_mix_with_new_session_profiles(setup, monkeypatch):
+    client, settings, calls = setup
+    settings.broker_read_diagnostic_catalog = settings.broker_read_diagnostic_worker = True
+    monkeypatch.setattr(api, 'review_native_catalog', lambda **_: pytest.fail('mixed profile'))
+    assert client.post(PATH).status_code == 409
+    assert not calls
 
 
 @pytest.mark.parametrize("kind", ["missing", "temporary", "legacy"])

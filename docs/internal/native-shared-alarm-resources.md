@@ -71,3 +71,15 @@ match. Do not use the old standalone homologation script while native streaming
 owns the account. No new audio or light test is needed to inspect the catalogue.
 Until that review is renewed, camera3's public sound selector correctly remains
 unavailable; no physical acceptance or working public selection is claimed here.
+
+### Silent operator review transport
+
+The existing opt-in `/api/internal/diagnostics/broker-reads` trigger now accepts a
+server-only `BROKER_READ_DIAGNOSTIC_CATALOG=true` profile. It additionally requires
+`BROKER_READ_DIAGNOSTIC_ENABLED=true` and the reviewed camera/device settings.
+Like the original diagnostic, it is direct-loopback/primary-session only, hidden,
+single-use per process and accepts no body/query/target from HTTP. Heartbeat/worker
+profiles cannot be mixed with it. This profile requires the existing native owner;
+it never falls back, authenticates, writes a camera setting or registers/renews a
+proof. Its output contains sanitized options and resource identity digests only.
+Disable temporary diagnostic settings after the deliberate review.

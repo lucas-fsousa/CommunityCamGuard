@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import require_primary_session
 from ..config import get_settings
-from ..drivers.contracts import ControlNotReady
+from ..drivers.contracts import ControlNotReady, ControlOperationError
 from ..drivers.yoosee.p2p.contracts import P2PProbeError
 from ..drivers.yoosee.p2p.control_ownership import ControlChannelBusy
 from ..services.camera_controls import CameraNotFound, ControlBusy
 from .local_operator import require_local_operator
+from .yoosee_alarm_catalog import review_native_catalog
 from .yoosee_broker_reads import run_reviewed_broker_reads
 
 router = APIRouter(prefix="/api/internal/diagnostics", include_in_schema=False)
@@ -36,12 +37,16 @@ def broker_reads(request: Request) -> dict:
             raise HTTPException(409, "diagnostic already attempted in this server process")
         request.app.state.broker_read_diagnostic_used = True
     try:
+        if settings.broker_read_diagnostic_catalog:
+            if settings.broker_read_diagnostic_heartbeat or settings.broker_read_diagnostic_worker:
+                raise ValueError('catalogue review cannot open an independent read session')
+            return review_native_catalog(camera_id=camera_id, device_id=device_id)
         result = run_reviewed_broker_reads(camera_id=camera_id, reviewed_camera_id=camera_id,
                                           reviewed_device_id=device_id,
                                           with_heartbeat=settings.broker_read_diagnostic_heartbeat,
                                           with_worker=settings.broker_read_diagnostic_worker)
     except (ControlBusy, ControlChannelBusy, ControlNotReady, CameraNotFound, ValueError):
         raise HTTPException(409, "diagnostic target is unavailable; attempt consumed") from None
-    except (P2PProbeError, OSError):
+    except (P2PProbeError, ControlOperationError, OSError):
         raise HTTPException(502, "broker read diagnostic failed; attempt consumed") from None
     return asdict(result)
