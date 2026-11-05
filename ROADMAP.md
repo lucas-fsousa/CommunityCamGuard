@@ -11,6 +11,12 @@ playback, second login or replay. Simulated writes are not physical acceptance.
 See docs/internal/native-shared-alarm-resources.md. Next remaining shared control
 is siren pulse with owner-driven OFF/cleanup, followed by native multi-camera
 capacity. LAN-only, SD and additional brands remain deferred.
+Deployed `d5f02a5` / `b-3e810903bb32`, native/active99, all3online/recording;
+full CI5821passed/1existing skip and Image passed. Real options GET501 did NOT
+reach the new reader: camera3 resource-selection review expired2026-10-11 while
+the capability evidence remains supported. Do not bypass/auto-renew it or claim
+live catalogue acceptance. Immediate follow-up: silent native-owner catalogue
+collection and deliberate exact-identity/resource re-review, then the siren work.
 
 2026-11-05 implementation: floodlight boolean now has a shared-native type11
 writer with type12 preflight/readback, one send and no second account. Read-only
