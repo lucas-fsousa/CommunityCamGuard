@@ -4,17 +4,25 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-Latest native implementation follow-up: `f69dcca` / `b-fde3e73e9103`
-restored camera3 native/active129. Video/AAC starvation, missing KCP WASK replies
-and permanent quarantine on a cleanly retired pre-ACCEPT capacity/deadline failure
-are corrected; CI5969passed/1skip and Image passed. Both MP4 tracks delivered, but
-KCP gap1 recurred, so continuous native stability remains OPEN. Next applied fix
-aligns native startup credit256→128 with the actual receiver and reserves an
-existing slot for the missing head (never ACKing/dropping unretained data).
-No memory/deadline increase, no physical commands, no experimental source on
-the other cameras. See native-transport-investigation.md, native-kcp-window.md
-and native-av-fairness.md in docs/internal. Resume multi-camera capacity only
-after the continuous native transport is demonstrated stable.
+Latest native stability implementation: `3b0b311` / `b-58c43b444dfd`, camera3
+native/active144; CI6012passed/1skip and Image passed. Implemented: fair video/AAC
+input, KCP window reports/consistent128-slot credit/reserved missing head, safe
+recovery of retired pre-ACCEPT limits, and bounded TCP scheduler yielding without
+discarding pending reads/ACKs. Continuous KCP repair now uses the existing5s idle
+budget: real repairs took2.7–3.5s, beyond the old2s cutoff. Periodic MTP maintenance
+is implemented on the same connection and its first fresh receipt was confirmed.
+
+Read-only lamp GET200/verified175ms and a complete300.964s original HEVC1920×1080/
+AAC recording passed during unchanged native ownership. Sustained acceptance
+remains OPEN; short successes previously preceded actual failures. No new
+physical control test or native experiment on the other cameras. Original media
+and memory ceilings remain; TCP continuation holds at most one4KiB read and one
+256-message/32KiB output batch. Other2retain legacy RTSP. Resume native multi-camera
+capacity only after sustained delivery; tests remain restricted to camera3.
+Exact sequence/results: docs/internal/native-transport-investigation.md and its
+linked KCP, A/V, TCP cooperation and maintenance notes.
+
+### Earlier native checkpoints (historical, not the latest runtime)
 
 Native failure investigation (2026-11-05): deployed `86596c7` /
 `b-29cb46445d20`, camera3 native/active126. Fixed bounded diagnostics retain

@@ -37,3 +37,9 @@ replay, clock validation, no burst after a time jump, unchanged5s media idle
 failure despite valid heartbeat ACKs, and maintenance cancellation before CLOSE.
 Ruff and Mypy405 passed. Live periodic-receipt and sustained-media acceptance
 follow deployment; neither is inferred from these fixtures.
+
+Live checkpoint: deployed `3b0b311` / `b-58c43b444dfd`, active144. The camera
+returned the correctly correlated periodic receipt for sequence2 on the existing
+connection. CI6012tests/1skip and Image passed. MSE and original300s archive
+rollover continued, with no sound/light/motor command. Sustained acceptance is
+still being measured; a transport maintenance receipt alone is not AV liveness.

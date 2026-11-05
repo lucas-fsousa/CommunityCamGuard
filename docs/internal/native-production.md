@@ -1,11 +1,31 @@
 # Native media delivery, not another finite trial
 
-Latest observer runtime4721975/buildb-e3baee6ef250/revision117 has recorded real
-decoder exits/KCP assembly/TCP I/O recovery failures; final player/video acceptance
-is NOT stable. Other two cameras remain on their existing working RTSP transport.
-Continuous native stability takes precedence over expanding capacity. See
-[current native-control/recovery evidence](native-shared-siren.md) for exact
-successful control acceptance versus unresolved media observations.
+Current deployed runtime (2026-11-05): `3b0b311`, build `b-58c43b444dfd`,
+camera3 native/active144. CI6012tests/1skip and Image passed. The other two
+cameras retain their existing RTSP sources; no camera action was used in this
+investigation. Continuous native stability takes precedence over expanding
+capacity, and sustained acceptance of this latest runtime remains in progress.
+
+Implemented corrections: fair video/AAC input scheduling, matching KCP receive
+credit/window reports, reserved missing-head capacity, and safe retry of retired
+pre-ACCEPT capacity/deadline failures. Actual KCP repairs at2.7–3.5s proved the
+finite2s assembler cutoff was premature; continuous repair now uses the existing
+5s media idle budget, without enlarging media buffers. The200ms TCP work budget
+now yields with bounded pending bytes/ACKs rather than closing a valid socket
+when host scheduling or decryption uses that time. Ambiguous writes still close
+without replay, and absolute protocol deadlines still apply.
+
+Ongoing MTP measurements now use that same TCP connection; the first fresh
+periodic receipt was confirmed live. A read-only lamp query returned200/verified
+in175ms during continued MSE. A closed300.964s original recording was identified
+as1920×1080HEVC plus16kHz mono AAC, and the next segment used the same encoder
+epoch. These are useful acceptance checkpoints, not a multi-day stability claim.
+
+See [investigation and exact live outcomes](native-transport-investigation.md),
+[TCP cooperation](native-tcp-cooperation.md), [KCP credit](native-kcp-window.md)
+and [A/V fairness](native-av-fairness.md), plus [route maintenance](native-tcp-maintenance.md).
+Short playback and unit tests are not
+multi-day endurance acceptance; the earlier records below are historical.
 
 Shared-native siren pulse is implemented with owner-driven timing, reserved OFF
 and exact independent OFF-state confirmation. Camera3's authorized two-second pulse

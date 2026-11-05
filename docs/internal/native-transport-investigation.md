@@ -190,3 +190,11 @@ Subsequent bounded SDK inspection found ongoing periodic meter transmission
 missing from the continuous implementation. The new same-connection maintenance
 owner is documented in [TCP MTP maintenance](native-tcp-maintenance.md). This
 addresses that protocol omission; live confirmation is still required.
+
+Latest deployment `3b0b311` / `b-58c43b444dfd`, native/active144, confirmed the
+fresh periodic meter receipt for sequence2. CI42103383366 passed6012tests/1skip;
+Image42103383491 passed. During unchanged MSE ownership, a read-only lamp request
+returned200/verified in175ms; no lamp write was sent. The first closed original
+segment probed successfully:300.964s HEVC1920×1080 plus16kHz mono AAC. The next
+300s segment used the same encoder-epoch suffix. No OOM/restart loop; sustained
+MSE acceptance is still being measured and will be recorded separately.
