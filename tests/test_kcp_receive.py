@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from backend.app.drivers.yoosee.p2p.kcp_receive import KcpReceiver, ReceiveError
+from backend.app.drivers.yoosee.p2p.kcp_receive import KcpAssemblyTimeout, KcpReceiver, ReceiveError
 from backend.app.drivers.yoosee.p2p.media_protocol import KCP_ACK, KCP_PUSH, KcpSegment
 
 
@@ -60,6 +60,24 @@ def test_duplicate_does_not_double_buffer_or_extend_deadline():
     with pytest.raises(ReceiveError, match="deadline"):
         receiver.expire()
     assert receiver.closed and receiver.buffered_bytes == 0
+
+
+@pytest.mark.parametrize('partial', [False,True])
+def test_timeout_preserves_only_bounded_missing_fragment_counters(partial):
+    now=[0.0]
+    receiver=KcpReceiver(42,clock=lambda:now[0])
+    receiver.receive(segment(0,1,b'PRIVATE') if partial else segment(3,0,b'PRIVATE'))
+    now[0]=2
+    with pytest.raises(KcpAssemblyTimeout) as error:receiver.expire()
+    facts=dict(error.value.facts)
+    assert facts['kcp_next_sequence']==(1 if partial else 0)
+    assert facts['kcp_pending']==(0 if partial else 1)
+    assert facts['kcp_parts']==(1 if partial else 0)
+    assert facts['kcp_gap']==(0 if partial else 3)
+    assert facts['kcp_remaining']==(1 if partial else 0)
+    assert facts['kcp_bytes']==7
+    assert 'PRIVATE' not in repr(error.value.facts)
+    assert receiver.closed and receiver.buffered_bytes==0
 
 
 @pytest.mark.parametrize("failure", ["bytes", "count", "conflict", "chain", "oversize"])

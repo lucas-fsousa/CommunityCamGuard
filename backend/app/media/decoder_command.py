@@ -28,7 +28,7 @@ def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
     cmd += ["-threads", "1"]
     if not output:
         return [*cmd, "-progress", "pipe:1", "-stats_period", "0.1", "-f", "null", "-"]
-    cmd += ["-v", "quiet", "-progress", "pipe:2", "-stats_period", "0.1", "-c:v", "libx264",
+    cmd += ["-v", "error", "-progress", "pipe:2", "-stats_period", "0.1", "-c:v", "libx264",
             "-preset", "ultrafast", "-tune", "zerolatency", "-pix_fmt", "yuv420p",
             "-profile:v", "baseline", "-g", "10" if live_timing or audio else "25",
             "-keyint_min", "10" if live_timing or audio else "25", "-sc_threshold", "0"]

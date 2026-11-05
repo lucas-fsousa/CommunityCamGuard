@@ -134,6 +134,18 @@ def test_unexpected_exit_does_not_restart(decoder):
     assert calls == []
 
 
+def test_exit_preserves_only_returncode_and_classified_stderr(decoder):
+    value, process, _, _, write, _ = decoder
+    if process.output is not None:
+        os.write(write, b'Failed to open segment /private/SECRET/path: Permission denied\n')
+    process.stopped = True
+    with pytest.raises(module.DecoderExitedError) as error:
+        value.step()
+    assert error.value.returncode == 0
+    assert error.value.category == ('output_path' if process.output is not None else 'unknown')
+    assert 'SECRET' not in str(error.value)
+
+
 def test_duplicate_progress_does_not_refresh_idle_deadline(decoder):
     value, _, now, _, write, _ = decoder
     os.write(write, b"frame=1\n")

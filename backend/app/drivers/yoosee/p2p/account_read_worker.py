@@ -17,6 +17,7 @@ from .catalog_read_inbox import CatalogReadInbox
 from .catalog_read_pump import CatalogReadPump
 from .contracts import CertifiedNode
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
+from .kcp_receive import KcpAssemblyTimeout
 from .lamp_read_inbox import LampReadInbox
 from .lamp_read_pump import LampReadPump
 from .media_failures import PROTOCOL_CODES
@@ -48,6 +49,7 @@ class WorkerSummary:
     protocol_site: str = ""
     protocol_code: str = ""
     siren: SirenPulseResult | None = None
+    protocol_facts: tuple[tuple[str, int], ...] = ()
 
 
 class _Stop(Exception):
@@ -152,6 +154,7 @@ class AccountReadWorker:
         reason = "stopped"
         protocol_site = ""
         protocol_code = ""
+        protocol_facts: tuple[tuple[str, int], ...] = ()
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
@@ -365,6 +368,8 @@ class AccountReadWorker:
                 trace=trace.tb_next
             protocol_site='/'.join(sites[-2:])
             protocol_code=PROTOCOL_CODES.get(str(error),'')
+            if isinstance(error, KcpAssemblyTimeout):
+                protocol_facts = error.facts
         finally:
             try:
                 if siren is not None:
@@ -440,4 +445,4 @@ class AccountReadWorker:
                              motion.result if motion is not None else last_motion,
                              media.result if media is not None else None,
                              tcp.result if tcp is not None else None,protocol_site,protocol_code,
-                             siren.last_result if siren is not None else None)
+                             siren.last_result if siren is not None else None, protocol_facts)

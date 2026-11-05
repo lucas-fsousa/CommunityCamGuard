@@ -41,3 +41,25 @@ def test_retry_facts_keep_fixed_reason_and_protocol_code_but_never_payload(tmp_p
     assert result['facts']['retry_reason']=='connection'
     assert result['facts']['session_protocol_code']=='mtp_record_length'
     assert 'SECRET' not in repr(result)
+
+
+def test_decoder_exit_facts_are_sanitized_and_local_failure_reason_is_preserved(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA,error='retry_planned',evidence_valid=True,details={
+        'retry_reason':'consumer_failed','decoder_failure':'timestamp_order','decoder_returncode':'1',
+        'stderr':'SECRET'})
+    result=json.loads((tmp_path/'native-events.jsonl').read_text())
+    assert result['facts']['decoder_failure']=='timestamp_order'
+    assert result['facts']['decoder_returncode']=='1'
+    assert result['facts']['retry_reason']=='consumer_failed'
+    assert 'SECRET' not in repr(result)
+
+
+def test_kcp_counter_ranges_never_accept_arbitrary_text_or_unbounded_numbers(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA,error='retry_planned',evidence_valid=True,details={
+        'kcp_next_sequence':'4294967295','kcp_pending':'128','kcp_parts':'SECRET',
+        'kcp_gap':'128','kcp_bytes':'9'*100})
+    result=json.loads((tmp_path/'native-events.jsonl').read_text())['facts']
+    assert result['kcp_next_sequence']=='4294967295' and result['kcp_pending']=='128'
+    assert 'kcp_parts' not in result and 'kcp_gap' not in result and 'kcp_bytes' not in result

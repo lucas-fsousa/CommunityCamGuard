@@ -13,12 +13,19 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .decoder_command import decoder_command
+from .decoder_failure import FAILURE_CATEGORIES, classify
 from .fragmented_mp4 import FragmentedMp4
 from .nonblocking_input import NonblockingInput
 
 
 class DecoderExitedError(RuntimeError):
     """The local owned decoder exited; never a camera authentication error."""
+
+    def __init__(self, message: str = 'continuous decoder exited', *,
+                 returncode: int | None = None, category: str = 'unknown'):
+        super().__init__(message)
+        self.returncode = returncode if type(returncode) is int and -128 <= returncode <= 255 else None
+        self.category = category if category in FAILURE_CATEGORIES else 'unknown'
 
 
 class HevcDecoder:
@@ -41,6 +48,7 @@ class HevcDecoder:
         self._deadline = self._last_time + 15
         self.frames = 0
         self._buffer = bytearray()
+        self._failure_category = 'unknown'
         self._input: NonblockingInput | None = None
         self._closed = False
         self._output = output
@@ -91,8 +99,17 @@ class HevcDecoder:
             if not math.isfinite(now) or now < self._last_time:
                 raise ValueError("invalid decoder clock")
             self._last_time = now
-            if self._process.poll() is not None:
-                raise DecoderExitedError("continuous decoder exited")
+            returncode = self._process.poll()
+            if returncode is not None:
+                tail = b''
+                if self._output is not None and self._process.stderr is not None:
+                    try:
+                        tail = os.read(self._process.stderr.fileno(), 8192)
+                    except (OSError, ValueError):
+                        pass
+                category = classify(bytes(self._buffer)+tail)
+                raise DecoderExitedError(returncode=returncode,
+                    category=self._failure_category if category == 'unknown' else category)
             assert self._process.stdout is not None and self._input is not None
             assert self._progress is not None
             if self._output is not None:
@@ -111,6 +128,9 @@ class HevcDecoder:
             while b"\n" in self._buffer:
                 line, _, rest = self._buffer.partition(b"\n")
                 self._buffer = bytearray(rest)
+                category = classify(bytes(line))
+                if category != 'unknown':
+                    self._failure_category = category
                 if line.startswith(b"frame="):
                     value = line[6:].strip()
                     if not value.isdigit() or len(value) > 20:

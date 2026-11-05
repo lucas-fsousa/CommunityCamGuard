@@ -21,6 +21,14 @@ class ReceiveError(ValueError):
     """Sanitized terminal receive failure; caller must close the session."""
 
 
+class KcpAssemblyTimeout(ReceiveError):
+    """Only bounded sequence/buffer counters, never video or vendor payloads."""
+
+    def __init__(self, facts: tuple[tuple[str, int], ...]):
+        super().__init__('KCP assembly deadline exceeded')
+        self.facts = facts
+
+
 @dataclass(frozen=True, slots=True)
 class ReceiveResult:
     acknowledge: bool
@@ -77,7 +85,13 @@ class KcpReceiver:
         if self.closed:
             raise ReceiveError("KCP receiver is closed")
         if self._since is not None and self.clock() - self._since >= self.timeout:
-            self._fail("KCP assembly deadline exceeded")
+            facts = (('kcp_next_sequence', self.next_sequence),
+                     ('kcp_pending', len(self._pending)), ('kcp_parts', len(self._parts)),
+                     ('kcp_gap', min(((seq-self.next_sequence) & _MASK for seq in self._pending), default=0)),
+                     ('kcp_remaining', self._remaining+1 if self._remaining is not None else 0),
+                     ('kcp_bytes', self.buffered_bytes))
+            self.close()
+            raise KcpAssemblyTimeout(facts)
 
     def receive(self, segment: KcpSegment) -> ReceiveResult:
         self.expire()

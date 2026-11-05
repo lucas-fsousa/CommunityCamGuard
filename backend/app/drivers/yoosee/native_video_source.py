@@ -16,7 +16,7 @@ from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.archive_spec import validate_segment_seconds
 from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError, Mp4SizeError
-from ...media.hevc_decoder import HevcDecoder
+from ...media.hevc_decoder import DecoderExitedError, HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
 from ...media.native_av_decoder import NativeAvDecoder
 from .p2p.av_delivery import NativeAvDelivery, supported_audio
@@ -84,6 +84,8 @@ class NativeVideoSource:
         self._output: FragmentedMp4 | None = None  # Consumer-thread confined.
         self._thread: threading.Thread | None = None
         self._failure_type = ""
+        self._decoder_returncode = ""
+        self._decoder_failure = 'unknown'
         self._failure_site = ""
         self._mp4_expected = ""
         self._mp4_actual = ""
@@ -95,6 +97,7 @@ class NativeVideoSource:
         """Safe local failure metadata, never exception messages, media or credentials."""
         return {**self._session.diagnostics(),
                 "consumer_error": self._failure_type, "consumer_site": self._failure_site,
+                "decoder_returncode": self._decoder_returncode, "decoder_failure": self._decoder_failure,
                 "consumer_mp4_expected": self._mp4_expected, "consumer_mp4_actual": self._mp4_actual,
                 "consumer_mp4_size": self._mp4_size, "consumer_mp4_box": self._mp4_box,
                 "audio_error": self._delivery.audio_failure if isinstance(self._delivery, NativeAvDelivery) else "",
@@ -196,6 +199,9 @@ class NativeVideoSource:
                 self._failed.set()
         except BaseException as error:
             self._failure_type = type(error).__name__
+            if isinstance(error, DecoderExitedError):
+                self._decoder_returncode = str(error.returncode) if error.returncode is not None else ''
+                self._decoder_failure = error.category
             if isinstance(error, Mp4OrderError):
                 self._mp4_expected, self._mp4_actual = error.expected, error.actual
             if isinstance(error, Mp4SizeError):

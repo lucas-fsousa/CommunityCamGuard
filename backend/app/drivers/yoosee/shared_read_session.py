@@ -94,6 +94,7 @@ class SharedReadSession:
             return {"session_worker": "unavailable", **(
                 {"session_connection_failure": self._connection_failure} if self._connection_failure else {})}
         return {"session_worker": worker.reason,
+                **{key:str(value) for key,value in worker.protocol_facts},
                 "session_protocol_site": worker.protocol_site,
                 "session_protocol_code": worker.protocol_code,
                 "session_broker_socket_closed": not worker.socket_close_failed,
