@@ -4,12 +4,17 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-Native failure investigation: preserve bounded decoder exit/category and KCP
-missing-sequence counters before teardown clears the evidence. FFmpeg no longer
-silences its error pipe, but only fixed labels/exit codes are persisted; all
-strict codec/framing/time/memory guards remain unchanged.281 focused tests,
-Mypy402/Ruff pass. See docs/internal/native-transport-investigation.md. Deploy,
-observe a real failure, then correct that cause rather than enlarge timeouts.
+Native failure investigation (2026-11-05): deployed `86596c7` /
+`b-29cb46445d20`, camera3 native/active126. Fixed bounded diagnostics retain
+decoder exit/category, KCP missing-sequence counters and rejected MTP kind/length.
+Real earlier failures included decoder234/unclassified and KCP gap1 with97/102
+queued segments; no receive-buffer exhaustion was established. Latest passive
+MSE observation delivered598fragments/227445585bytes over300seconds without a
+disconnect, max inter-fragment gap3.24s; native recordings advanced. This is NOT
+a demonstrated root-cause fix. CI5930passed/1skip and Image passed. Continue
+observing real failures; preserve strict checks and resource limits, do not
+silently lower framing admission or enlarge timeouts. See
+docs/internal/native-transport-investigation.md.
 
 Current priority after accepted controls: stabilize camera3's continuous native
 transport BEFORE multi-camera capacity. Observer deployment4721975/build

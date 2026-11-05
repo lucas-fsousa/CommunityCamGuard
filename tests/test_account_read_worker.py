@@ -158,6 +158,29 @@ def test_wrapped_media_timeout_keeps_safe_classification(monkeypatch):
     assert result.reason == 'protocol' and sock.closed == 1
 
 
+@pytest.mark.parametrize('kind', ['mtp', 'kcp'])
+def test_wrapped_transport_failure_preserves_bounded_facts_after_socket_cleanup(monkeypatch, kind):
+    from backend.app.drivers.yoosee.p2p.kcp_receive import KcpAssemblyTimeout, ReceiveError
+    from backend.app.drivers.yoosee.p2p.mtp_tcp_framing import MtpTcpFrameError
+
+    sock = WorkerSocket()
+    facts = (("mtp_kind", 80), ("mtp_length", 1501)) if kind == 'mtp' else (
+        ("kcp_next_sequence", 620), ("kcp_pending", 97), ("kcp_gap", 1))
+    error = MtpTcpFrameError('invalid MTP TCP record length', facts=facts) if kind == 'mtp' else KcpAssemblyTimeout(facts)
+
+    def fail(_):
+        try:
+            raise error
+        except ValueError:
+            raise ReceiveError('TCP AV incoming stream failed') from None
+
+    monkeypatch.setattr(sock, 'recvfrom', fail)
+    result = worker(sock).run(sock)
+    assert result.protocol_facts == facts
+    assert result.protocol_code == ('mtp_record_length' if kind == 'mtp' else 'kcp_assembly_timeout')
+    assert result.reason == 'protocol' and sock.closed == 1
+
+
 def test_drain_allows_inflight_response_but_rejects_queued_and_new_work(monkeypatch):
     sock = WorkerSocket()
     owner = worker(sock)

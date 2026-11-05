@@ -55,3 +55,29 @@ also exited with code 234 and an unclassified message. Fixed classification now
 recognizes HEVC/MPEG-TS error-component tags and missing codec/muxer headers; raw
 messages are still neither retained nor returned. This is further evidence
 collection, not a demonstrated correction of either transport or decode failure.
+
+## Latest deployment and passive acceptance
+
+`86596c7` / image `3fb9837e0fbf` / build `b-29cb46445d20` resumed camera3
+native/active revision126. CI42067495782 passed5930tests/1skip, Mypy402, frontend
+contracts and Ruff; Image42067503181 passed. No sound/light/motor/reset command.
+
+A90-second read-and-discard browser-protocol client received183binary messages
+(69374913bytes), max gap3.05s. A subsequent300-second observation received598
+(227445585bytes), max gap3.24s, without disconnect. The ending `TimeoutError` is
+the observer's explicit duration limit, not a server/session timeout. Payloads
+were discarded immediately, not accumulated. Native recording chunks advanced;
+the other two sources remained legacy/available. Container had no OOM/restart
+loop, around224MiB during observation.
+
+Two closed recording epochs (including one from a decoder-exit attempt) passed
+bounded strict offline video decode. The latter had120video/123audio packets,
+with no duplicate/backward DTS after archive-clock repair. This does not prove
+that live input clocks or the entire file are free of errors. A35-second passive
+UDP header count saw no mapped MTP packets; that short observation does not
+exclude an alternate route at another time. No raw packets or stderr persisted.
+
+The stream is currently delivering, but intermittent failure is unresolved:
+diagnostic changes alone must not be described as its root-cause correction.
+Further checks must use real recurrence evidence, not repeat physical control
+acceptance or alter production cameras.
