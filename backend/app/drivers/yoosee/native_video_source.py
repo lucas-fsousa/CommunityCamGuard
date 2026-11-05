@@ -170,24 +170,32 @@ class NativeVideoSource:
 
     def _consume(self) -> None:
         consumer = VideoConsumer(self._delivery, factory=self._decoder)
+        audio_turn = False
         try:
             while not self._stop.is_set():
                 self._apply_recording_policy(consumer)
                 if (self._archive_dirs is not None and self._recording_allowed
                         and consumer.decoder is not None):
                     self._archive_dirs.prepare()
-                consumer.step()
+                offered_video = consumer.step(accept_frame=not audio_turn)
                 if consumer.closed or self._stop.is_set():
                     break
                 decoder = consumer.decoder
                 if isinstance(self._delivery, NativeAvDelivery) and isinstance(decoder, NativeAvDecoder):
-                    if not decoder.pending_bytes:
+                    if offered_video:
+                        # Reserve the next free stdin slot for AAC. Previously
+                        # step() always claimed it for another queued video AU,
+                        # so a sustained video backlog could starve audio.
+                        audio_turn = True
+                    elif not decoder.pending_bytes:
                         audio = self._delivery.take_audio()
                         if audio is not None and not decoder.offer_audio(audio.payload, audio.timestamp):
                             raise ValueError("native decoder refused audio access unit")
+                        audio_turn = False
                 elif isinstance(self._delivery, NativeAvDelivery) and decoder is None:
                     # Awaiting a fresh IDR: do not accumulate pre-epoch AAC indefinitely.
                     self._delivery.take_audio()
+                    audio_turn = False
                 if self._output is not None:
                     while (chunk := self._output.take()) is not None:
                         with self._hub_lock:

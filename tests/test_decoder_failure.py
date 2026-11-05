@@ -15,6 +15,7 @@ from backend.app.media.hevc_decoder import DecoderExitedError
     (b'[hevc @ 0x123] The cu_qp_delta is outside the valid range', 'input_bitstream'),
     (b'[mpegts @ 0x123] PES packet size mismatch', 'input_transport'),
     (b'Could not write header for output file: Invalid argument', 'muxer_setup'),
+    (b'Too many packets buffered for output stream 0:0', 'muxer_queue'),
     (b'Could not find codec parameters for stream', 'input_headers'),
     (b'Error while opening encoder', 'encoder_setup'),
     (b'Error writing trailer of pipe:1: Broken pipe', 'output_write'),

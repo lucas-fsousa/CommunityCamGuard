@@ -67,6 +67,21 @@ def test_busy_decoder_leaves_next_frame_in_bounded_queue():
     assert consumer.closed and sink.closed
 
 
+def test_pump_only_step_drains_child_without_claiming_the_next_video_slot():
+    queue = delivery()
+    sink = Sink()
+    consumer = VideoConsumer(queue, factory=lambda frame: sink)
+    queue.consume(V1Record(video=idr(), video_timestamp=1))
+    assert consumer.step() is True
+    queue.consume(V1Record(video=nal(1), video_timestamp=2))
+    assert consumer.step(accept_frame=False) is False
+    assert sink.pending_bytes == 0 and sink.frames == [idr()]
+    assert queue.buffered_bytes == len(nal(1))
+    assert consumer.step() is True
+    assert sink.frames == [idr(), nal(1)]
+    consumer.close()
+
+
 def test_uncertain_shutdown_never_starts_second_decoder():
     queue = delivery()
     sink = Sink()

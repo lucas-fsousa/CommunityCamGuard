@@ -31,20 +31,27 @@ class VideoConsumer:
         """Consumer-thread-only access to the currently owned decoder."""
         return self._decoder
 
-    def step(self) -> None:
+    def step(self, *, accept_frame: bool = True) -> bool:
+        """Pump the child once; report whether a video AU was offered.
+
+        A/V owners can reserve the next free input slot for audio without
+        skipping decoder output/progress reads or taking a queued video frame.
+        """
         if self.closed:
             raise ValueError("video consumer closed")
         try:
             if self._delivery.closed:
                 self.close()
-                return
+                return False
             if self._decoder is not None:
                 self._decoder.step()
                 if self._decoder.pending_bytes:
-                    return
+                    return False
+            if not accept_frame:
+                return False
             frame = self._delivery.take()
             if frame is None:
-                return
+                return False
             if frame.epoch != self._epoch:
                 if not frame.restart_decoder:
                     raise ValueError("missing decoder epoch boundary")
@@ -58,6 +65,7 @@ class VideoConsumer:
                 raise ValueError("repeated decoder epoch boundary")
             if self._decoder is None or not self._decoder.offer(frame.payload, timestamp=frame.timestamp):
                 raise ValueError("decoder refused access unit")
+            return True
         except Exception:
             self.close()
             raise

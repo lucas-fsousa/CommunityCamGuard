@@ -11,8 +11,8 @@ _PATTERNS = (
     ('input_bitstream', (b'invalid data found', b'error while decoding', b'invalid nal unit', b'could not find ref',
                          b'error submitting packet', b'error sending packet to decoder', b'[hevc @')),
     ('input_transport', (b'[mpegts @', b'error during demuxing')),
-    ('muxer_setup', (b'could not write header', b'error opening output', b'could not find tag',
-                     b'too many packets buffered')),
+    ('muxer_queue', (b'too many packets buffered',)),
+    ('muxer_setup', (b'could not write header', b'error opening output', b'could not find tag')),
     ('encoder_setup', (b'error while opening encoder', b'error initializing output stream', b'unknown encoder', b'unrecognized option')),
     ('output_write', (b'broken pipe', b'error writing trailer', b'error muxing a packet')),
 )

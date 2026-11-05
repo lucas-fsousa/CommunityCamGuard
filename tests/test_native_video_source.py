@@ -195,6 +195,52 @@ def test_native_archive_cannot_be_requested_without_validated_audio(tmp_path):
         module.NativeVideoSource("test", "123", archive=tmp_path / "archive.mp4")
 
 
+def test_video_backlog_cannot_starve_aac_between_partial_pipe_writes(setup, monkeypatch):
+    from tests.test_av_delivery import ADTS
+    from tests.test_hevc_recovery import nal
+
+    offered = []
+    decoders = []
+
+    class Decoder:
+        pending_bytes = 0
+        closed = False
+
+        def __init__(self, **kwargs):
+            self.remaining = 0
+            decoders.append(self)
+
+        def _offer(self, kind):
+            assert self.pending_bytes == 0
+            offered.append(kind)
+            self.pending_bytes = 1
+            self.remaining = 2  # one iteration cannot drain the simulated pipe
+            if len(offered) == 6:
+                source._stop.set()
+            return True
+
+        def offer(self, payload, *, timestamp=None): return self._offer('video')
+        def offer_audio(self, payload, timestamp): return self._offer('audio')
+
+        def step(self):
+            self.remaining = max(0, self.remaining - 1)
+            if self.remaining == 0: self.pending_bytes = 0
+
+        def close(self): self.closed = True
+
+    monkeypatch.setattr(module, 'NativeAvDecoder', Decoder)
+    source = module.NativeVideoSource('test', '123', native_audio=True)
+    source._delivery.consume(V1Record(encoding=unpack_v1_encoding_header(header())))
+    for index in range(8):
+        source._delivery.consume(V1Record(video=idr() if index == 0 else nal(1),
+            video_timestamp=1_000_000 + index * 64000,
+            audio=(ADTS,), audio_timestamp=1_000_000 + index * 64000))
+    source._consume()
+    assert offered == ['video', 'audio', 'video', 'audio', 'video', 'audio']
+    assert len(decoders) == 1 and decoders[0].closed
+    assert not source._failed.is_set() and not source._cleanup_failed.is_set()
+
+
 @pytest.mark.parametrize("fail_initial", [True, False])
 def test_archive_directory_failure_stops_account_and_retires_decoder(setup, tmp_path, monkeypatch, fail_initial):
     _, _, _, _, calls = setup
