@@ -47,6 +47,9 @@ Bounded siren pulses also have a shared-session adapter with owner-driven OFF an
 independent state confirmation. A two-second native pulse was physically accepted
 on camera3; no other-device/duration support is inferred. See
 [native siren](docs/internal/native-shared-siren.md) for shutdown guarantees and limits.
+Continuous native-video stability on camera3 remains under investigation after
+observed decoder/KCP/TCP recovery failures; control acceptance is not a claim of
+reliable long-running native capture. See [current status](docs/internal/native-production.md).
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

@@ -1,5 +1,12 @@
 # Native media delivery, not another finite trial
 
+Latest observer runtime4721975/buildb-e3baee6ef250/revision117 has recorded real
+decoder exits/KCP assembly/TCP I/O recovery failures; final player/video acceptance
+is NOT stable. Other two cameras remain on their existing working RTSP transport.
+Continuous native stability takes precedence over expanding capacity. See
+[current native-control/recovery evidence](native-shared-siren.md) for exact
+successful control acceptance versus unresolved media observations.
+
 Shared-native siren pulse is implemented with owner-driven timing, reserved OFF
 and exact independent OFF-state confirmation. Camera3's authorized two-second pulse
 was confirmed by its owner and the exact OFF readback. See [native siren](native-shared-siren.md).

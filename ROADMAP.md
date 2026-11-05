@@ -4,6 +4,17 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Current priority after accepted controls: stabilize camera3's continuous native
+transport BEFORE multi-camera capacity. Observer deployment4721975/build
+b-e3baee6ef250 resumed revision117 but player attempts returned1013; actual retry
+events captured DecoderExitedError, tcp_io_timeout and kcp_assembly_timeout.
+Final check: camera3 recovering/not recording, other2online/recording, no OOM or
+container restart loop. Full CI5907passed/1skip and Image passed. Do not claim
+steady native video from those tests; native siren/selection physical acceptance
+at revision114/108 remains separate. Next diagnostic: bounded local decoder exit
+classification and investigation of real KCP/TCP progress/retirement, not another
+sound/light test or a new manufacturer-app capture.
+
 Native siren two-second pulse physically accepted on camera3: user explicitly
 authorized one attempt and confirmed it worked. HTTP200, applicationACK/error0
 and independent B7OFF confirmation; missing transportACK correctly remainedfalse.

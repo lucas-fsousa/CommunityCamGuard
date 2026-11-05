@@ -94,3 +94,20 @@ terminal event, hiding whether recovery was waiting on network opening or media
 framing. The same rotating512KiB/two-backup log is reused: no payload, credentials,
 network reply, growing history or extra worker. Logging failure cannot stop or
 authorize retry; the existing cleanup/evidence classifier remains authoritative.
+
+Final observer deployment: `4721975`, image `5318270181ea`, build
+`b-e3baee6ef250`, native revision117 after ordinary app-only replacement.
+CI42050667352 passed5907tests/1existing skip, Mypy401/Ruff/all Node contracts;
+Image42050667372 passed. No further sound/light/motor commands were sent.
+
+Do NOT count that final restart as stable-video acceptance. The initial player
+attempts returned1013, and real retry events subsequently captured a retired
+DecoderExitedError plus TCP I/O and KCP assembly timeouts. Final observed state
+was native/active117/recovering, camera3 not recording; the other two remained
+online/recording. Both sockets/outer route and siren cleanup were confirmed on the
+logged attempts; no OOM/container restart loop was observed. The successful native
+sound test remains valid at revision114, but continuous media stability is a
+separate unresolved priority. Diagnose these actual transport/decoder failures
+before enlarging native capacity; do not weaken framing checks or blame DHCP
+alone from the address observation. Decoder currently uses quiet error output,
+so preserving bounded, sanitized exit/error classification is a useful next check.
