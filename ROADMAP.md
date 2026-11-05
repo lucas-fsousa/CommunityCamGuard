@@ -10,7 +10,10 @@ night mode). One D2, correlated D3, bounded readback, no replay/login fallback.
 Weekday order is canonicalized; editing a plan never arms protection or rewrites
 adjacent fields. Schemas separated into a small module rather than growing the
 transaction state machine.187 focused tests, Mypy384/Ruff passed; only simulated
-actuation. No sound/light/motion/guard changes. Deployment/passive checks follow.
+actuation. Deployed `c29aa8c` / `b-4737e1a2c4e1`, native/active93. Both real guard
+GETs returned200 verified/authenticated while the same MSE socket advanced3→6
+chunks; all3online/recording, no OOM/restarts. CI/Image passed. No sound/light/
+motion/guard changes; physical actuation acceptance is not claimed.
 Remaining shared controls: floodlight, siren/resource selection; native multi-camera
 capacity remains separate. See docs/internal/native-shared-guard.md.
 

@@ -3,6 +3,9 @@
 Smart-protection switch/weekly-plan shared writers are implemented without a
 second native account. Coverage is simulated; no guard was armed or schedule
 changed for this integration. See [shared guard controls](native-shared-guard.md).
+Deployed `c29aa8c` / `b-4737e1a2c4e1`, native/active93: real GET-only guard reads
+passed with continued MSE on the same socket; all three cameras online/recording.
+CI/Image passed. Earlier runtime IDs below are historical checkpoints.
 
 The repeated2026-11-04 unavailable report exposed a separate startup gap, not
 another measured encoder failure. See [abrupt Docker startup](native-abrupt-startup.md)

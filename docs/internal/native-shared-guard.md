@@ -33,5 +33,13 @@ weekday no-op and actual synthetic worker dispatch on its single socket.
 
 No camera guard or schedule was changed during implementation: arming it could
 trigger audible alarms. This is implementation plus simulated protocol coverage,
-not new camera-backed actuation or physical acceptance. Deployment/passive checks
-are recorded below when completed.
+not new camera-backed actuation or physical acceptance.
+
+Deployed `c29aa8c` / `b-4737e1a2c4e1` via app-only replacement. Camera3 resumed
+native/active93, with both other cameras still legacy0. On the ordinary authenticated
+API, GET smart_protection and GET smart_protection_schedule both returned200,
+verified/authenticated. The same MSE socket advanced3→6 binary chunks during those
+reads (sizes1355/197477/200551/204355/205129/204242), and source revision93 did not
+change. All three cameras report online/recording; no OOM or unexpected app
+restart. CI42001820514 and Image42001820592 passed. These production checks were
+GET-only; they do not convert simulated guard writes into physical acceptance.

@@ -31,6 +31,9 @@ see [capability refresh](docs/internal/native-capability-refresh.md).
 The mapped automatic/day/night control now has a shared-session adapter too;
 its integration is covered by simulated protocol tests, not a new physical IR
 check. See [night-mode integration](docs/internal/native-shared-night-vision.md).
+Smart protection and its weekly plan also share the native session. Their write
+integration has simulated coverage; production checks were read-only, without
+arming protection. See [guard integration](docs/internal/native-shared-guard.md).
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).
