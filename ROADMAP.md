@@ -4,6 +4,18 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Latest native implementation follow-up: `f69dcca` / `b-fde3e73e9103`
+restored camera3 native/active129. Video/AAC starvation, missing KCP WASK replies
+and permanent quarantine on a cleanly retired pre-ACCEPT capacity/deadline failure
+are corrected; CI5969passed/1skip and Image passed. Both MP4 tracks delivered, but
+KCP gap1 recurred, so continuous native stability remains OPEN. Next applied fix
+aligns native startup credit256→128 with the actual receiver and reserves an
+existing slot for the missing head (never ACKing/dropping unretained data).
+No memory/deadline increase, no physical commands, no experimental source on
+the other cameras. See native-transport-investigation.md, native-kcp-window.md
+and native-av-fairness.md in docs/internal. Resume multi-camera capacity only
+after the continuous native transport is demonstrated stable.
+
 Native failure investigation (2026-11-05): deployed `86596c7` /
 `b-29cb46445d20`, camera3 native/active126. Fixed bounded diagnostics retain
 decoder exit/category, KCP missing-sequence counters and rejected MTP kind/length.

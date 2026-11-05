@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from .media_protocol import KCP_HEADER, KCP_PUSH, MTP_MAX_FRAME_SIZE, MTP_PREFIX_SIZE, KcpSegment
 
 _MASK = 0xFFFFFFFF
+DEFAULT_RECEIVE_SEGMENTS = 128
 
 
 class ReceiveError(ValueError):
@@ -45,7 +46,7 @@ class KcpReceiver:
     """
 
     def __init__(self, conv: int, *, initial_sequence: int = 0,
-                 max_segments: int = 128, max_bytes: int = 256 * 1024,
+                 max_segments: int = DEFAULT_RECEIVE_SEGMENTS, max_bytes: int = 256 * 1024,
                  timeout: float = 2.0, clock: Callable[[], float] = time.monotonic) -> None:
         if any(type(n) is not int or not 0 <= n <= _MASK for n in (conv, initial_sequence)):
             raise ValueError("invalid KCP conversation/initial sequence")
@@ -63,6 +64,9 @@ class KcpReceiver:
         self._remaining: int | None = None
         self.buffered_bytes = 0
         self._since: float | None = None
+        self._window_rejected = 0
+        self._first_rejected: int | None = None
+        self._last_rejected = 0
         self.closed = False
 
     def close(self) -> None:
@@ -81,6 +85,13 @@ class KcpReceiver:
         self.close()
         raise ReceiveError(reason)
 
+    def _reject_future(self, sequence: int) -> ReceiveResult:
+        self._window_rejected = min(_MASK, self._window_rejected + 1)
+        if self._first_rejected is None:
+            self._first_rejected = sequence
+        self._last_rejected = sequence
+        return ReceiveResult(False, self.next_sequence)
+
     def expire(self) -> None:
         if self.closed:
             raise ReceiveError("KCP receiver is closed")
@@ -89,7 +100,10 @@ class KcpReceiver:
                      ('kcp_pending', len(self._pending)), ('kcp_parts', len(self._parts)),
                      ('kcp_gap', min(((seq-self.next_sequence) & _MASK for seq in self._pending), default=0)),
                      ('kcp_remaining', self._remaining+1 if self._remaining is not None else 0),
-                     ('kcp_bytes', self.buffered_bytes))
+                     ('kcp_bytes', self.buffered_bytes),
+                     ('kcp_window_rejected', self._window_rejected),
+                     ('kcp_first_rejected', self._first_rejected or 0),
+                     ('kcp_last_rejected', self._last_rejected))
             self.close()
             raise KcpAssemblyTimeout(facts)
 
@@ -107,12 +121,17 @@ class KcpReceiver:
             # Already consumed: acknowledge again, but never emit the message twice.
             return ReceiveResult(True, self.next_sequence)
         if distance >= self.max_segments:
-            return ReceiveResult(False, self.next_sequence)
+            return self._reject_future(segment.sequence)
         previous = self._pending.get(segment.sequence)
         if previous is not None:
             if previous.body != segment.body or previous.fragment != segment.fragment:
                 self._fail("conflicting KCP duplicate")
             return ReceiveResult(True, self.next_sequence)
+        if distance and len(self._pending) + len(self._parts) >= self.max_segments - 1:
+            # Future packets must not consume the last slot needed by the
+            # missing head. Do not ACK a packet we did not retain: the peer
+            # retransmits it after the gap closes. Accepted history stays intact.
+            return self._reject_future(segment.sequence)
         if (len(self._pending) + len(self._parts) >= self.max_segments
                 or self.buffered_bytes + len(segment.body) > self.max_bytes):
             self._fail("KCP receive budget exceeded")

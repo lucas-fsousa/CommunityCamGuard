@@ -18,6 +18,27 @@ unchanged missing-fragment deadline, and both AV conversations before/after
 acceptance through the actual TCP session adapter.
 
 This fixes a protocol omission, not the proven cause of the observed gap1
-timeouts. A separate synthetic full-buffer case also exposed that a completely
-filled shared pending/partial budget cannot admit the missing head fragment;
-that admission/window-accounting limitation is not relaxed or hidden here.
+timeouts.
+
+## Admission and startup credit correction
+
+The synthetic full-buffer case exposed another defect: future segments could
+fill the shared pending/partial segment budget, leaving no slot for the missing
+head. The old receiver then failed even when that head finally arrived. Reserve
+one existing slot for the head: a future segment that would occupy it is not
+retained and not ACKed, so it must be retransmitted after the gap closes. No
+already-ACKed segment is evicted, no window/byte limit is enlarged and duplicates
+still receive their existing ACK. The default128-segment/256KiB budgets can hold
+128 maximum-size validated payloads within their original byte bound.
+
+INIT/START/CLOSE also inherited the generic PUSH encoder's window256, despite
+the actual owned receivers having128 slots. Native reliable controls now explicitly
+advertise128 from the receiver's default constant. Other PUSH encoder users keep
+their original default; the optional explicit window is range-checked.
+
+Tests exercise partial message + future queue pressure, refusal without ACK,
+successful missing-head assembly, later retransmission and all three opening/
+closing controls' advertised credit. Timeout facts add only three numeric counters
+(number of future rejections, first/last rejected sequence) to distinguish local
+window rejection from a segment never reaching the receiver. These are constant
+space, range-checked and contain no payloads. Assembly deadlines stay unchanged.

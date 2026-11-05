@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from .kcp_receive import ReceiveError
+from .kcp_receive import DEFAULT_RECEIVE_SEGMENTS, ReceiveError
 from .media_protocol import (
     KCP_ACK,
     MTP_MAX_FRAME_SIZE,
@@ -50,7 +50,8 @@ An ACK proves transport receipt only, not acceptance, media readiness or executi
         body = (build_av_init(call_id, request_user_data=request_user_data,
                               connection_type=1 if request_user_data is not None else None)
                 if action == 1 else build_av_control(call_id, action))
-        self._wire = build_kcp_push(self._conv, sequence, body, timestamp=self._timestamp)
+        self._wire = build_kcp_push(self._conv, sequence, body, timestamp=self._timestamp,
+                                    window=DEFAULT_RECEIVE_SEGMENTS)
         self._last_sent: float | None = None
         self.attempts = 0
         self.acknowledged = False

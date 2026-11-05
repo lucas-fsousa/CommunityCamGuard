@@ -140,14 +140,17 @@ def build_kcp_push(
     *,
     timestamp: int | None = None,
     unacknowledged: int = 0,
+    window: int = 0x100,
 ) -> bytes:
+    if type(window) is not int or not 0 <= window <= 0xFFFF:
+        raise ValueError("invalid KCP receive window")
     if timestamp is None:
         timestamp = int(time.monotonic() * 1000) & 0xFFFFFFFF
     segment = KCP_HEADER.pack(
         conv & 0xFFFFFFFF,
         KCP_PUSH,
         0,
-        0x100,
+        window,
         timestamp & 0xFFFFFFFF,
         sequence & 0xFFFFFFFF,
         unacknowledged & 0xFFFFFFFF,

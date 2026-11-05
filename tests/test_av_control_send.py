@@ -26,6 +26,18 @@ def test_control_uses_own_conversation_and_transport_receipt_only(action, conv):
     assert not sender.receive_ack(build_kcp_ack(conv, 0, 1000, unacknowledged=1), PEER)
 
 
+@pytest.mark.parametrize('action,sequence', [(1, 0), (6, 0), (7, 1)])
+def test_control_never_advertises_more_than_the_owned_receivers_capacity(action, sequence):
+    from backend.app.drivers.yoosee.p2p.kcp_receive import KcpReceiver
+
+    sender = ReliableAvControl(PEER, 42, 123, action=action, sequence=sequence)
+    segment, = parse_kcp_segments(sender.due())
+    receiver = KcpReceiver(segment.conv)
+    assert segment.window == receiver.available_window == 128
+    sender.close()
+    receiver.close()
+
+
 def test_identical_retransmissions_are_bounded_and_expire_during_silence():
     now = [0.0]
     sender = ReliableAvControl(PEER, 42, 123, action=1, clock=lambda: now[0])

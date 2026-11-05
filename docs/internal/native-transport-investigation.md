@@ -107,3 +107,19 @@ deterministic partial-write/video-backlog regression; it is not inferred from
 successful short media playback. Combined focused suite307passed, peak130.7MiB
 under192MiB/no swap/50%CPU; Ruff and Mypy403 passed. Live acceptance of this
 combined version follows deployment.
+
+Deployment `f69dcca` / build `b-fde3e73e9103`, native/active129, restored delivery
+without manual DB edits or camera actions. CI42093614624 passed5969tests/1skip;
+Image42093614554 passed. Read-only MP4 inspection confirmed H264 + AAC initialization
+and media fragments for both track IDs1/2. An observation disconnected after26.8s
+(27messages/6059884bytes), with a fresh KCP gap1 at sequence1120,42queued segments,
+10176bytes; safe retry/cleanup occurred. This disproves continuous stability of
+the combined version despite the delivered corrections.
+
+Further receive-window corrections now align native control advertisements with
+the actual128-slot receiver and reserve an existing slot for a missing head.
+They follow static/code inconsistency and a deterministic pressure regression,
+not a claim that the observed small42-segment queue was full. Numeric rejection
+counters will test whether a future missing sequence was previously outside our
+advertised/retained window. See the updated KCP note. No timeout increase or
+buffer expansion is used.

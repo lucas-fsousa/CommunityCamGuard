@@ -80,6 +80,22 @@ def test_timeout_preserves_only_bounded_missing_fragment_counters(partial):
     assert receiver.closed and receiver.buffered_bytes==0
 
 
+def test_timeout_distinguishes_unreceived_gaps_from_unacknowledged_window_rejections():
+    now = [0.0]
+    receiver = KcpReceiver(42, max_segments=4, clock=lambda: now[0])
+    assert not receiver.receive(segment(4)).acknowledge
+    receiver.receive(segment(0, 1))
+    receiver.receive(segment(2))
+    receiver.receive(segment(3))
+    assert not receiver.receive(segment(5)).acknowledge
+    now[0] = 2
+    with pytest.raises(KcpAssemblyTimeout) as error: receiver.expire()
+    facts = dict(error.value.facts)
+    assert facts['kcp_next_sequence'] == 1 and facts['kcp_gap'] == 1
+    assert facts['kcp_window_rejected'] == 2
+    assert facts['kcp_first_rejected'] == 4 and facts['kcp_last_rejected'] == 5
+
+
 @pytest.mark.parametrize("failure", ["bytes", "count", "conflict", "chain", "oversize"])
 def test_invalid_data_closes_and_frees_memory(failure):
     receiver = KcpReceiver(42, max_bytes=5, max_segments=3)

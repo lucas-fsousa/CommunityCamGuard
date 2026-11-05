@@ -6,6 +6,7 @@ from backend.app.drivers.yoosee.p2p.media_protocol import (
     KCP_HEADER,
     KCP_WASK,
     KCP_WINS,
+    build_kcp_push,
     build_mtp_frame,
     parse_kcp_segments,
 )
@@ -37,6 +38,20 @@ def test_window_probe_reports_current_credit_after_a_gap_is_filled():
     report, = parse_kcp_segments(batch.acknowledgements[0])
     assert (report.command, report.window, report.unacknowledged) == (KCP_WINS, 4, 4)
     assert receiver.buffered_bytes == 0 and not batch.messages
+
+
+def test_future_segment_cannot_occupy_the_missing_heads_reserved_slot():
+    receiver = KcpReceiver(42, max_segments=4, clock=lambda: 0)
+    media = MediaReceiver(PEER, receiver)
+    media.receive(packet(0, 1, b'head'), PEER)
+    for sequence in (2, 3):
+        assert media.receive(packet(sequence, 0, b'future'), PEER).acknowledgements
+    held_bytes = receiver.buffered_bytes
+    assert not media.receive(packet(4, 0, b'retransmit'), PEER).acknowledgements
+    assert receiver.buffered_bytes == held_bytes and receiver.available_window == 1
+    assert media.receive(packet(1, 0, b'tail'), PEER).messages == (b'headtail', b'future', b'future')
+    assert media.receive(packet(4, 0, b'retransmit'), PEER).messages == (b'retransmit',)
+    assert receiver.buffered_bytes == 0 and not receiver.closed
 
 
 @pytest.mark.parametrize('case', ['peer', 'conv', 'checksum', 'body', 'fragment', 'wins', 'unknown'])
@@ -88,3 +103,8 @@ def test_report_rejects_unbounded_or_noninteger_fields(field, value):
     fields = dict(conv=42, unacknowledged=0, window=128)
     fields[field] = value
     with pytest.raises(ValueError): build_window_report(**fields)
+
+
+@pytest.mark.parametrize('window', [-1, 65536, True])
+def test_push_cannot_advertise_an_invalid_receive_window(window):
+    with pytest.raises(ValueError): build_kcp_push(42, 0, b'data', window=window)
