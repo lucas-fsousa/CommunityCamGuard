@@ -38,7 +38,11 @@ This is one negotiated inbound conversation, not a multi-channel session manager
         self._initialization_timeout = initialization_timeout
         self._idle_timeout = idle_timeout
         self._lifetime = lifetime
-        self._media = MediaReceiver(peer, KcpReceiver(conv, clock=clock))
+        # Continuous media already has an absolute complete-message idle budget.
+        # Let KCP repair a missing segment within that same budget instead of
+        # retiring the route at the finite experiment's shorter2-second cutoff.
+        assembly_timeout = idle_timeout if policy is MediaPolicy.CONTINUOUS else 2.0
+        self._media = MediaReceiver(peer, KcpReceiver(conv, clock=clock, timeout=assembly_timeout))
         self._phase = "initializing"
 
     @property

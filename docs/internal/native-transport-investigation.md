@@ -123,3 +123,33 @@ not a claim that the observed small42-segment queue was full. Numeric rejection
 counters will test whether a future missing sequence was previously outside our
 advertised/retained window. See the updated KCP note. No timeout increase or
 buffer expansion is used.
+
+`2ae81fa` / `b-4ebad3f298f3`, native/active132, passed CI5977tests/1skip and
+Image. Live observation still disconnected after103.3s (218messages/82632269bytes),
+this time with a local `TimeoutError`. A later KCP gap at sequence196 had96queued
+segments/77675bytes and **zero local window rejections**. Thus the receive-credit
+corrections are not sufficient to fix the measured transport interruption.
+
+A temporary read-only process observer samples only the native FFmpeg's state,
+wait channel, CPU ticks, RSS and I/O counters; no arguments, media or credentials
+are retained. One retirement followed an input-counter plateau with negligible
+CPU use, not memory pressure or disk-blocked state. The container still had three
+FFmpeg processes total (two legacy recording owners, one native A/V), no OOM or
+restart loop. This observation does not identify every local timeout's stage.
+
+## Controlled repair-deadline experiment
+
+The continuous stream already has a5-second absolute complete-message idle
+budget, but its KCP assembler inherited the finite experiment's2-second cutoff.
+The missing segment above was not locally rejected and future packets continued
+to arrive. Test whether the peer repairs it after2s but before the existing idle
+budget ends: continuous assembly now uses that idle budget; finite diagnostics
+and the raw receiver default remain2s. This DOES extend that continuous assembly
+cutoff2→5s, not the session's existing overall idle limit. Memory/sequence/byte
+validation and pre-ACCEPT/control deadlines remain unchanged.
+
+A fixed numeric log records a complete assembly repaired after2s. Tests verify
+repair at2.5s, unchanged closure at5s and no extension from duplicate traffic.
+Production acceptance is experimental: retain only if actual delayed repairs/
+continuous delivery justify it; do not describe the prior failures as resolved
+merely because a larger wait was allowed.

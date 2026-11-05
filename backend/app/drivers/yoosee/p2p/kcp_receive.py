@@ -8,6 +8,7 @@ discard acknowledged fragments and continue on the same reliable channel.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from .media_protocol import KCP_HEADER, KCP_PUSH, MTP_MAX_FRAME_SIZE, MTP_PREFIX
 
 _MASK = 0xFFFFFFFF
 DEFAULT_RECEIVE_SEGMENTS = 128
+log = logging.getLogger(__name__)
 
 
 class ReceiveError(ValueError):
@@ -153,6 +155,11 @@ class KcpReceiver:
                 self.buffered_bytes -= len(message)
                 self._parts.clear()
                 self._remaining = None
+        if messages and self._since is not None and self.clock() - self._since >= 2.0:
+            # Fixed numeric evidence for the bounded continuous-media experiment.
+            # No packet contents, identity or clock supplied by the peer is logged.
+            log.warning('native KCP repaired delayed assembly elapsed_ms=%d',
+                        int((self.clock() - self._since) * 1000))
         if not self._pending and not self._parts:
             self._since = None
         elif messages:

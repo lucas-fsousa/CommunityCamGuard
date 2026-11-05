@@ -1,6 +1,7 @@
 import pytest
 
 from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+from backend.app.drivers.yoosee.p2p.media_policy import MediaPolicy
 from backend.app.drivers.yoosee.p2p.media_protocol import parse_kcp_segments
 from backend.app.drivers.yoosee.p2p.receive_lifecycle import ReceiveLifecycle
 from tests.test_media_receive import PEER, packet
@@ -59,6 +60,34 @@ def test_handoff_does_not_reset_fragment_deadline():
     with pytest.raises(ReceiveError, match="assembly"):
         session.poll()
     assert session.phase == "closed" and session.buffered_bytes == 0
+
+
+def test_continuous_gap_can_be_repaired_within_existing_idle_budget(caplog):
+    now = [0.0]
+    session = ReceiveLifecycle(PEER, 42, policy=MediaPolicy.CONTINUOUS, clock=lambda: now[0])
+    session.activate()
+    session.receive(packet(1, 0, b'future'), PEER)
+    now[0] = 2.5
+    session.poll()
+    result = session.receive(packet(0, 0, b'missing'), PEER)
+    assert result.messages == (b'missing', b'future')
+    assert session.buffered_bytes == 0 and session.next_sequence == 2
+    assert 'repaired delayed assembly elapsed_ms=2500' in caplog.text
+    assert 'missing' not in caplog.text and 'future' not in caplog.text
+
+
+@pytest.mark.parametrize('noise', [False, True])
+def test_continuous_repair_still_closes_at_the_original_idle_limit(noise):
+    now = [0.0]
+    session = ReceiveLifecycle(PEER, 42, policy=MediaPolicy.CONTINUOUS, clock=lambda: now[0])
+    session.activate()
+    session.receive(packet(1, 0, b'future'), PEER)
+    if noise:
+        now[0] = 4.9
+        session.receive(packet(1, 0, b'future'), PEER)
+    now[0] = 5.0
+    with pytest.raises(ReceiveError): session.poll()
+    assert session.phase == 'closed' and session.buffered_bytes == 0
 
 
 @pytest.mark.parametrize("traffic", ["duplicate", "wrong_peer", "wrong_conv", "invalid"])
