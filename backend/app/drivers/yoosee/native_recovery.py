@@ -36,6 +36,7 @@ def retryable(result: object, source: ManagedSource) -> bool:
         or (worker.tcp is not None and (worker.tcp.socket_close_failed
             or (not worker.tcp.close_acknowledged and not (released_timeout or local_decoder_failure))))
         or (worker.motion is not None and worker.motion.start_attempted and not worker.motion.release_delivery_confirmed)
+        or (worker.siren is not None and worker.siren.start_attempted and not worker.siren.off_confirmed)
     ):
         return False
     if local_decoder_failure:

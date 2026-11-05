@@ -8,6 +8,7 @@ import pytest
 from backend.app.drivers.yoosee.native_recovery import retryable
 from backend.app.drivers.yoosee.native_video_source import NativeVideoResult, NativeVideoSource
 from backend.app.drivers.yoosee.p2p.account_read_worker import WorkerSummary
+from backend.app.drivers.yoosee.p2p.siren_pulse_job import SirenPulseResult
 from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
 
 
@@ -78,12 +79,13 @@ def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(
 
 @pytest.mark.parametrize('code', ['tcp_session_timeout', 'av_handshake_timeout', 'av_control_timeout',
     'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof', 'mtp_record_length'])
-@pytest.mark.parametrize('fault', [None, 'route', 'socket', 'motor'])
+@pytest.mark.parametrize('fault', [None, 'route', 'socket', 'motor', 'siren'])
 def test_failed_handshake_can_retry_only_after_confirmed_retirement(code, fault):
     worker = WorkerSummary('protocol', 0, 0, 0, False,
         media=SimpleNamespace(opened=True, broker_release=fault != 'route'),
         tcp=SimpleNamespace(ready=False, close_acknowledged=False, socket_close_failed=fault == 'socket'),
         motion=SimpleNamespace(start_attempted=True, release_delivery_confirmed=fault != 'motor'),
-        protocol_code=code)
+        protocol_code=code,
+        siren=SirenPulseResult('off_unconfirmed', True, 2, False, 0, None, False, False) if fault == 'siren' else None)
     source = NativeVideoSource('test', '123')
     assert retryable(NativeVideoResult('transport', SharedReadResult('transport', worker)), source) is (fault is None)

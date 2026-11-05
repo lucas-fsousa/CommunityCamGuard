@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Shared-native siren pulse implemented: typed2/5/10s, preflightOFF, sole-owner timer,
+oneON, reserved OFF/readback cleanup on cancel/shutdown, AD0+exact independent B7OFF
+confirmation, and quarantine/recovery barriers for unknown OFF. No extra account,
+socket or thread; existing driver capability/permission gates retained.328 focused
+tests passed under192MiB, peak110.4MiB. No real siren/audio/light/motor command sent.
+See docs/internal/native-shared-siren.md. Remaining: deploy/passive verification,
+audible native pulse acceptance when appropriate, then native multi-camera capacity.
+
 CI follow-up: runs42042573079/42043633669 failed before pytest because the pinned
 go2rtc release transfer timed out. CLI now retries at most3fresh transfers with
 2s/4s backoff only for transient network/selected HTTP errors. Hash/size limits,

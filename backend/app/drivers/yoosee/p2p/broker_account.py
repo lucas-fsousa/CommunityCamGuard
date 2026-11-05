@@ -22,6 +22,7 @@ from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .model_control_job import ControlWriteJob, ControlWriteSpec
 from .model_protocol import build_model_read
 from .ptz_scheduler import PtzScheduler
+from .siren_pulse_job import SirenPulseJob, SirenPulseSpec
 
 Retirement = Literal["closed", "transport", "lifetime", "heartbeat_timeout",
                      "input_budget", "drained", "drain_timeout", "prepare"]
@@ -69,6 +70,7 @@ class BrokerAccount:
         self._drain_deadline: float | None = None
         self._reason: Retirement | None = None
         self._ptz: PtzScheduler | None = None
+        self._siren: SirenPulseJob | None = None
         self._media: MediaRouteJob | None = None
 
     @property
@@ -104,7 +106,7 @@ class BrokerAccount:
         Uses the SAME sequence source as reads/heartbeats; never a second login.
         """
         if (self.state != "active" or self._deadline - self._clock() < 4
-                or self.motion_cleanup_pending or self._media_release_uncertain):
+                or self.motion_cleanup_pending or self._media_release_uncertain or self.siren_cleanup_pending):
             raise ValueError("account not accepting PTZ")
         if (self._ptz is not None and self._ptz.result is not None
                 and self._ptz.result.start_attempted
@@ -117,6 +119,24 @@ class BrokerAccount:
             reviewed_directions=reviewed_directions, duration=duration, clock=self._clock)
         self._ptz = job
         return job
+
+    @property
+    def siren_cleanup_pending(self) -> bool:
+        job = self._siren
+        return job is not None and (job.result is None or
+            (job.result.start_attempted and not job.result.off_confirmed))
+
+    def prepare_siren_pulse(self, spec: SirenPulseSpec, output: AccountOutputBudget, *,
+                            admit_until: float | None = None) -> SirenPulseJob:
+        if (not isinstance(spec, SirenPulseSpec) or self.state != 'active' or self._node is None or self._media_release_uncertain
+                or self.siren_cleanup_pending or self.motion_cleanup_pending
+                or self._deadline-self._clock() < spec.seconds+4
+                or (self._ptz is not None and self._ptz.result is not None
+                    and self._ptz.result.start_attempted and not self._ptz.result.release_delivery_confirmed)):
+            raise ValueError('account not accepting siren pulse')
+        self._siren = SirenPulseJob(self._node, self._source, output, spec,
+                                   generation=self._generation, clock=self._clock, admit_until=admit_until)
+        return self._siren
 
     @property
     def state(self) -> Literal["active", "draining", "retired"]:

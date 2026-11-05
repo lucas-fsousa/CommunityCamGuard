@@ -10,7 +10,8 @@ def retired_media_route(worker: WorkerSummary, *, require_ready: bool = True) ->
         and worker.media.opened and worker.media.broker_release
         and worker.tcp is not None and (worker.tcp.ready or not require_ready) and not worker.tcp.socket_close_failed
         and (worker.motion is None or not worker.motion.start_attempted
-             or worker.motion.release_delivery_confirmed))
+             or worker.motion.release_delivery_confirmed)
+        and (worker.siren is None or not worker.siren.start_attempted or worker.siren.off_confirmed))
 
 
 def retired_assembly_timeout(worker: WorkerSummary) -> bool:

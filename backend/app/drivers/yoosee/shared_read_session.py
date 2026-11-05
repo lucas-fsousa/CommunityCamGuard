@@ -41,6 +41,8 @@ from .p2p.model_control_specs import AlarmVoiceWriteSpec, GuardScheduleWriteSpec
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
+from .p2p.siren_pulse_inbox import SirenPulseTicket
+from .p2p.siren_pulse_job import SirenPulseResult, SirenPulseSpec
 from .p2p.video_delivery import VideoDelivery
 
 
@@ -100,7 +102,9 @@ class SharedReadSession:
                 "session_tcp_socket_closed": worker.tcp is None or not worker.tcp.socket_close_failed,
                 "session_motion_started": worker.motion is not None and worker.motion.start_attempted,
                 "session_motion_cleanup_confirmed": worker.motion is None or not worker.motion.start_attempted
-                    or worker.motion.release_delivery_confirmed}
+                    or worker.motion.release_delivery_confirmed,
+                "session_siren_cleanup_confirmed": worker.siren is None or not worker.siren.start_attempted
+                    or worker.siren.off_confirmed}
 
     def stop(self) -> None:
         self._stop.set()
@@ -130,6 +134,18 @@ class SharedReadSession:
 
     def cancel_catalog_read(self, ticket: CatalogReadTicket) -> None:
         self._lifecycle.cancel_catalog_read(ticket)
+
+    def submit_siren_pulse(self, seconds: int) -> SirenPulseTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active siren enrollment required')
+        return self._lifecycle.submit_siren_pulse(SirenPulseSpec(entry.access_id, int(entry.device_id), seconds))
+
+    def take_siren_pulse(self, ticket: SirenPulseTicket) -> SirenPulseResult | None:
+        return self._lifecycle.take_siren_pulse(ticket)
+
+    def cancel_siren_pulse(self, ticket: SirenPulseTicket) -> None:
+        self._lifecycle.cancel_siren_pulse(ticket)
 
     def submit_lamp_read(self) -> LampReadTicket:
         entry = self._active_entry

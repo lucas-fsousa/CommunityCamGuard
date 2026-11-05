@@ -18,6 +18,7 @@ from .lamp_write_job import LampWriteJob
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .model_control_job import ControlWriteJob, ControlWriteSpec
 from .ptz_scheduler import PtzScheduler, PtzSpec
+from .siren_pulse_job import SirenPulseJob, SirenPulseSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,10 @@ class AccountReadDispatcher:
 
     def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
         return self._account.prepare_media(spec, output)
+
+    def prepare_siren_pulse(self, spec: SirenPulseSpec, output: AccountOutputBudget, *,
+                            admit_until: float | None = None) -> SirenPulseJob:
+        return self._account.prepare_siren_pulse(spec, output, admit_until=admit_until)
 
     def prepare_catalog_read(self, spec: CatalogReadSpec, *, deadline: float) -> CatalogReadJob:
         return self._account.prepare_catalog_read(spec, deadline=deadline)

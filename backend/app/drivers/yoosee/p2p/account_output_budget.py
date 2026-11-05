@@ -21,6 +21,7 @@ class AccountOutputBudget:
         self._traffic = TrafficBudget(packets, octets, policy=policy, clock=clock)
         self._ptz: PtzOutputReserve | None = None
         self._media: MediaOutputReserve | None = None
+        self._siren: SirenOutputReserve | None = None
 
     def charge(self, size: int) -> None:
         if type(size) is not int or not 0 < size <= 1024 * 1024:
@@ -42,7 +43,15 @@ class AccountOutputBudget:
     @property
     def _reserved(self) -> int:
         return ((self._ptz.remaining if self._ptz else 0)
-                + (self._media.remaining if self._media else 0))
+                + (self._media.remaining if self._media else 0)
+                + (self._siren.remaining if self._siren else 0))
+
+    def reserve_siren(self) -> SirenOutputReserve:
+        required = self._reserved + 12
+        if self._siren is not None or not self._traffic.available(required, required * 4096):
+            raise OutputExhausted('siren cleanup capacity unavailable')
+        self._siren = SirenOutputReserve(self)
+        return self._siren
 
     def reserve_media(self) -> MediaOutputReserve:
         required = self._reserved + 2
@@ -50,6 +59,30 @@ class AccountOutputBudget:
             raise OutputExhausted("media cleanup capacity unavailable")
         self._media = MediaOutputReserve(self)
         return self._media
+
+
+class SirenOutputReserve:
+    """ON, two OFF attempts, three state reads/six receipts, protected before ON."""
+
+    def __init__(self, owner: AccountOutputBudget):
+        self._owner = owner
+        self._slots = {'on':1, 'off':2, 'read':3, 'receipt':6}
+
+    @property
+    def remaining(self) -> int:
+        return sum(self._slots.values())
+
+    def charge(self, kind: str, size: int) -> None:
+        if (self._owner._siren is not self or kind not in self._slots
+                or not self._slots[kind] or type(size) is not int or not 0 < size <= 4096):
+            raise OutputExhausted('siren output reservation unavailable')
+        self._owner._traffic.charge(size)
+        self._slots[kind] -= 1
+
+    def close(self) -> None:
+        if self._owner._siren is self:
+            self._owner._siren = None
+        self._slots = {'on':0, 'off':0, 'read':0, 'receipt':0}
 
 
 class PtzOutputReserve:

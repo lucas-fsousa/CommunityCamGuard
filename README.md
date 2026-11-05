@@ -43,6 +43,9 @@ exact resource readback; see [alarm resources](docs/internal/native-shared-alarm
 for the distinction between simulated writes and live read-only checks.
 Camera3's expired resource review was explicitly renewed for its two unchanged,
 previously proven sounds; application code never renews these permissions automatically.
+Bounded siren pulses also have a shared-session adapter with owner-driven OFF and
+independent state confirmation. Its new path has simulated coverage only; see
+[native siren](docs/internal/native-shared-siren.md) for shutdown guarantees and limits.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

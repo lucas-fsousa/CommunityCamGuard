@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+[Shared native siren](native-shared-siren.md): typed owner-timed pulse and reserved
+OFF/readback cleanup, including cancellation/shutdown. Simulated actuation only.
+
 [Shared native floodlight](native-shared-floodlight.md): implementation and
 camera3 physical ON/OFF acceptance confirmed by the owner.
 

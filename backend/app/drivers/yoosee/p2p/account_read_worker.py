@@ -28,6 +28,10 @@ from .model_control_pump import ControlWritePump
 from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
+from .siren_pulse_inbox import SirenPulseInbox
+from .siren_pulse_job import SirenPulseResult
+from .siren_pulse_pump import SirenPulsePump
+from .siren_socket_cleanup import drain_siren
 from .video_delivery import VideoDelivery
 
 
@@ -43,6 +47,7 @@ class WorkerSummary:
     tcp: TcpMediaResult | None = None
     protocol_site: str = ""
     protocol_code: str = ""
+    siren: SirenPulseResult | None = None
 
 
 class _Stop(Exception):
@@ -75,6 +80,7 @@ class AccountReadWorker:
         self.lamp_inbox = LampReadInbox(generation, clock=clock) if state_reads else None
         self.catalog_inbox = CatalogReadInbox(generation, clock=clock) if state_reads else None
         self.control_inbox = ControlWriteInbox(generation, clock=clock) if state_reads else None
+        self.siren_inbox = SirenPulseInbox(generation, clock=clock) if state_reads else None
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
         self._generation, self._clock = generation, clock
@@ -85,6 +91,8 @@ class AccountReadWorker:
         self._socket: ReadSocket | None = None
 
     def stop(self) -> None:
+        if self.siren_inbox is not None:
+            self.siren_inbox.close()
         if self.catalog_inbox is not None:
             self.catalog_inbox.close()
         if self.control_inbox is not None:
@@ -97,6 +105,8 @@ class AccountReadWorker:
 
     def drain(self) -> None:
         """Request no new work, with <=2 seconds for already active replies."""
+        if self.siren_inbox is not None:
+            self.siren_inbox.close()
         if self.catalog_inbox is not None:
             self.catalog_inbox.close()
         if self.motion_inbox is not None:
@@ -149,11 +159,13 @@ class AccountReadWorker:
         tcp: CooperativeTcpMedia | None = None
         tcp_cleanup_error: BaseException | None = None
         motion_cleanup_error: BaseException | None = None
+        siren_cleanup_error: BaseException | None = None
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         lamp = LampReadPump(self._dispatcher, self.lamp_inbox, clock=self._clock) if self.lamp_inbox is not None else None
         catalog = CatalogReadPump(self._dispatcher, self.catalog_inbox) if self.catalog_inbox is not None else None
         control_writes = ControlWritePump(self._dispatcher, self.control_inbox, clock=self._clock) if self.control_inbox is not None else None
+        siren = SirenPulsePump(self._dispatcher, self.siren_inbox, output) if self.siren_inbox is not None else None
         mixed = initial_motion is not None or self.motion_inbox is not None
         manual_acks = mixed or lamp is not None
         node = self._node
@@ -255,7 +267,8 @@ class AccountReadWorker:
                         last_motion = motion.result
                         self.motion_inbox.finish(motion_ticket, last_motion)
                         motion, motion_ticket = None, None
-                    if motion is None and (media is None or (tcp is not None and tcp.ready)):
+                    if (motion is None and (media is None or (tcp is not None and tcp.ready))
+                            and (siren is None or (not siren.active and not siren.unsafe))):
                         claimed = self.motion_inbox.claim()
                         if claimed is not None:
                             motion_ticket, spec = claimed
@@ -283,6 +296,15 @@ class AccountReadWorker:
                 if control_writes is not None:
                     for packet_control in control_writes.poll():
                         send(packet_control)
+                if siren is not None:
+                    for packet_siren in siren.poll():
+                        try:
+                            send(packet_siren.wire, reserved=True)
+                        except BaseException:
+                            siren.send_failed()
+                            raise
+                    if siren.unsafe:
+                        raise _Stop('siren_cleanup_unconfirmed')
                 for item in batch.reads:
                     check()
                     if self.mailbox.ready(item.ticket):
@@ -300,6 +322,9 @@ class AccountReadWorker:
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
+                    siren_packets = siren.observe(plain, peer, generation=self._generation) if siren is not None else ()
+                    for packet_siren in siren_packets:
+                        send(packet_siren.wire, reserved=True)
                     if catalog is not None:
                         catalog.observe(plain, peer, generation=self._generation)
                     if control_writes is not None:
@@ -315,7 +340,7 @@ class AccountReadWorker:
                             send(packet.wire, reserved=True)
                     if manual_acks:
                         flags = struct.unpack_from("<I", plain, 20)[0]
-                        if ((motion is None or not motion.owns_release_reply(plain)) and not lamp_packets
+                        if ((motion is None or not motion.owns_release_reply(plain)) and not lamp_packets and not siren_packets
                                 and not flags & (1 << 20) and (flags >> 18) & 3):
                             send(build_mode2_response_ack(node, plain))
                 for acknowledgement in acknowledgements:
@@ -342,6 +367,15 @@ class AccountReadWorker:
             protocol_code=PROTOCOL_CODES.get(str(error),'')
         finally:
             try:
+                if siren is not None:
+                    assert node is not None
+                    try:
+                        cleanup_sent, cleanup_received = drain_siren(sock, node, siren, output,
+                            generation=self._generation, clock=self._clock, wait=wait)
+                        sent += cleanup_sent
+                        received += cleanup_received
+                    except BaseException as exc:
+                        siren_cleanup_error = exc
                 if catalog is not None:
                     catalog.close()
                 if control_writes is not None:
@@ -398,9 +432,12 @@ class AccountReadWorker:
                         self._socket = None
                     if motion_cleanup_error is not None:
                         raise motion_cleanup_error
+                    if siren_cleanup_error is not None:
+                        raise siren_cleanup_error
                     if tcp_cleanup_error is not None:
                         raise tcp_cleanup_error
         return WorkerSummary(reason, sent, received, beats, close_failed,
                              motion.result if motion is not None else last_motion,
                              media.result if media is not None else None,
-                             tcp.result if tcp is not None else None,protocol_site,protocol_code)
+                             tcp.result if tcp is not None else None,protocol_site,protocol_code,
+                             siren.last_result if siren is not None else None)

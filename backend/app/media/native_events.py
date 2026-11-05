@@ -19,7 +19,7 @@ _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport',
     'certification_unavailable', 'inventory_timeout', 'inventory_unavailable', 'preparation_budget'})
 _bools = frozenset({'session_broker_socket_closed', 'session_broker_release',
     'session_tcp_receipt', 'session_tcp_socket_closed', 'session_motion_started',
-    'session_motion_cleanup_confirmed', 'consumer_alive', 'cleanup_failed'})
+    'session_motion_cleanup_confirmed', 'session_siren_cleanup_confirmed', 'consumer_alive', 'cleanup_failed'})
 
 
 class _Handler(RotatingFileHandler):

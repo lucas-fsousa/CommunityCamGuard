@@ -84,7 +84,7 @@ def test_unintegrated_controls_cannot_preempt_live_native_stream(monkeypatch):
     monkeypatch.setattr(controls, "run_with_fresh_access", lambda *a, **k: pytest.fail("parallel login"))
     camera = SimpleNamespace(camera_id=ENROLLMENT.camera_id)
     with module.publish(ENROLLMENT.camera_id, session), pytest.raises(ControlNotReady, match="cannot yet share"):
-        controls.write(camera, "siren_pulse", 2)
+        controls.write(camera, "unsupported_control", 2)
     assert not session.paths
 
 

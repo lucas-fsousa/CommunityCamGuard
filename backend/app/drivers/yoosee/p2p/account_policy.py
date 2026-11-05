@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from enum import Enum
 
+MAX_CLEANUP_RESERVES = 20  # PTZ6 + media2 + siren12; not extra traffic allowance.
 
 class AccountPolicy(Enum):
     FINITE = "finite"
@@ -51,7 +52,7 @@ class TrafficBudget:
 
     def charge(self, size: int, *, reserved: int = 0) -> None:
         if (type(size) is not int or not 0 <= size <= 1024 * 1024
-                or type(reserved) is not int or not 0 <= reserved <= 8):
+                or type(reserved) is not int or not 0 <= reserved <= MAX_CLEANUP_RESERVES):
             raise ValueError("invalid traffic charge")
         if not self.available(1 + reserved, size + reserved * 4096):
             raise ValueError("traffic budget exhausted")

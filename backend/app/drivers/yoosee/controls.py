@@ -291,6 +291,13 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == SIREN_PULSE:
+        from .shared_siren import pulse as shared_siren_pulse
+        if type(value) is not int:
+            raise ControlOperationError('siren pulse must be 2, 5 or 10 seconds')
+        shared_pulse = shared_siren_pulse(_enrollment(camera), value)
+        if shared_pulse is not None:
+            return shared_pulse
     if key == ALARM_VOICE:
         from .shared_alarm_selection import write as write_shared_selection
         if type(value) is not str:

@@ -23,6 +23,8 @@ from .model_control_job import ControlWriteResult, ControlWriteSpec
 from .ptz_authority import PtzAuthority, PtzGrant
 from .ptz_inbox import MotionTicket
 from .ptz_scheduler import PtzSpec, ScheduledPtzResult
+from .siren_pulse_inbox import SirenPulseTicket
+from .siren_pulse_job import SirenPulseResult, SirenPulseSpec
 from .video_delivery import VideoDelivery
 
 
@@ -95,6 +97,23 @@ class AccountReadLifecycle:
         with self._lock:
             if self._worker is not None and self._worker.catalog_inbox is not None and ticket.generation == self._generation:
                 self._worker.catalog_inbox.cancel(ticket)
+
+    def submit_siren_pulse(self, spec: SirenPulseSpec) -> SirenPulseTicket:
+        with self._lock:
+            if self._state != 'active' or self._worker is None or self._worker.siren_inbox is None:
+                raise ValueError('account not accepting siren pulse')
+            return self._worker.siren_inbox.submit(spec)
+
+    def take_siren_pulse(self, ticket: SirenPulseTicket) -> SirenPulseResult | None:
+        with self._lock:
+            if self._worker is None or self._worker.siren_inbox is None or ticket.generation != self._generation:
+                return None
+            return self._worker.siren_inbox.take(ticket)
+
+    def cancel_siren_pulse(self, ticket: SirenPulseTicket) -> None:
+        with self._lock:
+            if self._worker is not None and self._worker.siren_inbox is not None and ticket.generation == self._generation:
+                self._worker.siren_inbox.cancel(ticket)
 
     def submit_lamp_read(self, spec: LampReadSpec) -> LampReadTicket:
         with self._lock:
@@ -337,6 +356,8 @@ class AccountReadLifecycle:
                                    and (summary.tcp is None or (summary.tcp.close_acknowledged
                                         and not summary.tcp.socket_close_failed))
                                    and (summary.motion is None or not summary.motion.start_attempted
-                                        or summary.motion.release_delivery_confirmed) else "blocked")
+                                        or summary.motion.release_delivery_confirmed)
+                                   and (summary.siren is None or not summary.siren.start_attempted
+                                        or summary.siren.off_confirmed) else "blocked")
                 if delivery is not None:
                     delivery.close()
