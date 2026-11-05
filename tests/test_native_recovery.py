@@ -78,7 +78,8 @@ def test_decoder_stall_reconnect_requires_retirement_and_known_consumer_failure(
 
 
 @pytest.mark.parametrize('code', ['tcp_session_timeout', 'av_handshake_timeout', 'av_control_timeout',
-    'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof', 'mtp_record_length'])
+    'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof', 'mtp_record_length',
+    'av_pending_capacity', 'av_pending_timeout'])
 @pytest.mark.parametrize('fault', [None, 'route', 'socket', 'motor', 'siren'])
 def test_failed_handshake_can_retry_only_after_confirmed_retirement(code, fault):
     worker = WorkerSummary('protocol', 0, 0, 0, False,

@@ -16,7 +16,7 @@ _errors = frozenset({'TimeoutError', 'Mp4SizeError', 'Mp4OrderError', 'Mp4Capaci
 _protocols = frozenset({'kcp_assembly_timeout', 'kcp_invalid_segment', 'kcp_conflicting_duplicate',
     'kcp_receive_budget', 'kcp_fragment_chain', 'tcp_session_timeout', 'av_handshake_timeout',
     'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout',
-    'tcp_eof', 'mtp_record_length'})
+    'tcp_eof', 'mtp_record_length', 'av_pending_capacity', 'av_pending_timeout'})
 _returncodes = frozenset(str(n) for n in range(-128, 256))
 _counters = {'kcp_next_sequence':2**32-1, 'kcp_pending':128, 'kcp_parts':128,
              'kcp_gap':127, 'kcp_remaining':128, 'kcp_bytes':1024*1024,

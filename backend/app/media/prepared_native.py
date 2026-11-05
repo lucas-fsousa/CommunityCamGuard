@@ -124,7 +124,8 @@ class PreparedNative:
                     if code not in {'kcp_assembly_timeout','kcp_invalid_segment','kcp_conflicting_duplicate',
                                     'kcp_receive_budget','kcp_fragment_chain', 'tcp_session_timeout',
                                     'av_handshake_timeout', 'av_control_timeout', 'media_initialization_timeout',
-                                    'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof'}: code=''
+                                    'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof',
+                                    'av_pending_capacity', 'av_pending_timeout'}: code=''
                     log.warning('native source ended camera_id=%s error_type=%s protocol_code=%s',self.offer.camera_id,
                                 type(error).__name__ if error is not None else 'source_returned',code)
                     # Driver diagnostics contain only local classifications/closure

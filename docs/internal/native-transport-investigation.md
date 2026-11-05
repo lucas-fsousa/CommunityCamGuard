@@ -81,3 +81,29 @@ The stream is currently delivering, but intermittent failure is unresolved:
 diagnostic changes alone must not be described as its root-cause correction.
 Further checks must use real recurrence evidence, not repeat physical control
 acceptance or alter production cameras.
+
+## Recurrence and implementation follow-up
+
+Longer observation did reproduce failure: KCP gaps at16:57:13 and17:11:11,
+followed by startup muxer failures (`muxer_setup`, exit234) at16:57:24 and
+17:11:20. At17:20:50 the source stopped retrying: the existing safe retirement
+log located the unknown error at `_message:119/append:34`, specifically
+`AV cross-channel receive budget exceeded`. Broker release and both socket
+closures were confirmed; there was no motion or siren activity to leave pending.
+
+That pre-ACCEPT capacity/deadline condition is now explicitly classified as a
+transient opening failure. Retry still requires confirmed outer route release,
+physical socket closure and safe control cleanup. Existing256KiB/128-message/
+one-second pending limits and byte validation stay intact. Unknown/malformed
+protocol failures and authentication rejection remain non-retryable. This fixes
+the permanent quarantine caused by treating a known opening-buffer limit as an
+unknown protocol failure; it does not increase buffering or prove why ACCEPT was
+delayed.
+
+Two independent implementation corrections also follow the evidence:
+[KCP window reports](native-kcp-window.md) and
+[fair video/AAC stdin scheduling](native-av-fairness.md). The latter has a
+deterministic partial-write/video-backlog regression; it is not inferred from
+successful short media playback. Combined focused suite307passed, peak130.7MiB
+under192MiB/no swap/50%CPU; Ruff and Mypy403 passed. Live acceptance of this
+combined version follows deployment.

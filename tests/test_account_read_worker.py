@@ -131,7 +131,9 @@ def test_input_flood_has_fixed_bound(monkeypatch):
     ('AV control receipt deadline exceeded','av_control_timeout'),
     ('receive progress deadline exceeded','media_idle_timeout'),
     ('receive initialization deadline exceeded','media_initialization_timeout'),
-    ('TCP media EOF before CLOSE receipt','tcp_eof')])
+    ('TCP media EOF before CLOSE receipt','tcp_eof'),
+    ('AV cross-channel receive budget exceeded','av_pending_capacity'),
+    ('AV cross-channel acceptance deadline exceeded','av_pending_timeout')])
 def test_protocol_diagnostics_use_known_codes_not_exception_payload(monkeypatch,message,code):
     sock=WorkerSocket()
     def fail(_): raise ValueError(message)

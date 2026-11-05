@@ -17,10 +17,13 @@ PROTOCOL_CODES = {
     'TCP media read exceeded deadline': 'tcp_io_timeout',
     'TCP media EOF before CLOSE receipt': 'tcp_eof',
     'invalid MTP TCP record length': 'mtp_record_length',
+    'AV cross-channel receive budget exceeded': 'av_pending_capacity',
+    'AV cross-channel acceptance deadline exceeded': 'av_pending_timeout',
 }
 
 TRANSIENT_CODES = frozenset({
     'kcp_assembly_timeout', 'tcp_session_timeout', 'av_handshake_timeout',
     'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout',
     'tcp_io_timeout', 'tcp_eof', 'mtp_record_length',
+    'av_pending_capacity', 'av_pending_timeout',
 })
