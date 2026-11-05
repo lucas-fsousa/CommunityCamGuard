@@ -22,6 +22,7 @@ from .p2p.account_read_worker import WorkerSummary
 from .p2p.broker_mailbox import MailboxTicket, ReadOutcome
 from .p2p.contracts import P2PProbeError
 from .p2p.control_ownership import ControlChannelBusy, control_channel_contended
+from .p2p.lamp_control_specs import LampWriteSpec
 from .p2p.lamp_read_inbox import LampReadTicket
 from .p2p.lamp_read_job import LampReadResult, LampReadSpec
 from .p2p.media_retirement import retired_media_route, retired_transport_failure
@@ -120,6 +121,18 @@ class SharedReadSession:
         if entry is None:
             raise ValueError("active lamp-read enrollment required")
         return self._lifecycle.submit_lamp_read(LampReadSpec(entry.access_id, int(entry.device_id)))
+
+    def submit_lamp_write(self, enabled: bool) -> LampReadTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active lamp-write enrollment required')
+        return self._lifecycle.submit_lamp_write(LampWriteSpec(entry.access_id, int(entry.device_id), enabled))
+
+    def take_lamp_write(self, ticket: LampReadTicket) -> LampReadResult | None:
+        return self._lifecycle.take_lamp_read(ticket)
+
+    def cancel_lamp_write(self, ticket: LampReadTicket) -> None:
+        self._lifecycle.cancel_lamp_read(ticket)
 
     def submit_volume_write(self, percent: int) -> ControlWriteTicket:
         entry = self._active_entry

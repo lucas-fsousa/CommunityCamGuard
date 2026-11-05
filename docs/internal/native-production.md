@@ -1,5 +1,9 @@
 # Native media delivery, not another finite trial
 
+The shared floodlight adapter is implemented with strict type12 reads/type11
+boolean writes on the same account, plus mandatory readback. Tests are simulated;
+no lamp was actuated for this integration. See [shared floodlight](native-shared-floodlight.md).
+
 Smart-protection switch/weekly-plan shared writers are implemented without a
 second native account. Coverage is simulated; no guard was armed or schedule
 changed for this integration. See [shared guard controls](native-shared-guard.md).

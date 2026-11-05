@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-05 implementation: floodlight boolean now has a shared-native type11
+writer with type12 preflight/readback, one send and no second account. Read-only
+admission stays strict; one lamp slot handles cancellation without leaks. Missing
+write reply can be resolved only after a send/timeout and exact readback, never
+by replaying or waiving explicit errors.222 focused tests, Mypy388/Ruff passed.
+No real LED/sound/motor commands. Deployment/passive checks follow; see
+docs/internal/native-shared-floodlight.md. Remaining shared controls: siren pulse
+and resource/sound selection, followed by multi-camera native capacity.
+
 2026-11-05 implementation: smart-protection switch and weekly plan now have typed
 shared-native writers (same account/inbox/sequence namespace as volume/orientation/
 night mode). One D2, correlated D3, bounded readback, no replay/login fallback.

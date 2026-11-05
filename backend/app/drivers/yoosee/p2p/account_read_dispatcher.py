@@ -11,7 +11,9 @@ from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
 from .broker_transactions import ReceiptTicket
 from .contracts import CertifiedNode
+from .lamp_control_specs import LampWriteSpec
 from .lamp_read_job import LampReadJob, LampReadSpec
+from .lamp_write_job import LampWriteJob
 from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .model_control_job import ControlWriteJob, ControlWriteSpec
 from .ptz_scheduler import PtzScheduler, PtzSpec
@@ -64,6 +66,9 @@ class AccountReadDispatcher:
 
     def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
         return self._account.prepare_lamp_read(spec, deadline=deadline)
+
+    def prepare_lamp_write(self, spec: LampWriteSpec, *, deadline: float) -> LampWriteJob:
+        return self._account.prepare_lamp_write(spec, deadline=deadline)
 
     def prepare_control_write(self, spec: ControlWriteSpec, *, deadline: float) -> ControlWriteJob:
         return self._account.prepare_control_write(spec, deadline=deadline)

@@ -1,10 +1,11 @@
-"""One-slot, generation-bound lamp-read handoff; cancellation never invokes a camera action."""
+"""One lamp read/write slot; a claimed cancelled write stays reserved until owner retirement."""
 
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from .lamp_control_specs import LampWriteSpec, valid_target
 from .lamp_read_job import LampReadResult, LampReadSpec
 
 
@@ -17,10 +18,11 @@ class LampReadTicket:
 @dataclass(slots=True)
 class _Slot:
     ticket: LampReadTicket
-    spec: LampReadSpec = field(repr=False)
+    spec: LampReadSpec | LampWriteSpec = field(repr=False)
     deadline: float
     claimed: bool = False
     result: LampReadResult | None = None
+    abandoned: bool = False
 
 
 class LampReadInbox:
@@ -34,10 +36,16 @@ class LampReadInbox:
         self._closed = False
 
     def submit(self, spec: LampReadSpec) -> LampReadTicket:
-        if (not isinstance(spec, LampReadSpec) or type(spec.access_id) is not int
-                or not 0 <= spec.access_id < 1 << 64 or type(spec.device_id) is not int
-                or not 0 < spec.device_id < 1 << 64):
+        if not isinstance(spec, LampReadSpec) or not valid_target(spec.access_id, spec.device_id):
             raise ValueError("typed lamp-state read required")
+        return self._submit(spec)
+
+    def submit_write(self, spec: LampWriteSpec) -> LampReadTicket:
+        if not isinstance(spec, LampWriteSpec):
+            raise ValueError('typed binary lamp write required')
+        return self._submit(spec)
+
+    def _submit(self, spec: LampReadSpec | LampWriteSpec) -> LampReadTicket:
         with self._lock:
             if self._closed or self._slot is not None or self._serial >= 1 << 64:
                 raise ValueError("lamp-state read admission unavailable")
@@ -46,7 +54,7 @@ class LampReadInbox:
             self._slot = _Slot(ticket, spec, self._clock() + 2)
             return ticket
 
-    def claim(self) -> tuple[LampReadTicket, LampReadSpec, float] | None:
+    def claim(self) -> tuple[LampReadTicket, LampReadSpec | LampWriteSpec, float] | None:
         with self._lock:
             slot = self._slot
             if slot is None or slot.claimed or slot.result is not None or self._closed:
@@ -59,25 +67,32 @@ class LampReadInbox:
 
     def should_cancel(self, ticket: LampReadTicket) -> bool:
         with self._lock:
-            return self._closed or self._slot is None or self._slot.ticket != ticket
+            return (self._closed or self._slot is None or self._slot.ticket != ticket
+                    or self._slot.abandoned)
 
     def cancel(self, ticket: LampReadTicket) -> None:
         with self._lock:
             if self._slot is not None and self._slot.ticket == ticket:
-                self._slot = None  # read-only: no STOP/action cleanup is needed
+                if self._slot.claimed and self._slot.result is None and isinstance(self._slot.spec, LampWriteSpec):
+                    self._slot.abandoned = True  # Wait for the owner to retire the possible send.
+                else:
+                    self._slot = None
 
     def finish(self, ticket: LampReadTicket, result: LampReadResult) -> None:
         if not isinstance(result, LampReadResult):
-            raise ValueError("typed lamp-read result required")
+            raise ValueError("typed lamp exchange result required")
         with self._lock:
             if (self._slot is not None and self._slot.ticket == ticket
                     and self._slot.claimed and self._slot.result is None):
-                self._slot.result = result
+                if self._slot.abandoned:
+                    self._slot = None
+                else:
+                    self._slot.result = result
 
     def take(self, ticket: LampReadTicket) -> LampReadResult | None:
         with self._lock:
             slot = self._slot
-            if slot is None or slot.ticket != ticket or slot.result is None:
+            if slot is None or slot.ticket != ticket or slot.result is None or slot.abandoned:
                 return None
             self._slot = None
             return slot.result

@@ -1,18 +1,20 @@
-"""Sole-reader bridge between one lamp-read inbox and the shared broker namespace."""
+"""Sole-reader bridge for the shared lamp slot; typed read and write paths stay separate."""
 
 import time
 from collections.abc import Callable
 
 from .account_read_dispatcher import AccountReadDispatcher
+from .lamp_control_specs import LampWriteSpec
 from .lamp_read_inbox import LampReadInbox, LampReadTicket
 from .lamp_read_job import LampReadJob, LampReadResult
+from .lamp_write_job import LampWriteJob
 
 
 class LampReadPump:
     def __init__(self, dispatcher: AccountReadDispatcher, inbox: LampReadInbox, *,
                  clock: Callable[[], float] = time.monotonic):
         self._dispatcher, self._inbox, self._clock = dispatcher, inbox, clock
-        self._job: LampReadJob | None = None
+        self._job: LampReadJob | LampWriteJob | None = None
         self._ticket: LampReadTicket | None = None
 
     def poll(self) -> tuple[bytes, ...]:
@@ -31,7 +33,9 @@ class LampReadPump:
                     self._inbox.finish(ticket, LampReadResult("timeout"))
                     return ()
                 try:
-                    self._job = self._dispatcher.prepare_lamp_read(spec, deadline=deadline)
+                    self._job = (self._dispatcher.prepare_lamp_write(spec, deadline=deadline)
+                        if isinstance(spec, LampWriteSpec) else
+                        self._dispatcher.prepare_lamp_read(spec, deadline=deadline))
                 except ValueError:
                     self._inbox.finish(ticket, LampReadResult("unavailable"))
                     return ()

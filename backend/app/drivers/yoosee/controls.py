@@ -287,6 +287,13 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == WHITE_LIGHT:
+        from .shared_floodlight import write as write_shared_floodlight
+        if type(value) is not bool:
+            raise ControlOperationError('white-light state must be a boolean')
+        shared_light = write_shared_floodlight(_enrollment(camera), value)
+        if shared_light is not None:
+            return shared_light
     if key == SMART_PROTECTION:
         from .shared_guard import write_enabled
         if type(value) is not bool:

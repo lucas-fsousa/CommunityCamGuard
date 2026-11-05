@@ -1,5 +1,6 @@
 import pytest
 
+from backend.app.drivers.yoosee.p2p.lamp_control_specs import LampWriteSpec
 from backend.app.drivers.yoosee.p2p.lamp_read_inbox import LampReadInbox, LampReadTicket
 from backend.app.drivers.yoosee.p2p.lamp_read_job import LampReadResult, LampReadSpec
 
@@ -50,3 +51,25 @@ def test_close_cancels_pending_read_without_requiring_camera_stop():
 @pytest.mark.parametrize("spec", [LampReadSpec(True, 1), LampReadSpec(1, 0), LampReadSpec(1, True)])
 def test_invalid_targets_cannot_enter_inbox(spec):
     with pytest.raises(ValueError): LampReadInbox(1).submit(spec)
+
+
+def test_claimed_cancelled_write_holds_both_read_and_write_admission_until_owner_retires():
+    inbox=LampReadInbox(1); spec=LampWriteSpec(123,7000000002,True)
+    with pytest.raises(ValueError): inbox.submit(spec)
+    with pytest.raises(ValueError): inbox.submit_write(SPEC)
+    ticket=inbox.submit_write(spec); assert inbox.claim()[0]==ticket
+    inbox.cancel(LampReadTicket(2,ticket.serial));assert not inbox.should_cancel(ticket)
+    inbox.cancel(ticket);assert inbox.should_cancel(ticket) and inbox.take(ticket) is None
+    with pytest.raises(ValueError): inbox.submit(SPEC)
+    with pytest.raises(ValueError): inbox.submit_write(spec)
+    inbox.finish(ticket,LampReadResult('cancelled',sent=True))
+    assert inbox.submit(SPEC).serial > ticket.serial
+
+
+def test_cancelling_completed_unread_write_releases_slot_without_waiting_for_an_absent_job():
+    inbox=LampReadInbox(1)
+    ticket=inbox.submit_write(LampWriteSpec(123,7000000002,True));inbox.claim()
+    inbox.finish(ticket,LampReadResult('response',error_code=0,sent=True))
+    inbox.cancel(ticket)
+    assert inbox.take(ticket) is None
+    assert inbox.submit(SPEC).serial>ticket.serial

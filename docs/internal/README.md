@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+[Shared native floodlight](native-shared-floodlight.md): implementation and
+synthetic acceptance, without physical illumination tests.
+
 Current shared-control implementation:
 [smart protection and weekly plan](native-shared-guard.md), with simulated tests
 explicitly distinguished from camera-backed actuation.

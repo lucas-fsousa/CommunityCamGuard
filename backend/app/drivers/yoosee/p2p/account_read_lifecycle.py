@@ -11,6 +11,7 @@ from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
 from .contracts import CertifiedNode, OnlineDevice
+from .lamp_control_specs import LampWriteSpec
 from .lamp_read_inbox import LampReadTicket
 from .lamp_read_job import LampReadResult, LampReadSpec
 from .media_policy import MediaPolicy
@@ -81,6 +82,12 @@ class AccountReadLifecycle:
             if self._state != "active" or self._worker is None or self._worker.lamp_inbox is None:
                 raise ValueError("account not accepting lamp-state reads")
             return self._worker.lamp_inbox.submit(spec)
+
+    def submit_lamp_write(self, spec: LampWriteSpec) -> LampReadTicket:
+        with self._lock:
+            if self._state != 'active' or self._worker is None or self._worker.lamp_inbox is None:
+                raise ValueError('account not accepting lamp changes')
+            return self._worker.lamp_inbox.submit_write(spec)
 
     def submit_control_write(self, spec: ControlWriteSpec) -> ControlWriteTicket:
         with self._lock:
