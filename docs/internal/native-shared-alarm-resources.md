@@ -83,6 +83,10 @@ profiles cannot be mixed with it. This profile requires the existing native owne
 it never falls back, authenticates, writes a camera setting or registers/renews a
 proof. Its output contains sanitized options and resource identity digests only.
 Disable temporary diagnostic settings after the deliberate review.
+The review also reads the current exact resource on the same pinned owner and
+returns its semantic `selected_key`, or null if absent from that fresh catalogue.
+It never guesses from a logical slot or returns the raw resource ID. This permits
+restoring the real original selection during a silent actuation test.
 
 The actual native-owner review returned200 with complete system4/custom0 at
 native revision102 unchanged. The two previously proven resource identity digests
