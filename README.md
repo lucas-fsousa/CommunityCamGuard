@@ -39,9 +39,11 @@ That deployment enables `NATIVE_RESUME_ON_START=true`; the distributed default
 remains off and does not automatically migrate arbitrary cameras. Support evidence
 does not expire merely because the30-minute control-state cache ages. Revoked
 support, changed identity/credentials and uncertain retirement still block reuse.
-Clean restart and bounded reconnection are implemented; abrupt power loss,
-multi-day endurance and concurrent native cameras remain follow-ups, not claims
-of completed validation. Earlier [integration evidence](docs/internal/native-av-delivery.md),
+Clean restart and bounded reconnection are implemented. The default Linux PID1
+Docker deployment also restores reviewed native capture after abrupt app death,
+without a clean-shutdown checkpoint; see [startup recovery](docs/internal/native-abrupt-startup.md).
+Other host layouts, multi-day endurance and concurrent native cameras remain
+follow-ups, not claims of completed validation. Earlier [integration evidence](docs/internal/native-av-delivery.md),
 [storage pause/resume](docs/internal/native-storage-policy.md) and
 [clean startup](docs/internal/native-clean-startup.md) remain available.
 

@@ -50,5 +50,35 @@ passed. Coverage includes live-lock exclusion, malformed/missing/same-process
 receipts, unsupported hosts, review denial, one-use generation checks, ordinary
 ASGI startup WITHOUT a clean checkpoint, delayed media readiness and publisher
 shutdown without late route publication. Fixtures are synthetic, no hardware
-actions. Camera-backed abrupt-container acceptance is required below; the old
-encoder-only test is not substituted for it.
+actions. The one-time old-version migration also now handles stranded active or
+transition intent, but only after the trusted installer verifies the exact Docker
+namespaces are closed; six additional operator tests passed (119.9MiB peak).
+
+## Actual abrupt-container acceptance
+
+Deployed `8fbdf5a`, image `308f3b55c41f`, dashboard `b-20782a2db487`. The trusted
+one-time upgrade completed (250.3MiB peak) and ordinary Docker owned native/active84.
+The PID1 lifetime record matched the live namespace. There were zero clean restart
+checkpoints. A real authenticated MSE reader received1355/230216/229992byte chunks.
+
+Then `docker kill --signal KILL ccg-app` actually exited the app with137, leaving
+native/active84 and zero checkpoints: no graceful shutdown had happened. Only
+ordinary `docker start ccg-app` followed — no installer, camera reset, database
+patch or manual source activation. In6.1s after start, camera3 was native/active87
+and delivered1355/261444/222679byte chunks. Container ID stayed the same, PID1
+lifetime changed, the recovered permission was consumed, and no clean checkpoint
+was left pending. All three cameras reported online/recording. Their latest
+original recordings were nonempty/recent, including camera3's new524288byte file.
+No sound, light or motor commands; no WSL shutdown or OOM test.
+
+CI41818344447 and Image41818344488 passed, including the full Python suite and
+Node contracts. Earlier startup implementation CI41816518263/Image41816518002
+also passed. The controlled encoder-only acceptance is explicitly NOT reused as
+the evidence for this change: this acceptance killed the entire app.
+
+The current guarantee is bounded to the tested default Linux PID1 Docker layout
+and intact reviewed enrollment/database. It does not promise automatic privilege
+restoration after revoked credentials/review, arbitrary host orphans, unsupported
+container init wrappers, or corrupted storage. An actual whole-WSL power cycle
+was not induced; the new boot-identity branch is implemented, not claimed as a
+separate physical WSL-reboot acceptance.

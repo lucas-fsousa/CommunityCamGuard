@@ -9,8 +9,14 @@ runtime_missing after app startup, snapshot92 intact and no clean checkpoint.
 The encoder-only acceptance did not cover this. Default Linux PID1 Docker startup
 now has OS-lock/namespace-lifetime fencing for abandoned reviewed native intent,
 plus owned background readiness so camera warmup cannot expire preparation.
-84 focused tests, Mypy382/Ruff passed; actual abrupt-container restart acceptance
-follows. No new user capture is required. See docs/internal/native-abrupt-startup.md.
+84 focused tests, six operator migration tests, Mypy382/Ruff passed. Deployed
+`8fbdf5a` / `b-20782a2db487`. Actual SIGKILL exited ccg-app137 with active84 and
+zero clean checkpoints; ordinary docker start restored native/active87 plus real
+MSE in6.1s, no installer/database patch after kill. All3online/recording, no OOM
+or camera sound/light/motor commands. Full CI/Image passed. Default Linux PID1
+Docker crash/start recovery is now accepted; arbitrary host layouts/whole-WSL
+physical reboot remain separate, not equivalent claims. No new user capture was
+needed. See docs/internal/native-abrupt-startup.md.
 
 2026-11-04 regression: camera3 native/blocked68 and snapshot90 without evidence,
 while both other cameras were online/recording. Local muxer/child-exit recovery and

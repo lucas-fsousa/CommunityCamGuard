@@ -5,6 +5,13 @@ another measured encoder failure. See [abrupt Docker startup](native-abrupt-star
 for namespace fencing, delayed readiness, supported layouts and actual acceptance.
 The earlier encoder-recovery evidence below does not cover container death.
 
+Current verified runtime: `8fbdf5a`, dashboard `b-20782a2db487`, native/active87.
+The entire app was killed with SIGKILL (exit137, zero clean checkpoints). Ordinary
+Docker start restored camera3's real MSE in6.1s, without the operator installer or
+a DB patch, with all three cameras online/recording. Default Linux PID1 namespace
+fencing and pending readiness are deployed; other host layouts still require
+clean restart proof. No actual WSL shutdown or physical camera action was tested.
+
 Latest runtime (2026-10-30): `575ed76`, dashboard `b-3422b2883cd9`, camera3 native
 active revision62. All three cameras online/recording, others legacy0; no OOM or
 unexpected app restarts. Capability renewal on the native owner was observed
