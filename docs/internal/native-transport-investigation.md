@@ -47,3 +47,11 @@ length, forwarded through the same bounded event channel. It still closes the
 connection and keeps the SDK-derived 1500-byte ceiling and checksum requirement.
 No packet payload is retained and no validation is relaxed. The actual offending
 length must be observed before changing framing behavior.
+
+The next run captured KCP gaps at sequences 620 and 1883, each with gap 1 and
+97/102 queued segments (under 96 KiB), not a full receive buffer. A browser probe
+received the initialization and one media fragment before retirement. FFmpeg
+also exited with code 234 and an unclassified message. Fixed classification now
+recognizes HEVC/MPEG-TS error-component tags and missing codec/muxer headers; raw
+messages are still neither retained nor returned. This is further evidence
+collection, not a demonstrated correction of either transport or decode failure.
