@@ -34,3 +34,16 @@ without packet payload recording or another camera connection.
 281 targeted tests passed under192MiB/no swap/50% CPU, peak107.1MiB. Ruff and
 Mypy402 passed. Deployment/real failure observation follows; no root cause or
 fixed continuous stream is claimed from instrumentation alone.
+
+## Live observation after deployment
+
+Build `b-51704da39ac8` repeatedly retired camera3 with `mtp_record_length`,
+interspersed with TCP handshake/control timeouts. Both GitHub CI and Image workflows
+passed for `fe987f0`. The decoder has not supplied an exit category in these
+pre-video attempts; increasing decoder timeouts would not address this evidence.
+
+Length rejection now retains only the numeric MTP kind and its 11-bit declared
+length, forwarded through the same bounded event channel. It still closes the
+connection and keeps the SDK-derived 1500-byte ceiling and checksum requirement.
+No packet payload is retained and no validation is relaxed. The actual offending
+length must be observed before changing framing behavior.

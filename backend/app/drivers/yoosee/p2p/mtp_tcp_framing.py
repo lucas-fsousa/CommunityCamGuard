@@ -10,6 +10,10 @@ MAX_RECORDS_PER_FEED = 64
 class MtpTcpFrameError(ValueError):
     """Terminal framing failure; owner must discard this connection."""
 
+    def __init__(self, reason: str, *, facts: tuple[tuple[str, int], ...] = ()) -> None:
+        super().__init__(reason)
+        self.facts = facts
+
 
 class MtpTcpFramer:
     """One instance per socket, no resynchronization or reconnect reuse.
@@ -26,9 +30,9 @@ class MtpTcpFramer:
     def buffered_bytes(self) -> int:
         return len(self._buffer)
 
-    def _fail(self, reason: str) -> None:
+    def _fail(self, reason: str, *, facts: tuple[tuple[str, int], ...] = ()) -> None:
         self.abort()
-        raise MtpTcpFrameError(reason)
+        raise MtpTcpFrameError(reason, facts=facts)
 
     def feed(self, data: bytes) -> list[bytes]:
         if self._closed:
@@ -44,7 +48,8 @@ class MtpTcpFramer:
                 self._fail("unmapped inbound MTP TCP prefix")
             size = mtp_frame_length(prefix)
             if not 30 <= size <= TCP_RECORD_LIMIT:
-                self._fail("invalid MTP TCP record length")
+                self._fail("invalid MTP TCP record length", facts=(
+                    ("mtp_kind", prefix[1]), ("mtp_length", size)))
             if len(self._buffer) - offset < size:
                 break
             if len(records) >= MAX_RECORDS_PER_FEED:

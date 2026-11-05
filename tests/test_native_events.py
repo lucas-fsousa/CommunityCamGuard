@@ -63,3 +63,16 @@ def test_kcp_counter_ranges_never_accept_arbitrary_text_or_unbounded_numbers(tmp
     result=json.loads((tmp_path/'native-events.jsonl').read_text())['facts']
     assert result['kcp_next_sequence']=='4294967295' and result['kcp_pending']=='128'
     assert 'kcp_parts' not in result and 'kcp_gap' not in result and 'kcp_bytes' not in result
+
+
+def test_mtp_failure_records_only_bounded_header_numbers(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA, error='retry_planned', evidence_valid=True, details={
+        'mtp_kind': '80', 'mtp_length': '1501', 'packet': 'SECRET'})
+    result = json.loads((tmp_path / 'native-events.jsonl').read_text())['facts']
+    assert result['mtp_kind'] == '80' and result['mtp_length'] == '1501'
+    assert 'SECRET' not in repr(result)
+    events.ended(CAMERA, error='retry_planned', evidence_valid=True, details={
+        'mtp_kind': '256', 'mtp_length': '2048'})
+    result = json.loads((tmp_path / 'native-events.jsonl').read_text().splitlines()[-1])['facts']
+    assert 'mtp_kind' not in result and 'mtp_length' not in result

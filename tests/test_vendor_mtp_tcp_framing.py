@@ -49,8 +49,10 @@ def test_maximum_record_and_batch_limits():
 @pytest.mark.parametrize("size", [0, 6, 29, 1501, 2047])
 def test_invalid_length_rejected_from_prefix_only(size):
     framer = MtpTcpFramer()
-    with pytest.raises(MtpTcpFrameError, match="length"):
+    with pytest.raises(MtpTcpFrameError, match="length") as failure:
         framer.feed(bytes((0xC0, 0x50, size & 7, size >> 3)))
+    assert failure.value.facts == (("mtp_kind", 0x50), ("mtp_length", size))
+    assert framer.buffered_bytes == 0
     with pytest.raises(MtpTcpFrameError, match="closed"):
         framer.feed(b"")
 

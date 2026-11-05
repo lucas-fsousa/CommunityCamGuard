@@ -26,6 +26,7 @@ from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .model_control_inbox import ControlWriteInbox
 from .model_control_pump import ControlWritePump
+from .mtp_tcp_framing import MtpTcpFrameError
 from .ptz_inbox import MotionTicket, PtzInbox
 from .ptz_scheduler import PtzScheduler, PtzSpec, ScheduledPtzResult
 from .ptz_socket_pump import pump_ptz
@@ -368,7 +369,7 @@ class AccountReadWorker:
                 trace=trace.tb_next
             protocol_site='/'.join(sites[-2:])
             protocol_code=PROTOCOL_CODES.get(str(error),'')
-            if isinstance(error, KcpAssemblyTimeout):
+            if isinstance(error, (KcpAssemblyTimeout, MtpTcpFrameError)):
                 protocol_facts = error.facts
         finally:
             try:

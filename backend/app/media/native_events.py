@@ -19,7 +19,8 @@ _protocols = frozenset({'kcp_assembly_timeout', 'kcp_invalid_segment', 'kcp_conf
     'tcp_eof', 'mtp_record_length'})
 _returncodes = frozenset(str(n) for n in range(-128, 256))
 _counters = {'kcp_next_sequence':2**32-1, 'kcp_pending':128, 'kcp_parts':128,
-             'kcp_gap':127, 'kcp_remaining':128, 'kcp_bytes':1024*1024}
+             'kcp_gap':127, 'kcp_remaining':128, 'kcp_bytes':1024*1024,
+             'mtp_kind':255, 'mtp_length':2047}
 _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport', 'busy', 'consumer_failed',
     'contended', 'heartbeat_timeout', 'media_complete', 'lifetime', 'unavailable',
     'offline', 'socket_timeout', 'socket_error', 'stale_access', 'access_rejected',
