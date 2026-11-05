@@ -77,6 +77,78 @@ def test_explicit_shutdown_drains_avclose_before_physical_close():
     assert sock.closed == 1
 
 
+def test_late_read_yields_and_processes_the_exact_bytes_before_reading_again(monkeypatch):
+    now = [1.0]
+    sock, owner = OwnedSocket(now), session(now)
+    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0])
+    receive = sock.recv
+    reads = []
+
+    def slow_once(size):
+        data = receive(size)
+        reads.append(data)
+        if len(reads) == 1: now[0] += 0.25
+        return data
+
+    monkeypatch.setattr(sock, 'recv', slow_once)
+    pump.step()
+    assert len(reads) == 1 and owner.received_bytes == 0
+    assert not owner.closed and not sock.closed and pump.result is None
+    pump.step()
+    assert len(reads) == 1 and owner.received_bytes == len(reads[0])
+    for _ in range(150):
+        if owner.ready: break
+        pump.step()
+    assert owner.ready
+    assert pump.finish().close_acknowledged and sock.closed == 1
+
+
+def test_cpu_work_budget_yields_without_dropping_or_replaying_generated_acks(monkeypatch, caplog):
+    now = [1.0]
+    sock, owner = OwnedSocket(now), session(now)
+    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0])
+    receive = owner.receive
+    delayed = []
+
+    def slow_decode(data, peer):
+        batch = receive(data, peer)
+        if batch.acknowledgements and not delayed:
+            delayed.append((len(sock.writes), batch.acknowledgements))
+            now[0] += 0.25
+        return batch
+
+    monkeypatch.setattr(owner, 'receive', slow_decode)
+    for _ in range(100):
+        pump.step()
+        if delayed: break
+    assert delayed and not sock.closed and not owner.closed
+    count, wires = delayed[0]
+    assert len(sock.writes) == count  # no syscall after the scheduling budget ended
+    pump.step()
+    assert tuple(sock.writes[count:count + len(wires)]) == wires
+    for _ in range(100):
+        if owner.ready: break
+        pump.step()
+    assert owner.ready and 'yielded scheduler budget phase=output' in caplog.text
+    assert pump.finish().close_acknowledged and sock.closed == 1
+
+
+def test_scheduler_yield_does_not_extend_the_absolute_receive_deadline(monkeypatch):
+    now = [1.0]
+    sock, owner = OwnedSocket(now), session(now)
+    pump = CooperativeTcpMedia(sock, PEER, owner, clock=lambda: now[0])
+    receive = sock.recv
+
+    def expired(size):
+        data = receive(size)
+        now[0] += 9
+        return data
+
+    monkeypatch.setattr(sock, 'recv', expired)
+    with pytest.raises(ReceiveError, match='read exceeded deadline'): pump.step()
+    assert owner.closed and sock.closed == 1
+
+
 @pytest.mark.parametrize("fault", ["send", "eof", "peer", "close", "physical_close"])
 def test_failure_is_terminal_and_close_is_not_retried(fault):
     now = [1.0]

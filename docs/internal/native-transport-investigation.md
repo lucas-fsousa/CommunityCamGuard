@@ -153,3 +153,15 @@ repair at2.5s, unchanged closure at5s and no extension from duplicate traffic.
 Production acceptance is experimental: retain only if actual delayed repairs/
 continuous delivery justify it; do not describe the prior failures as resolved
 merely because a larger wait was allowed.
+
+`fb72955` / `b-f2b2e3054e8e`, active135, passed CI5980tests/1skip and Image.
+The live experiment DID observe completed KCP repairs at2761,3473and3368ms,
+all beyond the old2000ms cutoff and within the unchanged5000ms idle budget.
+This is direct evidence for retaining the continuous repair-budget alignment.
+It did not fix every failure: repeated `tcp_io_timeout` remained.
+
+The next correction distinguishes a cooperative200ms scheduler budget from a
+real connection deadline, retaining one bounded read/output batch rather than
+discarding accepted bytes/ACKs. See [TCP cooperation](native-tcp-cooperation.md)
+for exact limits and negative/positive regression evidence. It does not extend
+protocol deadlines, retry ambiguous writes or open a replacement connection.

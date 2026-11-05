@@ -1,5 +1,6 @@
 """Finite TCP/AV pump driven by the account reader, never reading its UDP socket."""
 
+import logging
 import socket
 import time
 from collections.abc import Callable
@@ -13,7 +14,10 @@ from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .mtp_tcp_av import TcpAvSession
 from .mtp_tcp_handshake import build_mtp_tcp_pair_request
 from .mtp_tcp_receive import PairedSocket
+from .tcp_pending_output import PendingTcpOutput
 from .video_delivery import VideoDelivery
+
+log = logging.getLogger(__name__)
 
 
 class OwnedTcpSocket(PairedSocket, Protocol):
@@ -46,6 +50,9 @@ class CooperativeTcpMedia:
         self._step_until = self._deadline
         self._ready_at: float | None = None
         self._closing = False
+        self._pending_input = b''
+        self._output = PendingTcpOutput()
+        self._yield_logged = False
         self._video = self._audio = self._headers = 0
         self.result: TcpMediaResult | None = None
 
@@ -57,6 +64,8 @@ class CooperativeTcpMedia:
         if self.result is not None:
             return self.result
         confirmed = self._owner.close_acknowledged
+        self._pending_input = b''
+        self._output.close()
         if self._delivery is not None:
             self._delivery.close()
         self._owner.close()
@@ -69,12 +78,43 @@ class CooperativeTcpMedia:
                                       self._video, self._audio, self._headers)
         return self.result
 
-    def _send(self, wire: bytes) -> None:
-        remaining = min(self._deadline, self._step_until) - self._clock()
-        if remaining <= 0:
+    def _send(self, wire: bytes) -> bool:
+        now = self._clock()
+        if now >= self._deadline:
             raise ReceiveError("cooperative TCP output deadline exceeded")
-        self._sock.settimeout(min(0.02, remaining))
+        remaining = self._step_until - now
+        if remaining <= 0:
+            return False  # no syscall: safe to retain for the next owner turn
+        self._sock.settimeout(min(0.02, remaining, self._deadline - now))
         self._sock.sendall(wire)
+        return True
+
+    def _yield(self, phase: str) -> None:
+        if not self._yield_logged:
+            log.warning('native TCP pump yielded scheduler budget phase=%s', phase)
+            self._yield_logged = True
+
+    def _drain(self) -> bool:
+        if self._output.drain(self._send):
+            return True
+        self._yield('output')
+        return False
+
+    def _receive(self, data: bytes) -> None:
+        batch = self._owner.receive(data, self._peer)
+        if self._owner.ready and self._ready_at is None:
+            self._ready_at = self._clock()
+            if self._owner.policy is MediaPolicy.CONTINUOUS:
+                self._deadline = float("inf")
+        for record in batch.records:
+            if self._delivery is not None:
+                self._delivery.consume(record)
+            self._video += bool(record.video)
+            self._audio += len(record.audio)
+            self._headers += record.encoding is not None
+        self._output.offer(batch.acknowledgements)
+        if self._drain() and self._owner.close_acknowledged:
+            self._close()
 
     def step(self) -> None:
         if self.result is not None:
@@ -86,15 +126,26 @@ class CooperativeTcpMedia:
             if self._sock.getpeername() != self._peer:
                 raise ReceiveError("cooperative TCP peer mismatch")
             self._owner.poll()
+            if not self._drain():
+                return
+            if self._owner.close_acknowledged:
+                self._close()
+                return
             if (not self._closing and self._ready_at is not None and self._video
                     and self._owner.policy is MediaPolicy.FINITE
                     and self._clock() - self._ready_at >= self._owner.profile.budget.observation_seconds):
                 self._begin_finish()
-            for wire in self._owner.due():
-                self._send(wire)
+            if self._pending_input:
+                data, self._pending_input = self._pending_input, b''
+                self._receive(data)
+                return
+            self._output.offer(self._owner.due())
+            if not self._drain():
+                return
             remaining = min(self._deadline, self._step_until) - self._clock()
             if remaining <= 0:
-                raise ReceiveError("cooperative TCP step deadline exceeded")
+                self._yield('read')
+                return
             self._sock.settimeout(min(0.001, remaining))
             try:
                 data = self._sock.recv(4096)
@@ -102,23 +153,15 @@ class CooperativeTcpMedia:
                 return
             if not data:
                 raise ReceiveError("TCP media EOF before CLOSE receipt")
-            if self._clock() >= min(self._deadline, self._step_until):
+            if type(data) is not bytes or len(data) > 4096:
+                raise ReceiveError('invalid bounded TCP input batch')
+            if self._clock() >= self._deadline:
                 raise ReceiveError("TCP media read exceeded deadline")
-            batch = self._owner.receive(data, self._peer)
-            if self._owner.ready and self._ready_at is None:
-                self._ready_at = self._clock()
-                if self._owner.policy is MediaPolicy.CONTINUOUS:
-                    self._deadline = float("inf")  # Handshake/idle/assembly deadlines remain active.
-            for wire in batch.acknowledgements:
-                self._send(wire)
-            for record in batch.records:
-                if self._delivery is not None:
-                    self._delivery.consume(record)
-                self._video += bool(record.video)
-                self._audio += len(record.audio)
-                self._headers += record.encoding is not None
-            if self._owner.close_acknowledged:
-                self._close()
+            if self._clock() >= self._step_until:
+                self._pending_input = data
+                self._yield('read')
+                return
+            self._receive(data)
         except BaseException:
             self._close()
             raise
