@@ -4,6 +4,12 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Camera3 native selection actuation accepted: `6defc44` / `b-18dfd59c5904`,
+native/active108. Original selection was read, then Zumbido2 selected and Zumbido1
+restored; both200/ACK/error0/exact readback with same MSE3→6chunks and revision108
+unchanged. Initial409s were not counted as success. No sound was played. Remaining
+shared control: siren pulse with owner-driven OFF/cleanup, then native capacity.
+
 Delivered `22fc8d1` / `b-c66ccfb36649`, native/active105: ordinary alarm-voice
 options GET200 returned exactly the two renewed proven sounds while the same MSE
 socket advanced3→6chunks. All3online/recording, no OOM/restarts. Temporary

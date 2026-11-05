@@ -139,3 +139,16 @@ Full correction CI42036968374 passed5831tests/1existing skip, Mypy394, Ruff and
 all Node contracts; Image42036968327 passed. Both diagnostic flags were independently
 confirmed false in the running app. All3archive files had recent writes (1.1/3.3/
 3.4seconds old at the final storage check).
+
+## Native selection actuation — 2026-11-05
+
+Diagnostic extension `6defc44` / `b-18dfd59c5904` resolved the real current
+selection as Zumbido1 from the exact catalogue resource. Camera3 native/active108.
+An initial pair of PUTs returned409; no success is claimed for those calls. After
+ordinary options GET returned200, the controlled test selected Zumbido2 and
+restored Zumbido1. Both returned200/changed/verified/authenticated, transport and
+application ACK, error0. The writer's independent exact-resource readback passed
+in both directions. The same MSE connection advanced3→6chunks
+(1355/493260/269993/486312/259106/499657bytes), revision108 unchanged.
+No siren/playback/light/motor command was sent. This accepts native resource
+selection/restoration on this device, not the sound content or other resources.
