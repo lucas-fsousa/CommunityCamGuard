@@ -29,3 +29,15 @@ def test_failure_logging_cannot_break_retirement_with_an_unwritable_directory(tm
     path.write_text('test')
     events.configure(path)
     events.ended(CAMERA, error='TimeoutError', evidence_valid=True, details={})
+
+
+def test_retry_facts_keep_fixed_reason_and_protocol_code_but_never_payload(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA,error='retry_planned',evidence_valid=True,details={
+        'retry_reason':'connection','session_connection_failure':'inventory_timeout',
+        'session_protocol_code':'mtp_record_length','payload':'SECRET'})
+    result=json.loads((tmp_path/'native-events.jsonl').read_text())
+    assert result['error']=='retry_planned'
+    assert result['facts']['retry_reason']=='connection'
+    assert result['facts']['session_protocol_code']=='mtp_record_length'
+    assert 'SECRET' not in repr(result)

@@ -1,8 +1,8 @@
 # Native media delivery, not another finite trial
 
 Shared-native siren pulse is implemented with owner-driven timing, reserved OFF
-and exact independent OFF-state confirmation. Coverage is simulated; no new
-audible acceptance is claimed. See [native siren](native-shared-siren.md).
+and exact independent OFF-state confirmation. Camera3's authorized two-second pulse
+was confirmed by its owner and the exact OFF readback. See [native siren](native-shared-siren.md).
 
 Latest deployed runtime `22fc8d1` / `b-c66ccfb36649`, native/active105.
 Native alarm catalogue/selection adapters are integrated. The public options

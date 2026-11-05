@@ -158,6 +158,20 @@ def test_observed_still_on_retries_only_off_and_then_confirms_fresh_state():
     assert job.result.off_confirmed and job.result.off_attempts == 2
 
 
+def test_live_firmware_can_confirm_application_and_state_without_transport_ack():
+    job, _, _, now = make()
+    job.next_packet()
+    job.observe(response(job), NODE.address, generation=1)
+    now[0] = 2
+    job.next_packet()
+    job.observe(response(job, off=True), NODE.address, generation=1)
+    assert job.next_packet().kind == 'read'
+    job.observe(state_response(job, 1), NODE.address, generation=1)
+    job.next_packet()
+    assert job.result.status == 'completed' and job.result.off_confirmed
+    assert not job.result.transport_acknowledged
+
+
 @pytest.mark.parametrize('access,device,seconds', [(True,1,2),(0,1,2),(1,0,2),(1,True,2),(1,1,True),(1,1,1),(1,1,11)])
 def test_no_raw_unbounded_action_is_admitted(access, device, seconds):
     with pytest.raises(ValueError): SirenPulseSpec(access, device, seconds)

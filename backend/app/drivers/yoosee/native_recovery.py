@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from ...media.recovering_source import RecoveringSource
 from ...media.source_registry import ManagedSource
+from .native_retry_diagnostics import record as record_retry
 from .native_video_source import NativeVideoResult, NativeVideoSource
 from .p2p.media_retirement import retired_media_route, retired_transport_failure
 from .shared_control_reads import reserve_native_owner
@@ -12,7 +13,12 @@ from .shared_control_reads import reserve_native_owner
 class _OwnedRecovery(RecoveringSource):
     def __init__(self, initial: NativeVideoSource, *, camera_id: str,
                  factory: Callable[[], NativeVideoSource], valid: Callable[[], bool]):
-        super().__init__(initial, factory=factory, valid=valid, retryable=retryable)
+        def inspect_retry(result: object, source: ManagedSource) -> bool:
+            decision = retryable(result, source)
+            if decision and isinstance(result, NativeVideoResult) and isinstance(source, NativeVideoSource):
+                record_retry(camera_id, result, source)
+            return decision
+        super().__init__(initial, factory=factory, valid=valid, retryable=inspect_retry)
         self._camera_id = camera_id
 
     def run(self, *, cancelled: Callable[[], bool]) -> object:

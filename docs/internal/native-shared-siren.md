@@ -53,7 +53,8 @@ encrypted socket tests cover normal pulse plus media-route/B7/heartbeat traffic,
 one ON, exact OFF/state receipts, failed/ambiguous sends, unknown OFF, cancellation,
 interruption, shutdown and competing PTZ. The driver adapter and recovery guards
 also have positive/negative tests. No real native siren/audio/light/motor action
-was executed: audible/physical acceptance remains pending.
+was executed during that initial synthetic phase; subsequent physical acceptance
+is recorded below.
 
 Deployed `4f05980`, image `c5cb6f0e8932`, build `b-d14a329db286`.
 Camera3 resumed native/active114. Existing sound options GET200 and the same MSE
@@ -63,3 +64,33 @@ Image42046396602 passed. Full CI42046396512 exposed three old legacy-only test
 fixtures using `object()` as enrollment; the new owner check legitimately needs
 camera_id. Those fixtures are corrected without changing strict/compatibility
 dispatch expectations or weakening native admission. Follow-up full CI required.
+
+## Physical native pulse accepted
+
+Follow-up CI42046944035 passed5902tests/1existing skip, Mypy400/Ruff and all Node
+contracts. Only test fixtures/docs changed after the deployed4f05980 image.
+The owner then explicitly authorized ONE2second pulse on camera3. The test first
+received real native MSE chunks (1355/504688/266235bytes); ordinary PUT
+`siren_pulse=2` returned200, verified/authenticated, application ACK/error0, with
+OFF independently confirmed by B7. Transport ACK was absent and correctly reported
+false, not waived into a claimed receipt. Source stayed native/active114/available.
+The user confirmed the audible test worked. This physically accepts the native
+two-second pulse on camera3, not other devices or5/10second grants. No repeat
+pulse, light/motor/reset/reboot command was sent. Baseline selected sound remained
+Zumbido1 from the separately accepted selection/restoration test.
+
+## Recovery observation follow-up
+
+Camera3 had an obsolete LAN address; a complete bounded MAC-only lookup located
+the new address, and only its registry address wasCAS-updated. This does not prove
+the cause of the separate transient P2P recovery observed during the checks.
+The source did become ready again and delivered the real frames preceding the
+accepted pulse; no container restart was used between those recovery checks and
+the successful physical test.
+
+Retry diagnostics now preserve fixed connection/worker/protocol labels BEFORE
+discarding a retired source attempt. Previously automatic retries could leave no
+terminal event, hiding whether recovery was waiting on network opening or media
+framing. The same rotating512KiB/two-backup log is reused: no payload, credentials,
+network reply, growing history or extra worker. Logging failure cannot stop or
+authorize retry; the existing cleanup/evidence classifier remains authoritative.

@@ -11,7 +11,11 @@ from ..camera_identity import valid_camera_id
 _log = logging.getLogger('ccg.native_events')
 _errors = frozenset({'TimeoutError', 'Mp4SizeError', 'Mp4OrderError', 'Mp4CapacityError',
     'DecoderExitedError', 'BrokenPipeError', 'OSError', 'ValueError', 'P2PProbeError',
-    'SourceUnavailable', 'SourceCleanupUnconfirmed', 'RuntimeError', 'source_returned'})
+    'SourceUnavailable', 'SourceCleanupUnconfirmed', 'RuntimeError', 'source_returned', 'retry_planned'})
+_protocols = frozenset({'kcp_assembly_timeout', 'kcp_invalid_segment', 'kcp_conflicting_duplicate',
+    'kcp_receive_budget', 'kcp_fragment_chain', 'tcp_session_timeout', 'av_handshake_timeout',
+    'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout',
+    'tcp_eof', 'mtp_record_length'})
 _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport', 'busy',
     'contended', 'heartbeat_timeout', 'media_complete', 'lifetime', 'unavailable',
     'offline', 'socket_timeout', 'socket_error', 'stale_access', 'access_rejected',
@@ -50,9 +54,9 @@ def ended(camera_id: str, *, error: str, evidence_valid: bool, details: dict) ->
         return
     facts: dict[str, str | bool] = {
         key: value for key, value in details.items() if key in _bools and type(value) is bool}
-    for key in ('consumer_error', 'session_worker', 'session_connection_failure'):
+    for key in ('consumer_error', 'session_worker', 'session_connection_failure', 'session_protocol_code', 'retry_reason'):
         value = details.get(key, '')
-        facts[key] = value if isinstance(value, str) and value in (_errors | _labels) else 'unknown'
+        facts[key] = value if isinstance(value, str) and value in (_errors | _labels | _protocols) else 'unknown'
     _log.warning(json.dumps({'at': datetime.now(UTC).isoformat(timespec='milliseconds'),
         'camera_id': camera_id, 'error': error if error in _errors else 'unknown',
         'evidence_valid': evidence_valid is True, 'facts': facts}, separators=(',', ':')))

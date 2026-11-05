@@ -4,6 +4,22 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Native siren two-second pulse physically accepted on camera3: user explicitly
+authorized one attempt and confirmed it worked. HTTP200, applicationACK/error0
+and independent B7OFF confirmation; missing transportACK correctly remainedfalse.
+Native/active114 unchanged, actual MSE received before the pulse. Full follow-up
+CI5902passed/1skip and Image passed. No5/10second or other-device grant follows.
+Selection/restoration and native siren are now accepted; next native milestone is
+multi-camera capacity, not another sound retest.
+
+Operational follow-up: camera3 had an obsolete DHCP address; bounded MAC lookup
+located it and only its registry address wasCAS-updated. `AddressRecovery`
+currently excludes native sources; LAN metadata recovery for those sources is a
+separate pending fix (must not reopen RTSP media or restart the native owner).
+P2P also temporarily oscillated/recovered, so no claim is made that the address
+update alone fixed that transport. Add fixed retry facts before old attempts are
+discarded to distinguish network/opening/framing failures without payload logging.
+
 Deployed siren integration `4f05980` / `b-d14a329db286`, native/active114.
 Passive options200/MSE3→6 passed with all3online/recording; no pulse/audio/light/
 motor command. Full CI found three legacy-dispatch fixtures missing the newly
