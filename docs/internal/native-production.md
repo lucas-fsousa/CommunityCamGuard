@@ -3,6 +3,9 @@
 The shared floodlight adapter is implemented with strict type12 reads/type11
 boolean writes on the same account, plus mandatory readback. Tests are simulated;
 no lamp was actuated for this integration. See [shared floodlight](native-shared-floodlight.md).
+Deployed `a59907e` / `b-64827371360c`, native/active96. Real lamp status GET passed
+while the same MSE socket continued; all3online/recording, CI/Image passed. The
+new write path has simulated coverage only. Earlier runtimes below are historical.
 
 Smart-protection switch/weekly-plan shared writers are implemented without a
 second native account. Coverage is simulated; no guard was armed or schedule

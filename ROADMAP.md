@@ -9,7 +9,10 @@ writer with type12 preflight/readback, one send and no second account. Read-only
 admission stays strict; one lamp slot handles cancellation without leaks. Missing
 write reply can be resolved only after a send/timeout and exact readback, never
 by replaying or waiving explicit errors.222 focused tests, Mypy388/Ruff passed.
-No real LED/sound/motor commands. Deployment/passive checks follow; see
+Deployed `a59907e` / `b-64827371360c`, native/active96. Real GET white_light200
+verified/authenticated while the same MSE socket advanced3→6 chunks; all3online/
+recording, no OOM/restarts. Full CI/Image passed. No real LED/sound/motor commands;
+write-path physical acceptance is not claimed. See
 docs/internal/native-shared-floodlight.md. Remaining shared controls: siren pulse
 and resource/sound selection, followed by multi-camera native capacity.
 

@@ -32,4 +32,13 @@ Ruff passed. Synthetic encrypted single-socket tests cover media route/B7/lamp/
 heartbeat coexistence, one send, two response receipts without duplicate ACK,
 unique shared sequences, read-only admission, correlation/deadline failures,
 unknown outcomes, cancellation and readback. No real type11 command, illumination
-change or physical acceptance was performed. Deployment/passive checks follow.
+change or physical acceptance was performed.
+
+Deployed `a59907e` / `b-64827371360c`, app-only replacement. Camera3 resumed
+native/active96, other cameras legacy0. The ordinary authenticated GET white_light
+returned200, verified/authenticated; the same MSE socket advanced3→6 chunks
+(1355/194782/193588/199390/189249/188768bytes), with revision96 unchanged. All three
+cameras report online/recording, app restart count0 and no OOM. No real POST light
+command was used. CI42007665790 and Image42007665784 passed. This production
+acceptance confirms the status-reader refactor/coexistence, not physical actuation
+of the new native write path.
