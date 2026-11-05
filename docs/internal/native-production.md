@@ -3,7 +3,7 @@
 Current deployed runtime (2026-11-05): `3b0b311`, build `b-58c43b444dfd`,
 camera3 native/active144. CI6012tests/1skip and Image passed. The other two
 cameras retain their existing RTSP sources; no camera action was used in this
-investigation. A900-second continuous MSE acceptance window completed without
+investigation. A 900-second continuous MSE acceptance window completed without
 reconnection or source/SDK recovery:1797messages/684417887bytes. Max inter-message
 gap3.02s measures delivery gaps, not absolute live latency. Longer endurance and
 simultaneous native cameras remain unverified.

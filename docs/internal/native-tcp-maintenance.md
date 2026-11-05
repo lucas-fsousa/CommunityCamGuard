@@ -41,7 +41,7 @@ follow deployment; neither is inferred from these fixtures.
 Live checkpoint: deployed `3b0b311` / `b-58c43b444dfd`, active144. The camera
 returned the correctly correlated periodic receipt for sequence2 on the existing
 connection. CI6012tests/1skip and Image passed. MSE and original300s archive
-rollover continued, with no sound/light/motor command. Sustained acceptance is
-now passed a900-second continuous MSE window without reconnection or source
-recovery. This proves that observation window, not multi-day endurance; the
+rollover continued, with no sound/light/motor command. A 900-second continuous
+MSE observation completed without reconnection or source recovery. This proves
+that observation window, not multi-day endurance; the
 transport maintenance receipt alone is not the AV liveness evidence.
