@@ -1,5 +1,14 @@
 # Native media delivery, not another finite trial
 
+Latest deployed runtime `22fc8d1` / `b-c66ccfb36649`, native/active105.
+Native alarm catalogue/selection adapters are integrated. The public options
+request returned200 with the two specifically reviewed resources during continued
+MSE; all3online/recording, diagnostic disabled and no playback/selection actuation.
+The expired exact-resource profile was deliberately re-reviewed against the fresh
+native catalogue, not auto-renewed. See [shared alarm resources](native-shared-alarm-resources.md)
+for that acceptance, the separate invalid-length transport failure/fix, and the
+manual restoration of its already-blocked pre-fix generation.
+
 The shared floodlight adapter is implemented with strict type12 reads/type11
 boolean writes on the same account, plus mandatory readback. Subsequent authorized
 camera3 ON/OFF testing was physically confirmed by the owner. See [shared floodlight](native-shared-floodlight.md).

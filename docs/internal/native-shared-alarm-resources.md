@@ -111,3 +111,22 @@ not make malformed bytes valid or expand packet/memory limits.182 focused tests
 passed under192MiB/no swap/50% CPU, peak110.8MiB. CI also exposed an omitted
 server-only settings-inventory classification for the new diagnostic flag;
 that explicit classification is fixed without exposing it through the dashboard.
+
+## Final deployment and ordinary dashboard acceptance
+
+Deployed correction `22fc8d1`, image `1cd4f7556c1b`, build `b-c66ccfb36649`.
+The already-blocked old generation was restored through the existing trusted
+operator checkpoint AFTER confirming closure of both old Docker namespaces under
+the exclusive server lock. This was a brief declared app/hub interruption, not
+camera reboot or proof-free recovery. The new invalid-length retry classification
+has synthetic coverage; this manual restoration is NOT an injected-fault proof
+of automatic recovery.
+
+Normal startup restored native/active105. Ordinary authenticated GET
+`alarm_voice/options` returned200 with exactly Zumbido1/Zumbido2, not the other
+two unproven resources. The same MSE socket advanced3→6chunks
+(1355/250826/496147/247678/503523/271643bytes); source revision105 stayed active.
+All three cameras reported online/recording, app restart count0/no OOM.
+The internal diagnostic returned404 after its temporary settings were disabled;
+the ignored Compose override was removed. No real sound-selection write, siren,
+audio, light or movement was sent during these follow-ups.

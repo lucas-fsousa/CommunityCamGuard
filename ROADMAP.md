@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Delivered `22fc8d1` / `b-c66ccfb36649`, native/active105: ordinary alarm-voice
+options GET200 returned exactly the two renewed proven sounds while the same MSE
+socket advanced3→6chunks. All3online/recording, no OOM/restarts. Temporary
+loopback diagnostic disabled/removed; no sound selection or playback sent.
+The old blocked103 generation required a deliberate operator checkpoint after
+actual namespace closure; do not count that as automatic invalid-length fault
+injection acceptance. Remaining: native selection actuation (silent), shared
+siren pulse with owner-driven OFF/cleanup, then native multi-camera capacity.
+
 Native catalogue review succeeded on camera3 (system4/custom0, revision102).
 The two already-proven resource digests matched; explicit operator review renewed
 only those until2026-12-05. A later strict invalid-MTP-record-length rejection
