@@ -130,3 +130,8 @@ All three cameras reported online/recording, app restart count0/no OOM.
 The internal diagnostic returned404 after its temporary settings were disabled;
 the ignored Compose override was removed. No real sound-selection write, siren,
 audio, light or movement was sent during these follow-ups.
+
+Full correction CI42036968374 passed5831tests/1existing skip, Mypy394, Ruff and
+all Node contracts; Image42036968327 passed. Both diagnostic flags were independently
+confirmed false in the running app. All3archive files had recent writes (1.1/3.3/
+3.4seconds old at the final storage check).
