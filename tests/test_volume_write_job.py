@@ -2,6 +2,7 @@ import struct
 
 import pytest
 
+from backend.app.drivers.contracts import WeeklySchedule
 from backend.app.drivers.yoosee.p2p.account_read_worker import AccountReadWorker
 from backend.app.drivers.yoosee.p2p.broker_sequences import BrokerSequences
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
@@ -9,6 +10,8 @@ from backend.app.drivers.yoosee.p2p.model_control_inbox import ControlWriteInbox
 from backend.app.drivers.yoosee.p2p.model_control_job import (
     ControlWriteJob,
     ControlWriteResult,
+    GuardScheduleWriteSpec,
+    GuardWriteSpec,
     NightVisionWriteSpec,
     OrientationWriteSpec,
     VolumeWriteSpec,
@@ -49,7 +52,7 @@ def test_typed_write_sends_once_and_transport_ack_is_not_success():
 
 
 @pytest.mark.parametrize('fault', ['peer', 'generation', 'session', 'message', 'unsent', 'expired'])
-@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night')])
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',)))])
 def test_unrelated_or_late_reply_does_not_confirm_write(fault, spec):
     job, _, now = fixture(spec)
     if fault != 'unsent':job.next_packet()
@@ -88,7 +91,7 @@ def test_only_five_integer_volume_positions_are_accepted(percent):
     with pytest.raises(ValueError):VolumeWriteSpec(123, percent)
 
 
-@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night')])
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',)))])
 def test_existing_worker_sends_typed_control_on_its_only_socket_and_shared_sequences(monkeypatch, spec):
     sock = WorkerSocket()
     owner = AccountReadWorker(WORKER_NODE, 1, '192.0.2.1', 1234,

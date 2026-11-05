@@ -13,17 +13,21 @@ from .shared_read_session import SharedReadSession
 log = logging.getLogger(__name__)
 
 
-def apply(entry: P2PEnrollment, key: str, value: ControlValue, raw: int,
+def _matches(result: ControlResult | None, value: ControlValue, raw: int | None) -> bool:
+    return result is not None and (result.value == value if raw is None else result.native_previous_value == raw)
+
+
+def apply(entry: P2PEnrollment, key: str, value: ControlValue, raw: int | None,
           submit: Callable[[SharedReadSession], ControlWriteTicket]) -> ControlResult | None:
-    if key not in {'speaker_volume', 'orientation', 'night_vision'}:
+    if key not in {'speaker_volume', 'orientation', 'night_vision', 'smart_protection', 'smart_protection_schedule'}:
         raise ValueError('supported typed shared control required')
     session = session_for(entry)
     if session is None:
         return None
     previous = read(entry, key)
-    if previous is None or previous.native_previous_value is None:
+    if previous is None or (raw is not None and previous.native_previous_value is None):
         raise ControlNotReady('native control preflight unavailable')
-    if previous.native_previous_value == raw:
+    if _matches(previous, value, raw):
         return ControlResult(key=key, value=value, previous_value=previous.value,
             changed=False, verified=True, authenticated=True, error_code=0,
             native_previous_value=raw, native_requested_value=raw)
@@ -62,9 +66,9 @@ def apply(entry: P2PEnrollment, key: str, value: ControlValue, raw: int,
         if time.monotonic() >= verify_until or session_for(entry) is not session:
             break
         current = read(entry, key)
-        if current is not None and current.native_previous_value == raw:
+        if _matches(current, value, raw):
             break
-    if current is None or current.native_previous_value != raw:
+    if not _matches(current, value, raw):
         log.warning('native control readback mismatch camera_id=%s control=%s', entry.camera_id, key)
         raise ControlOperationError('camera did not confirm the requested control value')
     return ControlResult(key=key, value=value, previous_value=previous.value,

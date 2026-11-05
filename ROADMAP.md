@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-05 implementation: smart-protection switch and weekly plan now have typed
+shared-native writers (same account/inbox/sequence namespace as volume/orientation/
+night mode). One D2, correlated D3, bounded readback, no replay/login fallback.
+Weekday order is canonicalized; editing a plan never arms protection or rewrites
+adjacent fields. Schemas separated into a small module rather than growing the
+transaction state machine.187 focused tests, Mypy384/Ruff passed; only simulated
+actuation. No sound/light/motion/guard changes. Deployment/passive checks follow.
+Remaining shared controls: floodlight, siren/resource selection; native multi-camera
+capacity remains separate. See docs/internal/native-shared-guard.md.
+
 2026-11-04 repeated report, distinct observed cause: native/active73 but
 runtime_missing after app startup, snapshot92 intact and no clean checkpoint.
 The encoder-only acceptance did not cover this. Default Linux PID1 Docker startup

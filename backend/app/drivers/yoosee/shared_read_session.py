@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from ...db import p2p
 from ...db.p2p import P2PEnrollment
-from ..contracts import ControlNotReady
+from ..contracts import ControlNotReady, WeeklySchedule
 from .native_ptz import reserve_read_handoff
 from .p2p.account_policy import AccountPolicy
 from .p2p.account_read_connect import ReadConnectFailure, open_read_connection
@@ -33,6 +33,7 @@ from .p2p.model_control_job import (
     OrientationWriteSpec,
     VolumeWriteSpec,
 )
+from .p2p.model_control_specs import GuardScheduleWriteSpec, GuardWriteSpec
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
@@ -140,6 +141,18 @@ class SharedReadSession:
         if entry is None:
             raise ValueError('active night-vision enrollment required')
         return self._lifecycle.submit_control_write(NightVisionWriteSpec(int(entry.device_id), mode))
+
+    def submit_guard_write(self, enabled: bool) -> ControlWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active guard enrollment required')
+        return self._lifecycle.submit_control_write(GuardWriteSpec(int(entry.device_id), enabled))
+
+    def submit_guard_schedule_write(self, schedule: WeeklySchedule) -> ControlWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active guard enrollment required')
+        return self._lifecycle.submit_control_write(GuardScheduleWriteSpec(int(entry.device_id), schedule))
 
     def cancel_control_write(self, ticket: ControlWriteTicket) -> None:
         self._lifecycle.cancel_control_write(ticket)

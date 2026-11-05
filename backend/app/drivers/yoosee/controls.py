@@ -287,6 +287,20 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == SMART_PROTECTION:
+        from .shared_guard import write_enabled
+        if type(value) is not bool:
+            raise ControlOperationError('smart-protection state must be a boolean')
+        shared_guard = write_enabled(_enrollment(camera), value)
+        if shared_guard is not None:
+            return shared_guard
+    if key == SMART_PROTECTION_SCHEDULE:
+        from .shared_guard import write_schedule
+        if not isinstance(value, WeeklySchedule):
+            raise ControlOperationError('smart-protection schedule must be a weekly schedule')
+        shared_schedule = write_schedule(_enrollment(camera), value)
+        if shared_schedule is not None:
+            return shared_schedule
     if key == ORIENTATION:
         from .shared_orientation import write as write_shared_orientation
         if type(value) is not str:

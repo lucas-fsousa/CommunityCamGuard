@@ -1,5 +1,9 @@
 # Native media delivery, not another finite trial
 
+Smart-protection switch/weekly-plan shared writers are implemented without a
+second native account. Coverage is simulated; no guard was armed or schedule
+changed for this integration. See [shared guard controls](native-shared-guard.md).
+
 The repeated2026-11-04 unavailable report exposed a separate startup gap, not
 another measured encoder failure. See [abrupt Docker startup](native-abrupt-startup.md)
 for namespace fencing, delayed readiness, supported layouts and actual acceptance.

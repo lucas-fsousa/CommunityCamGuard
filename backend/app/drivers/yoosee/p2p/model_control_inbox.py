@@ -8,11 +8,8 @@ from dataclasses import dataclass, field
 
 from .model_control_job import (
     ControlWriteResult,
-    ControlWriteSpec,
-    NightVisionWriteSpec,
-    OrientationWriteSpec,
-    VolumeWriteSpec,
 )
+from .model_control_specs import CONTROL_WRITE_TYPES, ControlWriteSpec
 
 
 @dataclass(eq=False)
@@ -34,7 +31,7 @@ class ControlWriteInbox:
         self._closed = False
 
     def submit(self, spec: ControlWriteSpec) -> ControlWriteTicket:
-        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec)):
+        if not isinstance(spec, CONTROL_WRITE_TYPES):
             raise ValueError('typed control required')
         with self._lock:
             if self._closed or self._slot is not None:

@@ -9,6 +9,10 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Index
 
+Current shared-control implementation:
+[smart protection and weekly plan](native-shared-guard.md), with simulated tests
+explicitly distinguished from camera-backed actuation.
+
 Recurring offline / app startup without a live capture:
 [abrupt native startup](native-abrupt-startup.md), distinct from encoder recovery.
 

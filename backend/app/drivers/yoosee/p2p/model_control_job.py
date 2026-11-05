@@ -1,4 +1,4 @@
-"""Fixed typed scalar controls on an existing owner; no raw path, socket or replay."""
+"""Fixed typed model controls on an existing owner; no raw path, socket or replay."""
 
 import math
 import secrets
@@ -10,46 +10,26 @@ from dataclasses import dataclass
 from .broker_sequences import BrokerSequences
 from .broker_transactions import BrokerTransactions
 from .contracts import CertifiedNode
+from .model_control_specs import (
+    CONTROL_WRITE_TYPES,
+    ControlWriteSpec,
+    GuardScheduleWriteSpec,
+    GuardWriteSpec,
+    NightVisionWriteSpec,
+    OrientationWriteSpec,
+    VolumeWriteSpec,
+)
 from .model_write_protocol import parse_model_write_response
-from .night_vision import NIGHT_VISION_VALUES, build_night_vision_write
-from .orientation import ORIENTATION_VALUES, build_orientation_write
-from .volume import VOLUME_RAW_BY_PERCENT, build_volume_write
+from .night_vision import build_night_vision_write
+from .orientation import build_orientation_write
+from .smart_protection import build_smart_protection_write
+from .smart_protection_schedule import build_smart_protection_schedule_write
+from .volume import build_volume_write
 
-
-@dataclass(frozen=True, slots=True)
-class VolumeWriteSpec:
-    device_id: int
-    percent: int
-
-    def __post_init__(self):
-        if (type(self.device_id) is not int or not 0 < self.device_id < 1 << 64
-                or type(self.percent) is not int or self.percent not in VOLUME_RAW_BY_PERCENT):
-            raise ValueError('typed camera volume required')
-
-
-@dataclass(frozen=True, slots=True)
-class OrientationWriteSpec:
-    device_id: int
-    orientation: str
-
-    def __post_init__(self):
-        if (type(self.device_id) is not int or not 0 < self.device_id < 1 << 64
-                or type(self.orientation) is not str or self.orientation not in ORIENTATION_VALUES):
-            raise ValueError('typed camera orientation required')
-
-
-@dataclass(frozen=True, slots=True)
-class NightVisionWriteSpec:
-    device_id: int
-    mode: str
-
-    def __post_init__(self):
-        if (type(self.device_id) is not int or not 0 < self.device_id < 1 << 64
-                or type(self.mode) is not str or self.mode not in NIGHT_VISION_VALUES):
-            raise ValueError('typed camera night-vision mode required')
-
-
-ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec | NightVisionWriteSpec
+__all__ = (
+    'ControlWriteJob', 'ControlWriteResult', 'ControlWriteSpec', 'GuardScheduleWriteSpec',
+    'GuardWriteSpec', 'NightVisionWriteSpec', 'OrientationWriteSpec', 'VolumeWriteSpec',
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +42,7 @@ class ControlWriteResult:
 class ControlWriteJob:
     def __init__(self, node: CertifiedNode, sequences: BrokerSequences, spec: ControlWriteSpec, *,
                  generation: int, deadline: float, clock: Callable[[], float] = time.monotonic):
-        if not isinstance(spec, (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec)) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
+        if not isinstance(spec, CONTROL_WRITE_TYPES) or not math.isfinite(deadline) or not 0 < deadline-clock() <= 2:
             raise ValueError('bounded typed control write required')
         self._receipts = BrokerTransactions(node.session_id, generation, node.next_sequence,
                                             sequences=sequences, clock=clock)
@@ -73,8 +53,12 @@ class ControlWriteJob:
                 self._wire = build_volume_write(node, spec.device_id, spec.percent, ticket.sequence, self._message_id)
             elif isinstance(spec, OrientationWriteSpec):
                 self._wire = build_orientation_write(node, spec.device_id, spec.orientation, ticket.sequence, self._message_id)
-            else:
+            elif isinstance(spec, NightVisionWriteSpec):
                 self._wire = build_night_vision_write(node, spec.device_id, spec.mode, ticket.sequence, self._message_id)
+            elif isinstance(spec, GuardWriteSpec):
+                self._wire = build_smart_protection_write(node, spec.device_id, spec.enabled, ticket.sequence, self._message_id)
+            else:
+                self._wire = build_smart_protection_schedule_write(node, spec.device_id, spec.schedule, ticket.sequence, self._message_id)
         except BaseException:
             self._receipts.close()
             raise
