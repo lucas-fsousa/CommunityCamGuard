@@ -16,6 +16,8 @@ MTP_MAX_FRAME_SIZE = 0x7FF
 KCP_HEADER = struct.Struct("<IBBHIIII")
 KCP_PUSH = 0x51
 KCP_ACK = 0x52
+KCP_WASK = 0x53
+KCP_WINS = 0x54
 
 
 @dataclass(frozen=True, slots=True)

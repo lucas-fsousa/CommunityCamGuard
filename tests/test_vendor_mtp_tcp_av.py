@@ -72,6 +72,27 @@ def test_complete_lifecycle_with_close_receipt_and_no_reuse():
         s.due()
 
 
+@pytest.mark.parametrize('ready', [False, True])
+@pytest.mark.parametrize('conv', [42, CONTROL])
+def test_window_probe_uses_same_route_without_implying_av_acceptance(ready, conv):
+    from backend.app.drivers.yoosee.p2p.media_protocol import KCP_WINS, parse_kcp_segments
+    from tests.test_kcp_window import probe
+
+    s = session()
+    if ready:
+        negotiate(s)
+    else:
+        s.due()
+        s.receive(measurement_ack(), PEER)
+        s.due()  # INIT must be sent; unsolicited input remains ignored.
+    batch = s.receive(incoming(probe(conv=conv)), PEER)
+    assert len(batch.acknowledgements) == 1 and not batch.records
+    report, = parse_kcp_segments(canonical(batch.acknowledgements[0]))
+    assert report.conv == conv and report.command == KCP_WINS and report.window == 128
+    assert s.ready is ready
+    s.close()
+
+
 @pytest.mark.parametrize("kwargs", [{"sequence": 2}, {"timestamp": 999}, {"source": 24}])
 def test_wrong_measurement_cannot_start_av_or_extend_deadline(kwargs):
     now = [1.0]

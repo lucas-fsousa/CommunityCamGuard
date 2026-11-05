@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .kcp_receive import KcpReceiver
-from .media_protocol import MTP_MAX_FRAME_SIZE, build_kcp_ack, parse_kcp_segments
+from .kcp_window import build_window_report
+from .media_protocol import KCP_WASK, MTP_MAX_FRAME_SIZE, build_kcp_ack, parse_kcp_segments
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,15 @@ class MediaReceiver:
         acknowledgements: list[bytes] = []
         messages: list[bytes] = []
         for segment in segments:
+            if (segment.conv == self.receiver.conv and segment.command == KCP_WASK
+                    and segment.fragment == 0 and not segment.body):
+                # A peer that last saw window zero probes before sending again.
+                # WINS reports only current credit/UNA; it acknowledges no PUSH
+                # and must never advance sequence state or refresh a deadline.
+                acknowledgements.append(build_window_report(segment.conv,
+                    unacknowledged=self.receiver.next_sequence,
+                    window=self.receiver.available_window))
+                continue
             result = self.receiver.receive(segment)
             if result.acknowledge:
                 acknowledgements.append(build_kcp_ack(
