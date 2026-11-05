@@ -16,7 +16,13 @@ _PATTERNS = (
     ('encoder_setup', (b'error while opening encoder', b'error initializing output stream', b'unknown encoder', b'unrecognized option')),
     ('output_write', (b'broken pipe', b'error writing trailer', b'error muxing a packet')),
 )
-FAILURE_CATEGORIES = frozenset(name for name, _ in _PATTERNS) | {'unknown'}
+_TIMEOUTS = {'decoder input stalled': 'stdin_timeout',
+             'continuous decoder made no frame progress': 'progress_timeout'}
+FAILURE_CATEGORIES = frozenset(name for name, _ in _PATTERNS) | frozenset(_TIMEOUTS.values()) | {'unknown'}
+
+
+def timeout_category(error: TimeoutError) -> str:
+    return _TIMEOUTS.get(str(error), 'unknown')
 
 
 def classify(data: bytes) -> str:

@@ -1,6 +1,6 @@
 import pytest
 
-from backend.app.media.decoder_failure import classify
+from backend.app.media.decoder_failure import classify, timeout_category
 from backend.app.media.hevc_decoder import DecoderExitedError
 
 
@@ -30,3 +30,12 @@ def test_classifier_is_bounded_and_exit_metadata_cannot_hold_raw_error_text():
     error = DecoderExitedError(returncode=99999, category='SECRET')
     assert error.returncode is None and error.category == 'unknown'
     assert 'SECRET' not in str(error)
+
+
+@pytest.mark.parametrize('message,category', [
+    ('decoder input stalled', 'stdin_timeout'),
+    ('continuous decoder made no frame progress', 'progress_timeout'),
+    ('PRIVATE arbitrary timeout', 'unknown'),
+])
+def test_timeout_stage_uses_only_fixed_local_signatures(message, category):
+    assert timeout_category(TimeoutError(message)) == category

@@ -165,3 +165,17 @@ real connection deadline, retaining one bounded read/output batch rather than
 discarding accepted bytes/ACKs. See [TCP cooperation](native-tcp-cooperation.md)
 for exact limits and negative/positive regression evidence. It does not extend
 protocol deadlines, retry ambiguous writes or open a replacement connection.
+
+`02a6524` / `b-251e1726b689`, active138, passed CI5991tests/1skip and Image.
+A real `phase=output` scheduler yield occurred while the same MSE observation
+continued, confirming that this scheduling event no longer destroys the route.
+However the observation ended after153.9s (297messages/112764761bytes,
+max gap2.01s, trailing silence1.86s) with a local `TimeoutError`; another local
+timeout occurred later. Therefore sustained acceptance remains OPEN.
+
+Decoder timeout diagnostics now distinguish the existing fixed local signatures
+`stdin_timeout` (input writer) and `progress_timeout` (no new decoded frames).
+No raw exception text or new timeout/buffer policy is persisted/applied.45focused
+tests passed under192MiB/no swap, peak98.7MiB. This stage split is needed before
+changing the writer or output-drain behavior; the observed generic exception
+alone cannot justify increasing another deadline.

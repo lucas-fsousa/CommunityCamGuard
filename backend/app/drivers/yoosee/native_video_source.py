@@ -15,6 +15,7 @@ from pathlib import Path
 from ...media.archive_directories import ArchiveDirectories
 from ...media.archive_names import ARCHIVE_TEMPLATE, epoch_template
 from ...media.archive_spec import validate_segment_seconds
+from ...media.decoder_failure import timeout_category
 from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError, Mp4SizeError
 from ...media.hevc_decoder import DecoderExitedError, HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
@@ -210,6 +211,8 @@ class NativeVideoSource:
             if isinstance(error, DecoderExitedError):
                 self._decoder_returncode = str(error.returncode) if error.returncode is not None else ''
                 self._decoder_failure = error.category
+            elif isinstance(error, TimeoutError):
+                self._decoder_failure = timeout_category(error)
             if isinstance(error, Mp4OrderError):
                 self._mp4_expected, self._mp4_actual = error.expected, error.actual
             if isinstance(error, Mp4SizeError):

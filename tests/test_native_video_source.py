@@ -67,7 +67,8 @@ def setup(monkeypatch):
             return True
 
         def step(self):
-            pass
+            if failure[0] in ('decoder input stalled', 'continuous decoder made no frame progress'):
+                raise TimeoutError(failure[0])
 
         def close(self):
             if failure[0] == "close":
@@ -109,6 +110,21 @@ def test_single_source_fans_out_and_joins_owned_consumer_on_stop(setup):
         source.subscribe()
     with pytest.raises(ValueError, match="already started"):
         source.run(cancelled=lambda: False)
+
+
+@pytest.mark.parametrize('message,category', [
+    ('decoder input stalled', 'stdin_timeout'),
+    ('continuous decoder made no frame progress', 'progress_timeout'),
+])
+def test_local_timeout_stage_survives_consumer_and_account_cleanup(setup, message, category):
+    source, _, decoders, failure, calls = setup
+    failure[0] = message
+    result = source.run(cancelled=lambda: False)
+    assert result.reason == 'consumer_failed' and result.failure_type == 'TimeoutError'
+    assert source.diagnostics()['decoder_failure'] == category
+    assert calls == ['account', 'account_closed']
+    assert decoders[0].closed and not source._thread.is_alive()
+    assert message not in repr(source.diagnostics())
 
 
 def test_consumer_failure_cancels_account_and_is_not_retried(setup):
