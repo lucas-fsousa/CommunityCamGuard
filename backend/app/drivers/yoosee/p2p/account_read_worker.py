@@ -13,6 +13,8 @@ from .account_read_dispatcher import AccountReadDispatcher
 from .broker_account import AccountEvents
 from .broker_maintenance import BrokerMaintenance
 from .broker_read_socket import ReadSocket
+from .catalog_read_inbox import CatalogReadInbox
+from .catalog_read_pump import CatalogReadPump
 from .contracts import CertifiedNode
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp_media
 from .lamp_read_inbox import LampReadInbox
@@ -71,6 +73,7 @@ class AccountReadWorker:
                                                  clock=clock, policy=policy, state_reads=state_reads)
         self.mailbox = self._dispatcher.mailbox
         self.lamp_inbox = LampReadInbox(generation, clock=clock) if state_reads else None
+        self.catalog_inbox = CatalogReadInbox(generation, clock=clock) if state_reads else None
         self.control_inbox = ControlWriteInbox(generation, clock=clock) if state_reads else None
         self.motion_inbox = PtzInbox(generation, clock=clock) if allow_motion else None
         self._node: CertifiedNode | None = node
@@ -82,6 +85,8 @@ class AccountReadWorker:
         self._socket: ReadSocket | None = None
 
     def stop(self) -> None:
+        if self.catalog_inbox is not None:
+            self.catalog_inbox.close()
         if self.control_inbox is not None:
             self.control_inbox.close()
         if self.lamp_inbox is not None:
@@ -92,6 +97,8 @@ class AccountReadWorker:
 
     def drain(self) -> None:
         """Request no new work, with <=2 seconds for already active replies."""
+        if self.catalog_inbox is not None:
+            self.catalog_inbox.close()
         if self.motion_inbox is not None:
             self.motion_inbox.close()
         if self.lamp_inbox is not None:
@@ -145,6 +152,7 @@ class AccountReadWorker:
         motion_ticket: MotionTicket | None = None
         last_motion: ScheduledPtzResult | None = None
         lamp = LampReadPump(self._dispatcher, self.lamp_inbox, clock=self._clock) if self.lamp_inbox is not None else None
+        catalog = CatalogReadPump(self._dispatcher, self.catalog_inbox) if self.catalog_inbox is not None else None
         control_writes = ControlWritePump(self._dispatcher, self.control_inbox, clock=self._clock) if self.control_inbox is not None else None
         mixed = initial_motion is not None or self.motion_inbox is not None
         manual_acks = mixed or lamp is not None
@@ -269,6 +277,9 @@ class AccountReadWorker:
                 if lamp is not None:
                     for packet_lamp in lamp.poll():
                         send(packet_lamp)
+                if catalog is not None:
+                    for packet_catalog in catalog.poll():
+                        send(packet_catalog)
                 if control_writes is not None:
                     for packet_control in control_writes.poll():
                         send(packet_control)
@@ -289,6 +300,8 @@ class AccountReadWorker:
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
+                    if catalog is not None:
+                        catalog.observe(plain, peer, generation=self._generation)
                     if control_writes is not None:
                         control_writes.observe(plain, peer, generation=self._generation)
                     lamp_packets = lamp.observe(plain, peer, generation=self._generation) if lamp is not None else ()
@@ -329,6 +342,8 @@ class AccountReadWorker:
             protocol_code=PROTOCOL_CODES.get(str(error),'')
         finally:
             try:
+                if catalog is not None:
+                    catalog.close()
                 if control_writes is not None:
                     control_writes.close()
                 if lamp is not None:

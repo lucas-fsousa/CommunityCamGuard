@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from ...contracts import WeeklySchedule
+from .alarm_voice import AlarmVoiceResource
 from .night_vision import NIGHT_VISION_VALUES
 from .orientation import ORIENTATION_VALUES
 from .volume import VOLUME_RAW_BY_PERCENT
@@ -63,5 +64,15 @@ class GuardScheduleWriteSpec:
             raise ValueError('typed immutable camera guard schedule required')
 
 
-ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec | NightVisionWriteSpec | GuardWriteSpec | GuardScheduleWriteSpec
-CONTROL_WRITE_TYPES = (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec, GuardWriteSpec, GuardScheduleWriteSpec)
+@dataclass(frozen=True, slots=True)
+class AlarmVoiceWriteSpec:
+    device_id: int
+    resource: AlarmVoiceResource
+
+    def __post_init__(self):
+        if not _device(self.device_id) or not isinstance(self.resource, AlarmVoiceResource):
+            raise ValueError('typed catalogue resource selection required')
+
+
+ControlWriteSpec = VolumeWriteSpec | OrientationWriteSpec | NightVisionWriteSpec | GuardWriteSpec | GuardScheduleWriteSpec | AlarmVoiceWriteSpec
+CONTROL_WRITE_TYPES = (VolumeWriteSpec, OrientationWriteSpec, NightVisionWriteSpec, GuardWriteSpec, GuardScheduleWriteSpec, AlarmVoiceWriteSpec)

@@ -1,11 +1,15 @@
 # Native media delivery, not another finite trial
 
 The shared floodlight adapter is implemented with strict type12 reads/type11
-boolean writes on the same account, plus mandatory readback. Tests are simulated;
-no lamp was actuated for this integration. See [shared floodlight](native-shared-floodlight.md).
+boolean writes on the same account, plus mandatory readback. Subsequent authorized
+camera3 ON/OFF testing was physically confirmed by the owner. See [shared floodlight](native-shared-floodlight.md).
 Deployed `a59907e` / `b-64827371360c`, native/active96. Real lamp status GET passed
 while the same MSE socket continued; all3online/recording, CI/Image passed. The
-new write path has simulated coverage only. Earlier runtimes below are historical.
+new write path is now physically accepted on camera3. Earlier runtimes below are historical.
+
+Alarm-resource enumeration/selection now share that account too, without playing
+audio. See [shared alarm resources](native-shared-alarm-resources.md) for current
+test and deployment evidence; this does not homologate new sounds or devices.
 
 Smart-protection switch/weekly-plan shared writers are implemented without a
 second native account. Coverage is simulated; no guard was armed or schedule

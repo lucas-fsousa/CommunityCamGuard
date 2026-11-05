@@ -10,6 +10,8 @@ from .account_policy import AccountPolicy, validate_policy
 from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
 from .broker_read_socket import ReadSocket, ReadSpec
+from .catalog_read_inbox import CatalogReadTicket
+from .catalog_read_job import CatalogReadResult, CatalogReadSpec
 from .contracts import CertifiedNode, OnlineDevice
 from .lamp_control_specs import LampWriteSpec
 from .lamp_read_inbox import LampReadTicket
@@ -76,6 +78,23 @@ class AccountReadLifecycle:
             if self._state != "active" or self._worker is None:
                 raise ValueError("account not accepting reads")
             return self._worker.mailbox.submit(device_id, path, timeout)
+
+    def submit_catalog_read(self, spec: CatalogReadSpec) -> CatalogReadTicket:
+        with self._lock:
+            if self._state != 'active' or self._worker is None or self._worker.catalog_inbox is None:
+                raise ValueError('account not accepting catalogue reads')
+            return self._worker.catalog_inbox.submit(spec)
+
+    def take_catalog_read(self, ticket: CatalogReadTicket) -> CatalogReadResult | None:
+        with self._lock:
+            if self._worker is None or self._worker.catalog_inbox is None or ticket.generation != self._generation:
+                return None
+            return self._worker.catalog_inbox.take(ticket)
+
+    def cancel_catalog_read(self, ticket: CatalogReadTicket) -> None:
+        with self._lock:
+            if self._worker is not None and self._worker.catalog_inbox is not None and ticket.generation == self._generation:
+                self._worker.catalog_inbox.cancel(ticket)
 
     def submit_lamp_read(self, spec: LampReadSpec) -> LampReadTicket:
         with self._lock:

@@ -16,11 +16,13 @@ from backend.app.drivers.yoosee.p2p.model_control_job import (
     OrientationWriteSpec,
     VolumeWriteSpec,
 )
+from backend.app.drivers.yoosee.p2p.model_control_specs import AlarmVoiceWriteSpec
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2, new_header
 from tests.test_account_read_worker import WorkerSocket
 from tests.test_broker_reads import NODE as WORKER_NODE
 from tests.test_broker_transactions import ack
 from tests.test_lamp_read_job import NODE
+from tests.test_yoosee_alarm_resource_controls import resource
 
 
 def fixture(spec=None):
@@ -52,7 +54,7 @@ def test_typed_write_sends_once_and_transport_ack_is_not_success():
 
 
 @pytest.mark.parametrize('fault', ['peer', 'generation', 'session', 'message', 'unsent', 'expired'])
-@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',)))])
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',))), AlarmVoiceWriteSpec(7000000002, resource())])
 def test_unrelated_or_late_reply_does_not_confirm_write(fault, spec):
     job, _, now = fixture(spec)
     if fault != 'unsent':job.next_packet()
@@ -91,7 +93,7 @@ def test_only_five_integer_volume_positions_are_accepted(percent):
     with pytest.raises(ValueError):VolumeWriteSpec(123, percent)
 
 
-@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',)))])
+@pytest.mark.parametrize('spec', [VolumeWriteSpec(7000000002, 50), OrientationWriteSpec(7000000002, 'inverted'), NightVisionWriteSpec(7000000002, 'night'), GuardWriteSpec(7000000002, True), GuardScheduleWriteSpec(7000000002, WeeklySchedule('22:00','06:00',('mon',))), AlarmVoiceWriteSpec(7000000002, resource())])
 def test_existing_worker_sends_typed_control_on_its_only_socket_and_shared_sequences(monkeypatch, spec):
     sock = WorkerSocket()
     owner = AccountReadWorker(WORKER_NODE, 1, '192.0.2.1', 1234,

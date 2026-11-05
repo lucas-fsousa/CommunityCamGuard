@@ -35,8 +35,12 @@ Smart protection and its weekly plan also share the native session. Their write
 integration has simulated coverage; production checks were read-only, without
 arming protection. See [guard integration](docs/internal/native-shared-guard.md).
 The floodlight ON/OFF adapter can share that session too, with mandatory status
-readback and no command replay. Its new write path has simulated coverage only;
+readback and no command replay. Camera3 ON/OFF was physically confirmed by its owner;
 see [floodlight integration](docs/internal/native-shared-floodlight.md).
+Alarm-sound enumeration and selection also have shared-session adapters, without
+playing audio or opening another login. Selection requires a fresh catalogue and
+exact resource readback; see [alarm resources](docs/internal/native-shared-alarm-resources.md)
+for the distinction between simulated writes and live read-only checks.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

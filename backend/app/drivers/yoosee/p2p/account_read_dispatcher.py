@@ -10,6 +10,7 @@ from .broker_account import AccountEvents, AccountRead, BrokerAccount, Retiremen
 from .broker_mailbox import BrokerMailbox, MailboxTicket
 from .broker_reads import ReadRequest
 from .broker_transactions import ReceiptTicket
+from .catalog_read_job import CatalogReadJob, CatalogReadSpec
 from .contracts import CertifiedNode
 from .lamp_control_specs import LampWriteSpec
 from .lamp_read_job import LampReadJob, LampReadSpec
@@ -63,6 +64,9 @@ class AccountReadDispatcher:
 
     def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
         return self._account.prepare_media(spec, output)
+
+    def prepare_catalog_read(self, spec: CatalogReadSpec, *, deadline: float) -> CatalogReadJob:
+        return self._account.prepare_catalog_read(spec, deadline=deadline)
 
     def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
         return self._account.prepare_lamp_read(spec, deadline=deadline)

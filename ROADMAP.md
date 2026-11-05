@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-05 implementation: alarm-resource listing and selection now share the
+native owner. Fixed bounded C0/C1 catalogue reads, sole-reader fragments/QuickLZ,
+one typed D2 selection, exact resource readback and fresh per-unit proofs; no
+playback, second login or replay. Simulated writes are not physical acceptance.
+See docs/internal/native-shared-alarm-resources.md. Next remaining shared control
+is siren pulse with owner-driven OFF/cleanup, followed by native multi-camera
+capacity. LAN-only, SD and additional brands remain deferred.
+
 2026-11-05 implementation: floodlight boolean now has a shared-native type11
 writer with type12 preflight/readback, one send and no second account. Read-only
 admission stays strict; one lamp slot handles cancellation without leaks. Missing

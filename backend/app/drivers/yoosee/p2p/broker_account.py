@@ -13,6 +13,7 @@ from .broker_heartbeat import BrokerHeartbeat, HeartbeatCompletion
 from .broker_reads import BrokerReads, ReadCompletion, ReadRequest
 from .broker_sequences import BrokerSequences
 from .broker_transactions import ReceiptTicket
+from .catalog_read_job import CatalogReadJob, CatalogReadSpec
 from .contracts import CertifiedNode
 from .lamp_control_specs import LampWriteSpec
 from .lamp_read_job import LampReadJob, LampReadSpec
@@ -138,6 +139,13 @@ class BrokerAccount:
             self._reads.cancel(request.ticket)
             raise
         return AccountRead(request, wire)
+
+    def prepare_catalog_read(self, spec: CatalogReadSpec, *, deadline: float) -> CatalogReadJob:
+        if (self.state != 'active' or self._media_release_uncertain or self._node is None
+                or deadline > self._deadline or self.motion_cleanup_pending):
+            raise ValueError('account not accepting catalogue reads')
+        return CatalogReadJob(self._node, self._source, spec, generation=self._generation,
+                              deadline=deadline, clock=self._clock)
 
     def prepare_lamp_read(self, spec: LampReadSpec, *, deadline: float) -> LampReadJob:
         if (self.state != "active" or self._media_release_uncertain or self._node is None

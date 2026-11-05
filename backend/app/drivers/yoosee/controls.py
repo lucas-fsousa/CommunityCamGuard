@@ -263,16 +263,20 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
     if key != ALARM_VOICE:
         raise Unsupported(key)
     from .shared_control_reads import require_legacy_available
-    require_legacy_available(camera.camera_id)
     try:
         from . import alarm_resource_controls
 
         if alarm_resource_controls.managed(camera.camera_id):
             resources = alarm_resource_controls.options(_enrollment(camera))
         else:
-            resources = run_with_fresh_access(
-                _enrollment(camera), read_camera_alarm_voice_catalog,
-            ).resources
+            from .shared_alarm_catalog import read as read_shared_catalog
+            catalogue = read_shared_catalog(_enrollment(camera))
+            if catalogue is None:
+                require_legacy_available(camera.camera_id)
+                catalogue = run_with_fresh_access(
+                    _enrollment(camera), read_camera_alarm_voice_catalog,
+                )
+            resources = catalogue.resources
         return tuple(
             ControlOption(
                 resource.key,
@@ -287,6 +291,13 @@ def options(camera: Camera, key: str) -> tuple[ControlOption, ...]:
 
 
 def write(camera: Camera, key: str, value: ControlValue) -> ControlResult:
+    if key == ALARM_VOICE:
+        from .shared_alarm_selection import write as write_shared_selection
+        if type(value) is not str:
+            raise ControlOperationError('alarm voice must be a semantic option key')
+        shared_selection = write_shared_selection(_enrollment(camera), value)
+        if shared_selection is not None:
+            return shared_selection
     if key == WHITE_LIGHT:
         from .shared_floodlight import write as write_shared_floodlight
         if type(value) is not bool:

@@ -7,11 +7,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .alarm_voice_selection import build_alarm_voice_selection_write
 from .broker_sequences import BrokerSequences
 from .broker_transactions import BrokerTransactions
 from .contracts import CertifiedNode
 from .model_control_specs import (
     CONTROL_WRITE_TYPES,
+    AlarmVoiceWriteSpec,
     ControlWriteSpec,
     GuardScheduleWriteSpec,
     GuardWriteSpec,
@@ -57,6 +59,8 @@ class ControlWriteJob:
                 self._wire = build_night_vision_write(node, spec.device_id, spec.mode, ticket.sequence, self._message_id)
             elif isinstance(spec, GuardWriteSpec):
                 self._wire = build_smart_protection_write(node, spec.device_id, spec.enabled, ticket.sequence, self._message_id)
+            elif isinstance(spec, AlarmVoiceWriteSpec):
+                self._wire = build_alarm_voice_selection_write(node, spec.device_id, spec.resource, ticket.sequence, self._message_id)
             else:
                 self._wire = build_smart_protection_schedule_write(node, spec.device_id, spec.schedule, ticket.sequence, self._message_id)
         except BaseException:

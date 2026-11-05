@@ -116,3 +116,22 @@ def test_catalogue_target_must_match(setup, monkeypatch):
 ])
 def test_resource_evidence_requires_explicit_supported_structure(value, expected):
     assert alarm_resource_evidence(value) == expected
+
+
+def test_native_catalogue_keeps_exact_resource_proofs_without_legacy_login(setup, monkeypatch):
+    from backend.app.drivers.yoosee import shared_alarm_catalog, shared_control_reads
+    monkeypatch.setattr(shared_control_reads, 'has_session', lambda _: True)
+    monkeypatch.setattr(controls, 'run_with_fresh_access', lambda *a, **k: pytest.fail('parallel login'))
+    monkeypatch.setattr(shared_alarm_catalog, 'read', lambda _: SimpleNamespace(
+        device_id=IDENTITY.device_id, resources=(ITEM, resource(8))))
+    assert controls.options(ACCESS) == (ITEM,)
+    assert setup == []
+
+
+def test_native_owner_lost_before_collection_cannot_fall_back(setup, monkeypatch):
+    from backend.app.drivers.contracts import ControlNotReady
+    from backend.app.drivers.yoosee import shared_alarm_catalog, shared_control_reads
+    monkeypatch.setattr(shared_control_reads, 'has_session', lambda _: True)
+    monkeypatch.setattr(shared_alarm_catalog, 'read', lambda _: None)
+    with pytest.raises(ControlNotReady): controls.options(ACCESS)
+    assert setup == []

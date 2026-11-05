@@ -19,7 +19,10 @@ from .p2p.account_policy import AccountPolicy
 from .p2p.account_read_connect import ReadConnectFailure, open_read_connection
 from .p2p.account_read_lifecycle import AccountReadLifecycle, ReadConnection
 from .p2p.account_read_worker import WorkerSummary
+from .p2p.alarm_voice import AlarmVoiceResource
 from .p2p.broker_mailbox import MailboxTicket, ReadOutcome
+from .p2p.catalog_read_inbox import CatalogReadTicket
+from .p2p.catalog_read_job import CatalogReadResult, CatalogReadSpec
 from .p2p.contracts import P2PProbeError
 from .p2p.control_ownership import ControlChannelBusy, control_channel_contended
 from .p2p.lamp_control_specs import LampWriteSpec
@@ -34,7 +37,7 @@ from .p2p.model_control_job import (
     OrientationWriteSpec,
     VolumeWriteSpec,
 )
-from .p2p.model_control_specs import GuardScheduleWriteSpec, GuardWriteSpec
+from .p2p.model_control_specs import AlarmVoiceWriteSpec, GuardScheduleWriteSpec, GuardWriteSpec
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
@@ -116,6 +119,18 @@ class SharedReadSession:
     def matches_enrollment(self, entry: P2PEnrollment) -> bool:
         return self._active_entry == entry and self._lifecycle.state == "active"
 
+    def submit_catalog_read(self, system: bool) -> CatalogReadTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active resource catalogue enrollment required')
+        return self._lifecycle.submit_catalog_read(CatalogReadSpec(entry.access_id, system))
+
+    def take_catalog_read(self, ticket: CatalogReadTicket) -> CatalogReadResult | None:
+        return self._lifecycle.take_catalog_read(ticket)
+
+    def cancel_catalog_read(self, ticket: CatalogReadTicket) -> None:
+        self._lifecycle.cancel_catalog_read(ticket)
+
     def submit_lamp_read(self) -> LampReadTicket:
         entry = self._active_entry
         if entry is None:
@@ -133,6 +148,12 @@ class SharedReadSession:
 
     def cancel_lamp_write(self, ticket: LampReadTicket) -> None:
         self._lifecycle.cancel_lamp_read(ticket)
+
+    def submit_alarm_voice_write(self, resource: AlarmVoiceResource) -> ControlWriteTicket:
+        entry = self._active_entry
+        if entry is None:
+            raise ValueError('active resource selection enrollment required')
+        return self._lifecycle.submit_control_write(AlarmVoiceWriteSpec(int(entry.device_id), resource))
 
     def submit_volume_write(self, percent: int) -> ControlWriteTicket:
         entry = self._active_entry

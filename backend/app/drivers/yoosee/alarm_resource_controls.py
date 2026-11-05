@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 
 from ...db.p2p import P2PEnrollment
-from ..contracts import ControlDescriptor
+from ..contracts import ControlDescriptor, ControlNotReady
 from . import capability_resource_profiles as profiles
 from . import capability_rollout as rollout
 from . import capability_snapshot_store as snapshots
@@ -52,9 +52,14 @@ def _profile(enrollment: P2PEnrollment) -> ResourceProfile:
     return profile
 
 
-def _fresh_resources(enrollment: P2PEnrollment) -> tuple[AlarmVoiceResource, ...]:
+def _fresh_resources(enrollment: P2PEnrollment, *, native_only: bool = False) -> tuple[AlarmVoiceResource, ...]:
     before = _profile(enrollment)
-    catalogue = read_camera_alarm_voice_catalog(enrollment, require_correlated_response=True)
+    from .shared_alarm_catalog import read as read_shared
+    catalogue = read_shared(enrollment)
+    if catalogue is None:
+        if native_only:
+            raise ControlNotReady('native resource catalogue owner changed')
+        catalogue = read_camera_alarm_voice_catalog(enrollment, require_correlated_response=True)
     if catalogue.device_id != enrollment.device_id:
         raise P2PProbeError("resource catalogue device mismatch")
     received_at = time.time()
@@ -68,6 +73,9 @@ def _fresh_resources(enrollment: P2PEnrollment) -> tuple[AlarmVoiceResource, ...
 
 
 def options(enrollment: P2PEnrollment) -> tuple[AlarmVoiceResource, ...]:
+    from .shared_control_reads import has_session
+    if has_session(enrollment.camera_id):
+        return _fresh_resources(enrollment, native_only=True)
     return run_with_fresh_access(enrollment, _fresh_resources)
 
 

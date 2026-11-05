@@ -78,15 +78,13 @@ def test_shared_reads_never_accept_an_action_or_unmapped_control():
         module.read(ENROLLMENT, "siren_pulse")
 
 
-@pytest.mark.parametrize("operation", ["write", "resource_options"])
-def test_unintegrated_controls_cannot_preempt_live_native_stream(monkeypatch, operation):
+def test_unintegrated_controls_cannot_preempt_live_native_stream(monkeypatch):
     session = Session()
     monkeypatch.setattr(controls, "_enrollment", lambda _: ENROLLMENT)
     monkeypatch.setattr(controls, "run_with_fresh_access", lambda *a, **k: pytest.fail("parallel login"))
     camera = SimpleNamespace(camera_id=ENROLLMENT.camera_id)
     with module.publish(ENROLLMENT.camera_id, session), pytest.raises(ControlNotReady, match="cannot yet share"):
-        if operation == "write": controls.write(camera, "siren_pulse", 2)
-        else: controls.options(camera, "alarm_voice")
+        controls.write(camera, "siren_pulse", 2)
     assert not session.paths
 
 

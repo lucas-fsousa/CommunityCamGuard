@@ -10,7 +10,10 @@ remains the fuller narrative record and the source for decisions not yet migrate
 ## Index
 
 [Shared native floodlight](native-shared-floodlight.md): implementation and
-synthetic acceptance, without physical illumination tests.
+camera3 physical ON/OFF acceptance confirmed by the owner.
+
+[Shared native alarm resources](native-shared-alarm-resources.md): silent catalogue
+enumeration and exact resource selection without another account or playback.
 
 Current shared-control implementation:
 [smart protection and weekly plan](native-shared-guard.md), with simulated tests
