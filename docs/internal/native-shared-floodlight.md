@@ -42,3 +42,18 @@ cameras report online/recording, app restart count0 and no OOM. No real POST lig
 command was used. CI42007665790 and Image42007665784 passed. This production
 acceptance confirms the status-reader refactor/coexistence, not physical actuation
 of the new native write path.
+
+## Authorized native LED test
+
+On the user's explicit request, camera3 alone received `PUT white_light=true`,
+remained on for10seconds, then received `PUT white_light=false` to restore its
+original state. Both calls returned200, verified/authenticated, transport and
+application acknowledged, error0. Independent type12 reads confirmed ON before
+restoration and OFF afterward. The existing native owner remained active at
+revision96; no standalone login, restart or other camera command was used.
+The same MSE socket delivered3binary chunks before and3more after the operation
+(1355/190213/187554/255214/628812/443510bytes). These receipts establish command
+acceptance and readback, not a latency measurement. Human visual confirmation
+of the LED turning on and off was subsequently supplied by the user: it lit
+normally and went out afterward. Shared-native floodlight actuation is physically
+accepted on camera3; this does not grant support to unverified devices/models.

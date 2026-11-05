@@ -11,8 +11,10 @@ write reply can be resolved only after a send/timeout and exact readback, never
 by replaying or waiving explicit errors.222 focused tests, Mypy388/Ruff passed.
 Deployed `a59907e` / `b-64827371360c`, native/active96. Real GET white_light200
 verified/authenticated while the same MSE socket advanced3→6 chunks; all3online/
-recording, no OOM/restarts. Full CI/Image passed. No real LED/sound/motor commands;
-write-path physical acceptance is not claimed. See
+recording, no OOM/restarts. Full CI/Image passed. Subsequent authorized camera3
+test sent ON then OFF after10seconds, both application-acknowledged with exact
+readback and native revision96 unchanged. User confirmed the LED lit normally
+and went out afterward: native write-path physical acceptance is complete. See
 docs/internal/native-shared-floodlight.md. Remaining shared controls: siren pulse
 and resource/sound selection, followed by multi-camera native capacity.
 
