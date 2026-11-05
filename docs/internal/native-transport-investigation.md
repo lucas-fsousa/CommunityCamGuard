@@ -179,3 +179,14 @@ No raw exception text or new timeout/buffer policy is persisted/applied.45focuse
 tests passed under192MiB/no swap, peak98.7MiB. This stage split is needed before
 changing the writer or output-drain behavior; the observed generic exception
 alone cannot justify increasing another deadline.
+
+`0cfd50d` / `b-f915c1b68689`, active141, retained delivery but a further observation
+ended after139.9s (272messages, max gap2.8s, trailing silence4.92s) with
+`media_idle_timeout`. FFmpeg's last samples showed a flat input counter and
+essentially flat CPU, with no disk-blocked state. This instance was a real
+complete-message receive silence, not evidence for changing the stdin guard.
+
+Subsequent bounded SDK inspection found ongoing periodic meter transmission
+missing from the continuous implementation. The new same-connection maintenance
+owner is documented in [TCP MTP maintenance](native-tcp-maintenance.md). This
+addresses that protocol omission; live confirmation is still required.

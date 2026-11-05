@@ -16,6 +16,7 @@ from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, MediaRateBudget, validate_media_policy
 from .mtp_tcp_ack import build_mtp_tcp_meter_ack, build_mtp_tcp_plain_meter_ack
 from .mtp_tcp_framing import MtpTcpFramer
+from .mtp_tcp_heartbeat import TcpMeterHeartbeat
 from .mtp_tcp_kcp import unwrap_tcp_relay_kcp, wrap_tcp_relay_kcp
 from .mtp_tcp_measurement import build_mtp_tcp_measurement, matches_mtp_tcp_measurement_ack
 from .tcp_budget import TcpProfile, validate_profile
@@ -63,6 +64,8 @@ class TcpAvSession:
         self._cookie, self._user_data = cookie, request_user_data
         self._framer = MtpTcpFramer()
         self._av: AvHandshake | None = None
+        self._heartbeat: TcpMeterHeartbeat | None = None
+        self._closing = False
         self._measurement_sent = False
         self.closed = False
         self.received_bytes = self.sent_bytes = self.received_records = 0
@@ -96,6 +99,8 @@ class TcpAvSession:
         self._framer.abort()
         if self._av is not None:
             self._av.close()
+        if self._heartbeat is not None:
+            self._heartbeat.close()
         self._measurement = self._cookie = b""
         self._user_data = None
 
@@ -144,7 +149,12 @@ class TcpAvSession:
         self.poll()
         try:
             if self._av is not None:
-                return self._account(tuple(self._wrap(wire) for wire in self._av.due()))
+                wires = tuple(self._wrap(wire) for wire in self._av.due())
+                if self._heartbeat is not None and not self._closing:
+                    maintenance = self._heartbeat.due()
+                    if maintenance is not None:
+                        wires += (maintenance,)
+                return self._account(wires)
             if self._measurement_sent:
                 return ()
             self._measurement_sent = True
@@ -160,7 +170,12 @@ class TcpAvSession:
                     expected_sequence=1, expected_timestamp_ms=self._tick)):
             self._av = AvHandshake(self._peer, self._link, self._call, self._cookie,
                                     request_user_data=self._user_data, clock=self._clock, policy=self.policy)
+            if self.policy is MediaPolicy.CONTINUOUS:
+                self._heartbeat = TcpMeterHeartbeat(link_id=self._link, source_id=self._source,
+                    destination_id=self._destination, call_id=self._call, clock=self._clock)
             self._measurement = b""
+            return None
+        if self._heartbeat is not None and self._heartbeat.observe(wire):
             return None
         offset = 14 if wire[1] == 0xD0 else 6
         if len(wire) > offset + 1 and wire[offset + 1] == 1:
@@ -215,6 +230,9 @@ class TcpAvSession:
             self._fail("TCP AV CLOSE requires negotiated media")
         try:
             self._av.begin_finish()
+            self._closing = True
+            if self._heartbeat is not None:
+                self._heartbeat.close()
         except ReceiveError:
             self.close()
             raise
