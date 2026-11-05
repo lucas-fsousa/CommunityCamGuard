@@ -198,3 +198,26 @@ returned200/verified in175ms; no lamp write was sent. The first closed original
 segment probed successfully:300.964s HEVC1920×1080 plus16kHz mono AAC. The next
 300s segment used the same encoder-epoch suffix. No OOM/restart loop; sustained
 MSE acceptance is still being measured and will be recorded separately.
+
+## Completed bounded continuous acceptance
+
+The latest observer completed its full900.0seconds on one MSE connection:
+1797binary messages,684417887bytes, max inter-message gap3.02seconds, trailing
+silence0.73seconds at the deliberate test deadline. There was no reconnect,
+native retry event, SDK/source replacement or container restart during that
+window. Source selection remained native/active144, build `b-58c43b444dfd`.
+Messages are MP4 initialization/fragments, not decoded-frame counts; gaps are
+delivery intervals, not measured camera-to-screen latency. Payloads were read
+and discarded immediately, not accumulated or written as a capture.
+
+Post-run lamp GET again returned200/verified in404ms, without a write. Legacy
+ingress counters were present for the two other cameras and their transports
+were not migrated. Native recordings continued across successive300s segments
+under the same encoder-epoch suffix, and the closed original clip's codec/
+resolution/sample-rate probe passed as recorded above. Container memory sampled
+around198–228MiB, OOMfalse, restart count0. No sound/light/motor/reset test.
+
+This bounded continuous acceptance PASSED. Do not infer multi-day endurance,
+unobserved failure coverage or concurrent native-camera support. The next
+implementation item is the shared-account multi-camera owner, with offline
+isolation/cleanup tests before any separately authorized additional live camera.

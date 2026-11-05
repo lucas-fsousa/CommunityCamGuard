@@ -13,12 +13,17 @@ budget: real repairs took2.7–3.5s, beyond the old2s cutoff. Periodic MTP maint
 is implemented on the same connection and its first fresh receipt was confirmed.
 
 Read-only lamp GET200/verified175ms and a complete300.964s original HEVC1920×1080/
-AAC recording passed during unchanged native ownership. Sustained acceptance
-remains OPEN; short successes previously preceded actual failures. No new
+AAC recording passed during unchanged native ownership. The latest900-second
+continuous MSE run PASSED:1797messages/684417887bytes, no reconnect or SDK recovery,
+max inter-message gap3.02s (not end-to-end latency). Longer endurance remains
+unproven; earlier short successes preceded actual failures. No new
 physical control test or native experiment on the other cameras. Original media
 and memory ceilings remain; TCP continuation holds at most one4KiB read and one
-256-message/32KiB output batch. Other2retain legacy RTSP. Resume native multi-camera
-capacity only after sustained delivery; tests remain restricted to camera3.
+256-message/32KiB output batch. Other2retain legacy RTSP. Next implementation item:
+shared-account multi-camera capacity, not another physical control re-test. Use
+one broker reader with independent per-camera routes/consumers and offline
+concurrency/cleanup tests; do not merely increase registry capacity or duplicate
+SDK logins. Live tests remain restricted to camera3 unless explicitly broadened.
 Exact sequence/results: docs/internal/native-transport-investigation.md and its
 linked KCP, A/V, TCP cooperation and maintenance notes.
 
