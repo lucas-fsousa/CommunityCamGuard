@@ -2,6 +2,7 @@
 
 import hashlib
 import io
+import urllib.error
 from unittest.mock import Mock
 
 import pytest
@@ -95,3 +96,40 @@ def test_output_symlink_never_changes_its_target(tmp_path, artifact):
     with pytest.raises(ValueError):
         installer.install("amd64", output)
     assert target.read_bytes() == b"user-data" and output.is_symlink()
+
+
+@pytest.mark.parametrize('failure', [TimeoutError(), ConnectionResetError(),
+    urllib.error.URLError(TimeoutError()), urllib.error.HTTPError('https://example.invalid',503,'busy',{},None)])
+def test_transient_transfer_retries_from_clean_files_and_preserves_digest(tmp_path, artifact, failure):
+    output = tmp_path/'go2rtc'
+    opener = Mock(side_effect=[failure, io.BytesIO(PAYLOAD)])
+    waits = []
+    assert installer.install_with_retry('amd64',output,opener=opener,sleep=waits.append) == 'amd64'
+    assert opener.call_count == 2 and waits == [2]
+    assert output.read_bytes() == PAYLOAD and list(tmp_path.iterdir()) == [output]
+
+
+def test_repeated_timeout_is_bounded_and_never_publishes(tmp_path, artifact):
+    output = tmp_path/'go2rtc'
+    opener = Mock(side_effect=TimeoutError())
+    waits = []
+    with pytest.raises(TimeoutError):
+        installer.install_with_retry('amd64',output,opener=opener,sleep=waits.append)
+    assert opener.call_count == 3 and waits == [2,4]
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize('failure', [urllib.error.HTTPError('https://example.invalid',403,'denied',{},None),
+    urllib.error.URLError('certificate failure')])
+def test_nontransient_http_or_trust_error_is_not_retried(tmp_path, artifact, failure):
+    opener = Mock(side_effect=failure)
+    with pytest.raises(urllib.error.URLError):
+        installer.install_with_retry('amd64',tmp_path/'go2rtc',opener=opener,sleep=lambda _:pytest.fail('retry'))
+    assert opener.call_count == 1
+
+
+def test_checksum_failure_is_not_retried_or_waived(tmp_path, artifact):
+    opener = Mock(return_value=io.BytesIO(b'wrong artifact'))
+    with pytest.raises(ValueError, match='checksum'):
+        installer.install_with_retry('amd64',tmp_path/'go2rtc',opener=opener,sleep=lambda _:pytest.fail('retry'))
+    assert opener.call_count == 1 and not list(tmp_path.iterdir())

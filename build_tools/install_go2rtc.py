@@ -11,6 +11,7 @@ import platform
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -93,13 +94,35 @@ def install(value: str, output: Path, *, opener=urllib.request.urlopen,
         temporary.unlink(missing_ok=True)
 
 
+def install_with_retry(value: str, output: Path, *, opener=urllib.request.urlopen,
+                       clock=time.monotonic, sleep=time.sleep) -> str:
+    """At most three fresh, verified transfers for transient network errors only.
+
+    Each attempt retains install's60-second/32MiB bounds and removes partials.
+    Wrong hashes, custom files, certificate failures and HTTP4xx fail immediately.
+    """
+    for attempt in range(3):
+        try:
+            return install(value, output, opener=opener, clock=clock)
+        except (TimeoutError, ConnectionError, urllib.error.URLError) as exc:
+            transient = isinstance(exc, (TimeoutError, ConnectionError))
+            if isinstance(exc, urllib.error.HTTPError):
+                transient = exc.code in (408, 429, 500, 502, 503, 504)
+            elif isinstance(exc, urllib.error.URLError):
+                transient = isinstance(exc.reason, (TimeoutError, ConnectionError))
+            if not transient or attempt == 2:
+                raise
+            sleep(2 ** (attempt+1))
+    raise AssertionError('unreachable transfer attempt')
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arch", default="")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        name = install(args.arch, args.output)
+        name = install_with_retry(args.arch, args.output)
     except (OSError, ValueError) as exc:
         detail = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
         print(f"go2rtc artifact install failed: {detail}", file=sys.stderr)

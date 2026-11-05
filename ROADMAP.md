@@ -4,6 +4,13 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+CI follow-up: runs42042573079/42043633669 failed before pytest because the pinned
+go2rtc release transfer timed out. CLI now retries at most3fresh transfers with
+2s/4s backoff only for transient network/selected HTTP errors. Hash/size limits,
+custom-file/symlink safety and fixed architecture/version remain mandatory;
+integrity/trust/HTTP403 failures are never retried or waived.20 offline installer
+tests passed under192MiB; no artifact was downloaded/executed by those tests.
+
 Camera3 native selection actuation accepted: `6defc44` / `b-18dfd59c5904`,
 native/active108. Original selection was read, then Zumbido2 selected and Zumbido1
 restored; both200/ACK/error0/exact readback with same MSE3→6chunks and revision108
