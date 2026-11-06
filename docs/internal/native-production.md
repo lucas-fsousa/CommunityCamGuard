@@ -1,6 +1,24 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-06): `32632de`, build `b-210e76d55cfa`,
+Current deployed runtime (2026-11-06): `c82a053`, build `b-a5d5dd07a803`,
+camera3 native/active153. CI6119tests/1skip and Image passed. Optional lazy driver
+runtime services are now registered under the server owner, before native source
+runtimes. The shared account owner, same-owner group publication and camera-local
+recovery pass synthetic three-consumer integration, including a decoder failure
+and explicit replacement using only one login/socket/SDK-owner scope. The normal
+generic registry cleanup contract already supports lease detach; no vendor-specific
+socket-retirement exception was added. See [account lifetime](native-account-lifetime.md).
+
+Production offers remain the accepted single-source path. Reviewed shared offers,
+per-lease PTZ authority and bounded public multi-source admission are still pending.
+No other camera was migrated or tested natively. A post-deploy60s MSE connection
+completed without reconnect:62messages/31604455bytes, max inter-message gap1.877s
+(not live latency). Lamp GET-only200/verified267ms followed an initial409 response.
+Legacy packet counters advanced; app194.4MiB/1GiB, OOM=false/restarts=0. A closed
+299.885667s original archive remainsHEVC1920×1080/AAC16000Hz mono, with the next
+segment under the same epoch. No sound/light/motor action was sent.
+
+Previous deployed runtime (2026-11-06): `32632de`, build `b-210e76d55cfa`,
 camera3 native/active150. CI6085tests/1skip and Image passed. Dynamic source leases
 and a borrowed native-consumer/control binding are implemented and tested offline.
 The default production path now uses the extracted exact-device control delegates;

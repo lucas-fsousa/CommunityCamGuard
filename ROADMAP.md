@@ -16,6 +16,12 @@ Current production offers are unchanged; next
 wire reviewed offers and per-lease PTZ to the service, then bounded
 multi-source admission. See docs/internal/native-account-lifetime.md.
 
+Deployed checkpoint:c82a053/build b-a5d5dd07a803, camera3 native/active153,
+CI6119tests/1skip and Image passed. Default-path60s MSE:62fragments/31604455bytes,
+max gap1.877s (not absolute latency), no reconnect; read-only lamp200/verified267ms.
+Legacy counters advanced, original1080pHEVC/AAC archive closed/next segment present;
+app194.4MiB/1GiB, no OOM/restart. Shared multi-camera admission is still NOT enabled.
+
 2026-11-06 next integration checkpoint: dynamic per-camera media leases now reach
 the same worker/lifecycle, including cooperative detach and later replacement
 without another login. Admission binds exact authenticated account/inventory,

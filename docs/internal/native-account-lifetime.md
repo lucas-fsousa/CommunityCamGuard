@@ -86,3 +86,28 @@ contract already supports a detached source lease; do not invent a requirement
 to physically close the shared broker socket for each camera.
 
 See [source leases](native-source-leases.md) and [driver architecture](0001-pluggable-camera-drivers.md).
+
+## Deployed regression checkpoint
+
+Code `c82a053` passed CI6119tests/1skip and Image. The image build used512MiB/CPU50%
+limits; image0250f10f1842/tag `wsl-native-account-owner` replaced only the app,
+preserving the hub and user's recordings-host mount. Build `b-a5d5dd07a803`,
+camera3 native/active153. The service is registered but no shared-account request
+is made by current production offers; this does NOT activate a new login or
+silently migrate another camera.
+
+A single authenticated MSE connection completed60.0seconds:62binary fragments/
+31604455bytes, maximum inter-message gap1.877s, no reconnect or new retry event.
+Fragments are not decoded frames, and interarrival gap is not end-to-end latency.
+The old source's confirmed retirement event was at12:40:31Z; no later retry was
+logged in the checked interval. Read-only lamp state initially returned409, then
+returned200/verified267ms without a configuration write. Yard/garage ingress
+packet counters advanced6509→12471 and8372→15831; their base consumers changed
+from1to2 during the observation. No cause is inferred from that consumer change.
+
+App194.4MiB/1GiB, OOM=false/restarts=0, three FFmpeg processes inside the app
+(excluding hub transcoders/unrelated WSL projects). The closed native archive
+`20261106_124048_e06d20cb905a342ba897934a133e857e9.mp4` was inspected without
+playback:299.885667s, HEVC1920×1080/AAC16000Hz mono. The next124547segment used
+the same epoch. This is a short regression of the unchanged production path,
+not live acceptance of three native cameras or a new physical-control test.
