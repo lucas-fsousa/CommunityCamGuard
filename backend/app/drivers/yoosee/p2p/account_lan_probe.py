@@ -6,8 +6,10 @@ import time
 from collections.abc import Callable
 
 from .bootstrap_evidence import classify_meter
+from .crypto import gute_mode0_decrypt, gute_mode1_xor_checksum
 from .media_protocol import build_media_meter_request, parse_media_meter
 from .media_route_job import MediaRouteJob
+from .rendezvous_protocol import build_nat_online, build_nat_online_ack
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ class _Measurement:
         self.started = now
         self.sent: set[tuple[int, int]] = set()
         self.done = False
+        self.nat_started = False
+        self.nat_replies = 0
 
 
 class AccountLanProbe:
@@ -32,6 +36,7 @@ class AccountLanProbe:
         self._clock = clock
         self._probes: dict[MediaRouteJob, _Measurement] = {}
         self._disabled: set[int] = set()
+        self._replies: list[tuple[MediaRouteJob, bytes, tuple[str, int]]] = []
 
     def disable(self, device_id: int) -> None:
         self._disabled.add(device_id)
@@ -41,7 +46,8 @@ class AccountLanProbe:
         for route in tuple(self._probes):
             if route not in active:
                 del self._probes[route]
-        packets = []
+        packets = [(wire, peer) for route, wire, peer in self._replies if route in active]
+        self._replies.clear()
         now = self._clock()
         for route in routes:
             if route not in active or route.endpoint is None:
@@ -57,6 +63,14 @@ class AccountLanProbe:
                     probe.done = True
                     route.lan_probe_complete = True
                     log.info("native LAN measurement outcome=no_candidate")
+            if probe.peer is not None and route.nat_endpoint is not None and not probe.nat_started:
+                probe.nat_started = True
+                hello = build_nat_online(route.access_id, route.device_id, route.attempt.link_id)
+                packets.extend((hello, route.nat_endpoint) for _ in range(3))
+            if now - probe.started >= 1.5 and not route.nat_handshake_complete:
+                route.nat_handshake_complete = True
+                if route.nat_endpoint is not None:
+                    log.info("native UDP rendezvous confirmed=%s", route.nat_handshake_confirmed)
             if probe.done:
                 continue
             if now - probe.started >= 1.5:
@@ -78,6 +92,24 @@ class AccountLanProbe:
         return tuple(packets)
 
     def receive(self, wire: bytes, peer: tuple[str, int]) -> None:
+        if len(wire) == 52 and wire[:2] == b"\x7f\xca":
+            try:
+                direct = gute_mode0_decrypt(wire)
+            except ValueError:
+                return
+            if gute_mode1_xor_checksum(direct) != struct.unpack_from("<I", direct, 16)[0]:
+                return
+            for route, probe in self._probes.items():
+                if (not route.accepts_direct_probe or peer != route.nat_endpoint or not probe.nat_started
+                        or probe.nat_replies >= 3 or self._clock() - probe.started >= 1.5
+                        or struct.unpack_from("<I", direct, 0x24)[0] != route.attempt.link_id):
+                    continue
+                probe.nat_replies += 1
+                self._replies.extend(((route, build_nat_online(route.access_id, route.device_id, route.attempt.link_id), peer),
+                    (route, build_nat_online_ack(route.access_id, route.attempt.link_id), peer)))
+                route.nat_handshake_confirmed = route.nat_handshake_complete = True
+                log.info("native UDP rendezvous confirmed=True")
+            return
         # A fixed-size meter, never media buffers or arbitrary application data.
         if len(wire) not in (74, 78):
             return
@@ -102,3 +134,4 @@ class AccountLanProbe:
     def close(self) -> None:
         self._probes.clear()
         self._disabled.clear()
+        self._replies.clear()

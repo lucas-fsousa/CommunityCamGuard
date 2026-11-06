@@ -73,6 +73,32 @@ def test_meter_requires_pinned_peer_and_exact_fresh_roundtrip(fault, caplog):
     assert "192.168" not in caplog.text
 
 
+@pytest.mark.parametrize("reply", [True, False])
+def test_existing_udp_nat_exchange_is_cooperative_and_correlated(reply):
+    from backend.app.drivers.yoosee.p2p.rendezvous_protocol import build_nat_online
+
+    now = [0.0]
+    job = route(now)
+    job.nat_endpoint = ("8.8.4.4", 32100)
+    probe = AccountLanProbe(clock=lambda: now[0])
+    packets = probe.poll((job,))
+    assert len(packets) == 4
+    assert sum(wire[:2] == b"\x7f\xca" for wire, _ in packets) == 3
+    meter = next(wire for wire, _ in packets if wire[:2] == b"\xc0\x90")
+    probe.receive(build_media_meter_ack(meter), PEER)
+    assert job.lan_roundtrip_confirmed and not job.nat_handshake_confirmed
+    incoming = build_nat_online(job.device_id, job.access_id, job.attempt.link_id)
+    probe.receive(incoming, ("8.8.4.5", 32100))
+    assert not job.nat_handshake_confirmed
+    if reply:
+        probe.receive(incoming, job.nat_endpoint)
+        responses = probe.poll((job,))
+        assert [wire[:2] for wire, _ in responses] == [b"\x7f\xca", b"\x7f\xcb"]
+    now[0] = 1.5
+    probe.poll((job,))
+    assert job.nat_handshake_complete and job.nat_handshake_confirmed is reply
+
+
 @pytest.mark.parametrize("fault", ["send", "silent"])
 def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(monkeypatch, caplog, fault):
     caplog.set_level(logging.INFO)

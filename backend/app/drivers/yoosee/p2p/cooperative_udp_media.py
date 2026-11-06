@@ -41,6 +41,9 @@ class CooperativeUdpMedia:
         if route.lan_endpoint is None or not route.lan_roundtrip_confirmed:
             raise ValueError("UDP AV requires a measured LAN route")
         self.peer = route.lan_endpoint
+        self._peers = {self.peer}
+        if route.nat_handshake_confirmed and route.nat_endpoint is not None:
+            self._peers.add(route.nat_endpoint)
         self._clock, self._send, self._delivery = clock, send, video
         self._link, self._call = route.attempt.link_id, route.attempt.call_id
         self._direct_calling = route.direct_calling()
@@ -48,7 +51,7 @@ class CooperativeUdpMedia:
         self._owner = AvHandshake(self.peer, self._link, self._call, route.attempt.cookie,
             request_user_data=route.metadata, policy=MediaPolicy.CONTINUOUS, clock=clock)
         self._meter = AvMeter(self.peer, self._link, self._call, self._access, self._device,
-                              continuous=True)
+                              continuous=True, channel_types=(3, 4))
         self._traffic = MediaRateBudget(clock=clock)
         self._next_meter = clock() + 1
         self._sequence = 2  # Initial route measurements used sequences1/2.
@@ -61,9 +64,9 @@ class CooperativeUdpMedia:
     def ready(self) -> bool:
         return self.result is None and self._owner.ready and self._close_until is None
 
-    def _write(self, wire: bytes) -> None:
+    def _write(self, wire: bytes, peer: tuple[str, int] | None = None) -> None:
         self._traffic.charge(tx=len(wire))
-        self._send(wire, self.peer)
+        self._send(wire, self.peer if peer is None else peer)
 
     def _close(self) -> UdpMediaResult:
         if self.result is None:
@@ -99,12 +102,12 @@ class CooperativeUdpMedia:
 
     def receive(self, wire: bytes, peer: tuple[str, int]) -> bool:
         """Only validated exact-route traffic leaves the broker's foreign budget."""
-        if self.result is not None or peer != self.peer:
+        if self.result is not None or peer not in self._peers:
             return False
         meter = parse_media_meter(wire) if len(wire) in (74, 78) else None
         if meter is not None:
             if (meter.link_id != self._link or meter.source_id != self._device
-                    or meter.destination_id != self._access or meter.channel_type != 4
+                    or meter.destination_id != self._access or meter.channel_type not in (3, 4)
                     or meter.record_length != len(wire) - 6 or meter.kind not in (1, 2)):
                 return False
         else:
@@ -119,13 +122,16 @@ class CooperativeUdpMedia:
         try:
             self._traffic.charge(rx=len(wire), records=1)
             if meter is not None:
-                reply = self._meter.receive(wire, peer)
+                reply = self._meter.receive(wire, self.peer)
                 if reply is not None:
-                    self._write(reply)
+                    self._write(reply, peer)
                 return True
-            batch = self._owner.receive(wire, peer)
+            # Both endpoints were independently proved on this exact broker
+            # route. Normalize their logical session peer only AFTER wire and
+            # conversation validation; send receipts to the actual input path.
+            batch = self._owner.receive(wire, self.peer)
             for reply in batch.acknowledgements:
-                self._write(reply)
+                self._write(reply, peer)
             for record in batch.records:
                 if self._delivery is not None:
                     self._delivery.consume(record)

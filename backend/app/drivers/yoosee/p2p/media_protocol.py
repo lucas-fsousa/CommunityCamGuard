@@ -292,7 +292,7 @@ def build_media_meter_ack(frame: bytes) -> bytes:
     struct.pack_into("<Q", inner, 20, parsed.source_id)
     struct.pack_into("<I", inner, 28, parsed.sequence)
     struct.pack_into("<I", inner, 32, parsed.timestamp)
-    struct.pack_into("<I", inner, 48, 4)
+    struct.pack_into("<I", inner, 48, parsed.channel_type)
     struct.pack_into("<I", inner, 52, len(inner))
     inner[65] = 2
     return build_mtp_frame(0x90, bytes(inner))

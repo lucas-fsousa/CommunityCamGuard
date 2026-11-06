@@ -1,5 +1,6 @@
 """Single-owner broker route OPEN/relay/CLOSE; no sockets, login or media decoder."""
 
+import ipaddress
 import logging
 import secrets
 import struct
@@ -19,6 +20,7 @@ from .rendezvous_protocol import (
     build_calling_request,
     build_direct_calling_request,
     build_route_hangup,
+    parse_mtp_peer_endpoint,
 )
 from .video_startup_645 import with_preconnect_definition
 
@@ -92,6 +94,8 @@ class MediaRouteJob:
         self.lan_endpoint: tuple[str, int] | None = None
         self.lan_roundtrip_confirmed = False
         self.lan_probe_complete = False
+        self.nat_endpoint: tuple[str, int] | None = None
+        self.nat_handshake_confirmed = self.nat_handshake_complete = False
         self.access_id, self.device_id = spec.access_id, spec.device.device_id
         self.result: MediaRouteResult | None = None
 
@@ -131,6 +135,7 @@ class MediaRouteJob:
         self.metadata = b""
         self.endpoint = None
         self.lan_endpoint = None
+        self.nat_endpoint = None
         self.access_id = self.device_id = 0
 
     def next_packet(self) -> MediaRoutePacket | None:
@@ -169,6 +174,9 @@ class MediaRouteJob:
                     self.lan_endpoint = candidate
                 self.endpoint = select_relay(plain, self._node.session_id, self.attempt.link_id)
                 if self.endpoint is not None:
+                    direct = parse_mtp_peer_endpoint(plain, self.attempt.link_id)
+                    if direct is not None and ipaddress.ip_address(direct[0]).is_global:
+                        self.nat_endpoint = direct
                     log.info("native broker route candidates lan=%s tcp_relay=True",
                              self.lan_endpoint is not None)
             return

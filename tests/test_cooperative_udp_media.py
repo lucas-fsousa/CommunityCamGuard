@@ -26,27 +26,30 @@ from tests.test_media_receive import packet
 from tests.test_v1_receive import av
 
 
-def session():
+def session(nat=False):
     now, sent, video = [0.0], [], VideoDelivery()
     job = route(now)
     job.attempt = CallingAttempt(42, 123, COOKIE)
     job.lan_probe_complete = job.lan_roundtrip_confirmed = True
+    if nat:
+        job.nat_endpoint = ("8.8.4.4", 32100)
+        job.nat_handshake_confirmed = job.nat_handshake_complete = True
     owner = CooperativeUdpMedia(job, SPEC, lambda wire, peer: sent.append((wire, peer)),
                                 clock=lambda: now[0], video=video)
     return owner, job, now, sent, video
 
 
-def negotiate(owner, sent, flagged=False):
+def negotiate(owner, sent, flagged=False, control_peer=PEER):
     def incoming(wire):
         return build_mtp_frame(0x18, wire[6:]) if flagged else wire
     owner.step()
     init = sent[-1][0]
-    assert owner.receive(incoming(ack(init)), PEER)
-    owner.receive(incoming(packet(0, 0, control(123), conv=CONTROL)), PEER)
-    owner.receive(incoming(packet(0, 0, start())), PEER)
+    assert owner.receive(incoming(ack(init)), control_peer)
+    owner.receive(incoming(packet(0, 0, control(123), conv=CONTROL)), control_peer)
+    owner.receive(incoming(packet(0, 0, start())), control_peer)
     owner.step()
     local_start = sent[-1][0]
-    owner.receive(incoming(ack(local_start)), PEER)
+    owner.receive(incoming(ack(local_start)), control_peer)
     owner.receive(incoming(packet(1, 0, media(header() + av(video=idr(), video_ts=1)))), PEER)
     assert owner.ready and owner.was_ready
 
@@ -121,3 +124,12 @@ def test_cancelling_expired_udp_parser_detaches_without_failing_sibling_account(
     now[0] = 10
     owner.begin_finish()
     assert owner.result.detached and not owner.result.close_acknowledged
+
+
+def test_only_independently_proved_nat_peer_can_share_the_logical_av_session():
+    owner, job, _, sent, video = session(nat=True)
+    negotiate(owner, sent, control_peer=job.nat_endpoint)
+    assert video.take().payload == idr()
+    assert any(peer == job.nat_endpoint for _, peer in sent)
+    assert not owner.receive(packet(2, 0, b"invalid"), ("8.8.4.5", 32100))
+    assert owner.finish().detached

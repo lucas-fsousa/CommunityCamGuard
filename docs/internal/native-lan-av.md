@@ -80,3 +80,30 @@ definition metadata and fresh account-allocated sequence. It does not require an
 A4 receipt or create another broker OPEN/login. Synthetic worker reception still
 omits the A4 receipt and negotiates successfully; duplicate direct attempts are
 not admitted on one route.
+
+## Follow-up: reproduce the existing complete UDP rendezvous
+
+The next live attempt (85c6e5e) recognized a real high-conversation sequence0
+KCP ACK, but ended with av_handshake_timeout and recovered on TCP. The passive
+capture saw no ACCEPT/START. Current camera meters have the existing accepted
+kind1/channel4/role2/68-byte-body profile, so their role is not a demonstrated
+cause. The old capture's AV ACCEPT/START actually arrive over LAN; it does not
+prove that AV control must use the NAT endpoint.
+
+An actual omission versus the previously successful finite UDP primitive is
+the CA/CB rendezvous: call_device explicitly performs it before AV admission.
+The shared reader now reproduces that bounded exchange with the exact public
+peer from authenticated A3, alongside LAN measurement. No extra login, recvfrom
+or independent AV owner is introduced. Unknown/late peers, wrong link and bad
+checksum cannot establish the exchange. Queued receipts are discarded if their
+route is cancelled. Failure retains TCP instead of sending AV prematurely.
+
+The UDP owner can receive the same logical conversation through either its
+measured LAN endpoint or independently proved NAT endpoint, matching the SDK's
+conversation-based receive dispatch. This is explicit route aliasing AFTER
+endpoint/wire/conversation validation, not acceptance of arbitrary senders.
+ACKs return to the actual incoming path. SDK meter channel3 (NAT) and4 (LAN)
+are supported there; the reply copies the received channel as iv_rcv_meter_req
+does. Existing finite callers retain their channel4 admission by default.
+
+This restores known protocol steps; it is not yet evidence of live AV success.
