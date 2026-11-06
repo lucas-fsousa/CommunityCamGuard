@@ -62,6 +62,9 @@ last source ends. Public admission still permits one native camera; multi-camera
 rollout is separate. See
 [account lifetime](docs/internal/native-account-lifetime.md) and
 [source ownership](docs/internal/native-source-leases.md) for the exact remaining scope.
+The generic restart service is capacity-aware and tested with three synthetic
+sources; production still uses one native slot until driver cohort planning is
+integrated. Capacity/domain conflicts preserve unspent restart checkpoints.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

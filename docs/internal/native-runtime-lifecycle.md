@@ -1,7 +1,35 @@
-# Server-owned native runtime — 2026-10-24
+# Server-owned native runtime
 
-Status: integrated into lifespan, tested offline; not deployed. No production hub
-or camera was contacted, restarted, configured, illuminated or sounded.
+## Capacity-aware restart — 2026-11-06
+
+The runtime now reserves camera, resource domain and capacity atomically BEFORE
+spending a clean restart checkpoint. Preparing/failed activations consume their
+reservations too; two concurrent callers cannot both spend the last slot. Domain
+conflicts cannot construct a source or consume that camera's checkpoint.
+
+`restore_reviewed` walks the bounded checkpoint set, restoring only admissible
+offers rather than stopping unconditionally after the first. Unavailable evidence,
+busy driver domains and full capacity leave other checkpoints unspent. OS-fenced
+recovery also respects the runtime's total capacity, including existing checkpoints;
+it never creates native intent for legacy cameras. Invalid evidence on one camera
+does not prevent considering another eligible camera.
+
+Offline tests restore three sources through the ordinary startup service and
+retire all three, producing fresh checkpoints. Separate tests preserve the default
+one-source limit, shared-domain exclusion, reservations during preparation and
+previously issued checkpoints after fenced-namespace recovery. The targeted batch
+passed70 tests under192MiB/CPU50%, peak140MiB; mypy416modules and Ruff passed.
+No real camera, decoder, sound/light/motor command or emulator is used.
+
+Production still constructs capacity1 and Yoosee's shared admission domain is
+unchanged. This does not yet implement the driver's explicit multi-camera cohort
+plan or enable simultaneous native cameras. See [account lifetime](native-account-lifetime.md)
+and [deployment](native-production.md) for actual live scope.
+
+## Historical baseline — 2026-10-24
+
+The sections below describe the initial implementation/checkpoint, not today's
+deployment or pending list. Current restart behavior is described above.
 
 ## Ownership, not automatic activation
 

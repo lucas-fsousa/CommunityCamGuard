@@ -20,7 +20,7 @@ def restore_reviewed(runtime: NativeSourceRuntime, retirement: OwnedRetirementCo
     def offer_for(camera):
         return drivers.for_camera(camera).native_media_offer(camera, archive=recorder.native_archive(camera.camera_id))
     from .abandoned_native import checkpoints
-    statuses = checkpoints(owner, offer_for) if owner is not None else {}
+    statuses = checkpoints(owner, offer_for, limit=runtime.capacity) if owner is not None else {}
     for checkpoint in native_restart.pending():
         camera=registry.get_camera_by_id(checkpoint.camera_id)
         if camera is None:
@@ -30,6 +30,9 @@ def restore_reviewed(runtime: NativeSourceRuntime, retirement: OwnedRetirementCo
             if offer is None or offer.valid() is not True:
                 statuses[camera.camera_id]='evidence_unavailable'
                 continue  # Keep the unspent clean checkpoint; never fall back to RTSP.
+            if not runtime.can_admit(offer):
+                statuses[camera.camera_id] = 'admission_unavailable'
+                continue  # Capacity/domain busy: preserve this exact checkpoint.
             runtime.restore(retirement=retirement,checkpoint=checkpoint,offer=offer,
                             apply_routes=apply_routes,ready_timeout=30,
                             background=owner is not None and owner.namespace_init)
@@ -39,5 +42,4 @@ def restore_reviewed(runtime: NativeSourceRuntime, retirement: OwnedRetirementCo
         except Exception:
             statuses[camera.camera_id]='unavailable'
         log.info("native restart camera_id=%s status=%s",camera.camera_id,statuses[camera.camera_id])
-        break  # Current native capacity is one; never burn another checkpoint.
     return statuses

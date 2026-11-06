@@ -26,7 +26,42 @@ class NativeSourceRuntime:
         self._stopped = False
         self._operations = 0
         self._activations: dict[str, NativeActivation] = {}
+        self._domains: set[str] = set()
         self._restart_checkpoints = restart_checkpoints
+
+    @property
+    def capacity(self) -> int:
+        return self._capacity
+
+    def _can_admit(self, offer: NativeSourceOffer) -> bool:
+        return (not self._closed and offer.camera_id not in self._activations
+                and len(self._activations) < self._capacity and offer.domain not in self._domains)
+
+    def can_admit(self, offer: NativeSourceOffer) -> bool:
+        """Metadata-only hint. Actual reservation is atomic before any checkpoint spend."""
+        with self._condition:
+            return self._can_admit(offer)
+
+    def _admit(self, retirement: OwnedRetirementCoordinator, offer: NativeSourceOffer,
+               apply_routes: Callable[[], None]) -> NativeActivation:
+        if retirement.viewer_gate is not self._viewers:
+            raise ValueError("matching runtime viewer gate required")
+        with self._condition:
+            if not self._can_admit(offer):
+                raise SourceUnavailable("native runtime admission unavailable")
+            activation = NativeActivation(retirement=retirement, sources=self.sources,
+                                          executor=self._executor, apply_routes=apply_routes)
+            # Includes preparing/failed owners: never spend another checkpoint
+            # while capacity or a driver resource is already reserved.
+            self._activations[offer.camera_id] = activation
+            self._domains.add(offer.domain)
+            self._operations += 1
+            return activation
+
+    def _operation_finished(self) -> None:
+        with self._condition:
+            self._operations -= 1
+            self._condition.notify_all()
 
     def restore(self, *, retirement: OwnedRetirementCoordinator, checkpoint: native_restart.CleanRestart,
                 offer: NativeSourceOffer, apply_routes: Callable[[], None], ready_timeout: float = 5.0,
@@ -35,32 +70,23 @@ class NativeSourceRuntime:
                 or offer.camera_id!=checkpoint.camera_id or offer.domain!=checkpoint.domain
                 or offer.valid() is not True):
             raise SourceUnavailable("reviewed clean native restart required")
-        with self._condition:
-            if self._closed or self._activations:
-                raise SourceUnavailable("idle native runtime required for restart")
-        receipt=retirement.resume_native(checkpoint)
-        return self.activate(retirement=retirement,receipt=receipt,offer=offer,
-                            apply_routes=apply_routes,ready_timeout=ready_timeout,background=background)
+        activation = self._admit(retirement, offer, apply_routes)
+        try:
+            receipt = retirement.resume_native(checkpoint)
+            return activation.start(receipt, offer, ready_timeout=ready_timeout, background=background)
+        finally:
+            self._operation_finished()
 
     def activate(self, *, retirement: OwnedRetirementCoordinator, receipt: RetiredIngress,
                  offer: NativeSourceOffer, apply_routes: Callable[[], None], ready_timeout: float = 5.0,
                  background: bool = False):
         if retirement.viewer_gate is not self._viewers or offer.camera_id != receipt.camera_id:
             raise ValueError("matching runtime camera and viewer gate required")
-        with self._condition:
-            if self._closed or offer.camera_id in self._activations or len(self._activations) >= self._capacity:
-                raise SourceUnavailable("native runtime admission unavailable")
-            activation = NativeActivation(retirement=retirement, sources=self.sources,
-                                          executor=self._executor, apply_routes=apply_routes)
-            # Retain before preparation/submission, not after it returns.
-            self._activations[offer.camera_id] = activation
-            self._operations += 1
+        activation = self._admit(retirement, offer, apply_routes)
         try:
             return activation.start(receipt, offer, ready_timeout=ready_timeout, background=background)
         finally:
-            with self._condition:
-                self._operations -= 1
-                self._condition.notify_all()
+            self._operation_finished()
 
     def stop(self, *, timeout: float = 30.0) -> None:
         """Off the ASGI loop. Never clear handles after an uncertain shutdown."""
@@ -122,3 +148,4 @@ class NativeSourceRuntime:
         with self._condition:
             self._stopped = True
             self._activations.clear()
+            self._domains.clear()

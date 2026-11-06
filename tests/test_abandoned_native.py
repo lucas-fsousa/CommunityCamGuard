@@ -78,3 +78,31 @@ def test_scope_roundtrip_contains_no_pid_token_or_camera_payload():
     encoded = owner_scope.encode(OLD)
     assert owner_scope.decode(encoded) == OLD
     assert set(__import__('json').loads(encoded)) == {'version','scope'}
+
+
+@pytest.mark.parametrize('limit', [1, 3])
+def test_fenced_recovery_respects_total_capacity_and_preserves_existing_checkpoints(setup, monkeypatch, limit):
+    camera, legacy, _ = setup
+    native_ids = {camera.camera_id}
+    for suffix in ('05', '06'):
+        other = registry.upsert_camera('aa:bb:cc:dd:ee:' + suffix)
+        pending = source_policy.begin_change(other.camera_id, 'native', expected_revision=0)
+        source_policy.activate(other.camera_id, expected_revision=pending.revision)
+        native_ids.add(other.camera_id)
+    monkeypatch.setattr(owner_scope, 'current', lambda: OLD)
+    previous = ServerOwner(get_settings().db_path); previous.acquire(); previous.close()
+    monkeypatch.setattr(owner_scope, 'current', lambda: NEW)
+    current = ServerOwner(get_settings().db_path); current.acquire()
+    def offer(camera):
+        return SimpleNamespace(domain='reviewed/' + camera.camera_id, valid=lambda: True)
+    try:
+        assert checkpoints(current, offer, limit=limit) == {}
+        first = {item.camera_id: item for item in native_restart.pending()}
+        assert len(first) == limit
+        checkpoints(current, offer, limit=3)
+        following = {item.camera_id: item for item in native_restart.pending()}
+        assert set(following) == native_ids
+        assert all(following[cid] == item for cid, item in first.items())
+        assert source_policy.read_for((legacy.camera_id,))[legacy.camera_id].permits_legacy_rtsp
+    finally:
+        current.close()

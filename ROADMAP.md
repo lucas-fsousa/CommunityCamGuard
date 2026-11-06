@@ -21,7 +21,13 @@ CI6133tests/1skip, frontend contracts and Image passed; read-only lamp200/verifi
 60s MSE62fragments/51510162bytes, max gap1.537s (not absolute latency), no reconnect.
 No new physical-control test; original HEVC1080p/AAC archive closed299.977667s
 and the next segment started in the same epoch.
-Next: bounded public multi-source admission.
+Bounded-admission progress: the generic runtime/startup now restores multiple
+reviewed checkpoints up to its configured capacity. Camera/domain/slot reservations
+precede checkpoint spending; capacity/domain conflicts preserve unspent checkpoints.
+OS-fenced recovery respects that same total limit. Three-source startup/shutdown
+is covered offline;70targeted tests passed, peak140MiB (192MiB/CPU50% ceiling).
+Next: explicit driver cohort planning and public multi-source admission. Raising
+the runtime capacity alone still must not duplicate SDK logins or migrate cameras.
 Public capacity remains one; no automatic migration of other cameras.
 See docs/internal/native-account-lifetime.md.
 
