@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .access_protocol import build_mode2_response_ack
+from .account_media_channel import AccountMediaChannel, MediaBootstrap, MediaChannelSummary
 from .account_output_budget import AccountOutputBudget, OutputExhausted
 from .account_policy import AccountPolicy, validate_policy
 from .account_read_dispatcher import AccountReadDispatcher
@@ -51,6 +52,7 @@ class WorkerSummary:
     protocol_code: str = ""
     siren: SirenPulseResult | None = None
     protocol_facts: tuple[tuple[str, int], ...] = ()
+    media_channels: tuple[MediaChannelSummary, ...] = ()
 
 
 class _Stop(Exception):
@@ -72,13 +74,15 @@ class AccountReadWorker:
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
                  clock: Callable[[], float] = time.monotonic, allow_motion: bool = False,
-                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False):
+                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False,
+                 media_capacity: int = 1):
         validate_policy(policy)
         self._policy = policy
         if type(allow_motion) is not bool:
             raise ValueError("explicit motion admission flag required")
         self._dispatcher = AccountReadDispatcher(node, generation, local_ip, local_port,
-                                                 clock=clock, policy=policy, state_reads=state_reads)
+            clock=clock, policy=policy, state_reads=state_reads, media_capacity=media_capacity)
+        self._media_capacity = media_capacity
         self.mailbox = self._dispatcher.mailbox
         self.lamp_inbox = LampReadInbox(generation, clock=clock) if state_reads else None
         self.catalog_inbox = CatalogReadInbox(generation, clock=clock) if state_reads else None
@@ -123,6 +127,7 @@ class AccountReadWorker:
     def run(self, sock: ReadSocket, *, cancelled: Callable[[], bool] = lambda: False,
             initial_motion: PtzSpec | None = None,
             initial_media: MediaRouteSpec | None = None,
+            additional_media: tuple[MediaBootstrap, ...] = (),
             with_media_tcp: bool = False,
             video_delivery: VideoDelivery | None = None,
             media_policy: MediaPolicy = MediaPolicy.FINITE,
@@ -151,7 +156,8 @@ class AccountReadWorker:
             return WorkerSummary("already_started", 0, 0, 0, failed)
 
         sent = received = beats = 0
-        output = AccountOutputBudget(policy=self._policy, clock=self._clock)
+        output = AccountOutputBudget(policy=self._policy, clock=self._clock,
+                                     media_capacity=self._media_capacity)
         reason = "stopped"
         protocol_site = ""
         protocol_code = ""
@@ -161,7 +167,9 @@ class AccountReadWorker:
         motion: PtzScheduler | None = None
         media: MediaRouteJob | None = None
         tcp: CooperativeTcpMedia | None = None
+        channels: list[AccountMediaChannel] = []
         tcp_cleanup_error: BaseException | None = None
+        media_cleanup_error: BaseException | None = None
         motion_cleanup_error: BaseException | None = None
         siren_cleanup_error: BaseException | None = None
         motion_ticket: MotionTicket | None = None
@@ -191,6 +199,22 @@ class AccountReadWorker:
             if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
                                                or not with_media_tcp or video_delivery.closed):
                 raise ValueError("video delivery requires a fresh TCP media handoff")
+            if (not isinstance(additional_media, tuple)
+                    or len(additional_media) >= self._media_capacity
+                    or any(not isinstance(item, MediaBootstrap)
+                           or not isinstance(item.spec, MediaRouteSpec) for item in additional_media)):
+                raise ValueError("bounded typed additional media required")
+            if additional_media and (initial_media is None or not with_media_tcp
+                    or media_policy is not MediaPolicy.CONTINUOUS
+                    or self._policy is not AccountPolicy.CONTINUOUS):
+                raise ValueError("multiple media requires explicit continuous account and TCP")
+            deliveries = ([video_delivery] if video_delivery is not None else [])
+            for bootstrap in additional_media:
+                if bootstrap.video is not None:
+                    if (not isinstance(bootstrap.video, VideoDelivery) or bootstrap.video.closed
+                            or any(bootstrap.video is other for other in deliveries)):
+                        raise ValueError("independent fresh media deliveries required")
+                    deliveries.append(bootstrap.video)
             deadline = self._clock() + 60 if self._policy is AccountPolicy.FINITE else float("inf")
             maintenance = BrokerMaintenance.account_check(node, clock=self._clock,
                 acknowledge_messages=not manual_acks, policy=self._policy)
@@ -198,6 +222,11 @@ class AccountReadWorker:
                 if not isinstance(initial_media, MediaRouteSpec) or (mixed and not allow_media_motion):
                     raise ValueError("typed media-only bootstrap required")
                 media = self._dispatcher.prepare_media(initial_media, output)
+                channels.append(AccountMediaChannel(MediaBootstrap(initial_media, video_delivery),
+                    media, clock=self._clock, policy=media_policy))
+                for bootstrap in additional_media:
+                    route = self._dispatcher.prepare_media(bootstrap.spec, output)
+                    channels.append(AccountMediaChannel(bootstrap, route, clock=self._clock, policy=media_policy))
             if initial_motion is not None:
                 if not isinstance(initial_motion, PtzSpec) or self.motion_inbox is not None:
                     raise ValueError("typed motion specification required")
@@ -241,29 +270,21 @@ class AccountReadWorker:
                     if tcp is not None:
                         raise _Stop("draining")
                     service(self._dispatcher.drain())
-                if media is not None:
-                    if with_media_tcp and media.endpoint is not None and tcp is None:
-                        assert initial_media is not None
-                        if media_policy is MediaPolicy.CONTINUOUS:
-                            tcp = open_tcp_media(media, initial_media, clock=self._clock,
-                                                 video=video_delivery, policy=media_policy)
-                        elif video_delivery is None:
-                            tcp = open_tcp_media(media, initial_media, clock=self._clock)
-                        else:
-                            tcp = open_tcp_media(media, initial_media, clock=self._clock,
-                                                 video=video_delivery)
-                    if tcp is not None:
-                        tcp.step()
-                        if tcp.result is not None:
-                            raise _Stop("media_complete" if tcp.result.close_acknowledged
-                                        and not tcp.result.socket_close_failed
+                for channel in channels:
+                    if with_media_tcp:
+                        channel.step(open_tcp_media, budget_seconds=0.2 / len(channels))
+                        if channel is channels[0]:
+                            tcp = channel.tcp
+                        if channel.tcp is not None and channel.tcp.result is not None:
+                            raise _Stop("media_complete" if channel.tcp.result.close_acknowledged
+                                        and not channel.tcp.result.socket_close_failed
                                         else "media_unconfirmed")
-                    packet_media = media.next_packet()
+                    packet_media = channel.route.next_packet()
                     if packet_media is not None:
                         try:
                             send(packet_media.wire, reserved=True)
                         except BaseException:
-                            media.send_failed()
+                            channel.route.send_failed()
                             raise
                 if self.motion_inbox is not None:
                     if motion is not None and motion.result is not None:
@@ -271,7 +292,8 @@ class AccountReadWorker:
                         last_motion = motion.result
                         self.motion_inbox.finish(motion_ticket, last_motion)
                         motion, motion_ticket = None, None
-                    if (motion is None and (media is None or (tcp is not None and tcp.ready))
+                    if (motion is None and (media is None or all(
+                            channel.tcp is not None and channel.tcp.ready for channel in channels))
                             and (siren is None or (not siren.active and not siren.unsafe))):
                         claimed = self.motion_inbox.claim()
                         if claimed is not None:
@@ -401,26 +423,30 @@ class AccountReadWorker:
                         received += cleanup.received_datagrams
                     except BaseException as exc:
                         motion_cleanup_error = exc  # still retire TCP, route and socket
-                if tcp is not None:
+                for channel in channels:
                     try:
-                        tcp.finish()
+                        channel.finish_tcp()
                     except BaseException as exc:
-                        tcp_cleanup_error = exc
+                        if tcp_cleanup_error is None:
+                            tcp_cleanup_error = exc
                 self._dispatcher.close()
-                if media is not None and media.result is None:
-                    assert node is not None
-                    try:
-                        media_sent, media_received = close_media_route(sock, node, media, output,
-                            generation=self._generation, clock=self._clock, wait=wait)
-                        sent += media_sent
-                        received += media_received
-                    finally:
-                        if maintenance is not None:
-                            maintenance.close()
-                        self._node = None
-                if maintenance is not None:
-                    maintenance.close()
-                self._node = None
+                try:
+                    for channel in channels:
+                        if channel.route.result is not None:
+                            continue
+                        assert node is not None
+                        try:
+                            media_sent, media_received = close_media_route(sock, node, channel.route, output,
+                                generation=self._generation, clock=self._clock, wait=wait)
+                            sent += media_sent
+                            received += media_received
+                        except BaseException as exc:
+                            if media_cleanup_error is None:
+                                media_cleanup_error = exc
+                finally:
+                    if maintenance is not None:
+                        maintenance.close()
+                    self._node = None
             finally:
                 if (self.motion_inbox is not None and motion_ticket is not None
                         and motion is not None and motion.result is not None):
@@ -440,8 +466,13 @@ class AccountReadWorker:
                         raise siren_cleanup_error
                     if tcp_cleanup_error is not None:
                         raise tcp_cleanup_error
+                    if media_cleanup_error is not None:
+                        raise media_cleanup_error
+        if channels:
+            tcp = channels[0].tcp
         return WorkerSummary(reason, sent, received, beats, close_failed,
                              motion.result if motion is not None else last_motion,
                              media.result if media is not None else None,
                              tcp.result if tcp is not None else None,protocol_site,protocol_code,
-                             siren.last_result if siren is not None else None, protocol_facts)
+                             siren.last_result if siren is not None else None, protocol_facts,
+                             tuple(channel.summary() for channel in channels))

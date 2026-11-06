@@ -1,12 +1,15 @@
 """A timed-out inner stream may retire through its confirmed outer route release."""
 
+from .account_media_channel import media_channels_closed
 from .account_read_worker import WorkerSummary
 from .media_failures import TRANSIENT_CODES
 
 
 def retired_media_route(worker: WorkerSummary, *, require_ready: bool = True) -> bool:
     """Physical closure plus confirmed outer release; not a retry classification."""
-    return (not worker.socket_close_failed and worker.media is not None
+    return (not worker.socket_close_failed
+        and media_channels_closed(worker.media_channels, require_tcp_receipt=False)
+        and worker.media is not None
         and worker.media.opened and worker.media.broker_release
         and worker.tcp is not None and (worker.tcp.ready or not require_ready) and not worker.tcp.socket_close_failed
         and (worker.motion is None or not worker.motion.start_attempted

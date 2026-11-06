@@ -34,12 +34,39 @@ These are simulated broker tests, **not** concurrent real-camera acceptance.
 
 ## Remaining delivery steps
 
-1. Extend the account worker to pump per-device TCP channels/deliveries while
-   retaining one UDP reader and bounded scheduling/cleanup.
-2. Connect per-camera prepared sources to a driver-owned shared account lease;
+The account worker now also accepts an explicit internal tuple of additional
+`MediaBootstrap` entries, only with continuous TCP/account policy and a matching
+capacity supplied before starting. `AccountMediaChannel` owns each independent
+TCP pump and delivery. Different channels cannot share a delivery queue. The
+existing single-camera entry points, defaults and primary result fields remain.
+
+All channels share the previous 200ms TCP scheduling allowance per worker turn
+(divided among channels), not 200ms per camera. Each channel still reads at most
+4KiB per turn; each connection uses its own existing bounded queues. PTZ admission
+waits for every bootstrapped TCP channel to be ready. No extra broker reader,
+login, decoder or background thread is created by the group worker.
+
+Shutdown attempts all TCP and broker closes even after one cleanup raises. Every
+channel has a bounded summary. Lifecycle replacement and transient-retirement
+checks inspect all admitted channels, so a successful primary cannot conceal an
+unconfirmed sibling. The legacy single-camera result remains available.
+
+**Not yet implemented:** independent per-channel retry/replacement. Currently a
+transport error still retires the account group conservatively. Per-camera source
+leases and dynamic join/leave must not be advertised as available on the basis of
+the worker bootstrap tests.
+
+Second checkpoint: 257 targeted regression tests passed, peak104.9MiB. Full local
+mypy passed407source modules with a100.7MiB peak; repository Ruff passed. The first
+broker commit `02975e6` also passed GitHub CI6031tests/1skip and the Image workflow.
+No production rebuild or admission increase follows solely from these offline
+multi-channel results.
+
+1. Connect per-camera prepared sources to a driver-owned shared account lease;
    match enrollment/account identity explicitly. Do not turn the generic source
    registry into a vendor-specific singleton or raise its capacity independently.
-3. Offline admission, failure isolation, shutdown and consumer tests; then deploy
+2. Implement dynamic attachment and isolated, confirmed per-channel retirement.
+3. Offline source admission, failure isolation, shutdown and consumer tests; then deploy
    on camera3 only. Additional real-camera migration needs explicit scope.
 
 ## Separate endurance finding
@@ -50,3 +77,7 @@ at 2026-11-06T02:36:21Z followed by a busy retry. At 04:01Z the source API repor
 native/active144 and Docker reported OOM=false/restarts=0. API state alone is not
 proof of media progress. Preserve this finding; do not mark prolonged endurance
 complete from the earlier 15-minute result.
+
+A subsequent 30-second read-only MSE observation completed without reconnect:
+31 binary messages / 8,728,455 bytes. This confirms delivery during that later
+interval, not uninterrupted operation throughout the overnight gap.

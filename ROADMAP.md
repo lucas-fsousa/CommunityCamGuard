@@ -8,8 +8,11 @@ This section overrides the priorities and pending labels in the chronological hi
 explicit bounded three-device capacity under one account/sequence allocator and
 one output budget, with independent CLOSE reserves and no link-ID reuse within
 the generation. Production admission is unchanged at one native camera. First
-offline regression:110passed; next connect independent TCP channels and source
-leases, not additional SDK logins. See docs/internal/native-multi-camera.md.
+offline broker regression:110passed. The worker now pumps independent per-device
+TCP/delivery channels under that same reader and shared200ms scheduling budget;
+all-channel cleanup results gate lifecycle reuse. Production source admission
+still remains one; shared source leases/dynamic attachment and isolated channel
+retirement are next, not additional SDK logins. See docs/internal/native-multi-camera.md.
 The overnight log also contains a later decoder progress_timeout/retry; the
 900-second acceptance below must not be read as overnight endurance acceptance.
 

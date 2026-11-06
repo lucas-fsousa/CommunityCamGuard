@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .account_media_channel import media_channels_closed
 from .account_policy import AccountPolicy, validate_policy
 from .account_read_worker import AccountReadWorker, WorkerSummary
 from .broker_mailbox import BoundReadOutcome, BrokerMailbox, MailboxTicket, ReadOutcome
@@ -351,6 +352,7 @@ class AccountReadLifecycle:
                     # including interruptions even if the worker attempted close.
                     self._state = ("idle" if summary is not None
                                    and not summary.socket_close_failed
+                                   and media_channels_closed(summary.media_channels)
                                    and (summary.media is None or not summary.media.opened
                                         or summary.media.broker_release)
                                    and (summary.tcp is None or (summary.tcp.close_acknowledged

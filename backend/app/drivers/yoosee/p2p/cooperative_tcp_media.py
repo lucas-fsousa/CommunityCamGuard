@@ -116,11 +116,13 @@ class CooperativeTcpMedia:
         if self._drain() and self._owner.close_acknowledged:
             self._close()
 
-    def step(self) -> None:
+    def step(self, *, budget_seconds: float = 0.2) -> None:
         if self.result is not None:
             return
         try:
-            self._step_until = self._clock() + 0.2
+            if (type(budget_seconds) not in (int, float) or not 0 < budget_seconds <= 0.2):
+                raise ValueError("invalid TCP scheduler budget")
+            self._step_until = self._clock() + budget_seconds
             if self._clock() >= self._deadline:
                 raise ReceiveError("cooperative TCP media deadline exceeded")
             if self._sock.getpeername() != self._peer:
