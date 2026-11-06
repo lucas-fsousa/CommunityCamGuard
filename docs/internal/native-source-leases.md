@@ -85,3 +85,24 @@ The inbox now completes that queued lease as cancelled without OPEN, even if the
 caller did not manage to send a separate cancellation. This retains the unread
 outcome/slot until collected, rather than silently reusing it. The preceding
 consumer/control commit `99ea77e` passed CI6084tests/1skip and Image.
+
+## Deployment regression
+
+Code `32632de` passed CI6085tests/1skip and Image and was built with512MiB/CPU50%
+limits. Image `462c45d6e187` / tag `wsl-native-camera-leases` was deployed by
+replacing only the app container, preserving the hub and user's recordings mount.
+Build `b-210e76d55cfa`, camera3 native/active150. The old source logged confirmed
+retirement at09:43:35Z; no later retry was logged in the checked interval.
+
+One authenticated MSE connection completed60.0seconds without reconnect:
+62binary messages/17864715bytes, maximum inter-message gap1.187s. These are
+delivery fragments, not frame counts or absolute live latency. An initial state
+query returned409; later read-only lamp queries returned200/verified, the final
+one taking148ms. No write/actuation was sent. Other two cameras stayed on legacy
+RTSP; base packet counters advanced2602→7760 and5128→15360, each with one consumer.
+App181.3MiB/1GiB, OOM=false/restarts=0, three FFmpeg processes inside the app
+(not a count of hub transcoders or unrelated WSL projects).
+
+This deployment verifies the refactored default single-source/control path.
+The new shared lease mode remains internal; **it was not used as a live test of
+multiple cameras or advertised as production-ready multi-camera admission**.

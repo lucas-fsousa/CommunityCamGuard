@@ -1,6 +1,19 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-06): `39a0f29`, build `b-d4580bc96801`,
+Current deployed runtime (2026-11-06): `32632de`, build `b-210e76d55cfa`,
+camera3 native/active150. CI6085tests/1skip and Image passed. Dynamic source leases
+and a borrowed native-consumer/control binding are implemented and tested offline.
+The default production path now uses the extracted exact-device control delegates;
+one native source remains the admission limit. Driver account lifetime, group
+publication, lease-specific prepared-source retirement and per-lease PTZ authority
+still require integration. See [source leases](native-source-leases.md).
+
+Post-deploy60s MSE completed without reconnect:62messages/17864715bytes, max
+inter-message gap1.187s (not absolute latency). Read-only lamp GET200/verified148ms
+and advancing legacy ingress counters passed; app181.3MiB/1GiB, OOM=false/restarts=0.
+No sound/light/motor action or native experiment on the other cameras was used.
+
+Previous deployed runtime (2026-11-06): `39a0f29`, build `b-d4580bc96801`,
 camera3 native/active147. CI6044tests/1skip and Image passed. Broker ownership,
 independent TCP/delivery channels, bounded group scheduling and isolated channel
 retirement are implemented and tested offline for a three-channel bootstrap.

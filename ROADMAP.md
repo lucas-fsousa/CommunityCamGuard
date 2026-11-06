@@ -8,15 +8,20 @@ This section overrides the priorities and pending labels in the chronological hi
 the same worker/lifecycle, including cooperative detach and later replacement
 without another login. Admission binds exact authenticated account/inventory,
 not only a device ID.246targeted tests passed; no production capacity increase or
-physical experiment. Consumer/control-proxy and driver-owned account lifetime
-integration remain; see docs/internal/native-source-leases.md. The native consumer
-and per-device control proxy are now connected to camera-local leases in offline
+physical experiment. The native consumer and per-device control proxy are now
+connected to camera-local leases in offline
 tests: stopping one joins its consumer while the sibling/account continue.
 Remaining: driver account lifetime, group publication/admission, lease-specific
 prepared-source retirement and per-lease PTZ authority. Production is still one
 native source; do not advertise multi-camera native availability yet.
 
-2026-11-06 multi-camera implementation: broker route ownership now supports an
+Latest deployed code32632de/build b-210e76d55cfa, camera3 native/active150.
+CI6085tests/1skip and Image passed. Post-deploy60s MSE:62messages/17864715bytes,
+max inter-message gap1.187s, no reconnect; lamp GET-only200/verified148ms.
+Legacy ingress counters advanced, app181.3MiB/1GiB, no OOM/restart. See
+docs/internal/native-source-leases.md for implemented scope and remaining owner integration.
+
+Earlier2026-11-06 multi-camera checkpoint: broker route ownership supports an
 explicit bounded three-device capacity under one account/sequence allocator and
 one output budget, with independent CLOSE reserves and no link-ID reuse within
 the generation. Production admission is unchanged at one native camera. First
