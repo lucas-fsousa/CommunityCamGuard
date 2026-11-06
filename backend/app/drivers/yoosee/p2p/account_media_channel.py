@@ -78,10 +78,7 @@ class AccountMediaChannel:
             if udp_send is not None and self.route.lan_endpoint is not None:
                 if not self.route.lan_probe_complete:
                     return  # Existing owner polls the bounded measurement, no blocking I/O.
-                if self.route.nat_endpoint is not None and not self.route.nat_handshake_complete:
-                    return
-                if self.route.lan_roundtrip_confirmed and (
-                        self.route.nat_endpoint is None or self.route.nat_handshake_confirmed):
+                if self.route.lan_roundtrip_confirmed:
                     self.udp = CooperativeUdpMedia(self.route, spec, udp_send, clock=self._clock, video=video)
                     self.udp.step()
                     return

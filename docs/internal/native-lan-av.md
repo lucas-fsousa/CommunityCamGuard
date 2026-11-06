@@ -107,3 +107,25 @@ are supported there; the reply copies the received channel as iv_rcv_meter_req
 does. Existing finite callers retain their channel4 admission by default.
 
 This restores known protocol steps; it is not yet evidence of live AV success.
+
+## Correct the actual SDK UDP meter ACK, keep NAT optional for LAN
+
+The7d23976 checkpoint passed CI42299002113 and ran as image3369612190ae.
+LAN measurement succeeded but the public CA/CB exchange did not complete;
+TCP remained available. That negative NAT result must NOT invalidate the
+independently measured LAN channel. The SDK optimizer can select one positive
+channel. Public traversal now runs alongside LAN, without gating LAN INIT;
+only a NAT peer that actually proves the exact route is accepted as an alias.
+
+Pinned split ELF510bc51a, iv_rcv_meter_req0x25cfc0-0x25d048, reveals a concrete
+ACK-format bug: it writes reply marker2 at body+0x40 (byte64), not the REQUEST
+role field at byte65. Our helper wrote byte65. It also copied only the low32
+timestamp bits, whereas the SDK copies all64 at0x25d014-0x25d020. The UDP helper
+now echoes the complete clock and emits tail02/00/00/00, matching the same
+mapped reply profile already recognized by the bootstrap validator.
+
+A passive current-camera sample confirmed request source/destination match the
+enrolled device/account and role2 is already accepted. Its high timestamp bits
+were zero, so timestamp truncation was NOT demonstrated as this attempt's cause.
+The older binary's zero-tail note is not a substitute for the pinned split's
+explicit marker write. No role wildcard, guessed port or larger timeout was added.

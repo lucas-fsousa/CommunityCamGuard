@@ -41,6 +41,7 @@ class CooperativeUdpMedia:
         if route.lan_endpoint is None or not route.lan_roundtrip_confirmed:
             raise ValueError("UDP AV requires a measured LAN route")
         self.peer = route.lan_endpoint
+        self._route: MediaRouteJob | None = route
         self._peers = {self.peer}
         if route.nat_handshake_confirmed and route.nat_endpoint is not None:
             self._peers.add(route.nat_endpoint)
@@ -72,6 +73,7 @@ class CooperativeUdpMedia:
         if self.result is None:
             confirmed = self._owner.close_acknowledged
             self._direct_calling = b""
+            self._route = None
             self._owner.close()
             if self._delivery is not None:
                 self._delivery.close()
@@ -102,6 +104,10 @@ class CooperativeUdpMedia:
 
     def receive(self, wire: bytes, peer: tuple[str, int]) -> bool:
         """Only validated exact-route traffic leaves the broker's foreign budget."""
+        route = self._route
+        if (route is not None and route.accepts_direct_probe and route.nat_handshake_confirmed
+                and peer == route.nat_endpoint):
+            self._peers.add(peer)  # The parallel rendezvous may finish after LAN INIT.
         if self.result is not None or peer not in self._peers:
             return False
         meter = parse_media_meter(wire) if len(wire) in (74, 78) else None

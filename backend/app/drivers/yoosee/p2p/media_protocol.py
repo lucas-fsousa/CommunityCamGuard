@@ -291,8 +291,8 @@ def build_media_meter_ack(frame: bytes) -> bytes:
     struct.pack_into("<Q", inner, 12, parsed.destination_id)
     struct.pack_into("<Q", inner, 20, parsed.source_id)
     struct.pack_into("<I", inner, 28, parsed.sequence)
-    struct.pack_into("<I", inner, 32, parsed.timestamp)
+    inner[32:40] = frame[38:46]  # Echo the complete SDK64-bit timestamp.
     struct.pack_into("<I", inner, 48, parsed.channel_type)
     struct.pack_into("<I", inner, 52, len(inner))
-    inner[65] = 2
+    inner[64] = 2  # SDK reply-format marker, NOT the request's role byte65.
     return build_mtp_frame(0x90, bytes(inner))

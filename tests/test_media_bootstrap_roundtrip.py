@@ -86,10 +86,10 @@ def test_only_correlated_meter_ack_confirms_roundtrip(
     )
     assert not result.direct_acknowledged
     expected = {None: ("reply",), "peer": (), "node": (), "link": (), "source": (),
-                "destination": (), "checksum": (), "kind": ("unknown_kind",),
+                "destination": (), "checksum": (), "kind": ("unknown_kind", "wrong_role"),
                 "channel": ("reply", "wrong_channel"),
                 "length": ("reply", "wrong_record_length"), "role": ("reply", "wrong_role"),
-                "call": ("reply", "wrong_call"),
+                "call": ("reply", "wrong_call", "wrong_role"),
                 "sequence": ("reply", "unmatched_timestamp", "unsent_sequence"),
                 "timestamp": ("reply", "unmatched_timestamp"),
                 "timestamp_high": ("reply", "unmatched_timestamp"),

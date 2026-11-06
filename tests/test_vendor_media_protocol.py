@@ -76,10 +76,22 @@ def test_media_meter_ack_swaps_route() -> None:
     )
     parsed = parse_media_meter(camera_request)
     assert parsed is not None and parsed.kind == 1
-    ack = parse_media_meter(build_media_meter_ack(camera_request))
+    wire = build_media_meter_ack(camera_request)
+    ack = parse_media_meter(wire)
     assert ack is not None and ack.kind == 2
     assert ack.source_id == parsed.destination_id
     assert ack.destination_id == parsed.source_id
+    assert wire[70:74] == b"\x02\x00\x00\x00"  # SDK reply marker, not request role.
+    assert wire[38:46] == camera_request[38:46]
+
+
+def test_meter_ack_echoes_full_camera_clock_not_only_low_32_bits():
+    request = build_media_meter_request(1, 2, 3, 4, timestamp=7)
+    body = bytearray(request[6:])
+    struct.pack_into("<Q", body, 32, (1 << 32) + 7)
+    from backend.app.drivers.yoosee.p2p.media_protocol import build_mtp_frame
+    wire = build_mtp_frame(0x90, body)
+    assert build_media_meter_ack(wire)[38:46] == wire[38:46]
 
 
 def test_kcp_and_av_golden_frames() -> None:
