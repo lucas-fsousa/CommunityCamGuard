@@ -166,3 +166,21 @@ receipt are proven, but application-level AV acceptance is not. Do not mark UDP
 video, LAN-only operation or the original freeze permanently resolved. Keep
 future trials camera3-only, using this exact checkpoint rather than redoing
 discovery, broad firewall changes or quality guesses.
+
+## Deployed default-path checkpoint — 2026-11-06
+
+Commit7e7f9d2 passed CI42302705359 (6171passed/1skipped plus frontend
+contracts) and Image42302705156. Local targeted batches60passed, Ruff and
+Mypy424files passed, with test peaks97MiB and69MiB. Capped local image
+a2e53439a829/build b-b42008a87cd3 replaced only the app after CI succeeded.
+No field-camera transport migration or camera-control command was performed.
+
+Camera3 entered native/active revision198 directly, without LAN-probe,
+UDP-negotiation-failure or handshake-timeout logs. Its authenticated MSE
+consumer received122binary fragments/39538901bytes over120seconds, without
+reconnection or source revision change; maximum fragment gap1.367seconds.
+These are delivery measurements, NOT decoded-frame validation or absolute
+camera-to-browser latency. The current archive grew from0 to1572864bytes;
+the preceding closed archive retained1920x1080HEVC/AAC16kHz mono. App OOM=false
+and restart count0. This short observation does NOT supersede the earlier
+long-window TCP interruption or establish live UDP AV acceptance.

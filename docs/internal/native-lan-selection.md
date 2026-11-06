@@ -150,3 +150,7 @@ as physical closure of the shared broker socket. Direct media needs its existing
 per-stream rate budget: routing all media through the broker's finite foreign-
 packet budget would incorrectly terminate a valid high-rate stream, while simply
 skipping that budget for arbitrary foreign traffic defeats the flood bound.
+
+That integration is now implemented, but live AV acceptance remains unproven.
+See [LAN AV implementation and current production policy](native-lan-av.md):
+the driver keeps native TCP as the default until exact LAN AV evidence exists.

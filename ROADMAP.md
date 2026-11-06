@@ -30,6 +30,13 @@ unit by these trials). This avoids unaccepted UDP warmup attempts on every
 restart. Captured-profile comparison and safe restoration are documented in
 docs/internal/native-lan-av.md; do not repeat quality/firewall guesses.
 
+Deployed7e7f9d2/build b-b42008a87cd3: CI6171passed/1skip and Image green.
+Camera3 started directly on native TCP;120s MSE delivered122fragments without
+reconnection/source revision change, maximum fragment gap1.367s; archive grew.
+Other2remain legacy RTSP, OOM=false/restarts=0. This is a short delivery
+checkpoint, NOT long-term stability or UDP AV acceptance. Next protocol task
+remains the SDK's INIT-receipt-to-ACCEPT gap, not more physical-control tests.
+
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member
 cohort supplies one account/login/worker to independent camera leases. The full
