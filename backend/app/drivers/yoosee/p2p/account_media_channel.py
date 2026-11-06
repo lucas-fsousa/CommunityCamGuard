@@ -24,6 +24,7 @@ class MediaChannelSummary:
     tcp: TcpMediaResult | None
     failure: str = ""
     protocol_code: str = ""
+    protocol_facts: tuple[tuple[str, int], ...] = ()
 
 
 def media_channels_closed(channels: tuple[MediaChannelSummary, ...], *,
@@ -48,6 +49,7 @@ class AccountMediaChannel:
         self._retiring = False
         self._failure = ""
         self._protocol_code = ""
+        self._protocol_facts: tuple[tuple[str, int], ...] = ()
         self._stopping = False
 
     def step(self, opener: Callable[..., CooperativeTcpMedia], *, budget_seconds: float = 0.2) -> None:
@@ -85,7 +87,8 @@ class AccountMediaChannel:
             if self.bootstrap.video is not None:
                 self.bootstrap.video.close()
 
-    def retire(self, failure: str, *, protocol_code: str = "") -> None:
+    def retire(self, failure: str, *, protocol_code: str = "",
+               protocol_facts: tuple[tuple[str, int], ...] = ()) -> None:
         """No retry. Physical TCP cleanup precedes asynchronous broker CLOSE."""
         if failure not in ("socket", "protocol", "ended"):
             raise ValueError("invalid media channel failure")
@@ -94,6 +97,7 @@ class AccountMediaChannel:
         self._retiring = True
         self._failure = failure
         self._protocol_code = protocol_code
+        self._protocol_facts = protocol_facts
         try:
             self.finish_tcp()
         finally:
@@ -101,4 +105,5 @@ class AccountMediaChannel:
 
     def summary(self) -> MediaChannelSummary:
         return MediaChannelSummary(self.bootstrap.spec.device.device_id, self.route.result,
-                                   self.tcp.result if self.tcp is not None else None, self._failure, self._protocol_code)
+                                   self.tcp.result if self.tcp is not None else None, self._failure,
+                                   self._protocol_code, self._protocol_facts)

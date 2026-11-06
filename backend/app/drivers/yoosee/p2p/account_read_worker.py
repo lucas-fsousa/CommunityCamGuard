@@ -320,7 +320,9 @@ class AccountReadWorker:
                             # The TCP opener/pump certifies physical close or
                             # raises a distinct cleanup error. Never reopen here.
                             channel.retire("socket" if isinstance(channel_error, OSError) else "protocol",
-                                           protocol_code=PROTOCOL_CODES.get(str(channel_error), ""))
+                                protocol_code=PROTOCOL_CODES.get(str(channel_error), ""),
+                                protocol_facts=channel_error.facts if isinstance(
+                                    channel_error, (KcpAssemblyTimeout, MtpTcpFrameError)) else ())
                         if channel is channels[0]:
                             tcp = channel.tcp
                         if channel.tcp is not None and channel.tcp.result is not None:

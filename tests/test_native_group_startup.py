@@ -24,9 +24,10 @@ from backend.app.drivers.yoosee.capability_policy import OperationProof, Validat
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
 from backend.app.drivers.yoosee.driver import YooseeDriver
 from backend.app.drivers.yoosee.p2p.account_read_lifecycle import ReadConnection
-from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+from backend.app.drivers.yoosee.p2p.kcp_receive import KcpAssemblyTimeout
 from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_header
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
+from backend.app.media import native_events
 from backend.app.media.native_runtime import NativeSourceRuntime
 from backend.app.media.server_owner import ServerOwner
 from backend.app.services.native_startup import restore_reviewed
@@ -67,6 +68,8 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
     cameras, entries, _ = reviewed
     legacy = registry.upsert_camera("aa:bb:cc:dd:ee:10")
     sock, events, decoders, pumps = MediaSocket(), [], [], []
+    retries = []
+    monkeypatch.setattr(native_events, "ended", lambda *args, **kwargs: retries.append(kwargs))
     targets = tuple(replace(DEVICE, device_id=int(entry.device_id)) for entry in entries)
     receive = sock.recvfrom
     def paced_receive(size):
@@ -103,7 +106,7 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
             super().step(budget_seconds=budget_seconds)
             if self.inject and self.steps == 3 and not self.closing:
                 self.finish()
-                raise ReceiveError('TCP media EOF before CLOSE receipt')
+                raise KcpAssemblyTimeout((("kcp_gap", 1), ("kcp_pending", 2)))
         def finish(self):
             result = super().finish()
             if self.inject:
@@ -138,6 +141,9 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
         assert len(decoders) == len(pumps) == expected
         assert len(shared_control_reads._sessions) == len(cameras)
         assert events == ["sdk_enter", "login"] and sock.closed == 0
+        if inject_eof:
+            assert any(item['details'].get('session_protocol_code') == 'kcp_assembly_timeout'
+                       and item['details'].get('kcp_gap') == '1' for item in retries)
         account = service._account
         for entry in entries:
             binding = account.binding(entry.camera_id)

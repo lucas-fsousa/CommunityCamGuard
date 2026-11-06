@@ -2,6 +2,41 @@
 
 ## Actual regression — 2026-11-06
 
+Recovery fix4ac0dad is deployed: image6fbcb0cf0171/tag `wsl-native-lease-recovery`,
+buildb-516badb91149, camera3 native/active165. CI6147tests/1skip and Image passed.
+The artificial3/32-camera limits and NATIVE_SOURCE_CAPACITY field are gone.
+
+Live600s observation completed with1188binary fragments/450618308bytes. It was
+NOT uninterrupted: one media outage at217.2s caused six failed connection/retry
+attempts before the seventh WebSocket delivered media. Max binary interarrival
+gap12.696s. API stayed on the same active165 generation and recovered without app
+restart/manual unblocking. An earlier15:57:24Z failure also recovered; both source
+events identify kcp_assembly_timeout, confirmed TCP physical close/broker release,
+no inner CLOSE receipt and joined consumer. This validates the permanent-block
+fix, not the absence of streaming stalls. App218.3MiB/1GiB, OOM=false/restarts=0.
+A post-recovery closed original recording was300.926667s HEVC1920×1080/AAC16k mono,
+with the next16:06:41Z segment using the same epoch. No sound/light/motor action.
+
+### Actual media-path mismatch, not an assumed LAN transport
+
+The running native socket connects to a public TCP relay; `select_relay` accepts
+only global IPv4 TCP entries. The legacy RTSP sockets connect to LAN cameras.
+The saved July PCAP, summarized without payloads or decryption, contains a
+dominant camera→app LAN UDP flow:2358538payload bytes/3854packets, with120716bytes/
+2269packets in reverse. This is historical evidence for that captured unit/session,
+not proof that the same LAN dialect can be applied unchanged to camera3/firmware.
+The SDK notes already distinguish LAN/NAT channels and route optimization from
+the implemented single-relay TCP path. Current kernel route selection returns
+the same LAN interface for camera and relay, so a different chosen local interface
+was NOT demonstrated as the cause.
+
+Prioritize the actual media path and SDK route-selection implementation now,
+not new controls or generic architecture. Do not claim the relay is the sole cause
+of KCP gaps without packet evidence. The shared worker also discarded the numeric
+timeout facts already captured by the singleton path; these are now propagated
+through the per-camera summary/diagnostics with the EXISTING bounded whitelist,
+so gap/window counters survive retry. No packet payload/credential history is added.
+
 The subsequently installed group-plan image a73aefe/build b-88168866f405 left
 camera3 blocked163 at15:42:03Z. This supersedes the earlier successful short
 windows: they did NOT prove recovery in the shared-lease production path.

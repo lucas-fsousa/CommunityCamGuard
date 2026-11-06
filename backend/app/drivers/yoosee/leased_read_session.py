@@ -70,6 +70,7 @@ class LeasedReadSession(SharedDeviceControls):
         outcome = self._outcome
         channel = outcome.channel if outcome is not None else None
         return {"session_scope": "media_lease", "session_worker": "leased",
+                **({key: str(value) for key, value in channel.protocol_facts} if channel is not None else {}),
                 "session_lease_detached": outcome is not None and outcome.status in {"closed", "cancelled"},
                 # Detaching a source is NOT physical closure of the shared socket.
                 "session_broker_socket_closed": False,
