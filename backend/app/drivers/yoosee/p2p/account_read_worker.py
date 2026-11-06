@@ -1,5 +1,6 @@
 """Exclusive encrypted account pump; concurrent callers use only its mailbox."""
 
+import logging
 import struct
 import threading
 import time
@@ -44,6 +45,8 @@ from .siren_pulse_job import SirenPulseResult
 from .siren_pulse_pump import SirenPulsePump
 from .siren_socket_cleanup import drain_siren
 from .video_delivery import VideoDelivery
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,7 +314,13 @@ class AccountReadWorker:
                 code = PROTOCOL_CODES.get(str(cause), "")
                 if channel.udp is not None:
                     lan.disable(channel.bootstrap.spec.device.device_id)
-                    if not channel.udp.was_ready:
+                    trace, site = cause.__traceback__, ""
+                    while trace is not None:
+                        site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
+                        trace = trace.tb_next
+                    log.warning("native UDP transport retired ready=%s protocol_code=%s site=%s",
+                                channel.udp.was_ready, code or "unknown", site)
+                    if not channel.udp.was_ready and not code:
                         code = "udp_negotiation_failed"
                 channel.retire("socket" if isinstance(error, OSError) else "protocol",
                     protocol_code=code, protocol_facts=cause.facts if isinstance(

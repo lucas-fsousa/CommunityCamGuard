@@ -10,6 +10,7 @@ from .av_meter import AvMeter
 from .media_policy import MediaPolicy, MediaRateBudget
 from .media_protocol import build_media_meter_request, parse_kcp_segments, parse_media_meter
 from .media_route_job import MediaRouteJob, MediaRouteSpec
+from .mtp_udp_kcp import normalize_udp_kcp
 from .video_delivery import VideoDelivery
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,7 @@ class CooperativeUdpMedia:
                 return False
         else:
             try:
+                wire = normalize_udp_kcp(wire)
                 segments = parse_kcp_segments(wire)
             except ValueError:
                 return False

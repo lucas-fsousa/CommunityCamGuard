@@ -11,6 +11,7 @@ from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
 from backend.app.drivers.yoosee.p2p.media_policy import MediaPolicy
 from backend.app.drivers.yoosee.p2p.media_protocol import (
     build_media_meter_request,
+    build_mtp_frame,
     parse_kcp_segments,
 )
 from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
@@ -35,22 +36,25 @@ def session():
     return owner, job, now, sent, video
 
 
-def negotiate(owner, sent):
+def negotiate(owner, sent, flagged=False):
+    def incoming(wire):
+        return build_mtp_frame(0x18, wire[6:]) if flagged else wire
     owner.step()
     init = sent[-1][0]
-    assert owner.receive(ack(init), PEER)
-    owner.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
-    owner.receive(packet(0, 0, start()), PEER)
+    assert owner.receive(incoming(ack(init)), PEER)
+    owner.receive(incoming(packet(0, 0, control(123), conv=CONTROL)), PEER)
+    owner.receive(incoming(packet(0, 0, start())), PEER)
     owner.step()
     local_start = sent[-1][0]
-    owner.receive(ack(local_start), PEER)
-    owner.receive(packet(1, 0, media(header() + av(video=idr(), video_ts=1))), PEER)
+    owner.receive(incoming(ack(local_start)), PEER)
+    owner.receive(incoming(packet(1, 0, media(header() + av(video=idr(), video_ts=1)))), PEER)
     assert owner.ready and owner.was_ready
 
 
-def test_lan_negotiation_delivers_existing_hevc_handoff_and_closes_without_owning_socket():
+@pytest.mark.parametrize("flagged", [False, True])
+def test_lan_negotiation_delivers_existing_hevc_handoff_and_closes_without_owning_socket(flagged):
     owner, _, _, sent, video = session()
-    negotiate(owner, sent)
+    negotiate(owner, sent, flagged=flagged)
     assert video.take().payload == idr()
     owner.begin_finish()
     owner.step()
@@ -69,6 +73,10 @@ def test_bad_peer_conv_and_checksum_cannot_bypass_foreign_input_budget():
     assert not owner.receive(ack(sent[-1][0]), (PEER[0], PEER[1] + 1))
     assert not owner.receive(packet(0, 0, b"invalid", conv=44), PEER)
     assert not owner.receive(bytes(78), PEER)
+    damaged = bytearray(build_mtp_frame(0x18, ack(sent[-1][0])[6:]))
+    damaged[4] ^= 1
+    assert not owner.receive(bytes(damaged), PEER)
+    assert not owner.receive(build_mtp_frame(0x38, ack(sent[-1][0])[6:]), PEER)
     assert not owner.ready
     assert owner.finish().detached
 

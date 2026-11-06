@@ -181,7 +181,7 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
     result = execute(sock, inbox, owner, duration=3 if silent_av else 0.2)
     assert result.reason == "stopped" and not result.lease_cleanup_uncertain
     if silent_av:
-        assert outcomes[0].channel.protocol_code == "udp_negotiation_failed"
+        assert outcomes[0].channel.protocol_code == "av_control_timeout"
         assert outcomes[0].channel.udp.detached and outcomes[0].channel.media.broker_release
         assert len(pumps) == len(replacements) == 1
         assert inbox.take(replacements[0]).channel.tcp.ready

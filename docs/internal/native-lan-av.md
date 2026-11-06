@@ -43,3 +43,29 @@ original callers. Tests/builds remain memory/CPU capped; no full local suite.
 Do not label live UDP AV or freeze resolution accepted from these tests alone.
 The live checkpoint must show the UDP-ready log, advancing browser media and
 recording progress for camera3, with the two field cameras still legacy RTSP.
+
+## First live attempt and captured envelope mismatch
+
+Commit38c68f3 passed CI42295083521 and Image42295083447, then ran as capped
+image29acec2a4c9d. Camera3 passed its LAN meter but did not reach AV readiness.
+The UDP owner detached, obtained B9 release, and the SAME account recovered on
+TCP automatically. Its event honestly reported udp_detached=true,
+tcp_socket_closed=false; there was no permanent quarantine.
+
+A60s header-only capture saw38 c0/90 packets and THREE c0/18 packets of30bytes,
+not c0/10. The canonical KCP parser accepted only c0/10 and therefore discarded
+those replies. No payload was retained; treat their ACK interpretation as a
+candidate until exact-conversation/sequence/timestamp validation accepts them.
+
+Split ELF510bc51a confirms the receiving rule: UDP dispatcher0x21a4cc-0x21a524
+tests bit7 (control) and bit4 (data), not opaque low bit3. Handler
+iv_on_rcv_kcpdata_pkt0x25f448-0x25f478 uses a six-byte prefix for mode bits5/6
+equal to zero, then forwards unchanged KCP bytes. The isolated UDP normalizer
+now validates the ORIGINAL envelope/checksum before mapping only observed c0/18
+to canonical c0/10. Other modes, invalid checksum and foreign conversations are
+still rejected. TCP framing and the common KCP engine remain unchanged.
+
+Synthetic negotiation covers both observed envelope forms and rejects damaged
+or relay-mode input. Per-channel retirement now preserves known local error
+codes rather than replacing every initial UDP error with an opaque fallback
+label; only unknown initial negotiation failures use udp_negotiation_failed.
