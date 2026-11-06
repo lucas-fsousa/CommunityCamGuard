@@ -27,6 +27,8 @@ from .kcp_receive import KcpAssemblyTimeout
 from .lamp_read_inbox import LampReadInbox
 from .lamp_read_pump import LampReadPump
 from .media_failures import PROTOCOL_CODES
+from .media_lease_inbox import MediaLeaseInbox
+from .media_lease_pump import MediaLeasePump
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_route
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
@@ -58,6 +60,7 @@ class WorkerSummary:
     siren: SirenPulseResult | None = None
     protocol_facts: tuple[tuple[str, int], ...] = ()
     media_channels: tuple[MediaChannelSummary, ...] = ()
+    lease_cleanup_uncertain: bool = False
 
 
 class _Stop(Exception):
@@ -101,8 +104,11 @@ class AccountReadWorker:
         self._claim = threading.Lock()
         self._started = False
         self._socket: ReadSocket | None = None
+        self._media_leases: MediaLeaseInbox | None = None
 
     def stop(self) -> None:
+        if self._media_leases is not None:
+            self._media_leases.close()
         if self.siren_inbox is not None:
             self.siren_inbox.close()
         if self.catalog_inbox is not None:
@@ -117,6 +123,8 @@ class AccountReadWorker:
 
     def drain(self) -> None:
         """Request no new work, with <=2 seconds for already active replies."""
+        if self._media_leases is not None:
+            self._media_leases.close()
         if self.siren_inbox is not None:
             self.siren_inbox.close()
         if self.catalog_inbox is not None:
@@ -133,6 +141,7 @@ class AccountReadWorker:
             initial_motion: PtzSpec | None = None,
             initial_media: MediaRouteSpec | None = None,
             additional_media: tuple[MediaBootstrap, ...] = (),
+            media_leases: MediaLeaseInbox | None = None,
             with_media_tcp: bool = False,
             video_delivery: VideoDelivery | None = None,
             media_policy: MediaPolicy = MediaPolicy.FINITE,
@@ -173,6 +182,7 @@ class AccountReadWorker:
         media: MediaRouteJob | None = None
         tcp: CooperativeTcpMedia | None = None
         channels: list[AccountMediaChannel] = []
+        leases: MediaLeasePump | None = None
         tcp_cleanup_error: BaseException | None = None
         media_cleanup_error: BaseException | None = None
         motion_cleanup_error: BaseException | None = None
@@ -199,8 +209,19 @@ class AccountReadWorker:
             if media_policy is MediaPolicy.CONTINUOUS and (
                     not with_media_tcp or self._policy is not AccountPolicy.CONTINUOUS):
                 raise ValueError("continuous media requires a continuous account and TCP")
-            if type(with_media_tcp) is not bool or (with_media_tcp and initial_media is None):
+            if type(with_media_tcp) is not bool or (with_media_tcp and initial_media is None and media_leases is None):
                 raise ValueError("TCP media requires explicit typed route bootstrap")
+            if media_leases is not None:
+                if (not isinstance(media_leases, MediaLeaseInbox)
+                        or media_leases.generation != self._generation
+                        or media_leases.capacity > self._media_capacity
+                        or initial_media is not None or additional_media or initial_motion is not None
+                        or video_delivery is not None or self.motion_inbox is not None
+                        or not with_media_tcp or media_policy is not MediaPolicy.CONTINUOUS
+                        or self._policy is not AccountPolicy.CONTINUOUS):
+                    raise ValueError("exclusive reviewed continuous source leases required")
+                self._media_leases = media_leases
+                leases = MediaLeasePump(media_leases, channels, clock=self._clock)
             if video_delivery is not None and (not isinstance(video_delivery, VideoDelivery)
                                                or not with_media_tcp or video_delivery.closed):
                 raise ValueError("video delivery requires a fresh TCP media handoff")
@@ -275,6 +296,8 @@ class AccountReadWorker:
                     if tcp is not None:
                         raise _Stop("draining")
                     service(self._dispatcher.drain())
+                if leases is not None:
+                    leases.poll(lambda route_spec: self._dispatcher.prepare_media(route_spec, output))
                 for channel in channels:
                     if channel.route.result is not None:
                         continue
@@ -282,7 +305,7 @@ class AccountReadWorker:
                         try:
                             channel.step(open_tcp_media, budget_seconds=0.2 / len(channels))
                         except (OSError, ValueError) as channel_error:
-                            if len(channels) == 1:
+                            if len(channels) == 1 and leases is None:
                                 raise
                             # The TCP opener/pump certifies physical close or
                             # raises a distinct cleanup error. Never reopen here.
@@ -293,7 +316,7 @@ class AccountReadWorker:
                             completion = ("media_complete" if channel.tcp.result.close_acknowledged
                                         and not channel.tcp.result.socket_close_failed
                                         else "media_unconfirmed")
-                            if len(channels) == 1:
+                            if len(channels) == 1 and leases is None:
                                 raise _Stop(completion)
                             if channel.tcp.result.socket_close_failed:
                                 raise _Stop("media_unconfirmed")
@@ -305,7 +328,7 @@ class AccountReadWorker:
                         except BaseException:
                             channel.route.send_failed()
                             raise
-                if len(channels) > 1 and all(channel.route.result is not None for channel in channels):
+                if leases is None and len(channels) > 1 and all(channel.route.result is not None for channel in channels):
                     closed = media_channels_closed(tuple(channel.summary() for channel in channels))
                     raise _Stop("media_complete" if closed else "media_unconfirmed")
                 if self.motion_inbox is not None:
@@ -359,7 +382,7 @@ class AccountReadWorker:
                         send(item.prepared.wire)
                 # A 50ms idle UDP wait would cap the 4096-byte TCP pump near
                 # 80KiB/s and accumulate video latency despite a healthy relay.
-                interval = 0.001 if tcp is not None else 0.02 if mixed else 0.05
+                interval = 0.001 if any(channel.tcp is not None for channel in channels) else 0.02 if mixed else 0.05
                 sock.settimeout(min(interval, max(0.001, deadline - self._clock())))
                 try:
                     wire, peer = sock.recvfrom(4097)
@@ -478,6 +501,10 @@ class AccountReadWorker:
                 except OSError:
                     close_failed = True
                 finally:
+                    if leases is not None:
+                        leases.finish(uncertain=close_failed or tcp_cleanup_error is not None
+                            or media_cleanup_error is not None or motion_cleanup_error is not None
+                            or siren_cleanup_error is not None)
                     if isinstance(video_delivery, VideoDelivery):
                         video_delivery.close()
                     with self._claim:
@@ -497,4 +524,5 @@ class AccountReadWorker:
                              media.result if media is not None else None,
                              tcp.result if tcp is not None else None,protocol_site,protocol_code,
                              siren.last_result if siren is not None else None, protocol_facts,
-                             tuple(channel.summary() for channel in channels))
+                             tuple(channel.summary() for channel in channels),
+                             leases.cleanup_uncertain if leases is not None else False)

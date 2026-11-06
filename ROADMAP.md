@@ -4,6 +4,13 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-06 next integration checkpoint: dynamic per-camera media leases now reach
+the same worker/lifecycle, including cooperative detach and later replacement
+without another login. Admission binds exact authenticated account/inventory,
+not only a device ID.246targeted tests passed; no production capacity increase or
+physical experiment. Consumer/control-proxy and driver-owned account lifetime
+integration remain; see docs/internal/native-source-leases.md.
+
 2026-11-06 multi-camera implementation: broker route ownership now supports an
 explicit bounded three-device capacity under one account/sequence allocator and
 one output budget, with independent CLOSE reserves and no link-ID reuse within

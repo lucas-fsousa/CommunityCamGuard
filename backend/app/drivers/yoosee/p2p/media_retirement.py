@@ -7,7 +7,7 @@ from .media_failures import TRANSIENT_CODES
 
 def retired_media_route(worker: WorkerSummary, *, require_ready: bool = True) -> bool:
     """Physical closure plus confirmed outer release; not a retry classification."""
-    return (not worker.socket_close_failed
+    return (not worker.socket_close_failed and not worker.lease_cleanup_uncertain
         and media_channels_closed(worker.media_channels, require_tcp_receipt=False)
         and worker.media is not None
         and worker.media.opened and worker.media.broker_release

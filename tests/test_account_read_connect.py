@@ -84,3 +84,39 @@ def test_auth_error_with_failed_close_is_not_classified_as_confirmed(monkeypatch
     monkeypatch.setattr(opener, "open_camera_session", authenticate)
     with pytest.raises(OSError):
         opener.open_read_connection(ENROLLMENT, camera_id="cam_test", device_id="123")
+
+
+@pytest.mark.parametrize("identities", [("123",), ("0124",), ("124", "124"),
+    ("124", "125", "126"), (["124"],), (True,), ("9" * 21,)])
+def test_invalid_additional_targets_never_resolve_or_authenticate(monkeypatch, identities):
+    monkeypatch.setattr(opener, "resolve_list_hosts", lambda *a, **k: pytest.fail("DNS"))
+    with pytest.raises(ValueError):
+        opener.open_read_connection(ENROLLMENT, camera_id="cam_test", device_id="123",
+                                   additional_device_ids=identities)
+
+
+def test_additional_targets_come_from_the_same_authenticated_inventory(monkeypatch):
+    from dataclasses import replace
+
+    from backend.app.drivers.yoosee.p2p.contracts import OnlineDevice
+
+    class Socket:
+        def bind(self, address): pass
+        def getsockname(self): return ("0.0.0.0", 1234)
+        def close(self): pass
+    root = OnlineDevice(123, 1, False, 1, bytes(16))
+    extra = replace(root, device_id=124)
+    calls = []
+    def authenticate(*args, **kwargs):
+        calls.append(1)
+        kwargs["inventory"].extend((root, extra, replace(root, device_id=999)))
+        return NODE, root, 17
+    monkeypatch.setattr(opener, "resolve_list_hosts", lambda *a, **k: ("192.0.2.1",))
+    monkeypatch.setattr(opener.socket, "socket", lambda *a: Socket())
+    monkeypatch.setattr(opener, "open_camera_session", authenticate)
+    monkeypatch.setattr(opener, "local_route_ip", lambda *a: "192.0.2.10")
+    connection = opener.open_read_connection(ENROLLMENT, camera_id="cam_test", device_id="123",
+                                              additional_device_ids=("124",))
+    assert calls == [1] and connection.targets == (root, extra)
+    assert connection.access_id == ENROLLMENT.access_id
+    connection.socket.close()

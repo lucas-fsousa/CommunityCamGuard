@@ -174,6 +174,15 @@ class CooperativeTcpMedia:
             self._closing = True
             self._deadline = min(self._deadline, self._clock() + 2)
 
+    def begin_finish(self) -> None:
+        """Signal a bounded close; the existing account turns continue pumping it."""
+        if self.result is None:
+            try:
+                self._begin_finish()
+            except BaseException:
+                self._close()
+                raise
+
     def finish(self) -> TcpMediaResult:
         """Bounded AVCLOSE drain before physical TCP close; idempotent, no reopen."""
         if self.result is not None:

@@ -17,6 +17,7 @@ from .contracts import CertifiedNode, OnlineDevice
 from .lamp_control_specs import LampWriteSpec
 from .lamp_read_inbox import LampReadTicket
 from .lamp_read_job import LampReadResult, LampReadSpec
+from .media_lease_inbox import MediaLeaseInbox
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteSpec
 from .model_control_inbox import ControlWriteTicket
@@ -36,6 +37,8 @@ class ReadConnection:
     local_ip: str = field(repr=False)
     local_port: int = field(repr=False)
     target: OnlineDevice | None = field(default=None, repr=False)
+    access_id: int | None = field(default=None, repr=False)
+    targets: tuple[OnlineDevice, ...] = field(default=(), repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,10 +283,23 @@ class AccountReadLifecycle:
         return self._run(connect, (), cancelled, media=media, delivery=delivery,
                          media_motion=True).worker
 
+    def run_media_leases(self, connect: Callable[[int], ReadConnection], *,
+                         leases: Callable[[ReadConnection, int], MediaLeaseInbox],
+                         cancelled: Callable[[], bool]) -> WorkerSummary:
+        """Trusted owner transfers one authenticated, account-bound lease inbox.
+
+        No worker thread or authentication is created per source. Motion is not
+        admitted by this entry point until per-lease authority is integrated.
+        """
+        if self._policy is not AccountPolicy.CONTINUOUS or self._motion_authority.enabled:
+            raise ValueError("continuous media-lease account without motion required")
+        return self._run(connect, (), cancelled, leases_factory=leases).worker
+
     def _run(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...],
              cancelled: Callable[[], bool], *,
              media: Callable[[ReadConnection], MediaRouteSpec] | None = None,
-             delivery: VideoDelivery | None = None, media_motion: bool = False) -> ReadBatchSummary:
+             delivery: VideoDelivery | None = None, media_motion: bool = False,
+             leases_factory: Callable[[ReadConnection, int], MediaLeaseInbox] | None = None) -> ReadBatchSummary:
         """Claim before auth; permit replacement only after verified physical close.
 
         No I/O under the lifecycle lock. Old results are retained only until the
@@ -305,12 +321,20 @@ class AccountReadLifecycle:
         worker = None
         transferred = False
         summary = None
+        inbox: MediaLeaseInbox | None = None
         try:
             connection = connect(generation)
+            if leases_factory is not None:
+                inbox = leases_factory(connection, generation)
+                if (not isinstance(inbox, MediaLeaseInbox) or inbox.generation != generation
+                        or connection.access_id is None or not inbox.matches_account(connection.access_id)
+                        or not inbox.matches_targets(connection.targets)):
+                    raise ValueError("authenticated account lease inbox required")
             worker = AccountReadWorker(connection.node, generation, connection.local_ip,
                                        connection.local_port, clock=self._clock,
                                        allow_motion=self._motion_authority.enabled,
-                                       policy=self._policy, state_reads=self._state_reads)
+                policy=self._policy, state_reads=self._state_reads,
+                media_capacity=inbox.capacity if inbox is not None else 1)
             spec = media(connection) if media is not None else None
             if media is not None and not isinstance(spec, MediaRouteSpec):
                 raise ValueError("typed authenticated media route required")
@@ -326,7 +350,10 @@ class AccountReadLifecycle:
                 else:
                     self._state = "active"
             transferred = True
-            if media is None:
+            if inbox is not None:
+                summary = worker.run(connection.socket, cancelled=cancelled,
+                    media_leases=inbox, with_media_tcp=True, media_policy=MediaPolicy.CONTINUOUS)
+            elif media is None:
                 summary = worker.run(connection.socket, cancelled=cancelled)
             else:
                 if media_motion:
@@ -351,7 +378,7 @@ class AccountReadLifecycle:
                     # An exception has no verified WorkerSummary. Fail closed,
                     # including interruptions even if the worker attempted close.
                     self._state = ("idle" if summary is not None
-                                   and not summary.socket_close_failed
+                                   and not summary.socket_close_failed and not summary.lease_cleanup_uncertain
                                    and media_channels_closed(summary.media_channels)
                                    and (summary.media is None or not summary.media.opened
                                         or summary.media.broker_release)
@@ -363,3 +390,5 @@ class AccountReadLifecycle:
                                         or summary.siren.off_confirmed) else "blocked")
                 if delivery is not None:
                     delivery.close()
+                if isinstance(inbox, MediaLeaseInbox):
+                    inbox.close()

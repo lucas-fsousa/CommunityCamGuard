@@ -46,6 +46,7 @@ class AccountMediaChannel:
         self._clock, self._policy = clock, policy
         self._retiring = False
         self._failure = ""
+        self._stopping = False
 
     def step(self, opener: Callable[..., CooperativeTcpMedia], *, budget_seconds: float = 0.2) -> None:
         if self._retiring:
@@ -63,6 +64,16 @@ class AccountMediaChannel:
                 self.tcp.step()
             else:
                 self.tcp.step(budget_seconds=budget_seconds)
+
+    def request_stop(self) -> None:
+        """Cooperative detach; do not spend two seconds draining one sibling here."""
+        if self._retiring or self._stopping:
+            return
+        self._stopping = True
+        if self.tcp is None:
+            self.retire("ended")
+        else:
+            self.tcp.begin_finish()
 
     def finish_tcp(self) -> None:
         try:

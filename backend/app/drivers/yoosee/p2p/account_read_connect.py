@@ -9,7 +9,7 @@ from ....db.p2p import P2PEnrollment
 from .account_read_lifecycle import ReadConnection
 from .av_route_io import BudgetSocket
 from .camera_session import open_camera_session
-from .contracts import P2PProbeError
+from .contracts import OnlineDevice, P2PProbeError
 from .list_dns import resolve_list_hosts
 from .ptz_diagnostics import preparation_failure_reason
 from .session_io import local_route_ip
@@ -24,7 +24,8 @@ class ReadConnectFailure(P2PProbeError):
 
 
 def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id: str,
-                         cancelled: Callable[[], bool] = lambda: False) -> ReadConnection:
+                         cancelled: Callable[[], bool] = lambda: False,
+                         additional_device_ids: tuple[str, ...] = ()) -> ReadConnection:
     """Resolve then authenticate within one original20s budget, no credential renewal.
 
     For AccountReadLifecycle's trusted factory only. Caller retains camera and
@@ -35,6 +36,13 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
     if (not camera_id or not device_id or enrollment.camera_id != camera_id
             or enrollment.device_id != device_id):
         raise ValueError("read connection enrollment mismatch")
+    if (not isinstance(additional_device_ids, tuple) or len(additional_device_ids) > 2
+            or any(type(identity) is not str or not identity.isascii() or not identity.isdecimal()
+                   or len(identity) > 20
+                   or not 0 < int(identity) < 1 << 64 or str(int(identity)) != identity
+                   or identity == device_id for identity in additional_device_ids)
+            or len(set(additional_device_ids)) != len(additional_device_ids)):
+        raise ValueError("bounded exact additional device IDs required")
     deadline = time.monotonic() + 20.0
     sock = None
     try:
@@ -45,14 +53,26 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
         bounded = BudgetSocket(sock, cancelled)
         bounded.deadline = deadline  # DNS time is charged; never grant a new budget.
         bounded.bind(("", 0))
-        node, target, _ = open_camera_session(
-            cast(socket.socket, bounded), enrollment, 1.0, deadline, resolved_hosts=hosts)
+        inventory: list[OnlineDevice] = []
+        if additional_device_ids:
+            node, target, _ = open_camera_session(cast(socket.socket, bounded), enrollment,
+                1.0, deadline, resolved_hosts=hosts, inventory=inventory)
+        else:
+            node, target, _ = open_camera_session(
+                cast(socket.socket, bounded), enrollment, 1.0, deadline, resolved_hosts=hosts)
         bounded.check()
         if str(target.device_id) != device_id or not target.status:
             raise P2PProbeError("read connection online target mismatch")
         local_ip, local_port = local_route_ip(node.address), bounded.getsockname()[1]
         bounded.check()
-        connection = ReadConnection(node, bounded.sock, local_ip, local_port, target)
+        selected = [target]
+        for identity in additional_device_ids:
+            matches = [device for device in inventory if str(device.device_id) == identity]
+            if len(matches) > 1:
+                raise P2PProbeError("ambiguous authenticated inventory identity")
+            selected.extend(matches)
+        connection = ReadConnection(node, bounded.sock, local_ip, local_port, target,
+                                    enrollment.access_id, tuple(selected))
         return connection
     except BaseException as exc:
         if sock is not None:
