@@ -17,8 +17,13 @@ regression:260passed. Shared source leases/dynamic attachment and safe channel
 replacement are next, not additional SDK logins. See docs/internal/native-multi-camera.md.
 The overnight log also contains a later decoder progress_timeout/retry; the
 900-second acceptance below must not be read as overnight endurance acceptance.
+Deployed checkpoint:39a0f29/build b-d4580bc96801, camera3 native/active147.
+CI6044tests/1skip and Image passed; post-deploy60s MSE delivered63messages/
+20310557bytes without reconnect (max gap1.62s, not absolute latency). Both legacy
+ingress counters advanced; app181.1MiB/1GiB, no OOM/restart. See the multi-camera
+note for exact remaining source-lease work and the separate shutdown observation.
 
-Latest native stability implementation: `3b0b311` / `b-58c43b444dfd`, camera3
+Earlier native stability implementation: `3b0b311` / `b-58c43b444dfd`, camera3
 native/active144; CI6012passed/1skip and Image passed. Implemented: fair video/AAC
 input, KCP window reports/consistent128-slot credit/reserved missing head, safe
 recovery of retired pre-ACCEPT limits, and bounded TCP scheduler yielding without

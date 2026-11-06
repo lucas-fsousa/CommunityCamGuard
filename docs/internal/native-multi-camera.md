@@ -94,5 +94,30 @@ Third checkpoint:260targeted tests passed, peak105.2MiB. New regressions prove
 healthy siblings keep progressing after a channel failure, missing broker release
 retires the group, and primary success cannot allow lifecycle reauthentication
 when a sibling's cleanup failed. Commit `0bb36d0` passed GitHub CI6041tests/1skip
-and Image. The running deployment is still the earlier single-camera version
-until the final isolation changes pass CI and are deployed explicitly.
+and Image.
+
+## Deployment checkpoint
+
+Code `39a0f29` passed CI6044tests/1skip and Image, and was deployed as
+`community-cam-guard-app:wsl-native-multi-worker` (image487624920ee7), build
+`b-d4580bc96801`. Only the app container was replaced; the hub/tunnel were not
+restarted, and the user's recordings-host mount edits were preserved.
+
+Camera3 resumed native/active147. A single authenticated MSE connection completed
+60.0seconds:63binary messages/20310557bytes, maximum inter-message gap1.62s, no
+reconnect or new retry event. These are fragments, not decoded frame counts or
+end-to-end latency. First periodic meter ACK was observed on the new connection.
+The new archive epoch is `ea1543da82e5c46d1aedeed323cd8eee5`; a current UTC-hour
+file exists. Legacy counters advanced5690→9178 (yard),3838→6232 (garage), with
+one base consumer each. App181.1MiB/1GiB, OOM=false/restarts=0. Three FFmpeg
+processes were inside the app; this does not count hub-owned transcoders.
+
+Production still admits one native source. This live test exercises the refactored
+single-camera path; it is **not** a three-real-camera acceptance. The next delivery
+step is shared source ownership/dynamic attachment, not repeating physical controls.
+
+Operational observation: during replacement Uvicorn waited for active connections
+before lifespan shutdown; Compose has a45-second stop grace. Clean service teardown
+was not established from that wait. Do not infer graceful archival finalization
+from successful namespace-fenced startup; investigate bounded connection draining
+separately if necessary. No shutdown-budget change was mixed into this delivery.

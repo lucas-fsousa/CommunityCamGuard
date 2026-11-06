@@ -1,6 +1,21 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-05): `3b0b311`, build `b-58c43b444dfd`,
+Current deployed runtime (2026-11-06): `39a0f29`, build `b-d4580bc96801`,
+camera3 native/active147. CI6044tests/1skip and Image passed. Broker ownership,
+independent TCP/delivery channels, bounded group scheduling and isolated channel
+retirement are implemented and tested offline for a three-channel bootstrap.
+Production source admission remains ONE native camera; shared source leases and
+dynamic attachment/replacement are not yet integrated. No extra SDK login or
+native experiment was run on the other cameras. See [multi-camera scope](native-multi-camera.md).
+
+Post-deploy camera3 acceptance:60.0seconds,63binary MSE messages/20310557bytes,
+no reconnect, max inter-message gap1.62s (not end-to-end latency). The same source
+remained active147; periodic meter ACK was observed and no new retry event was
+logged. Legacy ingress counters advanced: yard5690→9178, garage3838→6232, each
+with one base consumer. App181.1MiB/1GiB, OOM=false/restarts=0. This is a short
+deployment regression, not simultaneous-native or long-endurance acceptance.
+
+Previous deployed runtime (2026-11-05): `3b0b311`, build `b-58c43b444dfd`,
 camera3 native/active144. CI6012tests/1skip and Image passed. The other two
 cameras retain their existing RTSP sources; no camera action was used in this
 investigation. A 900-second continuous MSE acceptance window completed without
