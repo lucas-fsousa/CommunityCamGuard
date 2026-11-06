@@ -168,9 +168,11 @@ def test_group_publication_allows_only_exact_same_owner_members(monkeypatch):
 
 def test_three_native_consumers_share_one_server_owned_account_and_replace_one(environment, monkeypatch, tmp_path):
     from backend.app.drivers.yoosee import native_account_service, native_video_source
+    from backend.app.drivers.yoosee.native_lease_recovery import wrap
     from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_header
     from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
     from backend.app.media.server_owner import ServerOwner
+    from backend.app.media.source_registry import SourceRegistry
     from backend.app.services.lifetime import ServiceLifetime
     from tests.test_captured_media import header
     from tests.test_fragmented_mp4 import box
@@ -186,6 +188,8 @@ def test_three_native_consumers_share_one_server_owned_account_and_replace_one(e
             with changed:
                 decoded.append(self)
         def offer(self, payload, *, timestamp=None):
+            if getattr(self, "fail_once", False):
+                raise OSError("synthetic local decoder failure")
             self.output.feed(box(b"ftyp") + box(b"moov") + box(b"moof") + box(b"mdat"))
             with changed:
                 self.offered = True
@@ -207,46 +211,66 @@ def test_three_native_consumers_share_one_server_owned_account_and_replace_one(e
     lifetime = ServiceLifetime(server)
     service = lifetime.own(native_account_service.NativeAccounts(server))
     sources, futures = [], []
+    registry = SourceRegistry(capacity=3)
     try:
         assert service.prepare(entries) is account
         wait_ready(account)
         with ThreadPoolExecutor(max_workers=3) as pool:
-            def start(entry):
-                source = native_video_source.NativeVideoSource(entry.camera_id, entry.device_id,
-                                                               shared_session=service.binding(entry))
-                sources.append(source)
-                future = pool.submit(source.run, cancelled=lambda: False)
+            def start(entry, *, fail_once=False):
+                attempts = 0
+                def construct():
+                    nonlocal attempts
+                    source = native_video_source.NativeVideoSource(entry.camera_id, entry.device_id,
+                                                                   shared_session=service.binding(entry))
+                    if fail_once and attempts == 0:
+                        original = source._decoder
+                        def fail_decoder(frame):
+                            decoder = original(frame)
+                            decoder.fail_once = True
+                            return decoder
+                        source._decoder = fail_decoder
+                    attempts += 1
+                    sources.append(source)
+                    return source
+                recovery = wrap(construct(), camera_id=entry.camera_id, factory=construct, valid=lambda: True)
+                future = pool.submit(registry.run, entry.camera_id, domain=f"yoosee/media-lease/{entry.camera_id}",
+                                     factory=lambda: recovery, cancelled=lambda: False)
                 futures.append(future)
-                return source, future
+                return recovery, future
             try:
-                for entry in entries:
-                    start(entry)
+                recoveries = [start(entry, fail_once=(index == 0))[0] for index, entry in enumerate(entries)]
                 with changed:
-                    assert changed.wait_for(lambda: len(decoded) == 3 and all(child.offered for child in decoded), 2)
+                    assert changed.wait_for(lambda: len(decoded) == 4 and sum(child.offered for child in decoded) == 3, 5)
+                assert recoveries[0].restarts == 1
+                assert any(child.closed and not child.offered for child in decoded)
                 assert len(publication._sessions) == 3
-                sources[0].stop()
+                assert registry.stop(entries[0].camera_id)
                 assert futures[0].result(timeout=3).reason == "stopped"
+                assert registry.state(entries[0].camera_id) == "idle"
+                assert all(registry.state(entry.camera_id) == "running" for entry in entries[1:])
                 assert len(publication._sessions) == 2 and account.ready and sock.closed == 0
                 siblings = [pump for device, pump in pumps if device != 100]
                 counts = [pump.steps for pump in siblings]
                 _, replacement = start(entries[0])
                 with changed:
-                    assert changed.wait_for(lambda: len(decoded) == 4 and all(child.offered for child in decoded), 2)
+                    assert changed.wait_for(lambda: len(decoded) == 5 and sum(child.offered for child in decoded) == 4, 2)
                 time.sleep(0.02)
                 assert all(pump.steps > count and pump.result is None
                            for pump, count in zip(siblings, counts, strict=True))
                 assert len(publication._sessions) == 3 and events.count("login") == 1
                 assert not replacement.done()
             finally:
+                registry.begin_shutdown()
                 for source in sources:
                     source.stop()
                 for future in futures:
                     future.result(timeout=3)
         assert not publication._sessions and account.ready
+        assert all(registry.state(entry.camera_id) == "idle" for entry in entries)
     finally:
         lifetime.stop()
     assert not server.acquired and account.cleanup_confirmed
     assert all(child.closed for child in decoded)
     assert all(not source._thread.is_alive() for source in sources)
-    assert sock.opens == sock.closes == 4 and sock.closed == 1
+    assert sock.opens == sock.closes == 5 and sock.closed == 1
     assert events == ["sdk_enter", "login", "sdk_exit"]

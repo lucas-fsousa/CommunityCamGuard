@@ -183,6 +183,7 @@ class AccountReadWorker:
         tcp: CooperativeTcpMedia | None = None
         channels: list[AccountMediaChannel] = []
         leases: MediaLeasePump | None = None
+        unexpected_exit = True
         tcp_cleanup_error: BaseException | None = None
         media_cleanup_error: BaseException | None = None
         motion_cleanup_error: BaseException | None = None
@@ -416,8 +417,10 @@ class AccountReadWorker:
                     send(acknowledgement)
         except _Stop as stopped:
             reason = stopped.reason
+            unexpected_exit = False
         except OSError:
             reason = "socket"
+            unexpected_exit = False
         except ValueError as error:
             reason = "protocol"
             # TCP/AV boundaries sanitize their public error messages. Retain the
@@ -436,6 +439,7 @@ class AccountReadWorker:
             protocol_code=PROTOCOL_CODES.get(str(error),'')
             if isinstance(error, (KcpAssemblyTimeout, MtpTcpFrameError)):
                 protocol_facts = error.facts
+            unexpected_exit = False
         finally:
             try:
                 if siren is not None:
@@ -502,9 +506,9 @@ class AccountReadWorker:
                     close_failed = True
                 finally:
                     if leases is not None:
-                        leases.finish(uncertain=close_failed or tcp_cleanup_error is not None
+                        leases.finish(uncertain=unexpected_exit or close_failed or tcp_cleanup_error is not None
                             or media_cleanup_error is not None or motion_cleanup_error is not None
-                            or siren_cleanup_error is not None)
+                            or siren_cleanup_error is not None or (siren is not None and siren.unsafe))
                     if isinstance(video_delivery, VideoDelivery):
                         video_delivery.close()
                     with self._claim:

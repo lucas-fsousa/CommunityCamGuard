@@ -5,6 +5,26 @@ from backend.app.media import native_events as events
 CAMERA = 'cam_' + '1' * 24
 
 
+def test_lease_retirement_is_distinct_from_shared_socket_closure(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA, error='retry_planned', evidence_valid=True, details={
+        'session_scope':'media_lease', 'session_worker':'leased',
+        'session_lease_detached':True, 'session_broker_socket_closed':False})
+    facts=json.loads((tmp_path/'native-events.jsonl').read_text())['facts']
+    assert facts['session_scope']=='media_lease' and facts['session_worker']=='leased'
+    assert facts['session_lease_detached'] is True and facts['session_broker_socket_closed'] is False
+
+
+def test_scope_and_detach_facts_cannot_log_arbitrary_text(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA, error='source_returned', evidence_valid=True,
+                 details={'session_scope':'SECRET', 'session_lease_detached':'SECRET'})
+    text=(tmp_path/'native-events.jsonl').read_text()
+    assert 'SECRET' not in text
+    facts=json.loads(text)['facts']
+    assert 'session_scope' not in facts and 'session_lease_detached' not in facts
+
+
 def test_bounded_failure_history_keeps_only_fixed_safe_facts(tmp_path):
     events.configure(tmp_path)
     events.configure(tmp_path)

@@ -55,8 +55,9 @@ wait and cannot report detached success or free the unresolved slot.
 
 Diagnostics explicitly distinguish `session_scope=media_lease` and
 `session_lease_detached`. They intentionally do NOT claim that detaching a camera
-physically closed the shared UDP socket. Production prepared-source retirement
-must understand that distinction before this mode is enabled publicly.
+physically closed the shared UDP socket. The generic normal-run cleanup contract
+already supports source detach; camera-local recovery interprets this distinction
+inside the driver, without changing generic PreparedNative socket assumptions.
 
 An offline integration test runs the actual native video source/consumer with a
 fake decoder and synthetic broker: video reaches the consumer, stopping it joins
@@ -71,8 +72,8 @@ The preceding dynamic-worker commit `d70c86f` passed GitHub CI6078tests/1skip an
 
 Production still runs one native source. These entry points are not exposed via
 HTTP or a dashboard toggle. Native consumer/control bindings, server-owned account
-lifetime and same-owner group publication are now implemented. Reviewed offers,
-recovery, PTZ authority and bounded multi-source admission remain to be connected.
+lifetime, same-owner group publication and camera-local recovery are implemented.
+Reviewed offers, PTZ authority and bounded multi-source admission remain to be connected.
 The generic core already accepts a source's normal return after lease cleanup;
 no generic vendor-socket retirement exception is required. See
 [account lifetime](native-account-lifetime.md). PTZ remains on the accepted

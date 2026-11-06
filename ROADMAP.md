@@ -8,9 +8,12 @@ This section overrides the priorities and pending labels in the chronological hi
 reader/worker for a bounded camera group. The generic server registers lazy driver
 runtime services before native sources, stopping sources before shared accounts
 and releasing ServerOwner last. Group publication accepts only same-owner members.
-Offline integration passed three consumers together plus replacement of one,
-using one login/socket/SDK scope. Current production offers are unchanged; next
-wire reviewed offers/recovery and per-lease PTZ to the service, then bounded
+Offline integration passed three consumers in the generic registry, automatic
+repair of one local decoder failure and explicit replacement, using one login/
+socket/SDK scope. Camera-local recovery now distinguishes detach from account
+socket closure; unexpected opening errors cannot publish clean lease outcomes.
+Current production offers are unchanged; next
+wire reviewed offers and per-lease PTZ to the service, then bounded
 multi-source admission. See docs/internal/native-account-lifetime.md.
 
 2026-11-06 next integration checkpoint: dynamic per-camera media leases now reach
@@ -20,8 +23,7 @@ not only a device ID.246targeted tests passed; no production capacity increase o
 physical experiment. The native consumer and per-device control proxy are now
 connected to camera-local leases in offline
 tests: stopping one joins its consumer while the sibling/account continue.
-Remaining: driver account lifetime, group publication/admission, lease-specific
-prepared-source retirement and per-lease PTZ authority. Production is still one
+Earlier remaining items are superseded by the account checkpoint above. Production is still one
 native source; do not advertise multi-camera native availability yet.
 
 Latest deployed code32632de/build b-210e76d55cfa, camera3 native/active150.

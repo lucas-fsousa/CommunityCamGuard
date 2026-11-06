@@ -53,13 +53,13 @@ periodic MTP route maintenance, and TCP pump scheduling under CPU load.
 Longer endurance and simultaneous native cameras are not yet established; see the
 [failure investigation](docs/internal/native-transport-investigation.md) and
 [current status](docs/internal/native-production.md).
-The broker/worker now supports a bounded three-channel bootstrap in offline tests,
-with one account reader and independent TCP/delivery state. Production admission
-remains one native camera until shared source leases are integrated; see
-[multi-camera implementation](docs/internal/native-multi-camera.md).
-Dynamic per-camera leases and a borrowed native-consumer/control binding are
-implemented and tested offline; see [source ownership integration](docs/internal/native-source-leases.md)
-for what still blocks public multi-camera admission.
+The shared-account path has dynamic camera leases, three independent native
+consumers, camera-local decoder recovery and server-owned account shutdown.
+Integration tests use synthetic broker replies and fake decoders; they are not
+a three-real-camera rollout. Production still admits one native camera until
+reviewed source offers and per-lease PTZ are connected. See
+[account lifetime](docs/internal/native-account-lifetime.md) and
+[source ownership](docs/internal/native-source-leases.md) for the exact remaining scope.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

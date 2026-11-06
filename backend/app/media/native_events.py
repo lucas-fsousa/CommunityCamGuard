@@ -26,10 +26,11 @@ _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport',
     'contended', 'heartbeat_timeout', 'media_complete', 'lifetime', 'unavailable',
     'offline', 'socket_timeout', 'socket_error', 'stale_access', 'access_rejected',
     'transport_or_auth', 'list_dns', 'list_timeout', 'broker_heartbeat',
-    'certification_unavailable', 'inventory_timeout', 'inventory_unavailable', 'preparation_budget'})
+    'certification_unavailable', 'inventory_timeout', 'inventory_unavailable', 'preparation_budget', 'leased'})
 _bools = frozenset({'session_broker_socket_closed', 'session_broker_release',
     'session_tcp_receipt', 'session_tcp_socket_closed', 'session_motion_started',
-    'session_motion_cleanup_confirmed', 'session_siren_cleanup_confirmed', 'consumer_alive', 'cleanup_failed'})
+    'session_motion_cleanup_confirmed', 'session_siren_cleanup_confirmed', 'consumer_alive', 'cleanup_failed',
+    'session_lease_detached'})
 
 
 class _Handler(RotatingFileHandler):
@@ -63,6 +64,9 @@ def ended(camera_id: str, *, error: str, evidence_valid: bool, details: dict) ->
     for key in ('consumer_error', 'session_worker', 'session_connection_failure', 'session_protocol_code', 'retry_reason'):
         value = details.get(key, '')
         facts[key] = value if isinstance(value, str) and value in (_errors | _labels | _protocols) else 'unknown'
+    scope = details.get('session_scope')
+    if scope in ('media_lease', 'account'):
+        facts['session_scope'] = scope
     cause = details.get('decoder_failure')
     facts['decoder_failure'] = cause if isinstance(cause, str) and cause in FAILURE_CATEGORIES else 'unknown'
     code = details.get('decoder_returncode')

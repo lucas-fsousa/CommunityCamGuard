@@ -127,3 +127,46 @@ def test_missing_close_receipt_fences_dynamic_source_replacement(monkeypatch):
     with pytest.raises(ValueError):
         inbox.submit(camera(0), bootstrap(0))
     assert len(pumps) == sock.opens == sock.closes == sock.closed == 1
+
+
+@pytest.mark.parametrize("failure", ["cleanup", "interrupt", "unexpected"])
+def test_unexpected_opening_exit_cannot_fabricate_a_clean_camera_detach(monkeypatch, failure):
+    from backend.app.drivers.yoosee.p2p.contracts import P2PProbeError
+
+    sock, inbox, _, owner = setup(monkeypatch)
+    ticket = inbox.submit(camera(0), bootstrap(0))
+    error = P2PProbeError if failure == "cleanup" else KeyboardInterrupt if failure == "interrupt" else RuntimeError
+    def opener(*args, **kwargs):
+        raise error("synthetic uncertain opening")
+    monkeypatch.setattr("backend.app.drivers.yoosee.p2p.account_read_worker.open_tcp_media", opener)
+    with pytest.raises(error):
+        execute(sock, inbox, owner)
+    outcome = inbox.take(ticket)
+    assert outcome.status == "blocked"
+    assert outcome.channel.media.broker_release  # Outer receipt cannot prove TCP closure.
+    assert sock.closed == 1
+    with pytest.raises(ValueError):
+        inbox.submit(camera(0), bootstrap(0))
+
+
+def test_unsafe_siren_cleanup_cannot_fabricate_a_clean_lease_outcome(monkeypatch):
+    from types import SimpleNamespace
+
+    sock, inbox, _, _ = setup(monkeypatch)
+    owner = AccountReadWorker(NODE, 1, "192.0.2.1", 1234, clock=lambda: sock.now,
+                              policy=AccountPolicy.CONTINUOUS, state_reads=True, media_capacity=3)
+    ticket = inbox.submit(camera(0), bootstrap(0))
+    class UnsafePulse:
+        unsafe = False
+        active = False
+        last_result = SimpleNamespace(start_attempted=True, off_confirmed=False)
+        def __init__(self, *args, **kwargs): pass
+        def poll(self):
+            self.unsafe = True
+            return ()
+    monkeypatch.setattr("backend.app.drivers.yoosee.p2p.account_read_worker.SirenPulsePump", UnsafePulse)
+    monkeypatch.setattr("backend.app.drivers.yoosee.p2p.account_read_worker.drain_siren", lambda *a, **k: (0, 0))
+    result = execute(sock, inbox, owner)
+    assert result.reason == "siren_cleanup_unconfirmed" and result.lease_cleanup_uncertain
+    assert inbox.take(ticket).status == "blocked"
+    assert sock.closed == 1

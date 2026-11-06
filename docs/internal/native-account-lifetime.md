@@ -45,8 +45,12 @@ increase was added. Unknown group exit stays fenced.
 The real account/lifecycle/worker, three native consumers and control-publication
 registry run against synthetic encrypted broker replies and fake decoders. Three
 consumers are active together; one is stopped and replaced while the other two
-continue. Four OPEN/CLOSE pairs use one login, one broker socket and one SDK-owner
-scope. Every decoder/consumer retires before service shutdown releases the account
+continue. The integration also uses the generic SourceRegistry and camera-local
+recovery: one injected decoder failure is repaired with a new lease after normal
+backoff while siblings continue, then a source is explicitly stopped/replaced.
+Five OPEN/CLOSE pairs still use one login, one broker socket and one SDK-owner
+scope. The detached camera's registry slot becomes idle while the account remains
+active. Every decoder/consumer retires before service shutdown releases the account
 and server owner. No real SDK login, FFmpeg child, camera, sound/light/motor action
 or emulator is used by this integration test.
 
@@ -54,12 +58,29 @@ Tests also cover SDK contention without login, changed credentials without
 reauthentication, confirmed opening failures, unknown physical close, scope-exit
 failure, server-lock retention, lazy startup and reverse source/account shutdown.
 
+`native_lease_recovery` classifies only confirmed lease detach and joined consumer/
+decoder retirement; it does not require closing or reacquiring the shared broker.
+Known local decoder/transport failures may retry with normal backoff. Unknown
+protocol/authentication/cleanup failures cannot. Fixed retry history distinguishes
+lease detach from shared-socket closure without persisting payloads or credentials.
+
+Safety follow-up: an unexpected opening exception (including a TCP-close failure)
+must not publish a clean lease outcome merely because broker CLOSE was confirmed.
+The worker now marks outstanding leases uncertain on unhandled exits. Regression
+tests require blocked outcomes/no slot reuse even with a positive broker receipt.
+Unsafe siren cleanup also blocks lease outcomes; this is tested with a synthetic
+unsafe actor only, without emitting sound or sending a command to any camera.
+The preceding owner/service commit `5a4b03f` passed CI6098tests/1skip and Image.
+
+Latest targeted integration/cleanup regression:202passed, peak125.3MiB, CPU50%
+and MemoryMax192MiB. Full mypy passed415source modules under a256MiB ceiling.
+
 ## Remaining public integration
 
 The service is registered but idle unless explicitly requested by a driver.
 Current production offers still use the previously accepted single-source path;
 no other camera is silently migrated. Remaining delivery work: bind reviewed
-source offers/recovery and per-lease PTZ authority to this account service, then
+source offers and per-lease PTZ authority to this account service, then
 enable bounded multi-source admission. The core's existing normal-run cleanup
 contract already supports a detached source lease; do not invent a requirement
 to physically close the shared broker socket for each camera.
