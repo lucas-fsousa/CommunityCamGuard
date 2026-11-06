@@ -104,7 +104,9 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
     class FaultyTcp(Tcp):
         def step(self, *, budget_seconds=0.2):
             super().step(budget_seconds=budget_seconds)
-            if self.inject and self.steps == 3 and not self.closing:
+            # Fail an actually started consumer, not the scheduler-dependent
+            # interval before its first decoder is constructed.
+            if self.inject and self.steps >= 3 and len(decoders) >= len(cameras) and not self.closing:
                 self.finish()
                 try:
                     raise KcpAssemblyTimeout((("kcp_gap", 1), ("kcp_pending", 2)))
