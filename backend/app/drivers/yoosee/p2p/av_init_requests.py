@@ -59,7 +59,8 @@ class AvInitRequests:
         if self._stopped or self._count >= 25 or now < self._next:
             return None
         request = ReliableAvControl(self._peer, self._link, self._call, action=1,
-            sequence=self._count, request_user_data=self._data, clock=self._clock)
+            sequence=self._count, request_user_data=self._data, clock=self._clock,
+            _sdk_init_repeat=True)
         self._requests.append(request)
         self._next = now + ((0.05, 0.07, 0.1)[self._count] if self._count < 3 else 0.35)
         self._count += 1
