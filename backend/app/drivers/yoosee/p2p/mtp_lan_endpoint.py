@@ -10,8 +10,8 @@ from .mtp_relays import inspect_mtp_relay_advertisement
 def parse_mtp_lan_endpoint(frame: bytes, session_id: int, link_id: int) -> tuple[str, int] | None:
     """Read the authenticated A3 peerlanip/host-order port, not a relay record.
 
-    Split SDK510bc51a, gat_on_rcvpkt_MTP_RES_RESPONSE0x247ad0–0x247b28:
-    IPv4 at0x64, host-order port at0x5a, added as LAN/NAT kind2. The
+    Split SDK 510bc51a, gat_on_rcvpkt_MTP_RES_RESPONSE 0x247ad0-0x247b28:
+    IPv4 at 0x64, host-order port at 0x5a, added as LAN/NAT kind 2. The
     outer endpoint's port at0x58 is NETWORK-order instead. Caller still must
     authenticate/decrypt the broker packet; checksum/correlation are not auth.
     Returning a candidate does not prove reachability or authorize contacting it.
