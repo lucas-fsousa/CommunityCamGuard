@@ -12,7 +12,7 @@ probe/profile evidence before its per-camera catalogue may advertise proprietary
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
 from ...control import device, media, ptz
@@ -61,6 +61,12 @@ class YooseeDriver(CameraDriver):
         from .native_media_offer import offer
 
         return offer(camera, archive=archive, accounts=self._native_accounts)
+
+    def native_media_offers(self, cameras: tuple[Camera, ...], *,
+                            archives: Mapping[str, NativeArchiveSpec | None]) -> tuple[NativeSourceOffer, ...]:
+        from .native_media_group import offers
+
+        return offers(cameras, archives, accounts=self._native_accounts)
 
     def onboarding(self) -> OnboardingPort:
         from .onboarding import ONBOARDING

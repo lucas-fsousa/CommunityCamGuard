@@ -13,6 +13,7 @@ class NativeSourceOffer:
     domain: str = field(repr=False)
     factory: Callable[[], ManagedSource] = field(repr=False)
     valid: Callable[[], bool] = field(repr=False)
+    restart_domains: frozenset[str] = field(default_factory=frozenset, repr=False)
 
     def __post_init__(self) -> None:
         if not valid_camera_id(self.camera_id):
@@ -21,3 +22,10 @@ class NativeSourceOffer:
                 or not self.domain.isascii() or any(ord(c) < 33 or ord(c) > 126 for c in self.domain)
                 or not callable(self.factory) or not callable(self.valid)):
             raise ValueError("trusted native source offer required")
+        if (not isinstance(self.restart_domains, frozenset) or len(self.restart_domains) > 8
+                or any(type(value) is not str or not 1 <= len(value) <= 128
+                       or any(not 33 <= ord(c) <= 126 for c in value) for value in self.restart_domains)):
+            raise ValueError("bounded driver-approved restart domains required")
+
+    def accepts_restart_domain(self, domain: str) -> bool:
+        return domain == self.domain or domain in self.restart_domains

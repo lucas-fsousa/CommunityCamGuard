@@ -67,7 +67,7 @@ class NativeSourceRuntime:
                 offer: NativeSourceOffer, apply_routes: Callable[[], None], ready_timeout: float = 5.0,
                 background: bool = False):
         if (not self._restart_checkpoints or retirement.viewer_gate is not self._viewers
-                or offer.camera_id!=checkpoint.camera_id or offer.domain!=checkpoint.domain
+                or offer.camera_id!=checkpoint.camera_id or not offer.accepts_restart_domain(checkpoint.domain)
                 or offer.valid() is not True):
             raise SourceUnavailable("reviewed clean native restart required")
         activation = self._admit(retirement, offer, apply_routes)

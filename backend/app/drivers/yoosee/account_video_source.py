@@ -9,6 +9,7 @@ from ...media.mp4_fanout import StreamClosedError, Subscription
 from ...media.source_registry import SourceCleanupUnconfirmed
 from .leased_read_session import LeasedReadSession
 from .native_account_service import NativeAccounts
+from .native_cohort import NativeCohort
 from .native_video_source import NativeVideoResult, NativeVideoSource
 from .p2p.ptz_authority import PtzGrant
 from .shared_read_session import SharedReadResult
@@ -24,9 +25,13 @@ class AccountVideoSource:
     def __init__(self, entry: P2PEnrollment, accounts: NativeAccounts, *,
                  factory: Callable[[LeasedReadSession], NativeVideoSource],
                  valid: Callable[[], bool], motion_grants: tuple[PtzGrant, ...] = (),
+                 cohort: NativeCohort | None = None,
                  clock: Callable[[], float] = time.monotonic):
         self._entry, self._accounts = entry, accounts
         self._factory, self._valid, self._grants, self._clock = factory, valid, motion_grants, clock
+        if cohort is not None and entry not in cohort.entries:
+            raise ValueError("source must belong to the explicit native cohort")
+        self._cohort = cohort
         self._lock = threading.Lock()
         self._started = False
         self._current: NativeVideoSource | None = None
@@ -71,8 +76,12 @@ class AccountVideoSource:
             return self._without_lease("stopped")
         if not self._valid():
             return self._without_lease("enrollment_changed")
-        account = self._accounts.prepare((self._entry,), motion_grants=self._grants,
-                                        motion_valid=(lambda _: self._valid()) if self._grants else None)
+        if self._cohort is not None:
+            account = self._accounts.prepare(self._cohort.entries, motion_grants=self._cohort.grants,
+                motion_valid=self._cohort.valid if self._cohort.grants else None)
+        else:
+            account = self._accounts.prepare((self._entry,), motion_grants=self._grants,
+                                            motion_valid=(lambda _: self._valid()) if self._grants else None)
         deadline, next_check = self._clock() + 22, self._clock() + 1
         while not account.ready:
             if cancelled():

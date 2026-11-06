@@ -3,13 +3,13 @@
 import logging
 from collections.abc import Callable
 
-from .. import drivers
 from ..db import native_restart, registry
 from ..media.native_runtime import NativeSourceRuntime
 from ..media.owned_retirement import OwnedRetirementCoordinator
 from ..media.server_owner import ServerOwner
 from ..media.source_registry import SourceCleanupUnconfirmed
 from ..recording.recorder import Recorder
+from .native_offer_plan import plan
 
 log=logging.getLogger(__name__)
 
@@ -17,8 +17,9 @@ log=logging.getLogger(__name__)
 def restore_reviewed(runtime: NativeSourceRuntime, retirement: OwnedRetirementCoordinator,
                      recorder: Recorder, apply_routes: Callable[[], None], *,
                      owner: ServerOwner | None = None) -> dict[str,str]:
+    offered = plan(recorder)
     def offer_for(camera):
-        return drivers.for_camera(camera).native_media_offer(camera, archive=recorder.native_archive(camera.camera_id))
+        return offered.get(camera.camera_id)
     from .abandoned_native import checkpoints
     statuses = checkpoints(owner, offer_for, limit=runtime.capacity) if owner is not None else {}
     for checkpoint in native_restart.pending():

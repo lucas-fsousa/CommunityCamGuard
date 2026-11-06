@@ -2,6 +2,11 @@
 
 ## Capacity-aware restart — 2026-11-06
 
+Follow-up: [driver group planning](native-group-startup.md) now connects ordinary
+startup to one reviewed account with independent native consumers. Runtime capacity
+is wired through server-only `NATIVE_SOURCE_CAPACITY`; default1 is unchanged.
+The earlier pending-driver-plan labels below are superseded by that delivery.
+
 The runtime now reserves camera, resource domain and capacity atomically BEFORE
 spending a clean restart checkpoint. Preparing/failed activations consume their
 reservations too; two concurrent callers cannot both spend the last slot. Domain

@@ -19,7 +19,7 @@ to add what's specific (PTZ, reboot, model/firmware, ...).
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -129,6 +129,12 @@ class CameraDriver:
     def native_media_offer(self, camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
         """Optional reviewed source; refuse unavailable recording, never silently drop it."""
         return None
+
+    def native_media_offers(self, cameras: tuple[Camera, ...], *,
+                            archives: Mapping[str, NativeArchiveSpec | None]) -> tuple[NativeSourceOffer, ...]:
+        """Optional coordinated plan for explicit native intents, never LAN discovery."""
+        return tuple(offered for camera in cameras
+                     if (offered := self.native_media_offer(camera, archive=archives.get(camera.camera_id))) is not None)
 
     def maintain_control_session(self, camera: Camera) -> bool:
         """Optional read-only, bounded session preparation. Never actuate hardware."""

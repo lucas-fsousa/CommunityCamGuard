@@ -4,6 +4,17 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
+driver offers for existing native intentions. Yoosee's reviewed three-member
+cohort supplies one account/login/worker to independent camera leases. The full
+driver→startup→runtime→account→consumer integration runs three synthetic sources,
+stops one without stopping siblings, then retires the complete group. Legacy
+RTSP cameras are excluded. Server-only NATIVE_SOURCE_CAPACITY (default1, up to32;
+Yoosee group up to3) wires the real app capacity. Driver-approved exact-camera
+restart aliases preserve old singleton checkpoints. This closes the driver-plan
+implementation item below, not physical acceptance of the other two cameras.
+See docs/internal/native-group-startup.md for configuration and exact scope.
+
 2026-11-06 account-lifetime integration: the driver now owns one explicit account
 reader/worker for a bounded camera group. The generic server registers lazy driver
 runtime services before native sources, stopping sources before shared accounts
@@ -29,8 +40,8 @@ is covered offline;70targeted tests passed, peak140MiB (192MiB/CPU50% ceiling).
 Deployed70beb7b/build b-3fad324407cc, camera3 native/active159, CI6139tests/1skip
 and Image passed. Singleton MSE60s/122fragments, no reconnect, lamp GET200/verified;
 app205.2MiB/1GiB, OOM=false/restarts=0. No sound/light/motor action.
-Next: explicit driver cohort planning and public multi-source admission. Raising
-the runtime capacity alone still must not duplicate SDK logins or migrate cameras.
+The driver cohort/public startup integration is now delivered above. Capacity
+alone never duplicates SDK logins or migrates cameras.
 Public capacity remains one; no automatic migration of other cameras.
 See docs/internal/native-account-lifetime.md.
 

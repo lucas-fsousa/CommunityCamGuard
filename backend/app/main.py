@@ -94,7 +94,8 @@ async def lifespan(app: FastAPI):
         media = lifetime.own(Go2rtc(owned_ingress=owned_bindings))
         rec = lifetime.own(Recorder(owned_ingress=owned_bindings))
         owned_runtime = lifetime.own(OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings))
-        native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers, restart_checkpoints=True))
+        native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers,
+            capacity=settings.native_source_capacity, restart_checkpoints=True))
         storage = lifetime.own(StorageMonitor(rec))
         retention = lifetime.own(RetentionCleaner())
         warmer = lifetime.own(Warmer())

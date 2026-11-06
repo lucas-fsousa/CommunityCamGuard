@@ -77,6 +77,10 @@ and MemoryMax192MiB. Full mypy passed415source modules under a256MiB ceiling.
 
 ## Reviewed offer integration
 
+The coordinated startup plan is now implemented too: see
+[native group startup](native-group-startup.md). Earlier singleton deployment
+checkpoints below remain historical measurements, not the current capacity limit.
+
 Production offers now bind lazily through `AccountVideoSource` and the driver's
 server-owned `NativeAccounts` service. Construction, subscription and startup
 never authenticate; the admitted source run prepares the exact singleton cohort,

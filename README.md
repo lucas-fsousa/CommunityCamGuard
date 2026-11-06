@@ -58,13 +58,15 @@ consumers, camera-local decoder recovery and server-owned account shutdown.
 Integration tests use synthetic broker replies and fake decoders; they are not
 a three-real-camera rollout. Reviewed offers and exact-device PTZ now bind lazily
 to the server account, retaining it across video recovery and closing it when the
-last source ends. Public admission still permits one native camera; multi-camera
-rollout is separate. See
+last source ends. Startup now supports a reviewed Yoosee group of up to three
+native cameras through that same account. See
 [account lifetime](docs/internal/native-account-lifetime.md) and
 [source ownership](docs/internal/native-source-leases.md) for the exact remaining scope.
-The generic restart service is capacity-aware and tested with three synthetic
-sources; production still uses one native slot until driver cohort planning is
-integrated. Capacity/domain conflicts preserve unspent restart checkpoints.
+Set `NATIVE_SOURCE_CAPACITY=3` to budget three native consumers (default1); this
+does not migrate RTSP cameras. The ordinary startup/driver/account path is tested
+with three synthetic sources and one login. Current physical native acceptance
+remains camera3 only. Capacity/domain conflicts preserve unspent checkpoints.
+See [native groups](docs/internal/native-group-startup.md) for setup and limits.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).
