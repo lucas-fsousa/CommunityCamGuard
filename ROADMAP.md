@@ -11,8 +11,10 @@ the generation. Production admission is unchanged at one native camera. First
 offline broker regression:110passed. The worker now pumps independent per-device
 TCP/delivery channels under that same reader and shared200ms scheduling budget;
 all-channel cleanup results gate lifecycle reuse. Production source admission
-still remains one; shared source leases/dynamic attachment and isolated channel
-retirement are next, not additional SDK logins. See docs/internal/native-multi-camera.md.
+still remains one. Isolated channel retirement now keeps healthy siblings running
+when cleanup is confirmed; uncertain cleanup still fences the group. Latest local
+regression:260passed. Shared source leases/dynamic attachment and safe channel
+replacement are next, not additional SDK logins. See docs/internal/native-multi-camera.md.
 The overnight log also contains a later decoder progress_timeout/retry; the
 900-second acceptance below must not be read as overnight endurance acceptance.
 

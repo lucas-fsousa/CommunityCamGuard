@@ -7,7 +7,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .access_protocol import build_mode2_response_ack
-from .account_media_channel import AccountMediaChannel, MediaBootstrap, MediaChannelSummary
+from .account_media_channel import (
+    AccountMediaChannel,
+    MediaBootstrap,
+    MediaChannelSummary,
+    media_channels_closed,
+)
 from .account_output_budget import AccountOutputBudget, OutputExhausted
 from .account_policy import AccountPolicy, validate_policy
 from .account_read_dispatcher import AccountReadDispatcher
@@ -271,14 +276,28 @@ class AccountReadWorker:
                         raise _Stop("draining")
                     service(self._dispatcher.drain())
                 for channel in channels:
+                    if channel.route.result is not None:
+                        continue
                     if with_media_tcp:
-                        channel.step(open_tcp_media, budget_seconds=0.2 / len(channels))
+                        try:
+                            channel.step(open_tcp_media, budget_seconds=0.2 / len(channels))
+                        except (OSError, ValueError) as channel_error:
+                            if len(channels) == 1:
+                                raise
+                            # The TCP opener/pump certifies physical close or
+                            # raises a distinct cleanup error. Never reopen here.
+                            channel.retire("socket" if isinstance(channel_error, OSError) else "protocol")
                         if channel is channels[0]:
                             tcp = channel.tcp
                         if channel.tcp is not None and channel.tcp.result is not None:
-                            raise _Stop("media_complete" if channel.tcp.result.close_acknowledged
+                            completion = ("media_complete" if channel.tcp.result.close_acknowledged
                                         and not channel.tcp.result.socket_close_failed
                                         else "media_unconfirmed")
+                            if len(channels) == 1:
+                                raise _Stop(completion)
+                            if channel.tcp.result.socket_close_failed:
+                                raise _Stop("media_unconfirmed")
+                            channel.retire("ended")
                     packet_media = channel.route.next_packet()
                     if packet_media is not None:
                         try:
@@ -286,6 +305,9 @@ class AccountReadWorker:
                         except BaseException:
                             channel.route.send_failed()
                             raise
+                if len(channels) > 1 and all(channel.route.result is not None for channel in channels):
+                    closed = media_channels_closed(tuple(channel.summary() for channel in channels))
+                    raise _Stop("media_complete" if closed else "media_unconfirmed")
                 if self.motion_inbox is not None:
                     if motion is not None and motion.result is not None:
                         assert motion_ticket is not None

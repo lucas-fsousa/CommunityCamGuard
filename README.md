@@ -53,6 +53,10 @@ periodic MTP route maintenance, and TCP pump scheduling under CPU load.
 Longer endurance and simultaneous native cameras are not yet established; see the
 [failure investigation](docs/internal/native-transport-investigation.md) and
 [current status](docs/internal/native-production.md).
+The broker/worker now supports a bounded three-channel bootstrap in offline tests,
+with one account reader and independent TCP/delivery state. Production admission
+remains one native camera until shared source leases are integrated; see
+[multi-camera implementation](docs/internal/native-multi-camera.md).
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

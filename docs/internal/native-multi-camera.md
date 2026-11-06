@@ -51,10 +51,18 @@ channel has a bounded summary. Lifecycle replacement and transient-retirement
 checks inspect all admitted channels, so a successful primary cannot conceal an
 unconfirmed sibling. The legacy single-camera result remains available.
 
-**Not yet implemented:** independent per-channel retry/replacement. Currently a
-transport error still retires the account group conservatively. Per-camera source
-leases and dynamic join/leave must not be advertised as available on the basis of
-the worker bootstrap tests.
+**Isolated retirement implemented:** in explicit multi-channel mode, a local TCP
+transport/protocol failure closes that channel and requests its broker CLOSE on
+the existing reader. Healthy siblings continue. The failing channel is never
+reopened automatically. An unconfirmed physical close or broker release still
+retires/fences the whole group. Unknown cleanup exceptions escape after all
+other channels have been given their cleanup attempts. Single-channel error and
+retry semantics remain unchanged.
+
+**Not yet implemented:** independent per-channel retry/replacement, per-camera
+source leases and dynamic join/leave. Do not advertise those as available on the
+basis of worker bootstrap tests. Callers must distinguish a retired failed
+channel (fixed `socket`/`protocol`/`ended` summary) from a healthy channel.
 
 Second checkpoint: 257 targeted regression tests passed, peak104.9MiB. Full local
 mypy passed407source modules with a100.7MiB peak; repository Ruff passed. The first
@@ -65,7 +73,7 @@ multi-channel results.
 1. Connect per-camera prepared sources to a driver-owned shared account lease;
    match enrollment/account identity explicitly. Do not turn the generic source
    registry into a vendor-specific singleton or raise its capacity independently.
-2. Implement dynamic attachment and isolated, confirmed per-channel retirement.
+2. Implement dynamic attachment and safe per-channel replacement after retirement.
 3. Offline source admission, failure isolation, shutdown and consumer tests; then deploy
    on camera3 only. Additional real-camera migration needs explicit scope.
 
@@ -81,3 +89,10 @@ complete from the earlier 15-minute result.
 A subsequent 30-second read-only MSE observation completed without reconnect:
 31 binary messages / 8,728,455 bytes. This confirms delivery during that later
 interval, not uninterrupted operation throughout the overnight gap.
+
+Third checkpoint:260targeted tests passed, peak105.2MiB. New regressions prove
+healthy siblings keep progressing after a channel failure, missing broker release
+retires the group, and primary success cannot allow lifecycle reauthentication
+when a sibling's cleanup failed. Commit `0bb36d0` passed GitHub CI6041tests/1skip
+and Image. The running deployment is still the earlier single-camera version
+until the final isolation changes pass CI and are deployed explicitly.
