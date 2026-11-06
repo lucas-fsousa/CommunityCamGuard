@@ -119,3 +119,34 @@ are logged, using an explicitly enabled narrow INFO logger. No endpoints,
 identifiers, tokens, cookies or payloads are logged. Offline coverage includes
 the actual leased account worker with TCP progress and broker release on the
 same socket. This is route measurement, NOT production UDP video acceptance.
+
+### Camera3 live result: LAN roundtrip confirmed — 2026-11-06
+
+Commit1dddcbb passed CI42292690269 (6157tests,1skip; Mypy422files;
+frontend contracts) and Image42292690188. Capped512MiB/CPU50% local image
+2b4cc9bfd41f was deployed by replacing only the app, retaining hub/tunnel and
+legacy RTSP selection for the other two cameras.
+
+The actual account logger reported `outcome=roundtrip attempts=1`: a valid LAN
+reply reached the SAME account reader and matched its freshly sent measurement.
+A passive header-only90s capture independently saw the camera's78-byte c0/90
+reply and subsequent74-byte c0/90 requests. It ran in an auto-removed64MiB/
+CPU25% container; no payload was retained. Exact private endpoints remain outside
+the public notes. No firewall mutation, broadcast, new login, device setting,
+audio, light, PTZ, reboot or reset was required.
+
+This supersedes the hypothesis that WSL inbound policy necessarily blocks this
+broker-assisted LAN route. It does NOT establish UDP AV acceptance/decoding,
+uninterrupted video or LAN-only/offline authentication. The outstanding discovery
+firewall-rule request is no longer a prerequisite for this path; do not change
+the firewall merely to satisfy the older discovery hypothesis.
+
+Next concrete integration: select the proven LAN channel BEFORE creating a TCP
+media channel; feed the existing AvHandshake from the account reader, maintain
+meters, deliver decoded records through the existing bounded handoff, and retain
+TCP fallback with honest UDP detach/broker-release evidence. Do not simultaneously
+create independent TCP/UDP AV receivers for one call or mislabel UDP detachment
+as physical closure of the shared broker socket. Direct media needs its existing
+per-stream rate budget: routing all media through the broker's finite foreign-
+packet budget would incorrectly terminate a valid high-rate stream, while simply
+skipping that budget for arbitrary foreign traffic defeats the flood bound.

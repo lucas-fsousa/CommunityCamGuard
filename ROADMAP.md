@@ -15,6 +15,10 @@ The SDK's A3 handler also supplies LAN IPv4/port independently of broadcast
 discovery. Those authenticated/correlated fields are now preserved passively;
 production UDP routing is NOT yet enabled. Prioritize the existing account
 reader's direct UDP path rather than treating discovery silence as a blocker.
+Camera3 LAN measurement is now LIVE-CONFIRMED on that same account reader
+(one attempted meter, correlated roundtrip), without firewall changes or an
+extra login. Next is UDP AV selection/receive/delivery with TCP fallback, not
+another discovery probe, control test or generic-architecture expansion.
 
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member
