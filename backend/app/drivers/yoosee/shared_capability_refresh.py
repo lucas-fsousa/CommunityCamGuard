@@ -11,15 +11,15 @@ from .capability_snapshot import CapabilitySnapshot, normalize_snapshot
 from .p2p.contracts import P2PPropertyRead
 from .p2p.white_light import P2PWhiteLightState
 from .shared_control_reads import session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 
-def _current(session: SharedReadSession, entry: P2PEnrollment) -> bool:
+def _current(session: SharedDeviceControls, entry: P2PEnrollment) -> bool:
     return (p2p.read_registered_enrollment(entry.camera_id or '') == entry
             and session_for(entry) is session and session.matches_enrollment(entry))
 
 
-def collect(session: SharedReadSession, entry: P2PEnrollment, *, include_siren: bool) -> CapabilitySnapshot | None:
+def collect(session: SharedDeviceControls, entry: P2PEnrollment, *, include_siren: bool) -> CapabilitySnapshot | None:
     """Sequential fixed B7 roots plus optional type-12 lamp STATUS, <=20 seconds.
 
     Every waiter is consumed/cancelled, and the same account/enrollment must survive

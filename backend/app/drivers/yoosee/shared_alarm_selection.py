@@ -15,10 +15,10 @@ from .p2p.alarm_voice_selection import (
 from .p2p.contracts import P2PProbeError
 from .shared_alarm_catalog import read as read_catalog
 from .shared_control_reads import session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 
-def _state(session: SharedReadSession) -> AlarmVoiceSelectionState:
+def _state(session: SharedDeviceControls) -> AlarmVoiceSelectionState:
     try:
         ticket = session.submit(ALARM_VOICE_READ_PATH)
     except ValueError:

@@ -40,12 +40,41 @@ sibling, idle account admission, stale tickets, queued cancellation, exact accou
 and inventory matching, missing CLOSE and blocked reauthentication. No physical
 camera, sound, light, motor or emulator was used by these tests.
 
+## Native consumer / per-device controls
+
+`SharedDeviceControls` now contains the unchanged exact-device control delegates;
+it does not own authentication or account shutdown. `SharedReadSession` uses that
+base for the existing production path. `LeasedReadSession` uses the same delegates
+but only cancels its own media ticket on stop, never the shared lifecycle.
+
+`NativeVideoSource` can receive an exact-target shared session instead of creating
+its own. The lease adapter rechecks enrollment locally, observes owner/generation
+changes, and waits for confirmed channel retirement before returning. Cancellation
+exceptions are re-raised only after cleanup; missing receipts have a bounded5s
+wait and cannot report detached success or free the unresolved slot.
+
+Diagnostics explicitly distinguish `session_scope=media_lease` and
+`session_lease_detached`. They intentionally do NOT claim that detaching a camera
+physically closed the shared UDP socket. Production prepared-source retirement
+must understand that distinction before this mode is enabled publicly.
+
+An offline integration test runs the actual native video source/consumer with a
+fake decoder and synthetic broker: video reaches the consumer, stopping it joins
+its decoder thread and closes only that channel, while the sibling keeps being
+pumped on the same account. No real FFmpeg, camera or SDK login is used by that test.
+Regression checkpoint:220targeted tests passed, peak106.9MiB; mypy passed411modules.
+Broader consumer/control/lease regression:288passed, peak112.1MiB; no real device
+commands or decoder process was used by those tests.
+The preceding dynamic-worker commit `d70c86f` passed GitHub CI6078tests/1skip and Image.
+
 ## Production boundary / next integration
 
 Production still runs one native source. These entry points are not exposed via
-HTTP or a dashboard toggle. Next bind the native video consumer and per-device
-control proxy to this lease, then integrate the driver-owned account lifetime
-with generic source admission. Do not increase the generic registry capacity or
+HTTP or a dashboard toggle. Native consumer/control bindings are now implemented,
+but the driver-owned account lifetime, multi-camera publication/admission and
+prepared-source lease-retirement evidence still need integration. PTZ authority
+also remains on the existing production path, not the new lease entry point.
+Do not increase the generic registry capacity or
 declare independent SDK domains before that owner exists. Do not claim that
 returning a camera lease means the shared broker socket was physically closed.
 

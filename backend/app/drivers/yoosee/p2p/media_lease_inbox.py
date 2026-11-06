@@ -73,6 +73,9 @@ class MediaLeaseInbox:
     def matches_targets(self, targets: tuple[OnlineDevice, ...]) -> bool:
         return self._targets == targets
 
+    def permits_target(self, target: OnlineDevice) -> bool:
+        return target in self._targets and bool(target.status)
+
     def submit(self, camera_id: str, bootstrap: MediaBootstrap) -> MediaLeaseTicket:
         if (type(camera_id) is not str or not valid_camera_id(camera_id) or not isinstance(bootstrap, MediaBootstrap)
                 or not isinstance(bootstrap.spec, MediaRouteSpec)

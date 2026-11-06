@@ -57,6 +57,9 @@ The broker/worker now supports a bounded three-channel bootstrap in offline test
 with one account reader and independent TCP/delivery state. Production admission
 remains one native camera until shared source leases are integrated; see
 [multi-camera implementation](docs/internal/native-multi-camera.md).
+Dynamic per-camera leases and a borrowed native-consumer/control binding are
+implemented and tested offline; see [source ownership integration](docs/internal/native-source-leases.md)
+for what still blocks public multi-camera admission.
 The other two cameras retain their existing RTSP transports. No emulator or temporary
 trial server is needed. Support remains per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).

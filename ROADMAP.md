@@ -9,7 +9,12 @@ the same worker/lifecycle, including cooperative detach and later replacement
 without another login. Admission binds exact authenticated account/inventory,
 not only a device ID.246targeted tests passed; no production capacity increase or
 physical experiment. Consumer/control-proxy and driver-owned account lifetime
-integration remain; see docs/internal/native-source-leases.md.
+integration remain; see docs/internal/native-source-leases.md. The native consumer
+and per-device control proxy are now connected to camera-local leases in offline
+tests: stopping one joins its consumer while the sibling/account continue.
+Remaining: driver account lifetime, group publication/admission, lease-specific
+prepared-source retirement and per-lease PTZ authority. Production is still one
+native source; do not advertise multi-camera native availability yet.
 
 2026-11-06 multi-camera implementation: broker route ownership now supports an
 explicit bounded three-device capacity under one account/sequence allocator and

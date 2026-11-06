@@ -73,11 +73,17 @@ class AccountReadLifecycle:
         self._worker: AccountReadWorker | None = None
         self._drain = False
         self._stop = False
+        self._lease_inbox: MediaLeaseInbox | None = None
 
     @property
     def state(self) -> str:
         with self._lock:
             return self._state
+
+    def owns_media_leases(self, inbox: MediaLeaseInbox) -> bool:
+        with self._lock:
+            return (self._state == "active" and self._lease_inbox is inbox
+                    and inbox.generation == self._generation)
 
     def submit(self, device_id: int, path: str, timeout: float = 2.0) -> MailboxTicket:
         with self._lock:
@@ -341,6 +347,7 @@ class AccountReadLifecycle:
             tickets = tuple(worker.mailbox.submit(r.device_id, r.path, r.timeout) for r in reads)
             with self._lock:
                 self._worker = worker
+                self._lease_inbox = inbox
                 if self._stop:
                     worker.mailbox.close()
                     worker.stop()
@@ -375,6 +382,7 @@ class AccountReadLifecycle:
                         connection.socket.close()
             finally:
                 with self._lock:
+                    self._lease_inbox = None
                     # An exception has no verified WorkerSummary. Fail closed,
                     # including interruptions even if the worker attempted close.
                     self._state = ("idle" if summary is not None

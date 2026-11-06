@@ -20,6 +20,7 @@ from ...media.fragmented_mp4 import FragmentedMp4, Mp4OrderError, Mp4SizeError
 from ...media.hevc_decoder import DecoderExitedError, HevcDecoder
 from ...media.mp4_fanout import Mp4Fanout, StreamClosedError, Subscription
 from ...media.native_av_decoder import NativeAvDecoder
+from .leased_read_session import LeasedReadSession
 from .p2p.av_delivery import NativeAvDelivery, supported_audio
 from .p2p.contracts import P2PProbeError
 from .p2p.ptz_authority import PtzGrant
@@ -48,7 +49,8 @@ class NativeVideoSource:
                  archive_segment_seconds: int = 60,
                  saving_allowed: Callable[[], bool] | None = None,
                  motion_grants: tuple[PtzGrant, ...] = (),
-                 motion_valid: Callable[[], bool] | None = None):
+                 motion_valid: Callable[[], bool] | None = None,
+                 shared_session: SharedReadSession | LeasedReadSession | None = None):
         if not isinstance(motion_grants, tuple):
             raise ValueError("explicit reviewed media motion grants required")
         if motion_valid is not None and (not callable(motion_valid) or not motion_grants):
@@ -65,7 +67,11 @@ class NativeVideoSource:
         if delivery is not None and (not isinstance(delivery, VideoDelivery) or delivery.closed):
             raise ValueError("fresh native delivery required")
         self._camera_id = camera_id
-        self._session = (SharedReadSession(camera_id, device_id, state_reads=True,
+        if shared_session is not None and (not isinstance(shared_session, (SharedReadSession, LeasedReadSession))
+                or not shared_session.matches_target(camera_id, device_id)
+                or motion_grants or motion_valid is not None):
+            raise ValueError("exact device session with its own authority required")
+        self._session = shared_session if shared_session is not None else (SharedReadSession(camera_id, device_id, state_reads=True,
                                           motion_grants=motion_grants, motion_valid=motion_valid)
                          if motion_grants else SharedReadSession(camera_id, device_id, state_reads=True))
         self._delivery = NativeAvDelivery() if native_audio else delivery if delivery is not None else VideoDelivery()

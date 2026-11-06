@@ -6,11 +6,11 @@ from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult
 from .p2p.siren import SIREN_READ_PATH
 from .shared_control_reads import session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 from .siren_evidence import siren_state
 
 
-def _state(session: SharedReadSession) -> int:
+def _state(session: SharedDeviceControls) -> int:
     try:
         ticket = session.submit(SIREN_READ_PATH)
     except ValueError:

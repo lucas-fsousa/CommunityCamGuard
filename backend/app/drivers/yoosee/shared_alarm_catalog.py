@@ -7,10 +7,10 @@ from ..contracts import ControlNotReady, ControlOperationError
 from .p2p.alarm_voice import AlarmVoiceCatalog
 from .p2p.alarm_voice_catalog import P2PAlarmVoiceCatalog
 from .shared_control_reads import session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 
-def _part(session: SharedReadSession, system: bool) -> tuple[AlarmVoiceCatalog, bool]:
+def _part(session: SharedDeviceControls, system: bool) -> tuple[AlarmVoiceCatalog, bool]:
     try:
         ticket = session.submit_catalog_read(system)
     except ValueError:

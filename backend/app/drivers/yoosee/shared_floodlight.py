@@ -6,10 +6,10 @@ from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult
 from .p2p.lamp_read_job import LampReadResult
 from .shared_control_reads import read, session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 
-def _exchange(session: SharedReadSession, enabled: bool) -> LampReadResult | None:
+def _exchange(session: SharedDeviceControls, enabled: bool) -> LampReadResult | None:
     try:
         ticket = session.submit_lamp_write(enabled)
     except ValueError:

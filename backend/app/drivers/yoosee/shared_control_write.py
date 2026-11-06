@@ -8,7 +8,7 @@ from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult, ControlValue
 from .p2p.model_control_inbox import ControlWriteTicket
 from .shared_control_reads import read, session_for
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def _matches(result: ControlResult | None, value: ControlValue, raw: int | None)
 
 
 def apply(entry: P2PEnrollment, key: str, value: ControlValue, raw: int | None,
-          submit: Callable[[SharedReadSession], ControlWriteTicket]) -> ControlResult | None:
+          submit: Callable[[SharedDeviceControls], ControlWriteTicket]) -> ControlResult | None:
     if key not in {'speaker_volume', 'orientation', 'night_vision', 'smart_protection', 'smart_protection_schedule'}:
         raise ValueError('supported typed shared control required')
     session = session_for(entry)

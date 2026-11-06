@@ -12,10 +12,10 @@ from .p2p.orientation import ORIENTATION_READ_PATH, ORIENTATION_VALUES, extract_
 from .p2p.smart_protection import SMART_PROTECTION_READ_PATH, extract_smart_protection_enabled
 from .p2p.smart_protection_schedule import extract_smart_protection_schedule
 from .p2p.volume import VOLUME_READ_PATH, extract_volume_raw, volume_percent
-from .shared_read_session import SharedReadSession
+from .shared_device_controls import SharedDeviceControls
 
 _lock = threading.Lock()
-_sessions: dict[str, SharedReadSession] = {}
+_sessions: dict[str, SharedDeviceControls] = {}
 _owners: dict[str, object] = {}  # retain control admission across clean reconnect gaps
 _paths = {"speaker_volume": VOLUME_READ_PATH, "smart_protection": SMART_PROTECTION_READ_PATH,
           "smart_protection_schedule": SMART_PROTECTION_READ_PATH, "orientation": ORIENTATION_READ_PATH,
@@ -27,7 +27,7 @@ def has_session(camera_id: str | None) -> bool:
         return camera_id in _sessions or camera_id in _owners
 
 
-def session_for(entry: P2PEnrollment) -> SharedReadSession | None:
+def session_for(entry: P2PEnrollment) -> SharedDeviceControls | None:
     if not entry.camera_id:
         return None
     with _lock:
@@ -67,7 +67,7 @@ def reserve_native_owner(camera_id: str) -> Iterator[None]:
 
 
 @contextmanager
-def publish(camera_id: str, session: SharedReadSession) -> Iterator[None]:
+def publish(camera_id: str, session: SharedDeviceControls) -> Iterator[None]:
     """Run-lifetime lease, not a second owner, thread, socket or capability grant."""
     with _lock:
         if _sessions or (_owners and camera_id not in _owners):
@@ -131,7 +131,7 @@ def read(entry: P2PEnrollment, key: str) -> ControlResult | None:
         session.cancel(ticket)
 
 
-def _read_lamp(session: SharedReadSession) -> ControlResult:
+def _read_lamp(session: SharedDeviceControls) -> ControlResult:
     try:
         ticket = session.submit_lamp_read()
     except ValueError:
