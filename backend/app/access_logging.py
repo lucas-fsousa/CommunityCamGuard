@@ -32,4 +32,7 @@ def access_log_config() -> dict:
     config["loggers"]["backend.app.drivers.yoosee.p2p.account_lan_probe"] = {
         "handlers": ["default"], "level": "INFO", "propagate": False,
     }
+    config["loggers"]["backend.app.drivers.yoosee.p2p.cooperative_udp_media"] = {
+        "handlers": ["default"], "level": "INFO", "propagate": False,
+    }
     return config

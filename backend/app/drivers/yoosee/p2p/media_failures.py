@@ -31,6 +31,7 @@ PROTOCOL_CODES = {
 }
 
 TRANSIENT_CODES = frozenset({
+    'udp_negotiation_failed',
     'kcp_assembly_timeout', 'tcp_session_timeout', 'av_handshake_timeout',
     'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout',
     'tcp_io_timeout', 'tcp_eof', 'mtp_record_length',

@@ -297,6 +297,26 @@ class AccountReadWorker:
                 for wire in events.outgoing:
                     send(wire)
 
+            def send_udp_media(wire: bytes, peer: tuple[str, int]) -> None:
+                # Per-channel MediaRateBudget charges AV traffic. It must not
+                # consume the separate broker/control cleanup reservation.
+                nonlocal sent
+                sock.settimeout(0.002)
+                sent += 1
+                if sock.sendto(wire, peer) != len(wire):
+                    raise OSError("partial UDP media datagram")
+
+            def retire_channel(channel: AccountMediaChannel, error: OSError | ValueError) -> None:
+                cause = underlying_receive_error(error)
+                code = PROTOCOL_CODES.get(str(cause), "")
+                if channel.udp is not None:
+                    lan.disable(channel.bootstrap.spec.device.device_id)
+                    if not channel.udp.was_ready:
+                        code = "udp_negotiation_failed"
+                channel.retire("socket" if isinstance(error, OSError) else "protocol",
+                    protocol_code=code, protocol_facts=cause.facts if isinstance(
+                        cause, (KcpAssemblyTimeout, MtpTcpFrameError)) else ())
+
             while True:
                 check()
                 if self._drain.is_set():
@@ -312,22 +332,24 @@ class AccountReadWorker:
                         motion.cancel()
                     leases.poll(lambda route_spec: self._dispatcher.prepare_media(route_spec, output),
                                 defer_stop_device=moving)
+                    for wire_lan, peer_lan in lan.poll(tuple(channel.route for channel in channels)):
+                        try:
+                            send(wire_lan, peer=peer_lan)
+                        except OSError:
+                            pass
                 for channel in channels:
                     if channel.route.result is not None:
                         continue
                     if with_media_tcp:
                         try:
-                            channel.step(open_tcp_media, budget_seconds=0.2 / len(channels))
+                            channel.step(open_tcp_media, budget_seconds=0.2 / len(channels),
+                                udp_send=send_udp_media if leases is not None else None)
                         except (OSError, ValueError) as channel_error:
                             if len(channels) == 1 and leases is None:
                                 raise
                             # The TCP opener/pump certifies physical close or
                             # raises a distinct cleanup error. Never reopen here.
-                            cause = underlying_receive_error(channel_error)
-                            channel.retire("socket" if isinstance(channel_error, OSError) else "protocol",
-                                protocol_code=PROTOCOL_CODES.get(str(cause), ""),
-                                protocol_facts=cause.facts if isinstance(
-                                    cause, (KcpAssemblyTimeout, MtpTcpFrameError)) else ())
+                            retire_channel(channel, channel_error)
                         if channel is channels[0]:
                             tcp = channel.tcp
                         if channel.tcp is not None and channel.tcp.result is not None:
@@ -339,6 +361,8 @@ class AccountReadWorker:
                             if channel.tcp.result.socket_close_failed:
                                 raise _Stop("media_unconfirmed")
                             channel.retire("ended")
+                        if channel.udp is not None and channel.udp.result is not None:
+                            channel.retire("ended")
                     defer_close = (leases is not None and motion is not None and motion.result is None
                                    and motion_device_id == channel.bootstrap.spec.device.device_id)
                     packet_media = None if defer_close else channel.route.next_packet()
@@ -348,14 +372,6 @@ class AccountReadWorker:
                         except BaseException:
                             channel.route.send_failed()
                             raise
-                if leases is not None:
-                    for wire_lan, peer_lan in lan.poll(tuple(channel.route for channel in channels)):
-                        # Best-effort measurement must not retire a healthy TCP
-                        # stream on LAN-specific routing/firewall send failure.
-                        try:
-                            send(wire_lan, peer=peer_lan)
-                        except OSError:
-                            pass
                 if leases is None and len(channels) > 1 and all(channel.route.result is not None for channel in channels):
                     closed = media_channels_closed(tuple(channel.summary() for channel in channels))
                     raise _Stop("media_complete" if closed else "media_unconfirmed")
@@ -419,7 +435,7 @@ class AccountReadWorker:
                         send(item.prepared.wire)
                 # A 50ms idle UDP wait would cap the 4096-byte TCP pump near
                 # 80KiB/s and accumulate video latency despite a healthy relay.
-                interval = 0.001 if any(channel.tcp is not None for channel in channels) else 0.02 if mixed else 0.05
+                interval = 0.001 if any(channel.transport_running for channel in channels) else 0.02 if mixed else 0.05
                 sock.settimeout(min(interval, max(0.001, deadline - self._clock())))
                 try:
                     wire, peer = sock.recvfrom(4097)
@@ -429,6 +445,17 @@ class AccountReadWorker:
                 check()
                 if peer != node.address:
                     lan.receive(wire, peer)
+                    owned_udp = False
+                    for channel in channels:
+                        if channel.udp is None or channel.route.result is not None:
+                            continue
+                        try:
+                            owned_udp |= channel.udp.receive(wire, peer)
+                        except (OSError, ValueError) as udp_error:
+                            retire_channel(channel, udp_error)
+                            owned_udp = True
+                    if owned_udp:
+                        continue  # Validated media has its own per-stream rate budget.
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
@@ -513,7 +540,7 @@ class AccountReadWorker:
                         motion_cleanup_error = exc  # still retire TCP, route and socket
                 for channel in channels:
                     try:
-                        channel.finish_tcp()
+                        channel.finish_media()
                     except BaseException as exc:
                         if tcp_cleanup_error is None:
                             tcp_cleanup_error = exc

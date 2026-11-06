@@ -85,6 +85,7 @@ class MediaRouteJob:
         self.endpoint: tuple[str, int] | None = None
         self.lan_endpoint: tuple[str, int] | None = None
         self.lan_roundtrip_confirmed = False
+        self.lan_probe_complete = False
         self.access_id, self.device_id = spec.access_id, spec.device.device_id
         self.result: MediaRouteResult | None = None
 

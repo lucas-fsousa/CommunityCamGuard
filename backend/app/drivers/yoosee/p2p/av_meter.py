@@ -14,6 +14,7 @@ class AvMeter:
     access_id: int
     device_id: int
     acknowledgements: int = 0
+    continuous: bool = False
 
     def receive(self, wire: bytes, source: tuple[str, int]) -> bytes | None:
         if source != self.peer or len(wire) not in (74, 78):
@@ -26,7 +27,7 @@ class AvMeter:
                 or (meter.call_id is not None and meter.call_id != self.call_id)
                 or meter.role not in (1, 2, 3)):
             return None
-        if self.acknowledgements >= 64:
+        if not self.continuous and self.acknowledgements >= 64:
             raise ReceiveError("AV meter response budget exceeded")
-        self.acknowledgements += 1
+        self.acknowledgements = min(0xFFFFFFFF, self.acknowledgements + 1)
         return build_media_meter_ack(wire)

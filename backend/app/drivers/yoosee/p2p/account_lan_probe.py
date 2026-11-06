@@ -31,6 +31,10 @@ class AccountLanProbe:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic):
         self._clock = clock
         self._probes: dict[MediaRouteJob, _Measurement] = {}
+        self._disabled: set[int] = set()
+
+    def disable(self, device_id: int) -> None:
+        self._disabled.add(device_id)
 
     def poll(self, routes: tuple[MediaRouteJob, ...]) -> tuple[tuple[bytes, tuple[str, int]], ...]:
         active = {route for route in routes if route.accepts_direct_probe}
@@ -42,16 +46,22 @@ class AccountLanProbe:
         for route in routes:
             if route not in active or route.endpoint is None:
                 continue
+            if route.device_id in self._disabled:
+                route.lan_probe_complete = True
+                route.lan_roundtrip_confirmed = False
+                continue
             probe = self._probes.get(route)
             if probe is None:
                 probe = self._probes[route] = _Measurement(route, now)
                 if probe.peer is None:
                     probe.done = True
+                    route.lan_probe_complete = True
                     log.info("native LAN measurement outcome=no_candidate")
             if probe.done:
                 continue
             if now - probe.started >= 1.5:
                 probe.done = True
+                route.lan_probe_complete = True
                 log.info("native LAN measurement outcome=no_roundtrip attempts=%d", len(probe.sent))
                 continue
             count = len(probe.sent)
@@ -86,7 +96,9 @@ class AccountLanProbe:
             assert struct.unpack_from("<Q", wire, 38)[0] == meter.timestamp
             probe.done = True
             route.lan_roundtrip_confirmed = True
+            route.lan_probe_complete = True
             log.info("native LAN measurement outcome=roundtrip attempts=%d", len(probe.sent))
 
     def close(self) -> None:
         self._probes.clear()
+        self._disabled.clear()

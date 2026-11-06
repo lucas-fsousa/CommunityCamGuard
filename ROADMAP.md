@@ -19,6 +19,10 @@ Camera3 LAN measurement is now LIVE-CONFIRMED on that same account reader
 (one attempted meter, correlated roundtrip), without firewall changes or an
 extra login. Next is UDP AV selection/receive/delivery with TCP fallback, not
 another discovery probe, control test or generic-architecture expansion.
+UDP AV selection/receive/delivery and same-account TCP fallback are now
+implemented; live camera3 acceptance remains pending. See
+docs/internal/native-lan-av.md. The initial implementation reuses the existing
+AV engine and consumers; it does not open TCP and UDP media for one call.
 
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member

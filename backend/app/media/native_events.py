@@ -16,7 +16,7 @@ _errors = frozenset({'TimeoutError', 'Mp4SizeError', 'Mp4OrderError', 'Mp4Capaci
 _protocols = frozenset({'kcp_assembly_timeout', 'kcp_invalid_segment', 'kcp_conflicting_duplicate',
     'kcp_receive_budget', 'kcp_fragment_chain', 'tcp_session_timeout', 'av_handshake_timeout',
     'av_control_timeout', 'media_initialization_timeout', 'media_idle_timeout', 'tcp_io_timeout',
-    'tcp_eof', 'mtp_record_length', 'av_pending_capacity', 'av_pending_timeout'})
+    'tcp_eof', 'mtp_record_length', 'av_pending_capacity', 'av_pending_timeout', 'udp_negotiation_failed'})
 _returncodes = frozenset(str(n) for n in range(-128, 256))
 _counters = {'kcp_next_sequence':2**32-1, 'kcp_pending':128, 'kcp_parts':128,
              'kcp_gap':127, 'kcp_remaining':128, 'kcp_bytes':1024*1024,
@@ -28,7 +28,7 @@ _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport',
     'transport_or_auth', 'list_dns', 'list_timeout', 'broker_heartbeat',
     'certification_unavailable', 'inventory_timeout', 'inventory_unavailable', 'preparation_budget', 'leased'})
 _bools = frozenset({'session_broker_socket_closed', 'session_broker_release',
-    'session_tcp_receipt', 'session_tcp_socket_closed', 'session_motion_started',
+    'session_tcp_receipt', 'session_tcp_socket_closed', 'session_udp_detached', 'session_udp_receipt', 'session_motion_started',
     'session_motion_cleanup_confirmed', 'session_siren_cleanup_confirmed', 'consumer_alive', 'cleanup_failed',
     'session_lease_detached'})
 

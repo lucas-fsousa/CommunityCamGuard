@@ -73,7 +73,7 @@ def test_meter_requires_pinned_peer_and_exact_fresh_roundtrip(fault, caplog):
     assert "192.168" not in caplog.text
 
 
-@pytest.mark.parametrize("fault", [None, "send", "silent"])
+@pytest.mark.parametrize("fault", ["send", "silent"])
 def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(monkeypatch, caplog, fault):
     caplog.set_level(logging.INFO)
     sock, inbox, pumps, owner = setup(monkeypatch)
@@ -110,3 +110,87 @@ def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(mon
     assert sock.opens == sock.closes == sock.closed == 1
     assert pumps[0].steps > 3 and pumps[0].closed == 1
     assert inbox.take(ticket).status == "closed"
+
+
+@pytest.mark.parametrize("silent_av", [False, True])
+def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(monkeypatch, caplog, silent_av):
+    from backend.app.drivers.yoosee.p2p.media_protocol import parse_kcp_segments, parse_media_meter
+    from backend.app.drivers.yoosee.p2p.stream_protocol import encrypt_media_tlv
+    from tests.test_av_handshake import ack
+    from tests.test_captured_media import control, header
+    from tests.test_hevc_recovery import idr
+    from tests.test_media_receive import packet
+    from tests.test_v1_receive import av
+
+    caplog.set_level(logging.INFO)
+    sock, inbox, pumps, owner = setup(monkeypatch)
+    item = bootstrap(0)
+    records = []
+    consume = item.video.consume
+    def capture(record):
+        records.append(record)
+        consume(record)
+    monkeypatch.setattr(item.video, "consume", capture)
+    ticket = inbox.submit(camera(0), item)
+    send, receive = sock.sendto, sock.recvfrom
+    pending, attempts, replacements, outcomes = [], [], [], []
+
+    def sendto(wire, peer):
+        if peer != PEER:
+            result = send(wire, peer)
+            if wire[1] == 0xA4:
+                request = gute_mode2_decrypt(wire, NODE.session_key)
+                attempts.append((struct.unpack_from("<I", request, 28)[0], request[0x78:0x80]))
+                plain = gute_mode2_decrypt(sock.queue[-1], NODE.session_key)
+                sock.queue[-1] = finish_mode2(bytearray(lan_advertisement(plain)), NODE.session_key)
+            return result
+        meter = parse_media_meter(wire)
+        if meter is not None:
+            if meter.kind == 1:
+                pending.append((build_media_meter_ack(wire), peer))
+            return len(wire)
+        segment, = parse_kcp_segments(wire)
+        if not segment.body or silent_av:
+            return len(wire)
+        pending.append((ack(wire), peer))
+        action = struct.unpack_from("<I", segment.body, 8)[0]
+        call = struct.unpack_from("<I", segment.body, 4)[0]
+        link, cookie = attempts[-1]
+        if action == 1:
+            pending.append((packet(0, 0, control(call), conv=link | 0x80000000), peer))
+            start = bytearray(control(call))
+            struct.pack_into("<I", start, 8, 6)
+            pending.append((packet(0, 0, start, conv=link), peer))
+        elif action == 6:
+            body = encrypt_media_tlv(header() + av(video=idr(), video_ts=1), cookie)
+            pending.append((packet(1, 0, body, conv=link), peer))
+        return len(wire)
+
+    def recvfrom(size):
+        if silent_av and not replacements:
+            outcome = inbox.take(ticket)
+            if outcome is not None:
+                outcomes.append(outcome)
+                replacements.append(inbox.submit(camera(0), bootstrap(0)))
+        if pending:
+            return pending.pop(0)
+        return receive(size)
+
+    monkeypatch.setattr(sock, "sendto", sendto)
+    monkeypatch.setattr(sock, "recvfrom", recvfrom)
+    result = execute(sock, inbox, owner, duration=3 if silent_av else 0.2)
+    assert result.reason == "stopped" and not result.lease_cleanup_uncertain
+    if silent_av:
+        assert outcomes[0].channel.protocol_code == "udp_negotiation_failed"
+        assert outcomes[0].channel.udp.detached and outcomes[0].channel.media.broker_release
+        assert len(pumps) == len(replacements) == 1
+        assert inbox.take(replacements[0]).channel.tcp.ready
+        assert sock.opens == sock.closes == 2
+    else:
+        outcome = inbox.take(ticket)
+        assert outcome.channel.udp.ready and outcome.channel.udp.detached
+        assert outcome.channel.media.broker_release and outcome.channel.tcp is None
+        assert any(record.video == idr() for record in records)
+        assert not pumps and sock.opens == sock.closes == 1
+        assert "native UDP AV ready transport=lan" in caplog.text
+    assert sock.closed == 1

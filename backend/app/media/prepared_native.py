@@ -125,7 +125,7 @@ class PreparedNative:
                                     'kcp_receive_budget','kcp_fragment_chain', 'tcp_session_timeout',
                                     'av_handshake_timeout', 'av_control_timeout', 'media_initialization_timeout',
                                     'media_idle_timeout', 'tcp_io_timeout', 'tcp_eof',
-                                    'av_pending_capacity', 'av_pending_timeout'}: code=''
+                                    'av_pending_capacity', 'av_pending_timeout', 'udp_negotiation_failed'}: code=''
                     log.warning('native source ended camera_id=%s error_type=%s protocol_code=%s',self.offer.camera_id,
                                 type(error).__name__ if error is not None else 'source_returned',code)
                     # Driver diagnostics contain only local classifications/closure
@@ -134,6 +134,7 @@ class PreparedNative:
                                 {key: value for key, value in details.items() if key in {
                                     'session_worker', 'session_protocol_site', 'session_broker_socket_closed',
                                     'session_broker_release', 'session_tcp_receipt', 'session_tcp_socket_closed',
+                                    'session_udp_detached', 'session_udp_receipt',
                                     'session_motion_started', 'session_motion_cleanup_confirmed',
                                     'consumer_error', 'consumer_site', 'consumer_alive', 'cleanup_failed',
                                     'consumer_mp4_size', 'consumer_mp4_box',

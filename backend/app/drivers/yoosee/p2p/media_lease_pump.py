@@ -26,7 +26,7 @@ class MediaLeasePump:
     def motion_ready(self, device_id: int) -> bool:
         return any(channel.bootstrap.spec.device.device_id == device_id
                    and not self.inbox.should_cancel(ticket)
-                   and channel.tcp is not None and channel.tcp.ready
+                   and channel.ready
                    for ticket, channel in self._active.items())
 
     def any_motion_ready(self) -> bool:
@@ -39,8 +39,8 @@ class MediaLeasePump:
             if channel.bootstrap.spec.device.device_id == defer_stop_device:
                 continue  # Motor STOP/receipt precedes detach/result publication.
             if channel.route.result is not None:
-                if channel.tcp is not None and channel.tcp.result is None:
-                    raise ValueError("media route ended before TCP retirement")
+                if channel.transport_running:
+                    raise ValueError("media route ended before transport retirement")
                 if not self._complete(ticket, channel):
                     raise ValueError("media lease cleanup unconfirmed")
                 self._channels.remove(channel)
