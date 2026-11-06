@@ -23,6 +23,12 @@ UDP AV selection/receive/delivery and same-account TCP fallback are now
 implemented; live camera3 acceptance remains pending. See
 docs/internal/native-lan-av.md. The initial implementation reuses the existing
 AV engine and consumers; it does not open TCP and UDP media for one call.
+Live UDP trials still lack AV ACCEPT despite a metered LAN path and INIT
+transport receipt. Native TCP stays the production default; UDP requires the
+driver's exact-identity native_video proof option lan_udp (not granted to any
+unit by these trials). This avoids unaccepted UDP warmup attempts on every
+restart. Captured-profile comparison and safe restoration are documented in
+docs/internal/native-lan-av.md; do not repeat quality/firewall guesses.
 
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member

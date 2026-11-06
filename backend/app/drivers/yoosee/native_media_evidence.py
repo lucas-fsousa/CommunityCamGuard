@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from time import time
 
 from ...db import p2p
 from . import capability_profiles as profiles
@@ -16,6 +17,23 @@ class NativeMediaEvidence:
     entry: p2p.P2PEnrollment = field(repr=False)
     grants: tuple[PtzGrant, ...] = field(repr=False)
     valid: Callable[[], bool] = field(repr=False)
+
+
+def supports_lan_udp(camera_id: str) -> bool:
+    """The driver needs exact AV evidence, not merely a successful LAN meter."""
+    selected = rollout.selected(camera_id)
+    if selected is None or "native_video" not in selected[1]:
+        return False
+    identity = selected[0]
+    entry = p2p.read_registered_enrollment(camera_id)
+    if entry is None or entry.device_id != identity.device_id:
+        return False
+    now = time()
+    if not snapshots.matches_recorded_identity(camera_id=camera_id, identity=identity, now=now):
+        return False
+    profile = profiles.load(camera_id=camera_id, identity=identity, now=now)
+    return bool(profile and any(item.key == "native_video" and item.readable is True
+        and item.writable is False and {"hevc", "lan_udp"} <= item.options for item in profile.operations))
 
 
 def capture(camera_id: str, *, archive: bool, now: Callable[[], float]) -> NativeMediaEvidence | None:

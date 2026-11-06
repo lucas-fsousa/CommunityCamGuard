@@ -341,7 +341,8 @@ class AccountReadWorker:
                         motion.cancel()
                     leases.poll(lambda route_spec: self._dispatcher.prepare_media(route_spec, output),
                                 defer_stop_device=moving)
-                    for wire_lan, peer_lan in lan.poll(tuple(channel.route for channel in channels)):
+                    for wire_lan, peer_lan in lan.poll(tuple(channel.route for channel in channels
+                                                            if channel.bootstrap.spec.prefer_lan_udp)):
                         try:
                             send(wire_lan, peer=peer_lan)
                         except OSError:
@@ -352,7 +353,8 @@ class AccountReadWorker:
                     if with_media_tcp:
                         try:
                             channel.step(open_tcp_media, budget_seconds=0.2 / len(channels),
-                                udp_send=send_udp_media if leases is not None else None)
+                                udp_send=send_udp_media if leases is not None
+                                    and channel.bootstrap.spec.prefer_lan_udp else None)
                         except (OSError, ValueError) as channel_error:
                             if len(channels) == 1 and leases is None:
                                 raise

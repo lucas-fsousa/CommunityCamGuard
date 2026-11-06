@@ -2,6 +2,7 @@
 
 import logging
 import struct
+from dataclasses import replace
 
 import pytest
 
@@ -99,11 +100,13 @@ def test_existing_udp_nat_exchange_is_cooperative_and_correlated(reply):
     assert job.nat_handshake_complete and job.nat_handshake_confirmed is reply
 
 
-@pytest.mark.parametrize("fault", ["send", "silent"])
+@pytest.mark.parametrize("fault", ["send", "silent", "not_reviewed"])
 def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(monkeypatch, caplog, fault):
     caplog.set_level(logging.INFO)
     sock, inbox, pumps, owner = setup(monkeypatch)
-    ticket = inbox.submit(camera(0), bootstrap(0))
+    item = bootstrap(0)
+    ticket = inbox.submit(camera(0), replace(item,
+        spec=replace(item.spec, prefer_lan_udp=fault != "not_reviewed")))
     send, receive = sock.sendto, sock.recvfrom
     direct, pending = [], []
 
@@ -130,9 +133,12 @@ def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(mon
     monkeypatch.setattr(sock, "recvfrom", recvfrom)
     result = execute(sock, inbox, owner, duration=2)
     assert result.reason == "stopped" and not result.lease_cleanup_uncertain
-    assert len(direct) == (1 if fault is None else 2)
+    assert len(direct) == (0 if fault == "not_reviewed" else 2)
     assert all(wire[:2] == b"\xc0\x90" for wire in direct)
-    assert ("outcome=roundtrip" if fault is None else "outcome=no_roundtrip") in caplog.text
+    if fault == "not_reviewed":
+        assert "native LAN" not in caplog.text
+    else:
+        assert "outcome=no_roundtrip" in caplog.text
     assert sock.opens == sock.closes == sock.closed == 1
     assert pumps[0].steps > 3 and pumps[0].closed == 1
     assert inbox.take(ticket).status == "closed"
@@ -151,12 +157,14 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
     caplog.set_level(logging.INFO)
     sock, inbox, pumps, owner = setup(monkeypatch)
     item = bootstrap(0)
+    item = replace(item, spec=replace(item.spec, prefer_lan_udp=True))
     records = []
     consume = item.video.consume
     def capture(record):
         records.append(record)
         consume(record)
     monkeypatch.setattr(item.video, "consume", capture)
+    # Only this reviewed transport test opts into the experimental LAN AV path.
     ticket = inbox.submit(camera(0), item)
     send, receive = sock.sendto, sock.recvfrom
     pending, attempts, replacements, outcomes = [], [], [], []
@@ -199,7 +207,9 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
             outcome = inbox.take(ticket)
             if outcome is not None:
                 outcomes.append(outcome)
-                replacements.append(inbox.submit(camera(0), bootstrap(0)))
+                replacement = bootstrap(0)
+                replacement = replace(replacement, spec=replace(replacement.spec, prefer_lan_udp=True))
+                replacements.append(inbox.submit(camera(0), replacement))
         if pending:
             return pending.pop(0)
         return receive(size)

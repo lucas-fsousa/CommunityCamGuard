@@ -7,6 +7,7 @@ from collections.abc import Callable
 from ...camera_identity import valid_camera_id
 from ...db import p2p
 from ...db.p2p import P2PEnrollment
+from .native_media_evidence import supports_lan_udp
 from .p2p.account_media_channel import MediaBootstrap
 from .p2p.account_read_lifecycle import AccountReadLifecycle
 from .p2p.contracts import OnlineDevice, P2PProbeError
@@ -97,7 +98,8 @@ class LeasedReadSession(SharedDeviceControls):
             if self._current() != self._entry:
                 return SharedReadResult("enrollment_changed")
             ticket = self._inbox.submit(self._camera_id,
-                MediaBootstrap(MediaRouteSpec(self._entry.access_id, self._target), video_delivery))
+                MediaBootstrap(MediaRouteSpec(self._entry.access_id, self._target,
+                    prefer_lan_udp=supports_lan_udp(self._camera_id)), video_delivery))
             with self._claim:
                 self._ticket = ticket
             self._active_entry = self._entry

@@ -15,6 +15,7 @@ from backend.app.drivers.yoosee import (
     capability_rollout,
     capability_snapshot_store,
     native_account,
+    native_media_evidence,
     native_media_offer,
     native_video_source,
     shared_control_reads,
@@ -171,6 +172,23 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
     assert events == ["sdk_enter", "login", "sdk_exit"]
     assert sock.opens == sock.closes == len(cameras) + int(inject_eof) and sock.closed == 1
     assert all(item.closed for item in decoders) and not shared_control_reads._sessions
+
+
+def test_driver_needs_exact_av_proof_before_preferring_udp(reviewed, monkeypatch):
+    cameras, _, _ = reviewed
+    camera_id = cameras[0].camera_id
+    monkeypatch.setattr(native_media_evidence, "time", lambda: 150)
+    assert not native_media_evidence.supports_lan_udp(camera_id)
+    identity = capability_rollout.selected(camera_id)[0]
+    profile = ValidatedProfile(camera_id, identity, (
+        OperationProof("native_video", readable=True, options=frozenset({"hevc", "lan_udp"})),))
+    assert capability_profiles.register(profile,
+        sources={"native_video": "sha256:" + "a" * 64 + " proof#lan-av"}, reviewed_at=101)
+    capability_rollout.activate(profile)
+    assert native_media_evidence.supports_lan_udp(camera_id)
+    assert not native_media_evidence.supports_lan_udp(cameras[1].camera_id)
+    capability_snapshot_store.begin(camera_id)
+    assert not native_media_evidence.supports_lan_udp(camera_id)
 
 
 @pytest.mark.parametrize("fault", ["account", "evidence", "duplicate", "unowned"])

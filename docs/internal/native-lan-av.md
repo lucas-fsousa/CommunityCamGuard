@@ -1,13 +1,19 @@
 # LAN AV selection on the shared account reader
 
+Current production policy: use native TCP unless the driver has an exact current
+native_video proof containing BOTH hevc and lan_udp. No live unit has received
+the lan_udp proof in this investigation. A successful LAN meter is not AV support.
+
 ## Implemented, awaiting the camera3 live checkpoint
 
 This follows the first live LAN roundtrip documented in
 [LAN selection evidence](native-lan-selection.md). It reuses the existing
 AvHandshake/AvReceiver/KCP/V1 engine, not a second protocol implementation.
 
-- Leased sources measure the authenticated broker-provided LAN candidate before
-  constructing a media transport. The probe is cooperative and expires in1.5s.
+- Leased sources explicitly admitted by the driver's LAN AV proof measure the
+  authenticated broker-provided LAN candidate before constructing a media
+  transport. The probe is cooperative and expires in1.5s. Other sources start
+  native TCP directly, without these probes.
 - A correlated roundtrip selects one UDP AV owner. No TCP media connection is
   opened for that call. Missing/silent LAN measurement selects the existing TCP
   relay path. Non-leased historical diagnostics retain their existing transport.
@@ -129,3 +135,34 @@ enrolled device/account and role2 is already accepted. Its high timestamp bits
 were zero, so timestamp truncation was NOT demonstrated as this attempt's cause.
 The older binary's zero-tail note is not a substitute for the pinned split's
 explicit marker write. No role wildcard, guessed port or larger timeout was added.
+
+## Latest live outcome and safe production handoff
+
+Commit4e56bdd passed CI42300238379 and Image42300237651 and ran as
+image67fbc704f803. The ACK correction did NOT establish live UDP AV: INIT had
+transport receipt, but no ACCEPT/START/media arrived before the existing
+handshake deadline. TCP recovered. The saved manufacturer's trace independently
+contains107 client-to-LAN meter ACKs with the corrected four-byte marker.
+
+One explicit temporary image compared the captured HD startup profile against
+our combined legacy/packed preconnection cache. Base4e56bdd changed ONLY startup
+userdata[23:25] back to12/00, preserving the legacy HD byte2. Experimental image
+6736b57697b1 used a temporary Compose override for30s, with an EXIT trap restoring
+the normal image. It also failed to obtain ACCEPT and recovered on TCP. Image
+67fbc704f803 was confirmed restored. The experimental profile was NOT merged,
+installed as latest or persisted as a device setting; it does not establish a
+different platform version or justify silently reducing production quality.
+
+Production now declines unaccepted UDP transport: a private typed preference is
+supplied only by the Yoosee driver's validated exact-identity native_video proof
+with lan_udp support. Without that evidence, the existing TCP owner starts
+directly; it does not send experimental LAN meters, NAT punches or UDP INITs on
+every server restart. This is not a camera-count/brand restriction or a public
+switch that invents hardware support. Explicit protocol tests retain the UDP
+path and verified same-account TCP fallback.
+
+Remaining protocol gap is precise: metered LAN reachability and INIT transport
+receipt are proven, but application-level AV acceptance is not. Do not mark UDP
+video, LAN-only operation or the original freeze permanently resolved. Keep
+future trials camera3-only, using this exact checkpoint rather than redoing
+discovery, broad firewall changes or quality guesses.

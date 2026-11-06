@@ -32,6 +32,7 @@ class MediaRouteSpec:
     """Trusted exact-device admission, not a public capability grant."""
     access_id: int = field(repr=False)
     device: OnlineDevice = field(repr=False)
+    prefer_lan_udp: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +61,7 @@ class MediaRouteJob:
                  local_ip: str, local_port: int, clock: Callable[[], float] = time.monotonic,
                  link_id: int | None = None):
         if (not isinstance(spec, MediaRouteSpec) or not isinstance(spec.device, OnlineDevice)
+                or type(spec.prefer_lan_udp) is not bool
                 or not sequences.matches(node.session_id, generation)
                 or type(spec.access_id) is not int or not 0 <= spec.access_id < 1 << 64
                 or type(spec.device.device_id) is not int
