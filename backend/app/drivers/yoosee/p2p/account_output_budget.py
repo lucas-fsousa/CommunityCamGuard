@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from .account_policy import AccountPolicy, TrafficBudget
+from .account_policy import AccountPolicy, TrafficBudget, validate_media_capacity
 
 
 class OutputExhausted(ValueError):
@@ -17,10 +17,12 @@ class AccountOutputBudget:
 
     def __init__(self, packets: int = 512, octets: int = 1024 * 1024, *,
                  policy: AccountPolicy = AccountPolicy.FINITE,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, media_capacity: int = 1):
+        validate_media_capacity(media_capacity)
         self._traffic = TrafficBudget(packets, octets, policy=policy, clock=clock)
         self._ptz: PtzOutputReserve | None = None
-        self._media: MediaOutputReserve | None = None
+        self._media: set[MediaOutputReserve] = set()
+        self._media_capacity = media_capacity
         self._siren: SirenOutputReserve | None = None
 
     def charge(self, size: int) -> None:
@@ -43,7 +45,7 @@ class AccountOutputBudget:
     @property
     def _reserved(self) -> int:
         return ((self._ptz.remaining if self._ptz else 0)
-                + (self._media.remaining if self._media else 0)
+                + sum(reserve.remaining for reserve in self._media)
                 + (self._siren.remaining if self._siren else 0))
 
     def reserve_siren(self) -> SirenOutputReserve:
@@ -55,10 +57,11 @@ class AccountOutputBudget:
 
     def reserve_media(self) -> MediaOutputReserve:
         required = self._reserved + 2
-        if self._media is not None or not self._traffic.available(required, required * 4096):
+        if len(self._media) >= self._media_capacity or not self._traffic.available(required, required * 4096):
             raise OutputExhausted("media cleanup capacity unavailable")
-        self._media = MediaOutputReserve(self)
-        return self._media
+        reserve = MediaOutputReserve(self)
+        self._media.add(reserve)
+        return reserve
 
 
 class SirenOutputReserve:
@@ -126,13 +129,12 @@ class MediaOutputReserve:
         return sum(self._slots.values())
 
     def charge(self, kind: str, size: int) -> None:
-        if (self._owner._media is not self or kind not in self._slots
+        if (self not in self._owner._media or kind not in self._slots
                 or not self._slots[kind] or type(size) is not int or not 0 < size <= 4096):
             raise OutputExhausted("media output reservation unavailable")
         self._owner._traffic.charge(size)
         self._slots[kind] -= 1
 
     def close(self) -> None:
-        if self._owner._media is self:
-            self._owner._media = None
+        self._owner._media.discard(self)
         self._slots = {"open": 0, "close": 0}

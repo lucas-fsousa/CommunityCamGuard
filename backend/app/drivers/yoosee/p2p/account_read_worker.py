@@ -336,8 +336,6 @@ class AccountReadWorker:
                     lamp_packets = lamp.observe(plain, peer, generation=self._generation) if lamp is not None else ()
                     for packet_lamp in lamp_packets:
                         send(packet_lamp)
-                    if media is not None:
-                        media.observe(plain, peer, generation=self._generation)
                     service(self._dispatcher.receive(plain, peer, generation=self._generation))
                     if motion is not None:
                         for packet in motion.observe(plain, peer, generation=self._generation):

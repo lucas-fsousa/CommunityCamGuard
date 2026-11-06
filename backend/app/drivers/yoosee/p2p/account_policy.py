@@ -5,7 +5,13 @@ import time
 from collections.abc import Callable
 from enum import Enum
 
-MAX_CLEANUP_RESERVES = 20  # PTZ6 + media2 + siren12; not extra traffic allowance.
+MAX_MEDIA_ROUTES = 3
+MAX_CLEANUP_RESERVES = 6 + 2 * MAX_MEDIA_ROUTES + 12  # Not extra traffic allowance.
+
+
+def validate_media_capacity(capacity: int) -> None:
+    if type(capacity) is not int or not 1 <= capacity <= MAX_MEDIA_ROUTES:
+        raise ValueError("invalid media route capacity")
 
 class AccountPolicy(Enum):
     FINITE = "finite"

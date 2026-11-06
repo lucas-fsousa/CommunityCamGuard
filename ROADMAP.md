@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-06 multi-camera implementation: broker route ownership now supports an
+explicit bounded three-device capacity under one account/sequence allocator and
+one output budget, with independent CLOSE reserves and no link-ID reuse within
+the generation. Production admission is unchanged at one native camera. First
+offline regression:110passed; next connect independent TCP channels and source
+leases, not additional SDK logins. See docs/internal/native-multi-camera.md.
+The overnight log also contains a later decoder progress_timeout/retry; the
+900-second acceptance below must not be read as overnight endurance acceptance.
+
 Latest native stability implementation: `3b0b311` / `b-58c43b444dfd`, camera3
 native/active144; CI6012passed/1skip and Image passed. Implemented: fair video/AAC
 input, KCP window reports/consistent128-slot credit/reserved missing head, safe

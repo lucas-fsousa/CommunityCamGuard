@@ -43,9 +43,11 @@ class AccountReadDispatcher:
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
                  clock: Callable[[], float] = time.monotonic,
-                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False):
+                 policy: AccountPolicy = AccountPolicy.FINITE, state_reads: bool = False,
+                 media_capacity: int = 1):
         self.mailbox = BrokerMailbox(generation, clock=clock, state_reads=state_reads)
-        self._account = BrokerAccount(node, generation, local_ip, local_port, clock=clock, policy=policy)
+        self._account = BrokerAccount(node, generation, local_ip, local_port,
+            clock=clock, policy=policy, media_capacity=media_capacity)
         self._clock = clock
         self._requests: dict[MailboxTicket, ReadRequest] = {}
         self._routes: dict[ReceiptTicket, MailboxTicket] = {}

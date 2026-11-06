@@ -47,17 +47,20 @@ class MediaRouteJob:
 
     def __init__(self, node: CertifiedNode, sequences: BrokerSequences,
                  output: AccountOutputBudget, spec: MediaRouteSpec, *, generation: int,
-                 local_ip: str, local_port: int, clock: Callable[[], float] = time.monotonic):
+                 local_ip: str, local_port: int, clock: Callable[[], float] = time.monotonic,
+                 link_id: int | None = None):
         if (not isinstance(spec, MediaRouteSpec) or not isinstance(spec.device, OnlineDevice)
                 or not sequences.matches(node.session_id, generation)
                 or type(spec.access_id) is not int or not 0 <= spec.access_id < 1 << 64
                 or type(spec.device.device_id) is not int
                 or not 0 < spec.device.device_id < 1 << 64 or not spec.device.status):
             raise ValueError("media route identity mismatch")
+        if link_id is not None and (type(link_id) is not int or not 0 < link_id <= 0xFFFFFF):
+            raise ValueError("invalid allocated media link")
         self._reserve = output.reserve_media()
         try:
             opening, self._closing_sequence = sequences.reserve(2)
-            self.attempt = CallingAttempt(secrets.randbelow(0xFFFFFF) + 1,
+            self.attempt = CallingAttempt(link_id if link_id is not None else secrets.randbelow(0xFFFFFF) + 1,
                                           secrets.randbits(32), secrets.token_bytes(8))
             self.metadata = with_preconnect_definition(build_av_init(self.attempt.call_id)[24:56], 3)
             self._opening = build_calling_request(node, spec.access_id, spec.device,

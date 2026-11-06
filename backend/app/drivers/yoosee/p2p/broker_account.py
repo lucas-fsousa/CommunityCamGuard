@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .account_media_routes import AccountMediaRoutes
 from .account_output_budget import AccountOutputBudget
 from .account_policy import AccountPolicy, TrafficBudget
 from .broker_heartbeat import BrokerHeartbeat, HeartbeatCompletion
@@ -55,7 +56,7 @@ class BrokerAccount:
 
     def __init__(self, node: CertifiedNode, generation: int, local_ip: str, local_port: int, *,
                  clock: Callable[[], float] = time.monotonic,
-                 policy: AccountPolicy = AccountPolicy.FINITE):
+                 policy: AccountPolicy = AccountPolicy.FINITE, media_capacity: int = 1):
         self._input = TrafficBudget(policy=policy, clock=clock)
         self._source = BrokerSequences(node.session_id, generation, node.next_sequence)
         self._reads = BrokerReads(node.session_id, generation, node.next_sequence,
@@ -71,25 +72,21 @@ class BrokerAccount:
         self._reason: Retirement | None = None
         self._ptz: PtzScheduler | None = None
         self._siren: SirenPulseJob | None = None
-        self._media: MediaRouteJob | None = None
+        self._media = AccountMediaRoutes(node, self._source, generation=generation,
+            local_ip=local_ip, local_port=local_port, capacity=media_capacity, clock=clock)
 
     @property
     def media_cleanup_pending(self) -> bool:
-        return self._media is not None and self._media.result is None
+        return self._media.cleanup_pending
 
     @property
     def _media_release_uncertain(self) -> bool:
-        return (self._media is not None and self._media.result is not None
-                and self._media.result.opened and not self._media.result.broker_release)
+        return self._media.release_uncertain
 
     def prepare_media(self, spec: MediaRouteSpec, output: AccountOutputBudget) -> MediaRouteJob:
-        if self.state != "active" or self._deadline - self._clock() < 6 or self._media is not None:
+        if self.state != "active" or self._deadline - self._clock() < 6:
             raise ValueError("account not accepting media route")
-        assert self._node is not None
-        self._media = MediaRouteJob(self._node, self._source, output, spec,
-            generation=self._generation, local_ip=self._local[0], local_port=self._local[1],
-            clock=self._clock)
-        return self._media
+        return self._media.prepare(spec, output)
 
     @property
     def motion_cleanup_pending(self) -> bool:
@@ -203,8 +200,7 @@ class BrokerAccount:
             return AccountEvents(retired=self._reason)
         if self._ptz is not None:
             self._ptz.cancel()
-        if self._media is not None:
-            self._media.cancel()
+        self._media.cancel_all()
         self._reason = reason
         self._source.close()  # Block late deliveries before releasing consumer state.
         reads = self._reads.close()
@@ -269,6 +265,7 @@ class BrokerAccount:
             return AccountEvents(events.reads + tail.reads, tail.heartbeats, retired=tail.retired)
         if peer != self._node.address or type(generation) is not int or generation != self._generation:
             return events
+        self._media.observe(plain, peer, generation=generation)
         read = self._reads.accept(plain, generation=generation)
         heartbeat = self._heartbeat.accept(plain, generation=generation)
         if heartbeat is not None:
@@ -282,6 +279,5 @@ class BrokerAccount:
             self._drain_deadline = self._clock() + 2
             if self._ptz is not None:
                 self._ptz.cancel()
-            if self._media is not None:
-                self._media.cancel()
+            self._media.cancel_all()
         return self._expire()
