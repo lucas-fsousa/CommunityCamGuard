@@ -162,4 +162,3 @@ class SharedDeviceControls:
 
     def abandon_motion(self, ticket: MotionTicket) -> None:
         self._lifecycle.abandon_motion(ticket)
-

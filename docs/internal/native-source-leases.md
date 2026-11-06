@@ -79,3 +79,9 @@ declare independent SDK domains before that owner exists. Do not claim that
 returning a camera lease means the shared broker socket was physically closed.
 
 See [multi-camera checkpoint](native-multi-camera.md) for the deployed baseline.
+
+Follow-up: a consumer can close its delivery between submission and worker claim.
+The inbox now completes that queued lease as cancelled without OPEN, even if the
+caller did not manage to send a separate cancellation. This retains the unread
+outcome/slot until collected, rather than silently reusing it. The preceding
+consumer/control commit `99ea77e` passed CI6084tests/1skip and Image.

@@ -92,6 +92,15 @@ def test_close_cancels_queued_but_does_not_fabricate_active_cleanup():
     assert inbox.claim() is None
 
 
+def test_delivery_closed_before_claim_cannot_open_a_camera_route():
+    inbox = MediaLeaseInbox(1, 123, targets=TARGETS)
+    media = bootstrap(0)
+    ticket = inbox.submit(camera(0), media)
+    media.video.close()  # Consumer failed before the account claimed its slot.
+    assert inbox.claim() is None
+    assert inbox.take(ticket).status == "cancelled"
+
+
 @pytest.mark.parametrize("generation,access,capacity", [(0, 123, 3), (True, 123, 3),
     (1, True, 3), (1, -1, 3), (1, 123, 4), (1, 123, 0)])
 def test_invalid_account_boundaries_fail_before_admission(generation, access, capacity):

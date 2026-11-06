@@ -106,6 +106,10 @@ class MediaLeaseInbox:
                 return None
             for ticket, lease in self._leases.items():
                 if not lease.claimed and lease.result is None:
+                    if lease.bootstrap.video is None or lease.bootstrap.video.closed:
+                        lease.cancelled = True
+                        lease.result = MediaLeaseOutcome("cancelled")
+                        continue
                     lease.claimed = True
                     return ticket, lease.bootstrap
             return None
