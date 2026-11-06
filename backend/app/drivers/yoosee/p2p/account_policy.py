@@ -5,12 +5,11 @@ import time
 from collections.abc import Callable
 from enum import Enum
 
-MAX_MEDIA_ROUTES = 3
-MAX_CLEANUP_RESERVES = 6 + 2 * MAX_MEDIA_ROUTES + 12  # Not extra traffic allowance.
+MAX_CLEANUP_RESERVES = 24  # Legacy default; explicit cohorts reserve per member.
 
 
 def validate_media_capacity(capacity: int) -> None:
-    if type(capacity) is not int or not 1 <= capacity <= MAX_MEDIA_ROUTES:
+    if type(capacity) is not int or capacity < 1:
         raise ValueError("invalid media route capacity")
 
 class AccountPolicy(Enum):
@@ -33,14 +32,16 @@ class TrafficBudget:
 
     def __init__(self, packets: int = 512, octets: int = 1024 * 1024, *,
                  policy: AccountPolicy = AccountPolicy.FINITE,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, members: int = 1):
         validate_policy(policy)
-        if (type(packets) is not int or not 1 <= packets <= 512
-                or type(octets) is not int or not 1 <= octets <= 1024 * 1024):
+        validate_media_capacity(members)
+        if (type(packets) is not int or not 1 <= packets <= 512 * members
+                or type(octets) is not int or not 1 <= octets <= 1024 * 1024 * members):
             raise ValueError("invalid traffic limits")
         self._max_packets, self._max_octets = packets, octets
         self._packets, self._octets = float(packets), float(octets)
         self._policy, self._clock = policy, clock
+        self._cleanup_reserves = max(MAX_CLEANUP_RESERVES, 18 + 2 * members)
         self._last = clock()
         if not math.isfinite(self._last):
             raise ValueError("invalid traffic clock")
@@ -58,7 +59,7 @@ class TrafficBudget:
 
     def charge(self, size: int, *, reserved: int = 0) -> None:
         if (type(size) is not int or not 0 <= size <= 1024 * 1024
-                or type(reserved) is not int or not 0 <= reserved <= MAX_CLEANUP_RESERVES):
+                or type(reserved) is not int or not 0 <= reserved <= self._cleanup_reserves):
             raise ValueError("invalid traffic charge")
         if not self.available(1 + reserved, size + reserved * 4096):
             raise ValueError("traffic budget exhausted")

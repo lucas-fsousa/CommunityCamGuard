@@ -216,7 +216,7 @@ def test_closing_one_reserve_does_not_release_other_media_reservations():
         reserve.charge("close", 1)
 
 
-@pytest.mark.parametrize("capacity", [0, 4, True, 1.0, "3"])
+@pytest.mark.parametrize("capacity", [0, -1, True, 1.0, "3"])
 def test_invalid_capacity_is_rejected(capacity):
     with pytest.raises(ValueError):
         AccountOutputBudget(media_capacity=capacity)

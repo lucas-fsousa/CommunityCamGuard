@@ -8,10 +8,11 @@ planner, migrated, opened or granted new capabilities by this operation.
 `CameraDriver.native_media_offers` defaults to existing individual offers; a
 driver may supply a coordinated group without adding vendor knowledge to core.
 
-Yoosee plans up to three explicitly reviewed units from one enrolled account.
+Yoosee plans the explicitly reviewed units from one enrolled account, with no
+hardcoded camera-count ceiling.
 Each member needs its own current identity/media proof and, when recording,
 original-A/V proof. PTZ grants remain per-device/per-direction. Missing proof,
-duplicate members, multiple accounts, excessive size or absent server ownership
+duplicate members, multiple accounts or absent server ownership
 reject the group without logging in. Same brand/model alone is not proof.
 
 Every offer captures the SAME cohort, with independent per-camera resource
@@ -27,11 +28,12 @@ original one-use checkpoint. Arbitrary domains are not accepted by default.
 
 ## Configuration and operation
 
-`NATIVE_SOURCE_CAPACITY` bounds source workers/consumers (1–32, default1).
-Use3 for the current three-camera group, budgeting CPU/RAM for each encoder.
-It is server-only and requires app recreation; not a remote capability override.
+There is no camera-count configuration or imposed three/32-camera maximum.
+The server allocates source workers on demand for admitted registered cameras.
+Queues/frames remain per-camera bounded; authentication, duplicate-owner rejection,
+cleanup receipts and actual OS resource constraints remain enforced.
 `NATIVE_RESUME_ON_START=true` resumes only eligible existing native intentions.
-Increasing capacity does NOT switch a legacy camera to native. First migration
+Adding cameras does NOT switch a legacy camera to native. First migration
 continues to use the existing explicit operator workflow and driver review.
 
 Cohort membership is fixed for a startup plan. Changes are applied on app restart,
@@ -52,7 +54,15 @@ all consumers and the account. A fourth legacy camera is excluded from planning.
 
 Negative tests cover missing proof, cross-account membership, duplicates, missing
 server owner, lazy construction, plan revalidation, singleton-domain compatibility
-and bounded capacity. The combined regression passed92tests (180.1MiB peak) and
+and dynamic worker admission. A five-source variant additionally forces TCP EOF
+without an inner close receipt, verifies recovery with the SAME login and shuts
+down cleanly. This reproduces the shared-path regression: valid physical close
+plus outer broker release must not be marked uncertain solely for missing inner
+ACK. Known transient protocol codes are now preserved from worker to lease/retry;
+unclassified errors or missing physical/outer release still cannot retry.
+The combined earlier regression passed92tests (180.1MiB peak) and
 a settings/group batch passed26 (160.1MiB), with192MiB/CPU50% scopes. Mypy passed
 420modules and Ruff passed. These are not claims of three real native cameras;
 only camera3 is authorized for current live experiments. The other two stay RTSP.
+One larger local batch was killed by its192MiB cgroup after reaching that ceiling;
+it was rerun in smaller batches, not by raising WSL memory or running the full suite locally.

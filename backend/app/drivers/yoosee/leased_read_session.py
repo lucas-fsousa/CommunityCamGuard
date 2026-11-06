@@ -75,7 +75,8 @@ class LeasedReadSession(SharedDeviceControls):
                 "session_broker_socket_closed": False,
                 "session_broker_release": channel is not None and channel.media is not None and channel.media.broker_release,
                 "session_tcp_socket_closed": channel is not None and channel.tcp is not None and not channel.tcp.socket_close_failed,
-                "session_tcp_receipt": channel is not None and channel.tcp is not None and channel.tcp.close_acknowledged}
+                "session_tcp_receipt": channel is not None and channel.tcp is not None and channel.tcp.close_acknowledged,
+                "session_protocol_code": channel.protocol_code if channel is not None else ""}
 
     def run(self, *, cancelled: Callable[[], bool],
             video_delivery: VideoDelivery | None = None) -> SharedReadResult:

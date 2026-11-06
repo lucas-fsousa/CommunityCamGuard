@@ -44,7 +44,7 @@ class NativeAccounts:
         with self._lock:
             if self._closed or self._retiring or not self._owner.acquired:
                 raise SourceUnavailable("driver account service admission closed")
-            if camera_id in self._intents or len(self._intents) >= 3:
+            if camera_id in self._intents:
                 raise ControlNotReady("native source intent already owned or full")
             if not self._managed and self._account is not None:
                 raise ControlNotReady("unmanaged native account still owned")

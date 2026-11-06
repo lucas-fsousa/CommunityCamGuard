@@ -56,7 +56,7 @@ class OwnedRetirementCoordinator:
         if not self._operation.acquire(blocking=False):
             raise SourceUnavailable("source handoff already in progress")
         try:
-            if self._failed is not None or len(self._receipts)>=32:
+            if self._failed is not None:
                 raise SourceUnavailable("native restart admission unavailable")
             camera_id=checkpoint.camera_id
             if self._viewers.is_suspended(camera_id) or self._recordings.is_suspended(camera_id):
@@ -84,7 +84,7 @@ class OwnedRetirementCoordinator:
             raise SourceUnavailable("source handoff already in progress")
         try:
             previous = source_policy.read_for((camera_id,))[camera_id]
-            if (self._failed is not None or len(self._receipts) >= 32
+            if (self._failed is not None
                     or not previous.permits_legacy_rtsp
                     or previous.revision != expected_revision
                     or self._viewers.is_suspended(camera_id) or self._recordings.is_suspended(camera_id)):
@@ -144,8 +144,6 @@ class OwnedRetirementCoordinator:
         try:
             if self._failed is not None:
                 raise SourceCleanupUnconfirmed("source retirement recovery required")
-            if len(self._receipts) >= 32:
-                raise SourceUnavailable("pending retirement capacity reached")
             camera_id = running.worker.camera_id
             previous = source_policy.read_for((camera_id,))[camera_id]
             binding = self._bindings.binding(camera_id, previous)

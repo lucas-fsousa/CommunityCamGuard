@@ -9,11 +9,24 @@ driver offers for existing native intentions. Yoosee's reviewed three-member
 cohort supplies one account/login/worker to independent camera leases. The full
 driver→startup→runtime→account→consumer integration runs three synthetic sources,
 stops one without stopping siblings, then retires the complete group. Legacy
-RTSP cameras are excluded. Server-only NATIVE_SOURCE_CAPACITY (default1, up to32;
-Yoosee group up to3) wires the real app capacity. Driver-approved exact-camera
+RTSP cameras are excluded. Artificial three-camera/32-camera ceilings and the
+NATIVE_SOURCE_CAPACITY setting have been removed at the owner's direction.
+The production runtime allocates workers on demand; account resources follow the
+explicit enrolled cohort, not the number of test units. Five-source integration
+includes a transient TCP EOF/no inner CLOSE receipt, then recovery on one login.
+Driver-approved exact-camera
 restart aliases preserve old singleton checkpoints. This closes the driver-plan
 implementation item below, not physical acceptance of the other two cameras.
 See docs/internal/native-group-startup.md for configuration and exact scope.
+
+Critical recovery regression identified in production at15:42:03Z: physical TCP
+close and outer broker release were confirmed, but missing inner CLOSE ACK marked
+the shared account cleanup uncertain. The leased path also discarded the local
+protocol error code, losing the existing transient-retry classification. It now
+uses the original path's physical-close/outer-release retirement contract, retains
+the fixed protocol code and retries only known transient failures after confirmed
+detach/consumer cleanup. Unknown physical close, absent broker release and unsafe
+motor/siren cleanup remain fenced. No speculative wire command was introduced.
 
 2026-11-06 account-lifetime integration: the driver now owns one explicit account
 reader/worker for a bounded camera group. The generic server registers lazy driver

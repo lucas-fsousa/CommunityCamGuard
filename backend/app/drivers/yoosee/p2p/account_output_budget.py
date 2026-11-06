@@ -15,11 +15,13 @@ class OutputExhausted(ValueError):
 class AccountOutputBudget:
     """Attempts consume capacity before transport I/O, with no refunds on failure."""
 
-    def __init__(self, packets: int = 512, octets: int = 1024 * 1024, *,
+    def __init__(self, packets: int | None = None, octets: int | None = None, *,
                  policy: AccountPolicy = AccountPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic, media_capacity: int = 1):
         validate_media_capacity(media_capacity)
-        self._traffic = TrafficBudget(packets, octets, policy=policy, clock=clock)
+        self._traffic = TrafficBudget(512 * media_capacity if packets is None else packets,
+                                     1024 * 1024 * media_capacity if octets is None else octets,
+                                     policy=policy, clock=clock, members=media_capacity)
         self._ptz: PtzOutputReserve | None = None
         self._media: set[MediaOutputReserve] = set()
         self._media_capacity = media_capacity

@@ -18,7 +18,7 @@ def offers(cameras: tuple[Camera, ...], archives: Mapping[str, NativeArchiveSpec
     if len(cameras) == 1:
         offered = native_media_offer.offer(cameras[0], archive=archives.get(cameras[0].camera_id), accounts=accounts)
         return (offered,) if offered is not None else ()
-    if accounts is None or len(cameras) > 3 or len({camera.camera_id for camera in cameras}) != len(cameras):
+    if accounts is None or len({camera.camera_id for camera in cameras}) != len(cameras):
         return ()
     ordered = tuple(sorted(cameras, key=lambda camera: camera.camera_id))
     evidence = []

@@ -24,13 +24,13 @@ class _Job:
 class SourceExecutor(Executor):
     """At most capacity workers + capacity queued jobs. No thread until submit."""
 
-    def __init__(self, *, capacity: int = 1):
-        if type(capacity) is not int or not 1 <= capacity <= 32:
-            raise ValueError("source worker capacity must be between 1 and 32")
+    def __init__(self, *, capacity: int | None = 1):
+        if capacity is not None and (type(capacity) is not int or capacity < 1):
+            raise ValueError("source worker capacity must be positive or automatic")
         self._capacity = capacity
         self._lock = threading.Lock()
         self._closed = threading.Event()
-        self._queue: Queue[_Job] = Queue(maxsize=capacity)
+        self._queue: Queue[_Job] = Queue(maxsize=capacity or 0)
         self._threads: list[threading.Thread] = []
         self._jobs: set[Future] = set()
 
@@ -42,7 +42,8 @@ class SourceExecutor(Executor):
                 raise SourceUnavailable("source executor queue full")
             # Start before publishing this job: a failed Thread.start must not
             # accept work that the caller never received a handle for.
-            if len(self._threads) < self._capacity:
+            if ((self._capacity is None and len(self._jobs) >= len(self._threads))
+                    or (self._capacity is not None and len(self._threads) < self._capacity)):
                 thread = threading.Thread(target=self._work, name="source-owner", daemon=True)
                 thread.start()
                 self._threads.append(thread)

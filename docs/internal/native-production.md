@@ -1,6 +1,28 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-06): `70beb7b`, build `b-3fad324407cc`, camera3
+## Actual regression — 2026-11-06
+
+The subsequently installed group-plan image a73aefe/build b-88168866f405 left
+camera3 blocked163 at15:42:03Z. This supersedes the earlier successful short
+windows: they did NOT prove recovery in the shared-lease production path.
+The event confirmed physical TCP closure, outer broker release, joined consumer
+and no decoder cleanup failure; the inner CLOSE receipt was absent. The lease
+was marked detached but the account was simultaneously marked cleanup-uncertain.
+The leased adapter also lost the channel's fixed protocol code, so the existing
+transient-retry classification could not run. We cannot infer the original TCP
+failure's exact cause from that discarded information.
+
+The correction carries the existing singleton retirement/retry contract into the
+shared path, not a new wire sequence or arbitrary timeout. A synthetic five-camera
+ordinary startup forces TCP EOF/no inner receipt, recovers on the SAME account,
+then closes the entire group successfully. Missing physical close/outer release,
+unknown opening failures or unsafe motor/siren cleanup still fence reuse.
+Artificial camera-count caps were removed as requested; workers follow admitted
+registered cameras and account/queue resources follow the explicit cohort. No
+NATIVE_SOURCE_CAPACITY configuration is required. Live deployment results follow
+after acceptance; other two cameras remain RTSP and no physical action is required.
+
+Previous deployed runtime (2026-11-06): `70beb7b`, build `b-3fad324407cc`, camera3
 native/active159. Generic startup now restores reviewed checkpoints up to runtime
 capacity, reserving camera/domain/slot before spending each checkpoint. Three
 synthetic sources pass ordinary startup/shutdown; public capacity remains ONE

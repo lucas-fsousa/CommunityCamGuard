@@ -21,7 +21,7 @@ class PtzAuthority:
     """
 
     def __init__(self, grants: tuple[PtzGrant, ...]):
-        if not isinstance(grants, tuple) or len(grants) > 8:
+        if not isinstance(grants, tuple):
             raise ValueError("bounded driver motion grants required")
         self._grants: dict[int, PtzGrant] = {}
         access: int | None = None

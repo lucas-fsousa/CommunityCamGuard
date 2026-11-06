@@ -70,7 +70,7 @@ def reserve_native_owner(camera_id: str) -> Iterator[None]:
 @contextmanager
 def reserve_native_group(camera_ids: tuple[str, ...]) -> Iterator[None]:
     """One trusted shared account, explicit members, no wildcard publication."""
-    if (not isinstance(camera_ids, tuple) or not 1 <= len(camera_ids) <= 3
+    if (not isinstance(camera_ids, tuple) or not camera_ids
             or any(type(camera_id) is not str or not valid_camera_id(camera_id) for camera_id in camera_ids)
             or len(set(camera_ids)) != len(camera_ids)):
         raise ValueError("bounded exact native group required")

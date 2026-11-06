@@ -388,11 +388,11 @@ class AccountReadLifecycle:
                     # including interruptions even if the worker attempted close.
                     self._state = ("idle" if summary is not None
                                    and not summary.socket_close_failed and not summary.lease_cleanup_uncertain
-                                   and media_channels_closed(summary.media_channels)
+                                   and media_channels_closed(summary.media_channels, require_tcp_receipt=inbox is None)
                                    and (summary.media is None or not summary.media.opened
                                         or summary.media.broker_release)
-                                   and (summary.tcp is None or (summary.tcp.close_acknowledged
-                                        and not summary.tcp.socket_close_failed))
+                                   and (summary.tcp is None or (not summary.tcp.socket_close_failed
+                                        and (summary.tcp.close_acknowledged or inbox is not None)))
                                    and (summary.motion is None or not summary.motion.start_attempted
                                         or summary.motion.release_delivery_confirmed)
                                    and (summary.siren is None or not summary.siren.start_attempted

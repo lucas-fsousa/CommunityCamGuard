@@ -7,7 +7,7 @@ from .p2p.ptz_authority import PtzAuthority
 class NativeCohort:
     def __init__(self, evidence: tuple[NativeMediaEvidence, ...]):
         entries = tuple(item.entry for item in evidence)
-        if (not 1 <= len(entries) <= 3 or any(not item.camera_id for item in entries)
+        if (not entries or any(not item.camera_id for item in entries)
                 or len({item.camera_id for item in entries}) != len(entries)
                 or len({item.device_id for item in entries}) != len(entries)
                 or len({item.access_id for item in entries}) != 1):

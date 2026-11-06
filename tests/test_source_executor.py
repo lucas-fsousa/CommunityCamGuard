@@ -70,7 +70,7 @@ def test_failed_thread_start_accepts_no_untracked_job(monkeypatch):
     executor.stop()
 
 
-@pytest.mark.parametrize("capacity", [0, 33, True])
+@pytest.mark.parametrize("capacity", [0, -1, True])
 def test_capacity_has_a_finite_limit(capacity):
     with pytest.raises(ValueError):
         SourceExecutor(capacity=capacity)

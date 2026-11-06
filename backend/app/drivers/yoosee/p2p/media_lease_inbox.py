@@ -41,7 +41,9 @@ class MediaLeaseInbox:
     """
 
     def __init__(self, generation: int, access_id: int, *,
-                 targets: tuple[OnlineDevice, ...], capacity: int = 3):
+                 targets: tuple[OnlineDevice, ...], capacity: int | None = None):
+        if capacity is None:
+            capacity = len(targets)
         validate_media_capacity(capacity)
         if (type(generation) is not int or not 0 < generation < 1 << 64
                 or type(access_id) is not int or not 0 <= access_id < 1 << 64):

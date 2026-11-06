@@ -87,7 +87,7 @@ def test_auth_error_with_failed_close_is_not_classified_as_confirmed(monkeypatch
 
 
 @pytest.mark.parametrize("identities", [("123",), ("0124",), ("124", "124"),
-    ("124", "125", "126"), (["124"],), (True,), ("9" * 21,)])
+    ("124", "125", "123"), (["124"],), (True,), ("9" * 21,)])
 def test_invalid_additional_targets_never_resolve_or_authenticate(monkeypatch, identities):
     monkeypatch.setattr(opener, "resolve_list_hosts", lambda *a, **k: pytest.fail("DNS"))
     with pytest.raises(ValueError):

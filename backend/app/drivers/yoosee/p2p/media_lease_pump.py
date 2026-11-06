@@ -18,8 +18,8 @@ class MediaLeasePump:
 
     def _complete(self, ticket: MediaLeaseTicket, channel: AccountMediaChannel, *, uncertain: bool = False) -> bool:
         summary = channel.summary()
-        self.cleanup_uncertain |= not media_channels_closed((summary,)) or uncertain
         clean = media_channels_closed((summary,), require_tcp_receipt=False) and not uncertain
+        self.cleanup_uncertain |= not clean
         self.inbox.finish(ticket, summary, uncertain=not clean)
         return clean
 

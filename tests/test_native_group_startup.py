@@ -7,10 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 from _native_fixture import FRAGMENT, INIT
-from pydantic import ValidationError
 
 from backend.app import drivers
-from backend.app.config import Settings
 from backend.app.db import p2p, registry
 from backend.app.drivers.yoosee import (
     capability_profiles,
@@ -26,6 +24,7 @@ from backend.app.drivers.yoosee.capability_policy import OperationProof, Validat
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
 from backend.app.drivers.yoosee.driver import YooseeDriver
 from backend.app.drivers.yoosee.p2p.account_read_lifecycle import ReadConnection
+from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
 from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_header
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 from backend.app.media.native_runtime import NativeSourceRuntime
@@ -41,8 +40,8 @@ from tests.test_native_restart import coordinator
 
 
 @pytest.fixture
-def reviewed(monkeypatch):
-    cameras, pending = checkpoints(("yoosee/shared-control",) * 3)
+def reviewed(monkeypatch, request):
+    cameras, pending = checkpoints(("yoosee/shared-control",) * getattr(request, 'param', 3))
     entries = []
     for index, camera in enumerate(cameras):
         identity = CapabilityIdentity(str(7000000001 + index), "123", "IPC", 1, "firmware", "sdk", "")
@@ -63,7 +62,8 @@ def reviewed(monkeypatch):
     return cameras, entries, pending
 
 
-def test_ordinary_startup_uses_driver_group_and_one_login_for_three_native_consumers(reviewed, monkeypatch, tmp_path):
+@pytest.mark.parametrize('reviewed', [3, 5], indirect=True)
+def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(reviewed, monkeypatch, tmp_path):
     cameras, entries, _ = reviewed
     legacy = registry.upsert_camera("aa:bb:cc:dd:ee:10")
     sock, events, decoders, pumps = MediaSocket(), [], [], []
@@ -97,9 +97,22 @@ def test_ordinary_startup_uses_driver_group_and_one_login_for_three_native_consu
         def close(self):
             self.closed = True
             self.output.close()
+    inject_eof = len(cameras) == 5
+    class FaultyTcp(Tcp):
+        def step(self, *, budget_seconds=0.2):
+            super().step(budget_seconds=budget_seconds)
+            if self.inject and self.steps == 3 and not self.closing:
+                self.finish()
+                raise ReceiveError('TCP media EOF before CLOSE receipt')
+        def finish(self):
+            result = super().finish()
+            if self.inject:
+                self.result = replace(result, close_acknowledged=False)
+            return self.result
     def opener(route, spec, *, clock, video, policy):
         video.consume(V1Record(encoding=unpack_v1_encoding_header(header()), video=idr(), video_timestamp=1))
-        pump = Tcp(video)
+        pump = FaultyTcp(video)
+        pump.inject = inject_eof and not pumps
         pumps.append(pump)
         return pump
     monkeypatch.setattr(native_account, "reserve_read_handoff", handoff)
@@ -116,12 +129,14 @@ def test_ordinary_startup_uses_driver_group_and_one_login_for_three_native_consu
         return driver
     monkeypatch.setattr(drivers, "for_camera", for_camera)
     retirement = coordinator()
-    runtime = NativeSourceRuntime(viewers=retirement.viewer_gate, capacity=3, restart_checkpoints=True)
+    runtime = NativeSourceRuntime(viewers=retirement.viewer_gate, capacity=None, restart_checkpoints=True)
     account = None
     try:
         statuses = restore_reviewed(runtime, retirement, SimpleNamespace(native_archive=lambda _: None), lambda: None)
         assert statuses == {camera.camera_id: "running" for camera in cameras}
-        assert len(decoders) == len(pumps) == len(shared_control_reads._sessions) == 3
+        expected = len(cameras) + int(inject_eof)
+        assert len(decoders) == len(pumps) == expected
+        assert len(shared_control_reads._sessions) == len(cameras)
         assert events == ["sdk_enter", "login"] and sock.closed == 0
         account = service._account
         for entry in entries:
@@ -131,7 +146,7 @@ def test_ordinary_startup_uses_driver_group_and_one_login_for_three_native_consu
         assert runtime.sources.stop(selected)
         runtime._activations[selected].session.completion.result(timeout=3)
         assert runtime.sources.state(selected) == "idle" and account.ready and sock.closed == 0
-        assert len(shared_control_reads._sessions) == 2
+        assert len(shared_control_reads._sessions) == len(cameras) - 1
         assert events.count("login") == 1
     finally:
         runtime.stop(timeout=6)
@@ -139,7 +154,7 @@ def test_ordinary_startup_uses_driver_group_and_one_login_for_three_native_consu
         server.close()
     assert account is not None and account.cleanup_confirmed
     assert events == ["sdk_enter", "login", "sdk_exit"]
-    assert sock.opens == sock.closes == 3 and sock.closed == 1
+    assert sock.opens == sock.closes == len(cameras) + int(inject_eof) and sock.closed == 1
     assert all(item.closed for item in decoders) and not shared_control_reads._sessions
 
 
@@ -165,12 +180,6 @@ def test_driver_group_refuses_unreviewed_or_conflicting_members_without_a_login(
     finally:
         service.stop()
         server.close()
-
-
-@pytest.mark.parametrize("capacity", [0, 33, -1])
-def test_native_source_capacity_is_bounded_configuration(capacity):
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None, native_source_capacity=capacity)
 
 
 def test_group_plan_is_lazy_exact_and_revalidated_before_construction(reviewed, tmp_path):

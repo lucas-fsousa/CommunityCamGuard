@@ -319,7 +319,8 @@ class AccountReadWorker:
                                 raise
                             # The TCP opener/pump certifies physical close or
                             # raises a distinct cleanup error. Never reopen here.
-                            channel.retire("socket" if isinstance(channel_error, OSError) else "protocol")
+                            channel.retire("socket" if isinstance(channel_error, OSError) else "protocol",
+                                           protocol_code=PROTOCOL_CODES.get(str(channel_error), ""))
                         if channel is channels[0]:
                             tcp = channel.tcp
                         if channel.tcp is not None and channel.tcp.result is not None:

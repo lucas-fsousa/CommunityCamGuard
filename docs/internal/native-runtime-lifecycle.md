@@ -4,7 +4,8 @@
 
 Follow-up: [driver group planning](native-group-startup.md) now connects ordinary
 startup to one reviewed account with independent native consumers. Runtime capacity
-is wired through server-only `NATIVE_SOURCE_CAPACITY`; default1 is unchanged.
+uses on-demand source workers in production, without a camera-count setting or
+artificial three/32-camera ceiling. Explicit capacities remain available to isolated tests.
 The earlier pending-driver-plan labels below are superseded by that delivery.
 
 The runtime now reserves camera, resource domain and capacity atomically BEFORE

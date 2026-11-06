@@ -38,7 +38,7 @@ class NativeAccount:
                  current_enrollment: Callable[[str], P2PEnrollment | None] = p2p.read_registered_enrollment,
                  motion_grants: tuple[PtzGrant, ...] = (), motion_valid: Callable[[str], bool] | None = None,
                  clock: Callable[[], float] = time.monotonic):
-        if (not isinstance(entries, tuple) or not 1 <= len(entries) <= 3
+        if (not isinstance(entries, tuple) or not entries
                 or any(not isinstance(entry, P2PEnrollment) or not entry.camera_id
                     or not valid_camera_id(entry.camera_id) or type(entry.device_id) is not str
                     or not entry.device_id.isascii() or not entry.device_id.isdecimal()

@@ -44,7 +44,7 @@ def save(items: tuple[CleanRestart, ...]) -> None:
     """Runtime-only, after confirmed closure of every native owner/executor."""
     if not items:
         return
-    if len(items)>32 or len({item.camera_id for item in items})!=len(items):
+    if len({item.camera_id for item in items})!=len(items):
         raise ValueError("bounded unique checkpoint batch required")
     for item in items: _validate(item)
     with closing(connect()) as conn, conn:
@@ -61,9 +61,7 @@ def pending() -> tuple[CleanRestart, ...]:
     with closing(connect()) as conn:
         if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='media_native_restart'").fetchone() is None:
             return ()
-        rows=conn.execute("SELECT * FROM media_native_restart LIMIT 33").fetchall()
-        if len(rows)>32:
-            raise source_policy.SourcePolicyConflict("native restart capacity exceeded")
+        rows=conn.execute("SELECT * FROM media_native_restart").fetchall()
         items=[]
         for row in rows:
             item=CleanRestart(row['camera_id'],row['revision'],row['domain'])

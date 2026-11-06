@@ -4,14 +4,14 @@ from ..db import native_restart, registry, source_policy
 from ..media.server_owner import ServerOwner
 
 
-def checkpoints(owner: ServerOwner, offer_for, *, limit: int = 1) -> dict[str, str]:
-    if type(limit) is not int or not 1 <= limit <= 32:
+def checkpoints(owner: ServerOwner, offer_for, *, limit: int | None = 1) -> dict[str, str]:
+    if limit is not None and (type(limit) is not int or limit < 1):
         raise ValueError("bounded native checkpoint capacity required")
     if not owner.abandoned_namespace_retired:
         return {}
     existing = {item.camera_id for item in native_restart.pending()}
-    remaining = max(0, limit - len(existing))
-    if not remaining:
+    remaining = max(0, limit - len(existing)) if limit is not None else None
+    if remaining == 0:
         return {}
     statuses: dict[str, str] = {}
     cameras = registry.list_cameras()
@@ -30,7 +30,8 @@ def checkpoints(owner: ServerOwner, offer_for, *, limit: int = 1) -> dict[str, s
         if policy.phase != 'blocked':
             policy = source_policy.block(camera.camera_id, expected_revision=policy.revision)
         native_restart.save((native_restart.CleanRestart(camera.camera_id, policy.revision, offer.domain),))
-        remaining -= 1
-        if not remaining:
-            break
+        if remaining is not None:
+            remaining -= 1
+            if not remaining:
+                break
     return statuses

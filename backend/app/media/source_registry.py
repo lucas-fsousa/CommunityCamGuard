@@ -44,9 +44,9 @@ class SourceRegistry:
     optimistic reset, unbounded failure history or authentication retry exists.
     """
 
-    def __init__(self, *, capacity: int = 1):
-        if type(capacity) is not int or not 1 <= capacity <= 32:
-            raise ValueError("source capacity must be between 1 and 32")
+    def __init__(self, *, capacity: int | None = 1):
+        if capacity is not None and (type(capacity) is not int or capacity < 1):
+            raise ValueError("source capacity must be positive or automatic")
         self._capacity = capacity
         self._lock = threading.Lock()
         self._entries: dict[str, _Entry] = {}
@@ -105,7 +105,7 @@ class SourceRegistry:
         with self._lock:
             if self._closed:
                 raise SourceUnavailable("source registry shutting down")
-            if (camera_id in self._entries or len(self._entries) >= self._capacity
+            if (camera_id in self._entries or (self._capacity is not None and len(self._entries) >= self._capacity)
                     or any(entry.domain == domain for entry in self._entries.values())):
                 raise SourceUnavailable("source or driver resource already reserved")
             entry = _Entry(domain, owner=owner if owner is not None else object())

@@ -102,7 +102,7 @@ def test_delivery_closed_before_claim_cannot_open_a_camera_route():
 
 
 @pytest.mark.parametrize("generation,access,capacity", [(0, 123, 3), (True, 123, 3),
-    (1, True, 3), (1, -1, 3), (1, 123, 4), (1, 123, 0)])
+    (1, True, 3), (1, -1, 3), (1, 123, -1), (1, 123, 0)])
 def test_invalid_account_boundaries_fail_before_admission(generation, access, capacity):
     with pytest.raises(ValueError):
         MediaLeaseInbox(generation, access, targets=TARGETS[:capacity], capacity=capacity)

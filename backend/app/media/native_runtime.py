@@ -15,7 +15,7 @@ from .viewer_gate import ViewerGate
 
 
 class NativeSourceRuntime:
-    def __init__(self, *, viewers: ViewerGate, capacity: int = 1, restart_checkpoints: bool = False):
+    def __init__(self, *, viewers: ViewerGate, capacity: int | None = 1, restart_checkpoints: bool = False):
         self.sources = SourceRegistry(capacity=capacity)
         self._executor = SourceExecutor(capacity=capacity)
         self._viewers = viewers
@@ -30,12 +30,13 @@ class NativeSourceRuntime:
         self._restart_checkpoints = restart_checkpoints
 
     @property
-    def capacity(self) -> int:
+    def capacity(self) -> int | None:
         return self._capacity
 
     def _can_admit(self, offer: NativeSourceOffer) -> bool:
         return (not self._closed and offer.camera_id not in self._activations
-                and len(self._activations) < self._capacity and offer.domain not in self._domains)
+                and (self._capacity is None or len(self._activations) < self._capacity)
+                and offer.domain not in self._domains)
 
     def can_admit(self, offer: NativeSourceOffer) -> bool:
         """Metadata-only hint. Actual reservation is atomic before any checkpoint spend."""

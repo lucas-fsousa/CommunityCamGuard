@@ -36,7 +36,7 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
     if (not camera_id or not device_id or enrollment.camera_id != camera_id
             or enrollment.device_id != device_id):
         raise ValueError("read connection enrollment mismatch")
-    if (not isinstance(additional_device_ids, tuple) or len(additional_device_ids) > 2
+    if (not isinstance(additional_device_ids, tuple)
             or any(type(identity) is not str or not identity.isascii() or not identity.isdecimal()
                    or len(identity) > 20
                    or not 0 < int(identity) < 1 << 64 or str(int(identity)) != identity

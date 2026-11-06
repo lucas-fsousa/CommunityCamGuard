@@ -9,6 +9,7 @@ from .account_video_source import AccountVideoSource
 from .native_account_service import NativeAccounts
 from .native_retry_diagnostics import record as record_retry
 from .native_video_source import NativeVideoResult, NativeVideoSource
+from .p2p.media_failures import TRANSIENT_CODES
 
 _local_failures = frozenset({"TimeoutError", "Mp4SizeError", "Mp4OrderError",
     "Mp4CapacityError", "DecoderExitedError", "BrokenPipeError", "OSError"})
@@ -27,6 +28,8 @@ def retryable(result: object, source: ManagedSource) -> bool:
     # detach plus consumer/decoder retirement permits another lease request.
     if result.reason == "consumer_failed":
         return result.failure_type in _local_failures
+    if result.reason == "protocol":
+        return details.get("session_protocol_code") in TRANSIENT_CODES
     if result.reason == "connection":
         return details.get("session_connection_failure") in {"offline", "socket_timeout", "socket_error",
             "list_dns", "list_timeout", "broker_heartbeat", "certification_unavailable",
