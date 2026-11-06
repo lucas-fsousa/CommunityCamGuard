@@ -119,14 +119,15 @@ A single authenticated MSE connection completed60.0s:62binary fragments/
 51510162bytes, max interarrival1.537s, no reconnect. A lamp GET initially returned
 409, then200/verified on the existing shared session, with no write. This does not
 establish the initial409's cause. The original archive started a new epoch at
-14:36:45Z; its MP4 grew to8388608bytes at the check (still open, not a closed-file
-acceptance). No sound/light/motor command was sent. No newer retry event than
+14:36:45Z. Its first closed MP4 was inspected without playback:299.977667s,
+HEVC1920×1080/AAC16000Hz mono,21035123bytes; the next14:41:44Z segment used the
+same epoch. No sound/light/motor command was sent. No newer retry event than
 the prior12:40:31Z event was present during this observation. Fragment delivery
 is not a decoded-frame or absolute-latency measurement.
 App217MiB/1GiB, OOM=false/restarts=0, three FFmpeg processes inside the app (not
 counting hub transcoders/unrelated projects). Both legacy sources remained active,
-with one base consumer each. The first packet-counter snapshot after replacement
-was garage9684/yard8196; do not compare these reset counters to the old container.
+with one base consumer each. Post-replacement packet counters advanced
+garage9684→11695/yard8196→11324; do not compare these reset counters to the old container.
 
 ### Previous checkpoint (classic offer)
 

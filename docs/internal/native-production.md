@@ -13,8 +13,9 @@ uses image `d1835e054877` (`wsl-shared-native-offer`); hub/tunnel were unchanged
 Post-deploy MSE completed60.0s:62binary fragments/51510162bytes, max interarrival
 1.537s, no reconnect. Read-only lamp GET returned409 initially, then200/verified.
 No sound/light/motor command or native experiment on the other cameras was sent.
-The new14:36:45Z original archive epoch was growing; a closed new-epoch segment
-has not yet been checked. No new retry event appeared in this short observation.
+The new14:36:45Z original archive epoch closed a299.977667s MP4 containing
+HEVC1920×1080/AAC16000Hz mono; the next14:41:44Z segment used the same epoch.
+No new retry event appeared in this short observation.
 These results do not prove simultaneous-native or multi-day endurance acceptance.
 App217MiB/1GiB, OOM=false/restarts=0, three in-app FFmpeg processes; the two legacy
 sources remained active with one base consumer each.
