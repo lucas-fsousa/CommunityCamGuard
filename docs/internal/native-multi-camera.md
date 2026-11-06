@@ -121,3 +121,14 @@ before lifespan shutdown; Compose has a45-second stop grace. Clean service teard
 was not established from that wait. Do not infer graceful archival finalization
 from successful namespace-fenced startup; investigate bounded connection draining
 separately if necessary. No shutdown-budget change was mixed into this delivery.
+
+The first closed new-epoch clip was inspected without playback/transcoding:
+`20261106_042024_ea1543da82e5c46d1aedeed323cd8eee5.mp4`,300.266667seconds,
+HEVC1920×1080 and AAC16000Hz/mono. The following042524clip was created under the
+same epoch. This verifies segmentation on the updated single-camera path.
+
+CI follow-up: the docs-only run42162237524 remained in the unconditional apt
+FFmpeg-install step for over five minutes, before any tests. The workflow now
+reuses existing ffmpeg/ffprobe when both exist; otherwise update/install each
+have240second wall-clock limits and bounded network waits/retries. Required
+ffmpeg/ffprobe/prlimit checks and the complete test suite remain mandatory.

@@ -30,8 +30,10 @@ jobs:
         # Runner images may omit FFmpeg. Do not silently skip archive/muxing
         # regressions that exercise the same binary used in the server image.
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo timeout 240s apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            sudo timeout 240s apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --yes --no-install-recommends ffmpeg
+          fi
           command -v ffmpeg
           command -v ffprobe
           command -v prlimit
