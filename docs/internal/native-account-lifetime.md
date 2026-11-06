@@ -97,10 +97,10 @@ for a STOP receipt before TCP/broker close. Missing STOP confirmation fences all
 lease outcomes. Synthetic encrypted tests cover that order, a healthy sibling,
 unleased-device rejection and repeated identical STOP on missing receipt.
 
-Targeted source/service/worker regression passed74 tests (147.9MiB peak); an earlier
-broader integration batch passed87 (165.5MiB). Both ran with192MiB/CPU50% limits.
-Mypy passed416modules; Ruff passed. These are offline results, not a new physical
-motor test. Live bridge acceptance and bounded multi-source admission remain.
+Final targeted source/service/worker regression passed137 tests (151.5MiB peak)
+under192MiB/CPU50% limits. Mypy passed416modules; Ruff passed. Full GitHub CI passed
+6133tests/1skip and all frontend contracts; Image passed too. These are offline
+results, not a new physical motor test. Bounded public multi-source admission remains.
 The core's existing normal-run cleanup
 contract already supports a detached source lease; do not invent a requirement
 to physically close the shared broker socket for each camera.
@@ -108,6 +108,27 @@ to physically close the shared broker socket for each camera.
 See [source leases](native-source-leases.md) and [driver architecture](0001-pluggable-camera-drivers.md).
 
 ## Deployed regression checkpoint
+
+Code `5ceece1`, image `d1835e054877` / `wsl-shared-native-offer`, build
+`b-ba01cbf86a08` replaced only the app using a512MiB/CPU50% image build. Camera3
+resumed native/active156 through the account-bound offer. Public capacity/domain
+remain unchanged, the other two cameras remain legacy RTSP, and the hub/tunnel
+were not replaced. CI6133tests/1skip and Image passed before deployment.
+
+A single authenticated MSE connection completed60.0s:62binary fragments/
+51510162bytes, max interarrival1.537s, no reconnect. A lamp GET initially returned
+409, then200/verified on the existing shared session, with no write. This does not
+establish the initial409's cause. The original archive started a new epoch at
+14:36:45Z; its MP4 grew to8388608bytes at the check (still open, not a closed-file
+acceptance). No sound/light/motor command was sent. No newer retry event than
+the prior12:40:31Z event was present during this observation. Fragment delivery
+is not a decoded-frame or absolute-latency measurement.
+App217MiB/1GiB, OOM=false/restarts=0, three FFmpeg processes inside the app (not
+counting hub transcoders/unrelated projects). Both legacy sources remained active,
+with one base consumer each. The first packet-counter snapshot after replacement
+was garage9684/yard8196; do not compare these reset counters to the old container.
+
+### Previous checkpoint (classic offer)
 
 Code `c82a053` passed CI6119tests/1skip and Image. The image build used512MiB/CPU50%
 limits; image0250f10f1842/tag `wsl-native-account-owner` replaced only the app,

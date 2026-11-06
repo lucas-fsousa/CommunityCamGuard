@@ -1,6 +1,26 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-06): `c82a053`, build `b-a5d5dd07a803`,
+Current deployed runtime (2026-11-06): `5ceece1`, build `b-ba01cbf86a08`, camera3
+native/active156. Reviewed offers now lazily bind to the driver's server-owned
+account, with exact-device PTZ grants and ready-lease gating. Source intents span
+decoder recovery/backoff, but the last source must stop/join the account before
+retirement can succeed. STOP confirmation precedes media detach. Public admission
+remains one, with the existing checkpoint domain; the other two cameras stay RTSP.
+See [account lifetime](native-account-lifetime.md) for the ownership contract.
+
+CI6133tests/1skip, frontend contracts and Image passed. The app-only replacement
+uses image `d1835e054877` (`wsl-shared-native-offer`); hub/tunnel were unchanged.
+Post-deploy MSE completed60.0s:62binary fragments/51510162bytes, max interarrival
+1.537s, no reconnect. Read-only lamp GET returned409 initially, then200/verified.
+No sound/light/motor command or native experiment on the other cameras was sent.
+The new14:36:45Z original archive epoch was growing; a closed new-epoch segment
+has not yet been checked. No new retry event appeared in this short observation.
+These results do not prove simultaneous-native or multi-day endurance acceptance.
+App217MiB/1GiB, OOM=false/restarts=0, three in-app FFmpeg processes; the two legacy
+sources remained active with one base consumer each.
+Next delivery item: bounded public multi-source admission, not another PTZ mapping.
+
+Previous deployed runtime (2026-11-06): `c82a053`, build `b-a5d5dd07a803`,
 camera3 native/active153. CI6119tests/1skip and Image passed. Optional lazy driver
 runtime services are now registered under the server owner, before native source
 runtimes. The shared account owner, same-owner group publication and camera-local

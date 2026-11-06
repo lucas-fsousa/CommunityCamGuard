@@ -16,7 +16,11 @@ Reviewed source offers and per-lease PTZ are now wired to that service. A source
 intent retains the account across recovery/backoff and retires it when the last
 source ends. Exact-device readiness and confirmed STOP precede lease detach;
 missing STOP blocks outcomes. Offline batches74/87passed; mypy416/Ruff passed.
-Next: deploy/read-only bridge acceptance, then bounded multi-source admission.
+Bridge deployed as5ceece1/build b-ba01cbf86a08, camera3 native/active156.
+CI6133tests/1skip, frontend contracts and Image passed; read-only lamp200/verified,
+60s MSE62fragments/51510162bytes, max gap1.537s (not absolute latency), no reconnect.
+No new physical-control test; original archive is growing in the new epoch.
+Next: bounded public multi-source admission.
 Public capacity remains one; no automatic migration of other cameras.
 See docs/internal/native-account-lifetime.md.
 
