@@ -4,6 +4,14 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+Owner priority: stop expanding controls/generic architecture; finish native video
+reliability using captured SDK/wire evidence. Permanent shared-lease quarantine
+regression is fixed and live retries were observed, but a600s window still had a
+12.696s pause. Do NOT label streaming fully stable. Current SDK LAN selection,
+historical LAN UDP versus our public TCP relay, scoped ELF offsets and the WSL
+inbound-firewall finding are documented in docs/internal/native-lan-selection.md.
+Do not add artificial camera-count ceilings or change global firewall policy.
+
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member
 cohort supplies one account/login/worker to independent camera leases. The full

@@ -26,7 +26,7 @@ from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult, open_tcp
 from .kcp_receive import KcpAssemblyTimeout
 from .lamp_read_inbox import LampReadInbox
 from .lamp_read_pump import LampReadPump
-from .media_failures import PROTOCOL_CODES
+from .media_failures import PROTOCOL_CODES, underlying_receive_error
 from .media_lease_inbox import MediaLeaseInbox
 from .media_lease_pump import MediaLeasePump
 from .media_policy import MediaPolicy, validate_media_policy
@@ -319,10 +319,11 @@ class AccountReadWorker:
                                 raise
                             # The TCP opener/pump certifies physical close or
                             # raises a distinct cleanup error. Never reopen here.
+                            cause = underlying_receive_error(channel_error)
                             channel.retire("socket" if isinstance(channel_error, OSError) else "protocol",
-                                protocol_code=PROTOCOL_CODES.get(str(channel_error), ""),
-                                protocol_facts=channel_error.facts if isinstance(
-                                    channel_error, (KcpAssemblyTimeout, MtpTcpFrameError)) else ())
+                                protocol_code=PROTOCOL_CODES.get(str(cause), ""),
+                                protocol_facts=cause.facts if isinstance(
+                                    cause, (KcpAssemblyTimeout, MtpTcpFrameError)) else ())
                         if channel is channels[0]:
                             tcp = channel.tcp
                         if channel.tcp is not None and channel.tcp.result is not None:

@@ -24,7 +24,7 @@ from backend.app.drivers.yoosee.capability_policy import OperationProof, Validat
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
 from backend.app.drivers.yoosee.driver import YooseeDriver
 from backend.app.drivers.yoosee.p2p.account_read_lifecycle import ReadConnection
-from backend.app.drivers.yoosee.p2p.kcp_receive import KcpAssemblyTimeout
+from backend.app.drivers.yoosee.p2p.kcp_receive import KcpAssemblyTimeout, ReceiveError
 from backend.app.drivers.yoosee.p2p.stream_protocol import unpack_v1_encoding_header
 from backend.app.drivers.yoosee.p2p.v1_receive import V1Record
 from backend.app.media import native_events
@@ -106,7 +106,11 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
             super().step(budget_seconds=budget_seconds)
             if self.inject and self.steps == 3 and not self.closing:
                 self.finish()
-                raise KcpAssemblyTimeout((("kcp_gap", 1), ("kcp_pending", 2)))
+                try:
+                    raise KcpAssemblyTimeout((("kcp_gap", 1), ("kcp_pending", 2)))
+                except ValueError:
+                    # Mirrors AvReceiver.receive's public sanitization boundary.
+                    raise ReceiveError("AV receive session failed") from None
         def finish(self):
             result = super().finish()
             if self.inject:

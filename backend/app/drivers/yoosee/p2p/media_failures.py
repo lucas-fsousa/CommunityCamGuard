@@ -1,5 +1,14 @@
 """Fixed local receive classifications, never raw network/error text."""
 
+
+def underlying_receive_error(error: BaseException) -> BaseException:
+    """Transport adapters sanitize messages; retain the bounded local cause chain."""
+    for _ in range(8):
+        if not isinstance(error.__context__, ValueError):
+            break
+        error = error.__context__
+    return error
+
 PROTOCOL_CODES = {
     'KCP assembly deadline exceeded': 'kcp_assembly_timeout',
     'invalid KCP receive segment': 'kcp_invalid_segment',
