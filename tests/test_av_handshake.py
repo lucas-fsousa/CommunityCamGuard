@@ -69,12 +69,13 @@ def test_udp_sdk_init_repeats_after_receipt_until_accept_without_replaying_start
         assert not s.ready
     assert len(set(bodies)) == 1
     s.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
-    now[0] = 0.6
-    assert not s.due()
-    s.receive(packet(0, 0, start()), PEER)
     local_start, = s.due()
     assert parse_kcp_segments(local_start)[0].sequence == 0
     s.receive(ack(local_start), PEER)
+    assert not s.ready  # Local START does not invent the peer's media readiness.
+    now[0] = 0.6
+    assert not s.due()
+    s.receive(packet(0, 0, start()), PEER)
     s.receive(packet(1, 0, media(header() + av())), PEER)
     assert s.ready
     now[0] = 2.3

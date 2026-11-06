@@ -106,7 +106,8 @@ the same parser/decoder owner, but do not claim ready or present a live source y
             elif (not self._init.acknowledged or
                   (isinstance(self._init, AvInitRequests) and not self._receiver.accepted)):
                 wire = self._init.due()
-            elif self._receiver.accepted and self._receiver.peer_started:
+            elif self._receiver.accepted and (self._receiver.peer_started
+                                              or isinstance(self._init, AvInitRequests)):
                 if self._start is None:
                     self._start = ReliableAvControl(self._peer, self._link_id, self._call_id,
                                                     action=6, clock=self._clock)

@@ -212,3 +212,9 @@ sequences, TCP handshake and production driver's default-TCP gate are unchanged.
 Offline tests cover repeat-after-ACK, stop-at-ACCEPT, delayed last receipt and
 the unchanged readiness deadline. Live effect remains to be measured; this is
 a wire/SDK-backed discrepancy, NOT yet a proven cause of absent ACCEPT.
+
+The same split's ACCEPT handler sets session+0x204 to1 at0x251640–648,
+confirming what stops those requests. At0x251614–620 it sends local START
+immediately after ACCEPT, without waiting for peer START. UDP follows that
+ordering too; final readiness still requires the peer's START and encoding.
+The historical TCP ordering remains unchanged.
