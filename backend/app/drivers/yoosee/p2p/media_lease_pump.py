@@ -23,8 +23,21 @@ class MediaLeasePump:
         self.inbox.finish(ticket, summary, uncertain=not clean)
         return clean
 
-    def poll(self, prepare: Callable[[MediaRouteSpec], MediaRouteJob]) -> None:
+    def motion_ready(self, device_id: int) -> bool:
+        return any(channel.bootstrap.spec.device.device_id == device_id
+                   and not self.inbox.should_cancel(ticket)
+                   and channel.tcp is not None and channel.tcp.ready
+                   for ticket, channel in self._active.items())
+
+    def any_motion_ready(self) -> bool:
+        return any(self.motion_ready(channel.bootstrap.spec.device.device_id)
+                   for channel in self._active.values())
+
+    def poll(self, prepare: Callable[[MediaRouteSpec], MediaRouteJob], *,
+             defer_stop_device: int | None = None) -> None:
         for ticket, channel in tuple(self._active.items()):
+            if channel.bootstrap.spec.device.device_id == defer_stop_device:
+                continue  # Motor STOP/receipt precedes detach/result publication.
             if channel.route.result is not None:
                 if channel.tcp is not None and channel.tcp.result is None:
                     raise ValueError("media route ended before TCP retirement")

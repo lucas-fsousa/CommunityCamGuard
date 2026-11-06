@@ -21,6 +21,7 @@ from .p2p.control_ownership import (
     control_channel_contended,
 )
 from .p2p.media_lease_inbox import MediaLeaseInbox
+from .p2p.ptz_authority import PtzAuthority, PtzGrant
 from .shared_control_reads import reserve_native_group
 from .shared_read_session import SharedReadResult
 
@@ -35,6 +36,7 @@ class NativeAccount:
 
     def __init__(self, entries: tuple[P2PEnrollment, ...], *,
                  current_enrollment: Callable[[str], P2PEnrollment | None] = p2p.read_registered_enrollment,
+                 motion_grants: tuple[PtzGrant, ...] = (), motion_valid: Callable[[str], bool] | None = None,
                  clock: Callable[[], float] = time.monotonic):
         if (not isinstance(entries, tuple) or not 1 <= len(entries) <= 3
                 or any(not isinstance(entry, P2PEnrollment) or not entry.camera_id
@@ -48,14 +50,23 @@ class NativeAccount:
                 or len({entry.device_id for entry in entries}) != len(entries)
                 or len({entry.access_id for entry in entries}) != 1):
             raise ValueError("bounded enrolled single-account group required")
+        PtzAuthority(motion_grants)
+        if (any(not any(grant.access_id == entry.access_id and str(grant.device_id) == entry.device_id
+                        for entry in entries) for grant in motion_grants)
+                or (motion_valid is not None and (not callable(motion_valid) or not motion_grants))):
+            raise ValueError("motion scope must belong to enrolled account members")
         self._entries, self._current = entries, current_enrollment
+        self._motion_grants, self._motion_valid = motion_grants, motion_valid
         self._clock = clock
-        self._lifecycle = AccountReadLifecycle(policy=AccountPolicy.CONTINUOUS, state_reads=True, clock=clock)
+        self._lifecycle = AccountReadLifecycle(policy=AccountPolicy.CONTINUOUS, state_reads=True,
+                                             motion_grants=motion_grants, clock=clock)
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._started = False
         self._inbox: MediaLeaseInbox | None = None
         self._cleanup_confirmed = False
+        self._result_reason = "preparing"
+        self._connection_failure = ""
         self._targets: tuple[OnlineDevice, ...] = ()
 
     def matches(self, entries: tuple[P2PEnrollment, ...]) -> bool:
@@ -64,10 +75,23 @@ class NativeAccount:
     def includes(self, entry: P2PEnrollment) -> bool:
         return entry in self._entries
 
+    def matches_motion(self, grants: tuple[PtzGrant, ...]) -> bool:
+        return self._motion_grants == grants
+
     @property
     def cleanup_confirmed(self) -> bool:
         with self._lock:
             return self._cleanup_confirmed
+
+    @property
+    def result_reason(self) -> str:
+        with self._lock:
+            return self._result_reason
+
+    @property
+    def connection_failure(self) -> str:
+        with self._lock:
+            return self._connection_failure
 
     @property
     def ready(self) -> bool:
@@ -91,12 +115,16 @@ class NativeAccount:
         target = next((target for target in targets if str(target.device_id) == entry.device_id), None)
         if target is None or not target.status:
             raise ControlNotReady("shared native account target is not online")
+        grants = tuple(grant for grant in self._motion_grants if grant.device_id == target.device_id)
+        validator = self._motion_valid
         return LeasedReadSession(entry, target, self._lifecycle, inbox,
-                                 current_enrollment=lambda: self._current(camera_id))
+            current_enrollment=lambda: self._current(camera_id), motion_grants=grants,
+            motion_valid=(lambda: validator(camera_id)) if validator is not None and grants else None)
 
     def _confirmed(self, result: SharedReadResult) -> SharedReadResult:
         with self._lock:
             self._cleanup_confirmed = True
+            self._result_reason = result.reason
         return result
 
     def run(self, *, cancelled: Callable[[], bool]) -> SharedReadResult:
@@ -151,7 +179,9 @@ class NativeAccount:
 
         try:
             result = self._lifecycle.run_media_leases(connect, leases=leases, cancelled=should_stop)
-        except ReadConnectFailure:
+        except ReadConnectFailure as failure:
+            with self._lock:
+                self._connection_failure = failure.reason
             # This exception certifies physical socket cleanup, unlike OSError.
             return SharedReadResult("connection")
         except BaseException:

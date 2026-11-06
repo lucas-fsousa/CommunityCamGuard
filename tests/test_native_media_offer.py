@@ -15,10 +15,12 @@ from backend.app.drivers.yoosee import (
     capability_snapshot_store,
     native_media_offer,
 )
+from backend.app.drivers.yoosee.account_video_source import AccountVideoSource
 from backend.app.drivers.yoosee.capability_identity import CapabilityIdentity
 from backend.app.drivers.yoosee.capability_policy import OperationProof, ValidatedProfile
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
 from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
+from backend.app.media.server_owner import ServerOwner
 from backend.app.media.source_registry import SourceUnavailable
 
 
@@ -52,6 +54,26 @@ def test_offer_is_lazy_exact_unit_and_does_not_expose_enrollment(evidence, monke
     offer.factory()
     factory.assert_called_once_with(camera.camera_id, "7000000002")
     assert CameraDriver().native_media_offer(camera) is None
+
+
+def test_server_owned_offer_is_lazy_and_keeps_existing_checkpoint_domain(evidence, tmp_path, monkeypatch):
+    camera, _, _, _ = evidence
+    owner = ServerOwner(tmp_path / "owner.db")
+    owner.acquire()
+    driver = YooseeDriver()
+    service, = driver.runtime_services(owner)
+    prepare = Mock(side_effect=AssertionError("offer construction must not log in"))
+    monkeypatch.setattr(service, "prepare", prepare)
+    try:
+        offered = driver.native_media_offer(camera)
+        assert offered is not None and offered.valid()
+        assert offered.domain == "yoosee/shared-control"
+        source = offered.factory()
+        assert isinstance(source.current, AccountVideoSource)
+        prepare.assert_not_called()
+    finally:
+        service.stop()
+        owner.close()
 
 
 @pytest.mark.parametrize("change", ["snapshot", "identity", "review", "enrollment", "device", "other-camera"])

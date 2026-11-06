@@ -12,9 +12,13 @@ Offline integration passed three consumers in the generic registry, automatic
 repair of one local decoder failure and explicit replacement, using one login/
 socket/SDK scope. Camera-local recovery now distinguishes detach from account
 socket closure; unexpected opening errors cannot publish clean lease outcomes.
-Current production offers are unchanged; next
-wire reviewed offers and per-lease PTZ to the service, then bounded
-multi-source admission. See docs/internal/native-account-lifetime.md.
+Reviewed source offers and per-lease PTZ are now wired to that service. A source
+intent retains the account across recovery/backoff and retires it when the last
+source ends. Exact-device readiness and confirmed STOP precede lease detach;
+missing STOP blocks outcomes. Offline batches74/87passed; mypy416/Ruff passed.
+Next: deploy/read-only bridge acceptance, then bounded multi-source admission.
+Public capacity remains one; no automatic migration of other cameras.
+See docs/internal/native-account-lifetime.md.
 
 Deployed checkpoint:c82a053/build b-a5d5dd07a803, camera3 native/active153,
 CI6119tests/1skip and Image passed. Default-path60s MSE:62fragments/31604455bytes,

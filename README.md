@@ -56,8 +56,10 @@ Longer endurance and simultaneous native cameras are not yet established; see th
 The shared-account path has dynamic camera leases, three independent native
 consumers, camera-local decoder recovery and server-owned account shutdown.
 Integration tests use synthetic broker replies and fake decoders; they are not
-a three-real-camera rollout. Production still admits one native camera until
-reviewed source offers and per-lease PTZ are connected. See
+a three-real-camera rollout. Reviewed offers and exact-device PTZ now bind lazily
+to the server account, retaining it across video recovery and closing it when the
+last source ends. Public admission still permits one native camera; multi-camera
+rollout is separate. See
 [account lifetime](docs/internal/native-account-lifetime.md) and
 [source ownership](docs/internal/native-source-leases.md) for the exact remaining scope.
 The other two cameras retain their existing RTSP transports. No emulator or temporary

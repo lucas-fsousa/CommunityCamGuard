@@ -3,6 +3,7 @@ from contextlib import suppress
 
 import pytest
 
+from backend.app.db.p2p import P2PEnrollment
 from backend.app.drivers.base import CameraDriver
 from backend.app.drivers.contracts import ControlNotReady
 from backend.app.drivers.yoosee import native_account_service as module
@@ -19,6 +20,7 @@ class Account:
         self.started, self.closed = threading.Event(), threading.Event()
         self.fail = False
     def matches(self, entries): return self.entries == entries
+    def matches_motion(self, grants): return not grants
     def run(self, *, cancelled):
         self.started.set()
         self.closed.wait(2)
@@ -110,3 +112,51 @@ def test_sources_retire_before_shared_account_and_server_owner(tmp_path, monkeyp
         with suppress(Exception):
             service.stop()
         owner.close()
+
+
+def test_source_intent_is_lazy_keeps_account_between_attempts_and_retires_last(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "NativeAccount", Account)
+    owner = ServerOwner(tmp_path / "app.db")
+    owner.acquire()
+    service = module.NativeAccounts(owner)
+    entry = P2PEnrollment("123456", 123, b"x" * 64, None, "", "", "cam_" + "a" * 24)
+    try:
+        with service.source_intent(entry):
+            assert service._thread is None  # Metadata admission never authenticates.
+            account = service.prepare((entry,))
+            assert account.started.wait(1)
+            assert service.prepare((entry,)) is account
+            assert not account.closed.is_set()
+            with pytest.raises(ControlNotReady):
+                with service.source_intent(entry):
+                    pytest.fail("duplicate source must not enter")
+        assert account.closed.is_set() and account.cleanup_confirmed
+        assert service._account is None and owner.acquired and not service.stopped
+        with pytest.raises(SourceUnavailable):
+            service.prepare((entry,))
+        with service.source_intent(entry):
+            replacement = service.prepare((entry,))
+            assert replacement is not account
+    finally:
+        service.stop()
+        owner.close()
+
+
+def test_last_source_cannot_hide_uncertain_account_retirement(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "NativeAccount", Account)
+    owner = ServerOwner(tmp_path / "app.db")
+    owner.acquire()
+    service = module.NativeAccounts(owner)
+    entry = P2PEnrollment("123456", 123, b"x" * 64, None, "", "", "cam_" + "a" * 24)
+    try:
+        with pytest.raises(SourceCleanupUnconfirmed):
+            with service.source_intent(entry):
+                account = service.prepare((entry,))
+                assert account.started.wait(1)
+                account.fail = True
+        assert service._account is account and owner.acquired
+        with pytest.raises(SourceUnavailable):
+            with service.source_intent(entry):
+                pytest.fail("uncertain account must remain fenced")
+    finally:
+        owner.close()  # Synthetic account only.

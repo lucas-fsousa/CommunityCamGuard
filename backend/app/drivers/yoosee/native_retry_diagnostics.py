@@ -1,14 +1,19 @@
 """Fixed, bounded failure facts before retry discards the previous source instance."""
 
 import logging
+from typing import Protocol
 
 from ...media import native_events
-from .native_video_source import NativeVideoResult, NativeVideoSource
+from .native_video_source import NativeVideoResult
 
 log = logging.getLogger(__name__)
 
 
-def record(camera_id: str, result: NativeVideoResult, source: NativeVideoSource) -> None:
+class DiagnosticSource(Protocol):
+    def diagnostics(self) -> dict[str, str | bool]: ...
+
+
+def record(camera_id: str, result: NativeVideoResult, source: DiagnosticSource) -> None:
     try:
         details = source.diagnostics()
         details['retry_reason'] = result.reason

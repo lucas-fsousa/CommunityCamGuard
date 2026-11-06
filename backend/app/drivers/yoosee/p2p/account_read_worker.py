@@ -179,6 +179,7 @@ class AccountReadWorker:
         close_failed = False
         maintenance = None
         motion: PtzScheduler | None = None
+        motion_device_id: int | None = None
         media: MediaRouteJob | None = None
         tcp: CooperativeTcpMedia | None = None
         channels: list[AccountMediaChannel] = []
@@ -202,7 +203,7 @@ class AccountReadWorker:
             validate_media_policy(media_policy)
             if type(allow_media_motion) is not bool:
                 raise ValueError("explicit media/motion admission required")
-            if allow_media_motion and (initial_media is None or initial_motion is not None
+            if allow_media_motion and ((initial_media is None and media_leases is None) or initial_motion is not None
                     or self.motion_inbox is None or not with_media_tcp
                     or media_policy is not MediaPolicy.CONTINUOUS
                     or self._policy is not AccountPolicy.CONTINUOUS):
@@ -217,7 +218,7 @@ class AccountReadWorker:
                         or media_leases.generation != self._generation
                         or media_leases.capacity > self._media_capacity
                         or initial_media is not None or additional_media or initial_motion is not None
-                        or video_delivery is not None or self.motion_inbox is not None
+                        or video_delivery is not None or (self.motion_inbox is not None and not allow_media_motion)
                         or not with_media_tcp or media_policy is not MediaPolicy.CONTINUOUS
                         or self._policy is not AccountPolicy.CONTINUOUS):
                     raise ValueError("exclusive reviewed continuous source leases required")
@@ -258,6 +259,7 @@ class AccountReadWorker:
                 if not isinstance(initial_motion, PtzSpec) or self.motion_inbox is not None:
                     raise ValueError("typed motion specification required")
                 motion = self._dispatcher.prepare_ptz(initial_motion, output)
+                motion_device_id = initial_motion.device_id
 
             def check() -> None:
                 if self._stop.is_set() or cancelled():
@@ -298,7 +300,14 @@ class AccountReadWorker:
                         raise _Stop("draining")
                     service(self._dispatcher.drain())
                 if leases is not None:
-                    leases.poll(lambda route_spec: self._dispatcher.prepare_media(route_spec, output))
+                    if (motion is not None and motion.result is not None and motion.result.start_attempted
+                            and not motion.result.release_delivery_confirmed):
+                        raise _Stop("transport")
+                    moving = motion_device_id if motion is not None and motion.result is None else None
+                    if moving is not None and motion is not None and not leases.motion_ready(moving):
+                        motion.cancel()
+                    leases.poll(lambda route_spec: self._dispatcher.prepare_media(route_spec, output),
+                                defer_stop_device=moving)
                 for channel in channels:
                     if channel.route.result is not None:
                         continue
@@ -322,7 +331,9 @@ class AccountReadWorker:
                             if channel.tcp.result.socket_close_failed:
                                 raise _Stop("media_unconfirmed")
                             channel.retire("ended")
-                    packet_media = channel.route.next_packet()
+                    defer_close = (leases is not None and motion is not None and motion.result is None
+                                   and motion_device_id == channel.bootstrap.spec.device.device_id)
+                    packet_media = None if defer_close else channel.route.next_packet()
                     if packet_media is not None:
                         try:
                             send(packet_media.wire, reserved=True)
@@ -337,23 +348,32 @@ class AccountReadWorker:
                         assert motion_ticket is not None
                         last_motion = motion.result
                         self.motion_inbox.finish(motion_ticket, last_motion)
-                        motion, motion_ticket = None, None
-                    if (motion is None and (media is None or all(
+                        motion, motion_ticket, motion_device_id = None, None, None
+                    ready = leases.any_motion_ready() if leases is not None else (media is None or all(
                             channel.tcp is not None and channel.tcp.ready for channel in channels))
+                    if (motion is None and ready
                             and (siren is None or (not siren.active and not siren.unsafe))):
                         claimed = self.motion_inbox.claim()
                         if claimed is not None:
                             motion_ticket, spec = claimed
-                            try:
-                                motion = self._dispatcher.prepare_ptz(spec, output)
-                            except BaseException:
+                            if leases is not None and not leases.motion_ready(spec.device_id):
                                 self.motion_inbox.finish(motion_ticket,
                                     ScheduledPtzResult("cancelled", False, 0, False, False))
-                                raise
+                                motion_ticket = None
+                            else:
+                                try:
+                                    motion = self._dispatcher.prepare_ptz(spec, output)
+                                    motion_device_id = spec.device_id
+                                except BaseException:
+                                    self.motion_inbox.finish(motion_ticket,
+                                        ScheduledPtzResult("cancelled", False, 0, False, False))
+                                    raise
                     if motion is not None and motion_ticket is not None:
                         if self.motion_inbox.should_cancel(motion_ticket):
                             motion.cancel()
                 if motion is not None:
+                    if leases is not None and motion_device_id is not None and not leases.motion_ready(motion_device_id):
+                        motion.cancel()
                     packet = motion.next_packet()
                     if packet is not None:
                         send(packet.wire, reserved=True)
@@ -506,9 +526,12 @@ class AccountReadWorker:
                     close_failed = True
                 finally:
                     if leases is not None:
+                        final_motion = motion.result if motion is not None else last_motion
+                        motion_uncertain = (final_motion is not None and final_motion.start_attempted
+                                            and not final_motion.release_delivery_confirmed)
                         leases.finish(uncertain=unexpected_exit or close_failed or tcp_cleanup_error is not None
                             or media_cleanup_error is not None or motion_cleanup_error is not None
-                            or siren_cleanup_error is not None or (siren is not None and siren.unsafe))
+                            or motion_uncertain or siren_cleanup_error is not None or (siren is not None and siren.unsafe))
                     if isinstance(video_delivery, VideoDelivery):
                         video_delivery.close()
                     with self._claim:

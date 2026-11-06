@@ -12,6 +12,7 @@ from .p2p.account_read_lifecycle import AccountReadLifecycle
 from .p2p.contracts import OnlineDevice, P2PProbeError
 from .p2p.media_lease_inbox import MediaLeaseInbox, MediaLeaseOutcome, MediaLeaseTicket
 from .p2p.media_route_job import MediaRouteSpec
+from .p2p.ptz_authority import PtzAuthority, PtzGrant
 from .p2p.video_delivery import VideoDelivery
 from .shared_device_controls import SharedDeviceControls
 from .shared_read_session import SharedReadResult
@@ -28,20 +29,26 @@ class LeasedReadSession(SharedDeviceControls):
     def __init__(self, entry: P2PEnrollment, target: OnlineDevice,
                  lifecycle: AccountReadLifecycle, inbox: MediaLeaseInbox, *,
                  current_enrollment: Callable[[], P2PEnrollment | None] | None = None,
+                 motion_grants: tuple[PtzGrant, ...] = (), motion_valid: Callable[[], bool] | None = None,
                  clock: Callable[[], float] = time.monotonic,
                  wait: Callable[[float], None] = time.sleep):
         if (not entry.camera_id or not valid_camera_id(entry.camera_id)
                 or entry.device_id != str(target.device_id)
                 or not inbox.matches_account(entry.access_id) or not inbox.permits_target(target)):
             raise ValueError("exact enrolled and authenticated lease target required")
+        PtzAuthority(motion_grants)
+        if (len(motion_grants) > 1 or any(grant.access_id != entry.access_id
+                or str(grant.device_id) != entry.device_id for grant in motion_grants)
+                or (motion_valid is not None and (not callable(motion_valid) or not motion_grants))):
+            raise ValueError("exact per-device reviewed motion grant required")
         self._camera_id, self._device_id = entry.camera_id, entry.device_id
         self._entry, self._target = entry, target
         self._lifecycle, self._inbox = lifecycle, inbox
         self._current = current_enrollment or (lambda: p2p.read_registered_enrollment(self._camera_id))
         self._clock, self._wait = clock, wait
         self._active_entry: P2PEnrollment | None = None
-        self._motion_grants = ()
-        self._motion_valid = None
+        self._motion_grants = motion_grants
+        self._motion_valid = motion_valid
         self._stop = threading.Event()
         self._claim = threading.Lock()
         self._started = False

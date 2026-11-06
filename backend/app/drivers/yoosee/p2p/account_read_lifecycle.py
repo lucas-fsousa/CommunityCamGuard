@@ -294,11 +294,11 @@ class AccountReadLifecycle:
                          cancelled: Callable[[], bool]) -> WorkerSummary:
         """Trusted owner transfers one authenticated, account-bound lease inbox.
 
-        No worker thread or authentication is created per source. Motion is not
-        admitted by this entry point until per-lease authority is integrated.
+        No worker thread or authentication is created per source. Reviewed motion
+        also requires a ready lease for its exact device and STOP before detach.
         """
-        if self._policy is not AccountPolicy.CONTINUOUS or self._motion_authority.enabled:
-            raise ValueError("continuous media-lease account without motion required")
+        if self._policy is not AccountPolicy.CONTINUOUS:
+            raise ValueError("continuous media-lease account required")
         return self._run(connect, (), cancelled, leases_factory=leases).worker
 
     def _run(self, connect: Callable[[int], ReadConnection], reads: tuple[ReadSpec, ...],
@@ -359,7 +359,8 @@ class AccountReadLifecycle:
             transferred = True
             if inbox is not None:
                 summary = worker.run(connection.socket, cancelled=cancelled,
-                    media_leases=inbox, with_media_tcp=True, media_policy=MediaPolicy.CONTINUOUS)
+                    media_leases=inbox, with_media_tcp=True, media_policy=MediaPolicy.CONTINUOUS,
+                    allow_media_motion=self._motion_authority.enabled)
             elif media is None:
                 summary = worker.run(connection.socket, cancelled=cancelled)
             else:

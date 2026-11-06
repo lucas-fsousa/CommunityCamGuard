@@ -2,8 +2,11 @@
 
 from collections.abc import Callable
 
+from ...db.p2p import P2PEnrollment
 from ...media.recovering_source import RecoveringSource
 from ...media.source_registry import ManagedSource
+from .account_video_source import AccountVideoSource
+from .native_account_service import NativeAccounts
 from .native_retry_diagnostics import record as record_retry
 from .native_video_source import NativeVideoResult, NativeVideoSource
 
@@ -12,7 +15,7 @@ _local_failures = frozenset({"TimeoutError", "Mp4SizeError", "Mp4OrderError",
 
 
 def retryable(result: object, source: ManagedSource) -> bool:
-    if not isinstance(result, NativeVideoResult) or not isinstance(source, NativeVideoSource):
+    if not isinstance(result, NativeVideoResult) or not isinstance(source, (NativeVideoSource, AccountVideoSource)):
         return False
     details = source.diagnostics()
     if (details.get("session_scope") != "media_lease"
@@ -24,15 +27,38 @@ def retryable(result: object, source: ManagedSource) -> bool:
     # detach plus consumer/decoder retirement permits another lease request.
     if result.reason == "consumer_failed":
         return result.failure_type in _local_failures
+    if result.reason == "connection":
+        return details.get("session_connection_failure") in {"offline", "socket_timeout", "socket_error",
+            "list_dns", "list_timeout", "broker_heartbeat", "certification_unavailable",
+            "inventory_timeout", "inventory_unavailable", "preparation_budget"}
+    if result.reason == "busy":
+        return isinstance(source, AccountVideoSource)
     return result.reason in {"socket", "media_complete", "stopped"}
 
 
-def wrap(initial: NativeVideoSource, *, camera_id: str, factory: Callable[[], NativeVideoSource],
-         valid: Callable[[], bool]) -> RecoveringSource:
+class AccountRecoveringSource(RecoveringSource):
+    def __init__(self, *args, accounts: NativeAccounts, entry: P2PEnrollment, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._accounts, self._entry = accounts, entry
+
+    def run(self, *, cancelled: Callable[[], bool]) -> object:
+        with self._accounts.source_intent(self._entry):
+            return super().run(cancelled=cancelled)
+
+
+def wrap(initial: NativeVideoSource | AccountVideoSource, *, camera_id: str,
+         factory: Callable[[], NativeVideoSource | AccountVideoSource],
+         valid: Callable[[], bool], accounts: NativeAccounts | None = None,
+         entry: P2PEnrollment | None = None) -> RecoveringSource:
     """The factory must bind the retained account, not authenticate another one."""
     def inspect(result: object, source: ManagedSource) -> bool:
         allowed = retryable(result, source)
-        if allowed and isinstance(result, NativeVideoResult) and isinstance(source, NativeVideoSource):
+        if allowed and isinstance(result, NativeVideoResult) and isinstance(source, (NativeVideoSource, AccountVideoSource)):
             record_retry(camera_id, result, source)
         return allowed
+    if accounts is not None:
+        if entry is None:
+            raise ValueError("account source requires an enrolled camera")
+        return AccountRecoveringSource(initial, factory=factory, valid=valid, retryable=inspect,
+                                       accounts=accounts, entry=entry)
     return RecoveringSource(initial, factory=factory, valid=valid, retryable=inspect)

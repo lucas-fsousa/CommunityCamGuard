@@ -60,7 +60,7 @@ class YooseeDriver(CameraDriver):
     def native_media_offer(self, camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
         from .native_media_offer import offer
 
-        return offer(camera, archive=archive)
+        return offer(camera, archive=archive, accounts=self._native_accounts)
 
     def onboarding(self) -> OnboardingPort:
         from .onboarding import ONBOARDING

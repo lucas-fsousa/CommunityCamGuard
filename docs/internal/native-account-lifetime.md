@@ -75,13 +75,33 @@ The preceding owner/service commit `5a4b03f` passed CI6098tests/1skip and Image.
 Latest targeted integration/cleanup regression:202passed, peak125.3MiB, CPU50%
 and MemoryMax192MiB. Full mypy passed415source modules under a256MiB ceiling.
 
-## Remaining public integration
+## Reviewed offer integration
 
-The service is registered but idle unless explicitly requested by a driver.
-Current production offers still use the previously accepted single-source path;
-no other camera is silently migrated. Remaining delivery work: bind reviewed
-source offers and per-lease PTZ authority to this account service, then
-enable bounded multi-source admission. The core's existing normal-run cleanup
+Production offers now bind lazily through `AccountVideoSource` and the driver's
+server-owned `NativeAccounts` service. Construction, subscription and startup
+never authenticate; the admitted source run prepares the exact singleton cohort,
+waits for readiness, then constructs the consumer with a `LeasedReadSession`.
+The existing public admission domain/capacity remain unchanged (one native source),
+preserving restart checkpoints. Other cameras are not automatically migrated.
+
+An explicit source intent spans the complete recovery loop, including backoff.
+Lease replacement therefore reuses a healthy account; ending the last source
+stops/joins the account and requires confirmed cleanup before releasing its SDK
+reservation. This also permits switching back to legacy controls. Unknown cleanup
+retains handles and closes admission. Sources cannot adopt an unmanaged account.
+
+Reviewed per-device PTZ grants propagate from the offer to the account and exact
+binding; ordinary PTZ evidence alone is still insufficient. Motion requires that
+device's active, non-cancelled, ready media lease. Detach cancels motion and waits
+for a STOP receipt before TCP/broker close. Missing STOP confirmation fences all
+lease outcomes. Synthetic encrypted tests cover that order, a healthy sibling,
+unleased-device rejection and repeated identical STOP on missing receipt.
+
+Targeted source/service/worker regression passed74 tests (147.9MiB peak); an earlier
+broader integration batch passed87 (165.5MiB). Both ran with192MiB/CPU50% limits.
+Mypy passed416modules; Ruff passed. These are offline results, not a new physical
+motor test. Live bridge acceptance and bounded multi-source admission remain.
+The core's existing normal-run cleanup
 contract already supports a detached source lease; do not invent a requirement
 to physically close the shared broker socket for each camera.
 

@@ -10,13 +10,17 @@ from ...media.source_registry import SourceUnavailable
 from . import capability_profiles as profiles
 from . import capability_rollout as rollout
 from . import capability_snapshot_store as snapshots
+from .account_video_source import AccountVideoSource
+from .native_account_service import NativeAccounts
+from .native_lease_recovery import wrap as wrap_lease
 from .native_recovery import wrap
 from .native_video_source import NativeVideoSource
 from .p2p.ptz_authority import PtzGrant
 from .p2p.ptz_protocol import DIRECTIONS
 
 
-def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
+def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None,
+          accounts: NativeAccounts | None = None) -> NativeSourceOffer | None:
     camera_id = camera.camera_id
     if archive is not None and archive.camera_id != camera_id:
         raise ValueError("archive must belong to the selected camera")
@@ -77,6 +81,19 @@ def offer(camera: Camera, *, archive: NativeArchiveSpec | None = None) -> Native
         return NativeVideoSource(camera_id, enrollment.device_id)
 
     def factory():
+        if accounts is not None:
+            def bound(session):
+                if not valid():
+                    raise SourceUnavailable("native media evidence changed")
+                if archive is not None:
+                    return NativeVideoSource(camera_id, enrollment.device_id, native_audio=True,
+                        archive=archive.template, archive_segment_seconds=archive.segment_seconds,
+                        saving_allowed=archive.saving_allowed, shared_session=session)
+                return NativeVideoSource(camera_id, enrollment.device_id, shared_session=session)
+            def leased():
+                return AccountVideoSource(enrollment, accounts, factory=bound, valid=valid, motion_grants=captured)
+            return wrap_lease(leased(), camera_id=camera_id, factory=leased, valid=valid,
+                              accounts=accounts, entry=enrollment)
         return wrap(construct(), camera_id=camera_id, factory=construct, valid=valid)
 
     return NativeSourceOffer(camera_id, NativeVideoSource.admission_domain, factory, valid)

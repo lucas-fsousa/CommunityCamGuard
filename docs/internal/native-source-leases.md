@@ -23,9 +23,12 @@ previously retired channel, and blocks account-generation replacement.
 
 `AccountReadLifecycle.run_media_leases` transfers one freshly authenticated
 connection and one account/inventory-bound inbox to that same worker. Leases are
-not an inferred feature/capability grant. Motion remains disabled at this new
-entry point until per-lease PTZ authority/readiness is integrated; the current
-production single-source media+PTZ path is unchanged.
+not an inferred feature/capability grant. Reviewed motion now propagates through
+this entry point, gated on the exact device's ready lease. STOP confirmation
+precedes its cooperative detach; uncertainty blocks all lease outcomes. The
+production offer bridge now binds to the server account lazily, while public
+source capacity remains one. See [account lifetime](native-account-lifetime.md)
+for ownership, offline evidence and the deployment checkpoint.
 
 `open_read_connection` can retain up to two explicitly requested additional
 devices from the SAME authenticated inventory, not by another login. Only the
