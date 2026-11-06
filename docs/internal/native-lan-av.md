@@ -69,3 +69,14 @@ Synthetic negotiation covers both observed envelope forms and rejects damaged
 or relay-mode input. Per-channel retirement now preserves known local error
 codes rather than replacing every initial UDP error with an opaque fallback
 label; only unknown initial negotiation failures use udp_negotiation_failed.
+
+Also corrected an omitted SDK step before the second live attempt: the existing
+successful finite UDP bootstrap sends direct mode1 A4 CALLING as well as the
+broker A4. The SDK queues both at0x2506cc-0x250704. The earlier note established
+only that the direct A4 RECEIPT was not a readiness prerequisite; it did not
+establish that the request itself could be omitted. The LAN owner now sends that
+existing builder exactly once before INIT, preserving the same cookie, call ID,
+definition metadata and fresh account-allocated sequence. It does not require an
+A4 receipt or create another broker OPEN/login. Synthetic worker reception still
+omits the A4 receipt and negotiates successfully; duplicate direct attempts are
+not admitted on one route.

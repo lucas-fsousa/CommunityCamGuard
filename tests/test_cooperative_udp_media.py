@@ -88,11 +88,13 @@ def test_lost_udp_negotiation_clears_parser_and_delivery_for_tcp_fallback():
     with pytest.raises(ReceiveError):
         owner.step()
     assert owner.result.detached and not owner.result.ready and video.closed
-    assert len(sent) == 1
+    assert [wire[:2] for wire, _ in sent] == [b"\x7e\xa4", b"\xc0\x10"]
 
 
 def test_measured_lan_selection_never_constructs_tcp_for_the_same_call():
-    _owner, job, now, sent, video = session()
+    now, sent, video = [0.0], [], VideoDelivery()
+    job = route(now)
+    job.lan_probe_complete = job.lan_roundtrip_confirmed = True
     channel = AccountMediaChannel(MediaBootstrap(SPEC, video), job,
                                    policy=MediaPolicy.CONTINUOUS, clock=lambda: now[0])
     def no_tcp(*args, **kwargs):
@@ -111,3 +113,11 @@ def test_continuous_meter_responder_has_no_finite_64_reply_cutoff():
         assert owner.receive(request, PEER)
     assert len(sent) == 70
     assert owner.finish().detached
+
+
+def test_cancelling_expired_udp_parser_detaches_without_failing_sibling_account():
+    owner, _, now, sent, _ = session()
+    negotiate(owner, sent)
+    now[0] = 10
+    owner.begin_finish()
+    assert owner.result.detached and not owner.result.close_acknowledged

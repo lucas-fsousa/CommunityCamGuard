@@ -43,6 +43,7 @@ class CooperativeUdpMedia:
         self.peer = route.lan_endpoint
         self._clock, self._send, self._delivery = clock, send, video
         self._link, self._call = route.attempt.link_id, route.attempt.call_id
+        self._direct_calling = route.direct_calling()
         self._access, self._device = spec.access_id, spec.device.device_id
         self._owner = AvHandshake(self.peer, self._link, self._call, route.attempt.cookie,
             request_user_data=route.metadata, policy=MediaPolicy.CONTINUOUS, clock=clock)
@@ -67,6 +68,7 @@ class CooperativeUdpMedia:
     def _close(self) -> UdpMediaResult:
         if self.result is None:
             confirmed = self._owner.close_acknowledged
+            self._direct_calling = b""
             self._owner.close()
             if self._delivery is not None:
                 self._delivery.close()
@@ -81,6 +83,9 @@ class CooperativeUdpMedia:
             if self._close_until is not None and self._clock() >= self._close_until:
                 self._close()
                 return
+            if self._direct_calling:
+                wire, self._direct_calling = self._direct_calling, b""
+                self._write(wire)
             for wire in self._owner.due():
                 self._write(wire)
             if self._close_until is None and self._clock() >= self._next_meter:
@@ -146,6 +151,10 @@ class CooperativeUdpMedia:
         try:
             self._owner.begin_finish()
             self._close_until = self._clock() + 2
+        except (OSError, ValueError):
+            # Cancellation of an already expired AV parser is local retirement,
+            # not an account-wide failure. Outer B9 release is still mandatory.
+            self._close()
         except BaseException:
             self._close()
             raise

@@ -15,7 +15,11 @@ from .crypto import gute_mode1_xor_checksum
 from .media_protocol import build_av_init
 from .mtp_lan_endpoint import parse_mtp_lan_endpoint
 from .relay_selection import select_relay
-from .rendezvous_protocol import build_calling_request, build_route_hangup
+from .rendezvous_protocol import (
+    build_calling_request,
+    build_direct_calling_request,
+    build_route_hangup,
+)
 from .video_startup_645 import with_preconnect_definition
 
 log = logging.getLogger(__name__)
@@ -76,6 +80,8 @@ class MediaRouteJob:
             self._reserve.close()
             raise
         self._node: CertifiedNode | None = node
+        self._spec, self._local = spec, (local_ip, local_port)
+        self._direct_attempted = False
         self._generation, self._sequences = generation, sequences
         self._clock = clock
         self._admit_until = clock() + 1
@@ -93,6 +99,21 @@ class MediaRouteJob:
     def accepts_direct_probe(self) -> bool:
         return (self.result is None and self._opened and not self._closing_sent
                 and not self._cancel.is_set())
+
+    def direct_calling(self) -> bytes:
+        """SDK LAN CALLING precedes AV INIT; its ACK is not a readiness gate.
+
+        Use the existing shared sequence allocator, cookie and startup metadata.
+        Returning bytes counts as the only attempt, even if the send fails.
+        """
+        if (not self.accepts_direct_probe or not self.lan_roundtrip_confirmed
+                or self._node is None or self._direct_attempted):
+            raise ValueError("fresh measured direct media route required")
+        sequence = self._sequences.allocate()
+        wire = build_direct_calling_request(self._node, self._spec.access_id, self._spec.device,
+            *self._local, self.attempt, sequence, request_user_data=self.metadata, connection_type=1)
+        self._direct_attempted = True
+        return wire
 
     def cancel(self) -> None:
         self._cancel.set()

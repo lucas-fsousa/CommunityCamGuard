@@ -144,6 +144,8 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
                 plain = gute_mode2_decrypt(sock.queue[-1], NODE.session_key)
                 sock.queue[-1] = finish_mode2(bytearray(lan_advertisement(plain)), NODE.session_key)
             return result
+        if wire[:2] == b"\x7e\xa4":
+            return len(wire)  # SDK sends it, but its receipt is not required for AV readiness.
         meter = parse_media_meter(wire)
         if meter is not None:
             if meter.kind == 1:
