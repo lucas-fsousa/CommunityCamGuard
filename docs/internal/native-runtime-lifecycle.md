@@ -34,6 +34,12 @@ max interarrival2.63s, no reconnect; read-only lamp GET200/verified. App205.2MiB
 OOM=false/restarts=0, three in-app FFmpeg processes. No sound/light/motor command
 was sent. This verifies singleton production regression, not three real natives.
 
+CI follow-up: the documentation run exposed an intermittent synthetic PTZ-socket
+bug: a binary hangup link can randomly start with byte`{`, which the fixture
+mistook for JSON. Dispatch now checks the actual protocol kind/envelope. A forced
+link`0x79417B` reproduces that collision deterministically. No production protocol
+code or deployed image was changed for this fixture correction.
+
 ## Historical baseline — 2026-10-24
 
 The sections below describe the initial implementation/checkpoint, not today's

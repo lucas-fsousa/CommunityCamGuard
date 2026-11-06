@@ -27,7 +27,9 @@ class MotionMediaSocket(MediaSocket):
     def sendto(self, wire, peer):
         plain = gute_mode2_decrypt(wire, NODE.session_key)
         flags = struct.unpack_from("<I", plain, 20)[0]
-        if plain[1] == 0xB9 and not flags & (1 << 20) and plain[60:61] == b"{":
+        if (plain[1] == 0xB9 and not flags & (1 << 20)
+                and len(plain) >= 60 and struct.unpack_from("<I", plain, 24)[0] == 2
+                and plain[52:56] == b"\x01\xff\x00\x00"):
             body = json.loads(plain[60:])
             touch = body["data"]["touchType"]
             device = struct.unpack_from("<Q", plain, 28)[0]
@@ -92,6 +94,16 @@ def test_stopping_a_sibling_does_not_cancel_the_other_camera_motion(monkeypatch)
     assert result.motion.release_delivery_confirmed
     assert sock.events.index(("tcp_close_begin", 101)) < sock.events.index(("stop", 100))
     assert inbox.take(tickets[1]).status == "closed" and len(sock.moves) == 2
+
+
+def test_binary_hangup_link_starting_with_json_brace_is_not_a_motion_request(monkeypatch):
+    # The binary link at byte60 can randomly begin with '{' (1/256). Dispatch
+    # using the protocol kind/envelope, not the first byte of arbitrary payload.
+    monkeypatch.setattr("backend.app.drivers.yoosee.p2p.account_media_routes.secrets.randbelow",
+                        lambda _: 0x79417A)
+    sock, inbox, tickets, _, _, _, result = run(monkeypatch, cancel_target=1)
+    assert result.motion.release_delivery_confirmed and sock.closes == 2
+    assert all(inbox.take(ticket).status == "closed" for ticket in tickets)
 
 
 def test_unconfirmed_motor_stop_blocks_all_lease_outcomes(monkeypatch):
