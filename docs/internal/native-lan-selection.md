@@ -67,3 +67,33 @@ worker must unwrap that local cause chain like the original singleton path;
 otherwise the known transient code/counters disappear again. The existing
 five-source integration now reproduces the sanitized wrapper, not only a directly
 raised KCP exception. This is recovery consistency, not a new protocol guess.
+
+## Broker-provided LAN candidate: do not block on discovery
+
+The historical PCAP has215 native70/02 requests and no captured70/03 reply, yet
+LAN media exists. All215 request headers use flags0x02010000, identifier-kind
+word10 and reply port8900, with zero terminal ID. Thus the native query used in
+the read-only live probe matches those captured fields; discovery silence alone
+does not establish that a broker-assisted direct route is impossible.
+
+The decisive split-ELF branch is `gat_on_rcvpkt_MTP_RES_RESPONSE`:
+
+- 0x247800–0x24781c: outer IPv4 at A3+0x60, NETWORK-order port at+0x58.
+- 0x247ad0–0x247b28: if peerlanip at+0x64 is nonzero and differs from the
+  outer IPv4, construct AF_INET using HOST-order port at+0x5a and add LAN/NAT
+  kind2 with `iv_mtp_session_add_lan_or_nat`. This branch does not depend on a
+  broadcast discovery response.
+- +0x5c / +0x68 are the IPv6 port/address, not the LAN IPv4 tuple.
+
+The account's existing authenticated broker handler now preserves the correlated
+private LAN tuple separately from the TCP relay. Unit coverage verifies the
+different port byte order and rejects wrong session/link/checksum and unsafe or
+duplicate addresses. This is passive extraction ONLY: production still uses its
+existing TCP channel. No UDP channel, punch, extra login or camera action is
+silently enabled by the parser. Next implementation must integrate the existing
+socket-free UDP AV engine into the SAME account reader and prove the candidate
+on camera3, not start a competing reader/login or invent a fixed camera port.
+
+At58.419s the saved PCAP already sends a LAN MTP meter request; a broker A3 arrives
+at58.470s, followed by public NAT traversal at58.486s. This proves concurrent
+route attempts, not that that particular A3 supplied the earlier LAN address.

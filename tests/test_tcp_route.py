@@ -30,6 +30,7 @@ def test_selection_requires_correlated_global_ipv4_table():
     assert route.select_relay(advertisement(), 18, 31) is None
     assert route.select_relay(advertisement(), 17, 32) is None
     assert route.select_relay(bytes(8), 17, 31) is None
+    assert route.select_relay(advertisement()[:32], 17, 31) is None
 
 
 def test_identity_mismatch_never_allocates_socket(monkeypatch):

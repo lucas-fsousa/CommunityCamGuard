@@ -11,6 +11,10 @@ regression is fixed and live retries were observed, but a600s window still had a
 historical LAN UDP versus our public TCP relay, scoped ELF offsets and the WSL
 inbound-firewall finding are documented in docs/internal/native-lan-selection.md.
 Do not add artificial camera-count ceilings or change global firewall policy.
+The SDK's A3 handler also supplies LAN IPv4/port independently of broadcast
+discovery. Those authenticated/correlated fields are now preserved passively;
+production UDP routing is NOT yet enabled. Prioritize the existing account
+reader's direct UDP path rather than treating discovery silence as a blocker.
 
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member

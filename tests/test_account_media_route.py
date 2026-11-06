@@ -11,8 +11,9 @@ from backend.app.drivers.yoosee.p2p.account_output_budget import (
 from backend.app.drivers.yoosee.p2p.account_read_lifecycle import AccountReadLifecycle
 from backend.app.drivers.yoosee.p2p.account_read_worker import AccountReadWorker
 from backend.app.drivers.yoosee.p2p.broker_sequences import BrokerSequences
-from backend.app.drivers.yoosee.p2p.crypto import gute_mode2_decrypt
+from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_xor_checksum, gute_mode2_decrypt
 from backend.app.drivers.yoosee.p2p.media_route_job import MediaRouteJob, MediaRouteSpec
+from backend.app.drivers.yoosee.p2p.mtp_lan_endpoint import parse_mtp_lan_endpoint
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2
 from tests.test_account_read_lifecycle import connection
 from tests.test_account_read_worker import WorkerSocket, submit, worker
@@ -21,6 +22,36 @@ from tests.test_broker_transactions import ack
 from tests.test_tcp_route import advertisement
 
 SPEC = MediaRouteSpec(123, DEVICE)
+
+
+def test_broker_lan_candidate_uses_sdk_host_order_port_without_selecting_it():
+    job = MediaRouteJob(NODE, BrokerSequences(NODE.session_id, 1, 40),
+        AccountOutputBudget(), SPEC, generation=1, local_ip="192.0.2.1", local_port=1234)
+    assert job.next_packet().kind == "open"
+    frame = bytearray(advertisement(link=job.attempt.link_id))
+    struct.pack_into("<Q", frame, 4, NODE.session_id)
+    frame[0x60:0x64] = bytes((198, 51, 100, 9))
+    frame[0x64:0x68] = bytes((192, 168, 1, 50))
+    struct.pack_into("<H", frame, 0x5A, 58654)
+    struct.pack_into("<I", frame, 16, gute_mode1_xor_checksum(frame))
+    wire = bytes(frame)
+    job.observe(wire, NODE.address, generation=1)
+    assert job.lan_endpoint == ("192.168.1.50", 58654)
+    assert job.endpoint == ("8.8.8.8", 0x584D)  # No unproven production UDP switch.
+    assert parse_mtp_lan_endpoint(wire, NODE.session_id, job.attempt.link_id + 1) is None
+    assert parse_mtp_lan_endpoint(wire, NODE.session_id + 1, job.attempt.link_id) is None
+    for offset, value in ((0x64, bytes((127, 0, 0, 1))),
+                          (0x64, bytes((224, 0, 0, 1))),
+                          (0x64, bytes((198, 51, 100, 9))),
+                          (0x5A, bytes(2))):
+        invalid = bytearray(wire)
+        invalid[offset:offset + len(value)] = value
+        struct.pack_into("<I", invalid, 16, gute_mode1_xor_checksum(invalid))
+        assert parse_mtp_lan_endpoint(bytes(invalid), NODE.session_id, job.attempt.link_id) is None
+    assert parse_mtp_lan_endpoint(wire[:32], NODE.session_id, job.attempt.link_id) is None
+    invalid = bytearray(wire)
+    invalid[16] ^= 1
+    assert parse_mtp_lan_endpoint(bytes(invalid), NODE.session_id, job.attempt.link_id) is None
 
 
 class MediaSocket(WorkerSocket):

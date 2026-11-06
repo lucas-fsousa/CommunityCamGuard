@@ -1,5 +1,6 @@
 """Single-owner broker route OPEN/relay/CLOSE; no sockets, login or media decoder."""
 
+import logging
 import secrets
 import struct
 import threading
@@ -12,9 +13,12 @@ from .broker_sequences import BrokerSequences
 from .contracts import CallingAttempt, CertifiedNode, OnlineDevice
 from .crypto import gute_mode1_xor_checksum
 from .media_protocol import build_av_init
+from .mtp_lan_endpoint import parse_mtp_lan_endpoint
 from .relay_selection import select_relay
 from .rendezvous_protocol import build_calling_request, build_route_hangup
 from .video_startup_645 import with_preconnect_definition
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +83,7 @@ class MediaRouteJob:
         self._cancel = threading.Event()
         self._opened = self._closing_sent = False
         self.endpoint: tuple[str, int] | None = None
+        self.lan_endpoint: tuple[str, int] | None = None
         self.result: MediaRouteResult | None = None
 
     def cancel(self) -> None:
@@ -96,6 +101,7 @@ class MediaRouteJob:
         self.attempt = CallingAttempt(0, 0, b"")
         self.metadata = b""
         self.endpoint = None
+        self.lan_endpoint = None
 
     def next_packet(self) -> MediaRoutePacket | None:
         if self.result is not None:
@@ -128,7 +134,13 @@ class MediaRouteJob:
             return
         if not self._closing_sent:
             if self.endpoint is None and not self._cancel.is_set() and self._clock() < self._relay_until:
+                candidate = parse_mtp_lan_endpoint(plain, self._node.session_id, self.attempt.link_id)
+                if candidate is not None:
+                    self.lan_endpoint = candidate
                 self.endpoint = select_relay(plain, self._node.session_id, self.attempt.link_id)
+                if self.endpoint is not None:
+                    log.info("native broker route candidates lan=%s tcp_relay=True",
+                             self.lan_endpoint is not None)
             return
         if (self._clock() >= self._close_until or len(plain) != 32
                 or plain[0] not in (0x7E, 0x7F) or plain[1] != 0xB9
