@@ -84,7 +84,14 @@ class MediaRouteJob:
         self._opened = self._closing_sent = False
         self.endpoint: tuple[str, int] | None = None
         self.lan_endpoint: tuple[str, int] | None = None
+        self.lan_roundtrip_confirmed = False
+        self.access_id, self.device_id = spec.access_id, spec.device.device_id
         self.result: MediaRouteResult | None = None
+
+    @property
+    def accepts_direct_probe(self) -> bool:
+        return (self.result is None and self._opened and not self._closing_sent
+                and not self._cancel.is_set())
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -102,6 +109,7 @@ class MediaRouteJob:
         self.metadata = b""
         self.endpoint = None
         self.lan_endpoint = None
+        self.access_id = self.device_id = 0
 
     def next_packet(self) -> MediaRoutePacket | None:
         if self.result is not None:

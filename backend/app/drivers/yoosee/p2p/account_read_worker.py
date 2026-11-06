@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .access_protocol import build_mode2_response_ack
+from .account_lan_probe import AccountLanProbe
 from .account_media_channel import (
     AccountMediaChannel,
     MediaBootstrap,
@@ -184,6 +185,7 @@ class AccountReadWorker:
         tcp: CooperativeTcpMedia | None = None
         channels: list[AccountMediaChannel] = []
         leases: MediaLeasePump | None = None
+        lan = AccountLanProbe(clock=self._clock)
         unexpected_exit = True
         tcp_cleanup_error: BaseException | None = None
         media_cleanup_error: BaseException | None = None
@@ -267,18 +269,20 @@ class AccountReadWorker:
                 if self._clock() >= deadline:
                     raise _Stop("deadline")
 
-            def send(wire: bytes, *, reserved: bool = False) -> None:
+            def send(wire: bytes, *, reserved: bool = False, peer: tuple[str, int] | None = None) -> None:
                 nonlocal sent
                 check()
                 try:
                     if not reserved:
                         output.charge(len(wire))
                 except OutputExhausted:
+                    if peer is not None:
+                        return  # An optional LAN measurement cannot spend cleanup credit.
                     raise _Stop("output_budget") from None
                 sock.settimeout(min(0.02 if mixed else 0.2, max(0.001, deadline - self._clock())))
                 sent += 1
                 try:
-                    if sock.sendto(wire, node.address) != len(wire):
+                    if sock.sendto(wire, node.address if peer is None else peer) != len(wire):
                         raise OSError("partial broker datagram")
                 except BaseException:
                     if reserved and motion is not None:
@@ -344,6 +348,14 @@ class AccountReadWorker:
                         except BaseException:
                             channel.route.send_failed()
                             raise
+                if leases is not None:
+                    for wire_lan, peer_lan in lan.poll(tuple(channel.route for channel in channels)):
+                        # Best-effort measurement must not retire a healthy TCP
+                        # stream on LAN-specific routing/firewall send failure.
+                        try:
+                            send(wire_lan, peer=peer_lan)
+                        except OSError:
+                            pass
                 if leases is None and len(channels) > 1 and all(channel.route.result is not None for channel in channels):
                     closed = media_channels_closed(tuple(channel.summary() for channel in channels))
                     raise _Stop("media_complete" if closed else "media_unconfirmed")
@@ -415,6 +427,8 @@ class AccountReadWorker:
                     continue
                 received += 1
                 check()
+                if peer != node.address:
+                    lan.receive(wire, peer)
                 complete: list[bytes] = []
                 acknowledgements = maintenance.receive(wire, peer, inspect_message=complete.append)
                 for plain in complete:
@@ -465,6 +479,7 @@ class AccountReadWorker:
                 protocol_facts = error.facts
             unexpected_exit = False
         finally:
+            lan.close()
             try:
                 if siren is not None:
                     assert node is not None

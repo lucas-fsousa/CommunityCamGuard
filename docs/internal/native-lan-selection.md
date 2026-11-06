@@ -97,3 +97,25 @@ on camera3, not start a competing reader/login or invent a fixed camera port.
 At58.419s the saved PCAP already sends a LAN MTP meter request; a broker A3 arrives
 at58.470s, followed by public NAT traversal at58.486s. This proves concurrent
 route attempts, not that that particular A3 supplied the earlier LAN address.
+
+## Cooperative measurement on the actual account reader
+
+The existing leased worker now measures the authenticated A3 LAN candidate with
+at most two c0/90 meters, 250ms apart, and a1.5s result deadline. TCP starts and
+continues normally; there is no blocking receive, extra socket/login/thread,
+AV INIT on UDP, camera setting or media-route replacement. Local send errors or
+unavailable ordinary output credit cannot terminate the TCP source. Cancelling
+the route stops measurement, and completed/detached routes retain no probe history.
+
+The same account recvfrom feeds direct meter replies before broker processing.
+Roundtrip requires exact peer, link, source/destination, checksum, reply shape,
+channel4, and the sequence/full timestamp of a measurement actually attempted.
+The split SDK0x258c34-0x258c50 maps LAN channel kind2 to meter channel4;
+reusing the existing channel4 builder is therefore SDK-backed, not a guessed
+protocol variant. Unknown packets and requests cannot establish success.
+
+Only fixed outcomes (no_candidate/no_roundtrip/roundtrip) and attempt counts
+are logged, using an explicitly enabled narrow INFO logger. No endpoints,
+identifiers, tokens, cookies or payloads are logged. Offline coverage includes
+the actual leased account worker with TCP progress and broker release on the
+same socket. This is route measurement, NOT production UDP video acceptance.
