@@ -26,6 +26,14 @@ unchanged. This does not yet implement the driver's explicit multi-camera cohort
 plan or enable simultaneous native cameras. See [account lifetime](native-account-lifetime.md)
 and [deployment](native-production.md) for actual live scope.
 
+Deployed checkpoint:70beb7b/build b-3fad324407cc, image d110105f882d/tag
+`wsl-bounded-native-restart`. CI6139tests/1skip, frontend contracts and Image
+passed. Only the app was replaced; camera3 resumed native/active159 and the other
+two retained legacy RTSP. Authenticated MSE completed60s/122fragments/46199177bytes,
+max interarrival2.63s, no reconnect; read-only lamp GET200/verified. App205.2MiB/1GiB,
+OOM=false/restarts=0, three in-app FFmpeg processes. No sound/light/motor command
+was sent. This verifies singleton production regression, not three real natives.
+
 ## Historical baseline — 2026-10-24
 
 The sections below describe the initial implementation/checkpoint, not today's

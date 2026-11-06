@@ -26,6 +26,9 @@ reviewed checkpoints up to its configured capacity. Camera/domain/slot reservati
 precede checkpoint spending; capacity/domain conflicts preserve unspent checkpoints.
 OS-fenced recovery respects that same total limit. Three-source startup/shutdown
 is covered offline;70targeted tests passed, peak140MiB (192MiB/CPU50% ceiling).
+Deployed70beb7b/build b-3fad324407cc, camera3 native/active159, CI6139tests/1skip
+and Image passed. Singleton MSE60s/122fragments, no reconnect, lamp GET200/verified;
+app205.2MiB/1GiB, OOM=false/restarts=0. No sound/light/motor action.
 Next: explicit driver cohort planning and public multi-source admission. Raising
 the runtime capacity alone still must not duplicate SDK logins or migrate cameras.
 Public capacity remains one; no automatic migration of other cameras.

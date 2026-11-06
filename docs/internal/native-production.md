@@ -1,6 +1,23 @@
 # Native media delivery, not another finite trial
 
-Current deployed runtime (2026-11-06): `5ceece1`, build `b-ba01cbf86a08`, camera3
+Current deployed runtime (2026-11-06): `70beb7b`, build `b-3fad324407cc`, camera3
+native/active159. Generic startup now restores reviewed checkpoints up to runtime
+capacity, reserving camera/domain/slot before spending each checkpoint. Three
+synthetic sources pass ordinary startup/shutdown; public capacity remains ONE
+and the Yoosee group plan is still pending. This is not a multi-camera rollout.
+See [runtime restart](native-runtime-lifecycle.md).
+
+CI6139tests/1skip, frontend contracts and Image passed. Image `d110105f882d` /
+`wsl-bounded-native-restart` replaced only the app; hub/tunnel were unchanged.
+Camera3 completed60s authenticated MSE:122binary fragments/46199177bytes, max
+interarrival2.63s (not absolute latency), no reconnect. Read-only lamp GET200/verified;
+both legacy sources stayed active with one base consumer each. App205.2MiB/1GiB,
+OOM=false/restarts=0, three in-app FFmpeg processes. The last event at15:01:06Z
+confirmed a media-lease detach (TCP socket/receipt and broker release confirmed,
+consumer joined, cleanup_failed=false; shared socket closure intentionally false).
+No later retry appeared in this observation. No sound/light/motor command was sent.
+
+Previous deployed runtime (2026-11-06): `5ceece1`, build `b-ba01cbf86a08`, camera3
 native/active156. Reviewed offers now lazily bind to the driver's server-owned
 account, with exact-device PTZ grants and ready-lease gating. Source intents span
 decoder recovery/backoff, but the last source must stop/join the account before
