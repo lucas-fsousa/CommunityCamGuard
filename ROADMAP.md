@@ -4,6 +4,15 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-06 account-lifetime integration: the driver now owns one explicit account
+reader/worker for a bounded camera group. The generic server registers lazy driver
+runtime services before native sources, stopping sources before shared accounts
+and releasing ServerOwner last. Group publication accepts only same-owner members.
+Offline integration passed three consumers together plus replacement of one,
+using one login/socket/SDK scope. Current production offers are unchanged; next
+wire reviewed offers/recovery and per-lease PTZ to the service, then bounded
+multi-source admission. See docs/internal/native-account-lifetime.md.
+
 2026-11-06 next integration checkpoint: dynamic per-camera media leases now reach
 the same worker/lifecycle, including cooperative detach and later replacement
 without another login. Admission binds exact authenticated account/inventory,

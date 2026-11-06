@@ -82,6 +82,13 @@ async def lifespan(app: FastAPI):
         p2p.init_db()
         drivers.init_onboarding()
 
+        # Register driver resources BEFORE source runtimes: reverse shutdown
+        # drains camera consumers first, then shared driver accounts, then the
+        # exclusive server owner. Constructors must be lazy (no camera I/O).
+        for driver in drivers.DRIVERS:
+            for service in driver.runtime_services(owner):
+                lifetime.own(service)
+
         owned_bindings = OwnedIngressBindings()
         viewers = ViewerGate()
         media = lifetime.own(Go2rtc(owned_ingress=owned_bindings))

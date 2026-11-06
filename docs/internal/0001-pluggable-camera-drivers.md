@@ -43,3 +43,11 @@ domain and local per-device evidence validation. Generic orchestration does not
 interpret vendor/model identity or treat enrollment as a feature grant. See
 [explicit native activation](native-source-activation.md); no startup rollout or
 new public activation endpoint is implied.
+
+2026-11-06 shared-runtime extension: optional `runtime_services(owner)` returns
+lazy, stoppable driver resources, registered under the exclusive server lifetime
+before native source runtimes. Reverse shutdown retires source consumers before
+their shared driver account, then releases the server owner. Defaults add no
+services or camera I/O. Yoosee implements an explicitly admitted account worker;
+this does not infer model capabilities or enable additional camera sources.
+See [native account lifetime](native-account-lifetime.md).

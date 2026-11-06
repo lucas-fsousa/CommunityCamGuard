@@ -11,6 +11,7 @@ probe/profile evidence before its per-camera catalogue may advertise proprietary
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -28,8 +29,11 @@ from . import audio, controls
 if TYPE_CHECKING:
     from ...db.registry import Camera
     from ...media.archive_spec import NativeArchiveSpec
+    from ...media.server_owner import ServerOwner
     from ...media.source_offer import NativeSourceOffer
     from ..onboarding import OnboardingPort
+    from ..runtime import DriverRuntimeService
+    from .native_account_service import NativeAccounts
 
 
 class YooseeDriver(CameraDriver):
@@ -37,6 +41,21 @@ class YooseeDriver(CameraDriver):
     label = "Yoosee / generic HiSilicon (ONVIF port 5000)"
     rtsp_paths = ("/onvif1", "/onvif2", "/11", "/12", "/live.sdp", "/0", "/1")
     transport = "udp"
+
+    def __init__(self) -> None:
+        self._runtime_lock = threading.Lock()
+        self._native_accounts: NativeAccounts | None = None
+
+    def runtime_services(self, owner: ServerOwner) -> tuple[DriverRuntimeService, ...]:
+        from ...media.source_registry import SourceUnavailable
+        from .native_account_service import NativeAccounts
+
+        with self._runtime_lock:
+            if self._native_accounts is not None and not self._native_accounts.stopped:
+                raise SourceUnavailable("driver runtime is already owned by a server")
+            accounts = NativeAccounts(owner)
+            self._native_accounts = accounts
+            return (accounts,)
 
     def native_media_offer(self, camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
         from .native_media_offer import offer

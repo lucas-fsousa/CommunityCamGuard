@@ -70,10 +70,13 @@ The preceding dynamic-worker commit `d70c86f` passed GitHub CI6078tests/1skip an
 ## Production boundary / next integration
 
 Production still runs one native source. These entry points are not exposed via
-HTTP or a dashboard toggle. Native consumer/control bindings are now implemented,
-but the driver-owned account lifetime, multi-camera publication/admission and
-prepared-source lease-retirement evidence still need integration. PTZ authority
-also remains on the existing production path, not the new lease entry point.
+HTTP or a dashboard toggle. Native consumer/control bindings, server-owned account
+lifetime and same-owner group publication are now implemented. Reviewed offers,
+recovery, PTZ authority and bounded multi-source admission remain to be connected.
+The generic core already accepts a source's normal return after lease cleanup;
+no generic vendor-socket retirement exception is required. See
+[account lifetime](native-account-lifetime.md). PTZ remains on the accepted
+production path, not the new lease entry point.
 Do not increase the generic registry capacity or
 declare independent SDK domains before that owner exists. Do not claim that
 returning a camera lease means the shared broker socket was physically closed.

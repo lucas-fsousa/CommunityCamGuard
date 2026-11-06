@@ -38,8 +38,10 @@ from .contracts import (
 if TYPE_CHECKING:
     from ..db.registry import Camera
     from ..media.archive_spec import NativeArchiveSpec
+    from ..media.server_owner import ServerOwner
     from ..media.source_offer import NativeSourceOffer
     from .onboarding import OnboardingPort
+    from .runtime import DriverRuntimeService
 
 
 class Unsupported(Exception):
@@ -119,6 +121,10 @@ class CameraDriver:
     label: str = "Generic RTSP"
     rtsp_paths: tuple[str, ...] = ()  # ordered path templates ([USERNAME]/[PASSWORD]/[CHANNEL])
     transport: str = "auto"  # media-layer hint: auto | tcp | udp
+
+    def runtime_services(self, owner: ServerOwner) -> tuple[DriverRuntimeService, ...]:
+        """Optional lazy services; server retains/stops them before releasing its owner."""
+        return ()
 
     def native_media_offer(self, camera: Camera, *, archive: NativeArchiveSpec | None = None) -> NativeSourceOffer | None:
         """Optional reviewed source; refuse unavailable recording, never silently drop it."""

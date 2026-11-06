@@ -5,6 +5,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from ...camera_identity import valid_camera_id
 from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady, ControlOperationError, ControlResult, ControlValue
 from .p2p.night_vision import NIGHT_VISION_READ_PATH, NIGHT_VISION_VALUES, extract_night_vision_mode
@@ -67,10 +68,37 @@ def reserve_native_owner(camera_id: str) -> Iterator[None]:
 
 
 @contextmanager
+def reserve_native_group(camera_ids: tuple[str, ...]) -> Iterator[None]:
+    """One trusted shared account, explicit members, no wildcard publication."""
+    if (not isinstance(camera_ids, tuple) or not 1 <= len(camera_ids) <= 3
+            or any(type(camera_id) is not str or not valid_camera_id(camera_id) for camera_id in camera_ids)
+            or len(set(camera_ids)) != len(camera_ids)):
+        raise ValueError("bounded exact native group required")
+    owner = object()
+    with _lock:
+        if _owners or _sessions:
+            raise ControlNotReady("native control owner already reserved")
+        _owners.update(dict.fromkeys(camera_ids, owner))
+    confirmed = False
+    try:
+        yield
+        confirmed = True
+    finally:
+        with _lock:
+            if confirmed:
+                for camera_id in camera_ids:
+                    if _owners.get(camera_id) is owner:
+                        del _owners[camera_id]
+
+
+@contextmanager
 def publish(camera_id: str, session: SharedDeviceControls) -> Iterator[None]:
     """Run-lifetime lease, not a second owner, thread, socket or capability grant."""
     with _lock:
-        if _sessions or (_owners and camera_id not in _owners):
+        owner = _owners.get(camera_id)
+        if (camera_id in _sessions or (_owners and owner is None)
+                or (_sessions and (owner is None or any(
+                    _owners.get(other) is not owner for other in _sessions)))):
             raise ControlNotReady("native shared-control owner already published")
         _sessions[camera_id] = session
     try:
