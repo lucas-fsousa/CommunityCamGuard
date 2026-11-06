@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable
 
 from .av_control_send import ReliableAvControl
+from .av_init_requests import AvInitRequests
 from .av_receive import AvReceiveBatch, AvReceiver
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, validate_media_policy
@@ -25,13 +26,17 @@ the same parser/decoder owner, but do not claim ready or present a live source y
 
     def __init__(self, peer: tuple[str, int], link_id: int, call_id: int, cookie: bytes, *,
                  request_user_data: bytes | None = None,
+                 repeat_init: bool = False,
                  policy: MediaPolicy = MediaPolicy.FINITE,
                  clock: Callable[[], float] = time.monotonic) -> None:
         validate_media_policy(policy)
         self._clock, self._created = clock, clock()
         self._peer, self._link_id, self._call_id = peer, link_id, call_id
-        self._init = ReliableAvControl(peer, link_id, call_id, action=1, clock=clock,
-                                       request_user_data=request_user_data)
+        self._init: ReliableAvControl | AvInitRequests
+        self._init = (AvInitRequests(peer, link_id, call_id, clock=clock,
+                                    request_user_data=request_user_data) if repeat_init
+                      else ReliableAvControl(peer, link_id, call_id, action=1, clock=clock,
+                                             request_user_data=request_user_data))
         self._receiver = AvReceiver(peer, link_id, call_id, cookie,
                                     control_conv=link_id | 0x80000000, clock=clock, policy=policy)
         self._start: ReliableAvControl | None = None
@@ -93,12 +98,13 @@ the same parser/decoder owner, but do not claim ready or present a live source y
             raise
 
     def due(self) -> tuple[bytes, ...]:
-        """At most one control per call; never replay INIT on a fresh sequence."""
+        """At most one control per turn; SDK INIT repetition is UDP opt-in only."""
         self.poll()
         try:
             if self._finish is not None:
                 wire = self._finish.due()
-            elif not self._init.acknowledged:
+            elif (not self._init.acknowledged or
+                  (isinstance(self._init, AvInitRequests) and not self._receiver.accepted)):
                 wire = self._init.due()
             elif self._receiver.accepted and self._receiver.peer_started:
                 if self._start is None:
@@ -122,7 +128,10 @@ the same parser/decoder owner, but do not claim ready or present a live source y
                 self._start.receive_ack(wire, peer)
             if self._finish is not None:
                 self._finish.receive_ack(wire, peer)
-            return self._receiver.receive(wire, peer)
+            batch = self._receiver.receive(wire, peer)
+            if self._receiver.accepted and isinstance(self._init, AvInitRequests):
+                self._init.stop_repeating()
+            return batch
         except ReceiveError:
             self.close()
             raise

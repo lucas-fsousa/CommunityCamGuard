@@ -36,6 +36,10 @@ reconnection/source revision change, maximum fragment gap1.367s; archive grew.
 Other2remain legacy RTSP, OOM=false/restarts=0. This is a short delivery
 checkpoint, NOT long-term stability or UDP AV acceptance. Next protocol task
 remains the SDK's INIT-receipt-to-ACCEPT gap, not more physical-control tests.
+Scoped SDK inspection plus saved-PCAP sequences now proves application INIT
+repetition after KCP receipt was omitted. Cooperative UDP now has the SDK's
+bounded normal retry profile; TCP and the production transport gate are unchanged.
+Live acceptance of this specific correction is still pending; see native-lan-av.md.
 
 2026-11-06 group startup IMPLEMENTED: ordinary startup now obtains coordinated
 driver offers for existing native intentions. Yoosee's reviewed three-member

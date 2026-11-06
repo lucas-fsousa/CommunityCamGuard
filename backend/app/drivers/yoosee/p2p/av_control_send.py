@@ -21,7 +21,7 @@ from .media_protocol import (
 
 
 class ReliableAvControl:
-    """One request: fresh INIT/START at sequence zero, or post-START CLOSE at one.
+    """One request: INIT at its caller-owned sequence, START zero or CLOSE one.
 
 At most four transmissions, 250 ms apart, within a two-second absolute deadline.
 Retransmit identical bytes/sequence, never manufacture new application requests.
@@ -38,7 +38,8 @@ An ACK proves transport receipt only, not acceptance, media readiness or executi
             raise ValueError("invalid AV call")
         if type(action) is not int or action not in (1, 6, 7):
             raise ValueError("only AV INIT/START/CLOSE controls are supported")
-        if type(sequence) is not int or sequence != (1 if action == 7 else 0):
+        if (type(sequence) is not int or (not 0 <= sequence < 25 if action == 1
+                                        else sequence != (1 if action == 7 else 0))):
             raise ValueError("invalid AV control sequence")
         if request_user_data is not None and action != 1:
             raise ValueError("AV startup metadata is only valid for INIT")

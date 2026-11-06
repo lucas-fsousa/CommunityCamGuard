@@ -50,7 +50,8 @@ class CooperativeUdpMedia:
         self._direct_calling = route.direct_calling()
         self._access, self._device = spec.access_id, spec.device.device_id
         self._owner = AvHandshake(self.peer, self._link, self._call, route.attempt.cookie,
-            request_user_data=route.metadata, policy=MediaPolicy.CONTINUOUS, clock=clock)
+            request_user_data=route.metadata, repeat_init=True,
+            policy=MediaPolicy.CONTINUOUS, clock=clock)
         self._meter = AvMeter(self.peer, self._link, self._call, self._access, self._device,
                               continuous=True, channel_types=(3, 4))
         self._traffic = MediaRateBudget(clock=clock)

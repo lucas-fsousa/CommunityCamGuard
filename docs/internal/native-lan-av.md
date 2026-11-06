@@ -184,3 +184,31 @@ camera-to-browser latency. The current archive grew from0 to1572864bytes;
 the preceding closed archive retained1920x1080HEVC/AAC16kHz mono. App OOM=false
 and restart count0. This short observation does NOT supersede the earlier
 long-window TCP interruption or establish live UDP AV acceptance.
+
+## SDK application retry found after the TCP handoff
+
+Scoped inspection of the pinned split (SHA510bc51a, never the older ELF's
+offsets) exposed a concrete difference from our initial handshake:
+
+- iv_start_process_transfer0x251740 invokes iv_on_timeout_send_reqconn once,
+  then creates a50ms timer at0x25176c–780.
+- iv_on_timeout_send_reqconn0x24f2cc tests session+0x204, then queues action1
+  at0x24f318–324 while application acceptance is absent. It does not stop at
+  the first KCP ACK. Normal branch starts with25requests and subsequent timer
+  returns are70ms,100ms,350ms (special branch uses180ms/16requests).
+- iv_send_av_stream_ctl_frm0x24f628–650 calls ivkcp_send for every non-START
+  request on the control KCP channel. ivkcp_send0x2672f8–340 appends a new
+  queued segment; this is not identical-sequence transport retransmission.
+- The saved app PCAP independently contains one call with INIT KCP sequences
+  0,1,2,3 at relative0/52/121/220ms, and another with0,1 at0/50ms.
+  Only structural counts/timing were printed; no raw payload or identity leaked.
+
+AvInitRequests now reproduces that normal bounded application retry profile
+for cooperative UDP only, preserving the same call/userdata and using distinct
+control KCP sequences. Each request still owns its original identical-byte KCP
+retries/receipts. ACCEPT stops application repetition; a superseded INIT ACK
+cannot kill accepted media later. The existing5s readiness deadline, START/CLOSE
+sequences, TCP handshake and production driver's default-TCP gate are unchanged.
+Offline tests cover repeat-after-ACK, stop-at-ACCEPT, delayed last receipt and
+the unchanged readiness deadline. Live effect remains to be measured; this is
+a wire/SDK-backed discrepancy, NOT yet a proven cause of absent ACCEPT.

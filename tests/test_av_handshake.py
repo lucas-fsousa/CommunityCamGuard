@@ -54,6 +54,45 @@ def test_ack_alone_and_accept_alone_do_not_emit_start():
     assert len(s.due()) == 1 and not s.ready
 
 
+def test_udp_sdk_init_repeats_after_receipt_until_accept_without_replaying_start():
+    now = [0.0]
+    s = AvHandshake(PEER, 42, 123, COOKIE, repeat_init=True, clock=lambda: now[0])
+    bodies = []
+    for sequence, timestamp in enumerate((0.0, 0.05, 0.121, 0.222)):
+        now[0] = timestamp
+        wire, = s.due()
+        segment, = parse_kcp_segments(wire)
+        assert segment.conv == CONTROL and segment.sequence == sequence
+        bodies.append(segment.body)
+        if sequence != 3:  # ACCEPT can arrive before the latest request's ACK.
+            s.receive(ack(wire), PEER)
+        assert not s.ready
+    assert len(set(bodies)) == 1
+    s.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
+    now[0] = 0.6
+    assert not s.due()
+    s.receive(packet(0, 0, start()), PEER)
+    local_start, = s.due()
+    assert parse_kcp_segments(local_start)[0].sequence == 0
+    s.receive(ack(local_start), PEER)
+    s.receive(packet(1, 0, media(header() + av())), PEER)
+    assert s.ready
+    now[0] = 2.3
+    s.poll()  # Superseded INIT receipts cannot later kill accepted media.
+    assert s.ready and not s.due()
+
+
+def test_udp_sdk_init_ack_does_not_remove_application_readiness_deadline():
+    now = [0.0]
+    s = AvHandshake(PEER, 42, 123, COOKIE, repeat_init=True, clock=lambda: now[0])
+    wire, = s.due()
+    s.receive(ack(wire), PEER)
+    now[0] = 5
+    with pytest.raises(ReceiveError, match="readiness"):
+        s.poll()
+    assert s.closed and not s.ready
+
+
 def test_accept_does_not_replace_missing_init_receipt():
     now = [0.0]
     s = session(now)
