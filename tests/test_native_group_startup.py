@@ -144,6 +144,9 @@ def test_ordinary_startup_uses_one_account_without_a_camera_count_ceiling(review
         statuses = restore_reviewed(runtime, retirement, SimpleNamespace(native_archive=lambda _: None), lambda: None)
         assert statuses == {camera.camera_id: "running" for camera in cameras}
         expected = len(cameras) + int(inject_eof)
+        deadline = time.monotonic() + 3
+        while (len(decoders) < expected or len(pumps) < expected) and time.monotonic() < deadline:
+            time.sleep(0.005)  # Recovery runs on the real account/source threads.
         assert len(decoders) == len(pumps) == expected
         assert len(shared_control_reads._sessions) == len(cameras)
         assert events == ["sdk_enter", "login"] and sock.closed == 0
