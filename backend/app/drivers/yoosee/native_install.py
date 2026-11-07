@@ -36,6 +36,12 @@ def prepare(camera_id: str, archive: NativeArchiveSpec, reference: str):
     if camera.capabilities.get('ptz') is True:
         additions.append(OperationProof('native_media_ptz',writable=True,options=frozenset(DIRECTIONS)))
     for proof in additions:
+        reviewed=proofs.get(proof.key)
+        if (reviewed is not None and reviewed.readable == proof.readable
+                and reviewed.writable == proof.writable and proof.options <= reviewed.options):
+            # load() already bound this review to the freshly collected identity.
+            # Preserve stronger options (e.g. LAN UDP) AND their original provenance.
+            continue
         proofs[proof.key]=proof
         sources[proof.key]=reference
     profile=ValidatedProfile(camera_id,identity,tuple(proofs.values()))

@@ -33,6 +33,15 @@ authorization. Further field-unit migration is a separate rollout decision,
 not another prerequisite for this delivered integration. New failures should
 be investigated from actual evidence rather than reopening completed gates.
 
+Next rollout preparation: fixed native reinstallation discarding stronger exact-
+identity transport proofs (notably lan_udp) and their original provenance.
+The installer now preserves reviewed supersets with matching read/write scope;
+changed firmware/model/SDK cannot inherit UDP acceptance. Focused offline tests
+cover preservation and identity-change rejection. No running source was restarted.
+Garage/yard migration requires separate authorization for brief video/recording
+interruption. Their enrollments exist but no current native media identity/profile
+is recorded; do not clone camera3's proofs or silently switch their source modes.
+
 ### Investigation history — pending labels below are superseded above
 
 Owner priority: stop expanding controls/generic architecture; finish native video

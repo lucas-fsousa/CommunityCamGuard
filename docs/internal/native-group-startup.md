@@ -42,6 +42,15 @@ installation workflow retires the old containers before its one-camera bootstrap
 normal startup then plans all enrolled native intentions together. No new
 camera reset/reboot, sound/light/motor test or firmware change is necessary.
 
+Reinstallation preserves an existing stronger operation proof and its provenance
+when the freshly collected exact identity still matches and the old proof covers
+the installer's baseline with the same read/write permissions. In particular,
+reinstalling an accepted LAN UDP unit must not silently replace hevc+lan_udp with
+hevc-only and force it back to TCP. Firmware/model/SDK changes cannot inherit
+that old transport review; they receive only the explicitly reviewed installation
+baseline. This correction is in the host installation path and does not require
+restarting a healthy running server to take effect on the next installation.
+
 ## Integrated proof, not isolated helpers
 
 `test_native_group_startup` uses actual profile/enrollment persistence, Yoosee
