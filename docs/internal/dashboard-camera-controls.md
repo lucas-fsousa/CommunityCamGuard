@@ -26,6 +26,22 @@ Local result: 94 Python tests passed, one optional fixture skipped, Node contrac
 Ruff and Mypy passed. Python runs peaked at 79 MiB, type checking at 124.5 MiB,
 with zero swap under explicit resource limits; no browser or emulator was started.
 
+Deployed `8756c31` as image `2e44c67946cb` / build `b-e14f49ad687c` at
+2026-11-07T16:04:33Z. CI42389205198 passed6196tests/1skip plus all Node
+contracts; Image42389205160 also passed. Only the app was recreated. All three
+sources resumed native/active (revisions234/18/18); every catalogue returned eight
+controls and `controls_pending: false`. This verifies the ready production path;
+pending-to-ready behavior is covered by the isolated regression, not a fabricated
+expired-cache camera test.
+
+Concurrent60s authenticated HD MSE reads delivered121/122/122binary fragments,
+46076513/46041489/46043131bytes, max gaps1.830/1.675/2.116s, without source
+revision change. Owning UDP socket drops0, no post-update native failure/retry
+event, originals recently modified on all three units. App425.7MiB/1GiB,
+OOM=false/restarts=0. No PTZ, light, audio, siren, reset or camera setting write.
+These are delivery/recording checks, not decoded visual frames, absolute latency
+or a new multi-day endurance claim.
+
 ## Direct intercom actions — 2026-10-29
 
 Hold-to-speak and recorded voice messages moved out of the camera-settings popup

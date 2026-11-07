@@ -220,11 +220,11 @@ see [deployment evidence and operator check](../internal/delegated-access-activa
   "name": "Garagem",
   "username": "admin",
   "has_password": true,
-  "stream_path": "/onvif1",
   "rtsp_port": 554,
   "last_ip": "192.168.1.50",
   "vendor": "yoosee",
-  "capabilities": { "video_codec": "h265", "has_audio": true, "ptz": true, "stream_paths": ["/onvif1", "/onvif2"] },
+  "capabilities": { "video_codec": "h265", "has_audio": true, "ptz": true },
+  "controls_pending": false,
   "controls": {
     "white_light": { "kind": "boolean", "readable": true, "writable": true, "options": [] },
     "orientation": { "kind": "choice", "readable": false, "writable": true, "options": ["normal", "inverted"] },
@@ -247,6 +247,15 @@ see [deployment evidence and operator check](../internal/delegated-access-activa
   "recording": true
 }
 ```
+
+`controls` is the selected driver's catalogue for this camera, not a brand-wide
+feature list. `controls_pending: true` means support evidence affecting that
+catalogue is temporarily stale. The settings panel repeats only the catalogue
+GET, at 500 ms intervals for at most 10 seconds, while the driver refreshes it.
+The flag never grants a missing control or permits replaying an action. A ready
+catalogue (including an empty one) is used immediately. Older responses without
+the additive flag are treated as ready. Neither stored stream paths nor private
+capability evidence are part of the public camera object.
 
 `id` is the stable, opaque application identity. Camera operations use it and resolve to each
 driver's private identity server-side; clients must not derive it or substitute a MAC/vendor ID.

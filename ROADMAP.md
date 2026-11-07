@@ -11,9 +11,12 @@ temporarily incomplete capability catalogue from a ready one. Opening settings
 waits up to 10s for read-only refresh, without retrying any action or touching the
 players. Other drivers keep their catalogue behavior; model/firmware proof and
 authorization remain authoritative. See docs/internal/dashboard-camera-controls.md.
+Deployed8756c31/image2e44c67946cb/build b-e14f49ad687c; CI6196passed/1skip,
+Image green. All three native sources resumed; simultaneous60s HD delivery passed
+without recovery/revision change, owning UDP drops0 and original recordings active.
 
 ALL THREE INSTALLED CAMERAS NOW RUN NATIVE LAN UDP in the normal image:
-7577ece10cd1/build b-c1ad3a34ef0f, code55b7b6f, CI and Image green. The final
+transport acceptance7577ece10cd1/build b-c1ad3a34ef0f, code55b7b6f, CI and Image green. The final
 simultaneous300s HD observation PASSED without disconnect/recovery/revision
 change. The owning receive socket stayed at ZERO packet drops with2MiB actual
 capacity; all three original1080pHEVC/AAC archives closed300s segments and the

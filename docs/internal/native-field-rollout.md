@@ -1,6 +1,10 @@
 # Native LAN UDP field rollout — 2026-11-07
 
-Current deployment: all three units are native/active on image7577ece10cd1,
+Current deployment: all three units remain native/active after the controls-only
+8756c31 update (image2e44c67946cb/build b-e14f49ad687c); its simultaneous60s
+HD check passed without recovery/source revision change and UDP drops stayed0.
+See [control-panel deployment](dashboard-camera-controls.md) for exact results.
+Transport acceptance was on image7577ece10cd1,
 with the post-receive-buffer300s group observation passed. See the final run
 below. Earlier failures and temporary RTSP rollback are retained honestly as
 history, not the current operating state.
