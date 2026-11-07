@@ -34,7 +34,7 @@ def test_partial_writes_preserve_exact_access_unit_and_backpressure(pipe):
     assert os.read(read, 65536) == b"next-frame"
 
 
-def test_full_pipe_never_blocks_and_absolute_deadline_retires(pipe):
+def test_full_pipe_never_blocks_and_no_progress_deadline_retires(pipe):
     _, writer, now = pipe
     writer.offer(b"x" * MAX_PENDING_BYTES)
     for _ in range(512):
@@ -101,14 +101,27 @@ def test_continuous_input_has_no_sample_frame_or_lifetime_limit(pipe):
     assert not writer.closed
 
 
-def test_partial_progress_does_not_extend_deadline(pipe):
+def test_large_frame_keeps_advancing_past_one_second_without_a_false_stall(pipe):
+    read, writer, now = pipe
+    payload = b"x" * (128 * 1024)
+    writer.offer(payload)
+    received = bytearray()
+    while writer.pending_bytes:
+        now[0] += 0.4
+        assert writer.pump() > 0
+        received.extend(os.read(read, 65536))
+    assert now[0] > 1
+    assert received == payload and not writer.closed
+
+
+def test_partial_progress_does_not_hide_a_subsequent_real_stall(pipe):
     read, writer, now = pipe
     writer.offer(b"x" * MAX_PENDING_BYTES)
     for instant in (0.0, 0.4, 0.8):
         now[0] = instant
         assert writer.pump() > 0
         os.read(read, 65536)
-    now[0] = 1.0
+    now[0] = 1.8
     with pytest.raises(TimeoutError):
         writer.pump()
     assert writer.closed

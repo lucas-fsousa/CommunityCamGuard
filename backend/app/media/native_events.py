@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -71,6 +72,13 @@ def ended(camera_id: str, *, error: str, evidence_valid: bool, details: dict) ->
     facts['decoder_failure'] = cause if isinstance(cause, str) and cause in FAILURE_CATEGORIES else 'unknown'
     code = details.get('decoder_returncode')
     facts['decoder_returncode'] = code if isinstance(code, str) and code in _returncodes else 'unknown'
+    site = details.get('consumer_site')
+    if isinstance(site, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}:[0-9]{1,6}', site):
+        facts['consumer_site'] = site
+    for key in ('consumer_mp4_expected', 'consumer_mp4_actual'):
+        value = details.get(key)
+        if isinstance(value, str) and value in {'ftyp', 'moov', 'moof', 'mdat', 'free', 'sidx', 'styp', 'mfra', 'mfro', 'unknown'}:
+            facts[key] = value
     for key, maximum in _counters.items():
         value = details.get(key)
         if isinstance(value,str) and value.isascii() and value.isdigit() and len(value)<=10 and int(value)<=maximum:

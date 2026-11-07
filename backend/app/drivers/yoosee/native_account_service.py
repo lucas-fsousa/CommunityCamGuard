@@ -1,5 +1,6 @@
 """Server-owned, lazy account worker. One SDK owner, no per-camera login thread."""
 
+import logging
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -12,6 +13,8 @@ from ..contracts import ControlNotReady
 from .leased_read_session import LeasedReadSession
 from .native_account import NativeAccount
 from .p2p.ptz_authority import PtzAuthority, PtzGrant
+
+log = logging.getLogger(__name__)
 
 
 class NativeAccounts:
@@ -120,10 +123,16 @@ class NativeAccounts:
     def _run(self, account: NativeAccount) -> None:
         try:
             account.run(cancelled=self._source_cancelled)
-        except BaseException:
+        except BaseException as error:
             # The account retains SDK fencing/cleanup uncertainty. No retry,
             # raw exception logging or optimistic handle deletion in this thread.
-            pass
+            trace = error.__traceback__
+            site = "unknown"
+            while trace is not None:
+                site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
+                trace = trace.tb_next
+            log.warning("native account worker failed error_type=%s site=%s",
+                        type(error).__name__, site)
 
     def binding(self, entry: P2PEnrollment) -> LeasedReadSession:
         with self._lock:

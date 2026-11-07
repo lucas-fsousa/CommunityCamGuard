@@ -84,7 +84,10 @@ class NonblockingInput:
             if count <= 0:
                 raise BrokenPipeError("decoder input made no progress")
             self._pending = self._pending[count:] if count < len(self._pending) else None
-            # Deadline covers the whole access unit, not each partial write.
+            # This is a no-progress deadline, not a maximum frame transfer time.
+            # A large IDR can span many scheduled turns while the decoder is healthy.
+            # The decoder's separate frame-progress deadline bounds actual decoding.
+            self._deadline = now + self._timeout
             return count
         except Exception:
             self.close()

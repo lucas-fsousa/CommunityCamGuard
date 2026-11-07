@@ -20,8 +20,10 @@ Supported intercom actions are directly on each live camera bar: hold to speak
 without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
 
-Yoosee proprietary LAN UDP streaming is deployed for the three currently installed
-units in the ordinary Docker dashboard: one shared account owns independent
+The installed units were temporarily restored to RTSP after another native
+account-wide outage on 2026-11-07. Native streaming is NOT considered resolved;
+see [the incident and current deployment](docs/internal/native-field-rollout.md).
+The Yoosee proprietary LAN UDP implementation uses one shared account with independent
 camera A/V leases, supplying H264/AAC to the existing player, original HEVC/AAC
 recordings and reviewed PTZ on the same owner. Camera3's speaker
 volume and normal/inverted image orientation can also be adjusted and verified on

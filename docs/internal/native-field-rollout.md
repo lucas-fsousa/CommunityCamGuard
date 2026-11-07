@@ -1,6 +1,36 @@
 # Native LAN UDP field rollout — 2026-11-07
 
-Current deployment: all three units remain native/active after the controls-only
+## Reopened incident — current deployment
+
+The owner reported all three cameras unavailable again. All three native sources
+were blocked (revisions237/21/21), with app start18:28:52Z, OOM=false/restarts=0.
+History includes yard progress_timeout17:42:29Z, camera3 progress_timeout17:58:20Z,
+KCP assembly failures, an unknown camera3 failure18:25:39Z, garage/yard Mp4OrderError
+18:26:50Z, then stdin_timeout and unconfirmed lease cleanup18:29:06–07Z after
+the newer start. The cause of the app restart itself is not established.
+The recording-index walker also logged OSError errno14; current recording mount
+stat/list succeeded with ample free space. Do not conclude that RAM, receive
+buffer size or one network event explains this complete sequence.
+
+Recovery: stopped and verified app/hub PID namespaces, acquired ServerOwner,
+saved a0600SQLite incident backup under ignored data/, changed only the three
+configured source policies to active legacy_rtsp, regenerated the private hub
+config and started the stack. HTTP subsequently reports all three available,
+online and recording. Enrollment, reviewed native profiles and existing footage
+are preserved. This is a temporary availability rollback, not native acceptance.
+
+The decoder writer had an independently reproducible defect: its one-second
+timeout covered the entire access unit even while partial writes succeeded.
+It now resets only after a successful write; genuinely full pipes still time out.
+Memory/output queues and the decoder's separate frame-progress deadline are not
+increased. New safe diagnostics preserve code site/known MP4 box labels and log
+account-worker exception type/site; original event records had discarded these
+facts. This fixes a false input-stall condition but does not establish why the
+shared account failed to recover. Native reliability remains open.
+
+## Earlier bounded acceptance — not current operating state
+
+All three units were native/active after the controls-only
 8756c31 update (image2e44c67946cb/build b-e14f49ad687c); its simultaneous60s
 HD check passed without recovery/source revision change and UDP drops stayed0.
 See [control-panel deployment](dashboard-camera-controls.md) for exact results.

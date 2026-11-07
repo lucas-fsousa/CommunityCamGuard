@@ -5,6 +5,22 @@ from backend.app.media import native_events as events
 CAMERA = 'cam_' + '1' * 24
 
 
+def test_parser_failure_preserves_fixed_box_labels_and_code_site_only(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA, error='Mp4OrderError', evidence_valid=True, details={
+        'consumer_site': 'feed:81', 'consumer_mp4_expected': 'moof',
+        'consumer_mp4_actual': 'mfra', 'stderr': 'SECRET'})
+    facts = json.loads((tmp_path / 'native-events.jsonl').read_text())['facts']
+    assert facts['consumer_site'] == 'feed:81'
+    assert facts['consumer_mp4_expected'] == 'moof'
+    assert facts['consumer_mp4_actual'] == 'mfra'
+    events.ended(CAMERA, error='ValueError', evidence_valid=True, details={
+        'consumer_site': '/private/SECRET:80', 'consumer_mp4_expected': 'SECRET',
+        'consumer_mp4_actual': []})
+    text = (tmp_path / 'native-events.jsonl').read_text()
+    assert 'SECRET' not in text
+
+
 def test_lease_retirement_is_distinct_from_shared_socket_closure(tmp_path):
     events.configure(tmp_path)
     events.ended(CAMERA, error='retry_planned', evidence_valid=True, details={

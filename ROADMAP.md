@@ -4,7 +4,29 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-### Current delivery — 2026-11-07
+### Current incident — 2026-11-07 (supersedes acceptance below)
+
+REOPENED: native streaming reliability is NOT resolved. All three sources were
+blocked again, including after the app start at18:28:52Z. Consumer progress/input
+timeouts, KCP assembly failures and local MP4 order failures precede an unconfirmed
+shared-account retirement. No container OOM; a separate recording-index walk
+reported OSError errno14. This does not establish one common root cause.
+
+All three sources have been temporarily restored to legacy RTSP under physically
+stopped app/hub namespaces and the database ownership lock. A private incident
+database backup was retained. Enrollments/proofs/footage were not removed.
+HTTP confirms all three available, online and recording again.
+
+Concrete consumer fix: stdin timeout now measures absence of successful writes,
+not total time to transfer a frame. The single-frame memory bound, nonblocking
+writes and independent decoder frame-progress watchdog remain unchanged.
+Safe logs now retain parser box labels/code site and account exception type/site,
+not credentials or exception text. This correction does NOT yet prove the native
+account-wide recovery fault resolved. Keep the field units on RTSP until that
+separate failure is reproduced and corrected; do not migrate them based on another
+short successful observation.
+
+### Earlier delivery — superseded by the incident above
 
 Control-panel expiry fix: driver-owned `controls_pending` now distinguishes a
 temporarily incomplete capability catalogue from a ready one. Opening settings

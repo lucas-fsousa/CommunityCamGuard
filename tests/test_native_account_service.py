@@ -28,6 +28,23 @@ class Account:
     def stop(self): self.closed.set()
 
 
+def test_account_failure_logs_type_and_site_without_exception_text(tmp_path, caplog):
+    class Failing:
+        def run(self, *, cancelled):
+            raise ValueError('PRIVATE_ACCESS_TOKEN')
+
+    owner = ServerOwner(tmp_path / 'app.db')
+    owner.acquire()
+    try:
+        service = module.NativeAccounts(owner)
+        service._run(Failing())
+        assert 'error_type=ValueError' in caplog.text
+        assert 'site=run:' in caplog.text
+        assert 'PRIVATE_ACCESS_TOKEN' not in caplog.text
+    finally:
+        owner.close()
+
+
 def test_lazy_service_is_server_owned_and_single_account_is_reused(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "NativeAccount", Account)
     owner = ServerOwner(tmp_path / "app.db")
