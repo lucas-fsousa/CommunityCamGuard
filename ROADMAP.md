@@ -22,6 +22,14 @@ Soft media-send congestion now drops a datagram instead of retiring the account;
 other errors retain failure behavior plus safe errno/type diagnostics.35focused
 tests passed; the normal group must be observed beyond the failed217s window
 before calling this rollout stable. No blanket timeout increase/control retry.
+The patched group subsequently recovered one yard progress_timeout locally
+(confirmed detach/broker release), without blocking siblings, but its strict
+300s observation failed at236s. The owning UDP socket exposed26424receive
+drops, later43616; WSL default/max buffers were212992bytes. Multi-target
+connections now request bounded1–4MiB per-socket headroom, using existing Linux
+capability only when needed to avoid the local clamp; no global sysctl/firewall
+change.40targeted tests/Ruff/Mypy427passed. Verify effective size, drop delta
+and simultaneous delivery after deployment; do not relabel the failed run passed.
 
 2026-11-07 LAN UDP AV LIVE-CONFIRMED on camera3. SDK-backed INIT application
 repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s

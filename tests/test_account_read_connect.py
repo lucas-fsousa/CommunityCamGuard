@@ -101,6 +101,8 @@ def test_additional_targets_come_from_the_same_authenticated_inventory(monkeypat
     from backend.app.drivers.yoosee.p2p.contracts import OnlineDevice
 
     class Socket:
+        def setsockopt(self, *args): pass
+        def getsockopt(self, *args): return 2 * 1024 * 1024
         def bind(self, address): pass
         def getsockname(self): return ("0.0.0.0", 1234)
         def close(self): pass

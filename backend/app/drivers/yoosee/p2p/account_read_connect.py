@@ -13,6 +13,7 @@ from .contracts import OnlineDevice, P2PProbeError
 from .list_dns import resolve_list_hosts
 from .ptz_diagnostics import preparation_failure_reason
 from .session_io import local_route_ip
+from .udp_receive_buffer import configure_receive_buffer
 
 
 class ReadConnectFailure(P2PProbeError):
@@ -50,6 +51,8 @@ def open_read_connection(enrollment: P2PEnrollment, *, camera_id: str, device_id
         if cancelled() or time.monotonic() >= deadline:
             raise P2PProbeError("read connection deadline or cancellation")
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if additional_device_ids:
+            configure_receive_buffer(sock, streams=1 + len(additional_device_ids))
         bounded = BudgetSocket(sock, cancelled)
         bounded.deadline = deadline  # DNS time is charged; never grant a new budget.
         bounded.bind(("", 0))

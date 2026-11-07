@@ -20,6 +20,37 @@ without raw error text. Synthetic coverage injects one media ACK send timeout
 and verifies the same UDP reader reaches readiness and retires cleanly. A new
 normal-group run beyond the observed failure time remains required.
 
+### Second run: isolated decoder recovery and measured socket loss
+
+Image17cbf80cc0a5/build b-412b47b83e19 (c1df7ed, CI42381584583 and
+Image42381584585 green) restored all three sources. Unlike the first incident,
+the group did NOT become blocked: at14:34:35Z yard retired its consumer with
+progress_timeout, confirmed UDP detach/CLOSE receipt and outer broker release,
+then recovered automatically on the retained account. The strict simultaneous
+observer closed1013 after236s; this was NOT an uninterrupted300s pass.
+No media-send soft-drop or fatal socket event was logged in this run.
+
+The server's OWN UDP socket (matched by Python PID1 FD inode, not just host-wide
+statistics) had26424kernel receive drops, later43616, with empty sampled queues.
+WSL rmem_default and rmem_max were both212992bytes; SndbufErrors was0.
+This is direct evidence of local receive loss under bursts, not proof that the
+earlier unclassified send error had the same cause.
+
+The shared multi-target account now requests bounded per-socket receive headroom:
+1–4MiB requested, scaling by admitted membership without limiting camera count.
+On this deployment the ordinary request is clamped to425984bytes; the ALREADY
+granted NET_ADMIN capability permits SO_RCVBUFFORCE on THIS socket and yielded
+2097152bytes for a1MiB request. No sysctl, firewall, interface or global kernel
+policy was changed. Unsupported ABIs/missing permissions retain the normal
+socket setting with its actual effective size logged, not a false success.
+Single-target connections are unchanged.40focused tests/Ruff/Mypy427passed.
+
+Pinned SDK510bc51a ivudp_listen_new0x1ee60c–648 supports SO_RCVBUF/SO_SNDBUF
+via its size argument. The inspected iv_unit_init0x2383d0 and
+iv_mtp_session_new0x25ac10 callers pass0, inheriting OS defaults; do NOT claim
+the chosen server buffer is a recovered vendor constant. This adaptation is
+justified by the measured WSL socket drops and bounded memory, not wire guessing.
+
 ## Initial accepted scope
 
 The owner authorized brief video/recording interruption to migrate garage and
