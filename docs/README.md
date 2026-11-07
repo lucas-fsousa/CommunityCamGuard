@@ -29,6 +29,10 @@ Docs are split by audience:
   layout, command-specific ACK semantics and conditional virtual startup replay;
   zero-initialized cache does not require sending a strategy; enum still unknown.
 
+- **[Native LAN UDP video](internal/native-lan-av.md)** — SDK-backed handshake,
+  driver-selected camera3 rollout in the normal image, original1080p archive,
+  measured MSE delivery and remaining long-term stability scope.
+
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.
 

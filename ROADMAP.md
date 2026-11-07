@@ -9,8 +9,11 @@ repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s
 authenticated MSE observation delivered62fragments without reconnection/source
 revision change; the original1080pHEVC/AAC archive closed correctly. CI1479f1f
 and Image passed. See docs/internal/native-lan-av.md for exact evidence and
-temporary-image restoration. Next: select this proven route through the normal
-driver profile, then observe endurance; earlier "no ACCEPT" notes are history,
+temporary-image restoration. Normal-image driver rollout is also DONE:
+build b-dc4b074403bc selected UDP from camera3's exact native_video profile;
+a second60s MSE run delivered62fragments with no reconnection/revision change
+and the archive grew. Next is endurance/actual failure investigation, not another
+transport implementation gate; earlier "no ACCEPT" notes are history,
 not the current protocol blocker. Other units stay unchanged. No claim of
 long-term freeze resolution or LAN-only authentication.
 

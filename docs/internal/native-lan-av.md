@@ -5,7 +5,7 @@ native_video proof containing BOTH hevc and lan_udp. Camera3 now has live LAN AV
 evidence documented below; rollout remains exact-unit, not brand-wide. A
 successful LAN meter alone is not AV support.
 
-## Implemented, awaiting the camera3 live checkpoint
+## Initial implementation (historical pre-acceptance checkpoint)
 
 This follows the first live LAN roundtrip documented in
 [LAN selection evidence](native-lan-selection.md). It reuses the existing
@@ -246,5 +246,26 @@ This closes the missing live LAN UDP AV acceptance/delivery checkpoint for
 camera3 and justifies its exact driver's lan_udp proof. It does NOT establish
 long-term freeze resolution, end-to-end browser latency, other units' acceptance
 or LAN-only authentication. Native TCP remains the fallback and remains default
-for units lacking this live AV proof. The normal image must be checked once more
-after registering this proof; temporary-image success is not normal rollout.
+for units lacking this live AV proof. Normal-image rollout is recorded below.
+
+## Normal-image driver rollout — 2026-11-07
+
+Camera3's trusted native_video proof now includes lan_udp after verifying its
+current enrollment, identity snapshot and HEVC read proof. All other operation
+proofs, provenance references and rollout controls were preserved. The new
+native_video reference uses the digest of this document at commita2e0024;
+subsequent documentation edits do not change that reviewed source snapshot.
+No raw credential, app proxy or public transport toggle was introduced.
+
+The NORMAL image7587f34c97a2/build b-dc4b074403bc was restarted and selected LAN
+UDP through that proof, not through the temporary override. Its log confirmed
+roundtrip attempts1 and UDP AV ready. Source revision213 remained active over
+another60s MSE observation:62fragments/20319865bytes, max gap1.233s, no closure
+or revision change. The new archive grew from0 to786432bytes. Both field cameras
+remained legacy RTSP. App178.6MiB/1GiB, OOM=false/restart count0; explicit operator
+restarts/recreates during testing still interrupted consumers temporarily.
+
+The active transport integration is delivered. Next investigation is sustained
+operation and any actual new interruption evidence, not another INIT/ACCEPT
+implementation prerequisite. Do not extrapolate this short result to overnight
+stability or silently migrate untested field cameras.
