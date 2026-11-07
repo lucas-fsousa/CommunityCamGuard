@@ -107,3 +107,13 @@ def test_inactive_account_never_creates_its_own_login():
     owner.active = False
     assert source.run(video_delivery=VideoDelivery(), cancelled=lambda: False).reason == "busy"
     assert inbox.claim() is None
+
+
+def test_account_closing_between_readiness_check_and_submit_is_a_refused_admission():
+    source, owner, inbox, _ = setup()
+    inbox.close()  # Owner's prior readiness check cannot make submission atomic.
+    video = VideoDelivery()
+    result = source.run(video_delivery=video, cancelled=lambda: False)
+    assert result.reason == 'busy' and video.closed and owner.active
+    assert source.diagnostics()['session_lease_detached'] is True
+    assert inbox.claim() is None

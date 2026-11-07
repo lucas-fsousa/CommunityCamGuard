@@ -1,10 +1,12 @@
 """Camera-local recovery inside an already owned account; never reserves/logs in."""
 
+import sqlite3
 from collections.abc import Callable
 
+from ...db.errors import is_lock_busy
 from ...db.p2p import P2PEnrollment
 from ...media.recovering_source import RecoveringSource
-from ...media.source_registry import ManagedSource
+from ...media.source_registry import ManagedSource, SourceValidationBusy
 from .account_video_source import AccountVideoSource
 from .native_account_service import NativeAccounts
 from .native_retry_diagnostics import record as record_retry
@@ -65,6 +67,13 @@ def wrap(initial: NativeVideoSource | AccountVideoSource, *, camera_id: str,
     if accounts is not None:
         if entry is None:
             raise ValueError("account source requires an enrolled camera")
-        return AccountRecoveringSource(initial, factory=factory, valid=valid, retryable=inspect,
+        def validated() -> bool:
+            try:
+                return valid()
+            except sqlite3.OperationalError as error:
+                if not is_lock_busy(error):
+                    raise
+                raise SourceValidationBusy("native registry read temporarily unavailable") from None
+        return AccountRecoveringSource(initial, factory=factory, valid=validated, retryable=inspect,
                                        accounts=accounts, entry=entry)
     return RecoveringSource(initial, factory=factory, valid=valid, retryable=inspect)

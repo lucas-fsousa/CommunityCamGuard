@@ -11,7 +11,12 @@ from .native_media_evidence import supports_lan_udp
 from .p2p.account_media_channel import MediaBootstrap
 from .p2p.account_read_lifecycle import AccountReadLifecycle
 from .p2p.contracts import OnlineDevice, P2PProbeError
-from .p2p.media_lease_inbox import MediaLeaseInbox, MediaLeaseOutcome, MediaLeaseTicket
+from .p2p.media_lease_inbox import (
+    MediaLeaseInbox,
+    MediaLeaseOutcome,
+    MediaLeaseTicket,
+    MediaLeaseUnavailable,
+)
 from .p2p.media_route_job import MediaRouteSpec
 from .p2p.ptz_authority import PtzAuthority, PtzGrant
 from .p2p.video_delivery import VideoDelivery
@@ -55,6 +60,7 @@ class LeasedReadSession(SharedDeviceControls):
         self._started = False
         self._ticket: MediaLeaseTicket | None = None
         self._outcome: MediaLeaseOutcome | None = None
+        self._unadmitted_retired = False
 
     def stop(self) -> None:
         self._stop.set()
@@ -72,7 +78,8 @@ class LeasedReadSession(SharedDeviceControls):
         channel = outcome.channel if outcome is not None else None
         return {"session_scope": "media_lease", "session_worker": "leased",
                 **({key: str(value) for key, value in channel.protocol_facts} if channel is not None else {}),
-                "session_lease_detached": outcome is not None and outcome.status in {"closed", "cancelled"},
+                "session_lease_detached": self._unadmitted_retired or (
+                    outcome is not None and outcome.status in {"closed", "cancelled"}),
                 # Detaching a source is NOT physical closure of the shared socket.
                 "session_broker_socket_closed": False,
                 "session_broker_release": channel is not None and channel.media is not None and channel.media.broker_release,
@@ -90,6 +97,7 @@ class LeasedReadSession(SharedDeviceControls):
             if self._started:
                 raise ValueError("leased read session already started")
             self._started = True
+        attempted_submit = False
         try:
             if self._stop.is_set() or cancelled():
                 return SharedReadResult("stopped")
@@ -97,14 +105,21 @@ class LeasedReadSession(SharedDeviceControls):
                 return SharedReadResult("busy")
             if self._current() != self._entry:
                 return SharedReadResult("enrollment_changed")
-            ticket = self._inbox.submit(self._camera_id,
-                MediaBootstrap(MediaRouteSpec(self._entry.access_id, self._target,
-                    prefer_lan_udp=supports_lan_udp(self._camera_id)), video_delivery))
+            bootstrap = MediaBootstrap(MediaRouteSpec(self._entry.access_id, self._target,
+                prefer_lan_udp=supports_lan_udp(self._camera_id)), video_delivery)
+            attempted_submit = True
+            try:
+                ticket = self._inbox.submit(self._camera_id, bootstrap)
+            except MediaLeaseUnavailable:
+                self._unadmitted_retired = True
+                return SharedReadResult("busy")
             with self._claim:
                 self._ticket = ticket
             self._active_entry = self._entry
             return self._await_retirement(ticket, cancelled)
         finally:
+            if not attempted_submit:
+                self._unadmitted_retired = True
             self._active_entry = None
             video_delivery.close()
 

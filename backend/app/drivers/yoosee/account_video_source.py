@@ -1,9 +1,11 @@
 """Lazy reviewed source: wait for the server-owned account, then borrow a lease."""
 
+import sqlite3
 import threading
 import time
 from collections.abc import Callable
 
+from ...db.errors import is_lock_busy
 from ...db.p2p import P2PEnrollment
 from ...media.mp4_fanout import StreamClosedError, Subscription
 from ...media.source_registry import SourceCleanupUnconfirmed
@@ -68,6 +70,23 @@ class AccountVideoSource:
         return NativeVideoResult(reason, SharedReadResult(reason))
 
     def run(self, *, cancelled: Callable[[], bool]) -> NativeVideoResult:
+        try:
+            return self._run(cancelled=cancelled)
+        except sqlite3.OperationalError as error:
+            if not is_lock_busy(error):
+                raise
+            source = self.current
+            if source is not None:
+                details = source.diagnostics()
+                if (details.get("session_lease_detached") is not True
+                        or details.get("consumer_alive") is not False
+                        or details.get("cleanup_failed") is not False):
+                    raise  # Never convert uncertainty about an active child into a retry.
+            else:
+                self._unadmitted_retired = True  # No camera lease or decoder was created.
+            return NativeVideoResult("busy", SharedReadResult("busy"))
+
+    def _run(self, *, cancelled: Callable[[], bool]) -> NativeVideoResult:
         with self._lock:
             if self._started:
                 raise ValueError("account-bound video source already started")

@@ -10,6 +10,7 @@ from backend.app.media.source_registry import (
     SourceCleanupUnconfirmed,
     SourceRegistry,
     SourceUnavailable,
+    SourceValidationBusy,
 )
 
 CAMERA = "cam_" + "a" * 24
@@ -70,6 +71,50 @@ def test_uncertain_cleanup_never_constructs_replacement_and_keeps_registry_block
     with pytest.raises(SourceCleanupUnconfirmed):
         registry.run(CAMERA, domain="shared", factory=lambda: wrapper, cancelled=lambda: False)
     assert registry.state(CAMERA) == "blocked" and wrapper.current is first and wrapper.restarts == 0
+
+
+@pytest.mark.parametrize('stage', ['initial', 'after_retirement'])
+def test_temporary_validation_wait_never_runs_a_child_before_a_fresh_grant(clock, stage):
+    events = []
+    first, second = Source('socket', events), Source('stop', events)
+    def valid():
+        if clock[0] < 0.5 and (stage == 'initial' or first.retired):
+            raise SourceValidationBusy('read unavailable')
+        return True
+    wrapper = module.RecoveringSource(first, factory=lambda: second, valid=valid,
+        retryable=lambda result, _: result == 'socket', clock=lambda: clock[0])
+    original = first.run
+    def run(**kwargs):
+        if stage == 'initial':
+            assert clock[0] >= 0.5
+        return original(**kwargs)
+    first.run = run
+    assert wrapper.run(cancelled=lambda: False) == 'stop'
+    assert first.retired and second.retired and wrapper.restarts == 1
+
+
+@pytest.mark.parametrize('end', ['cancel', 'revoke'])
+def test_temporary_validation_never_hides_cancel_or_revocation(clock, end):
+    events = []
+    def valid():
+        if clock[0] < 0.5:
+            raise SourceValidationBusy('read unavailable')
+        return False
+    wrapper = module.RecoveringSource(Source('stop', events),
+        factory=lambda: pytest.fail('factory must not run'), valid=valid,
+        retryable=lambda *_: True, clock=lambda: clock[0])
+    with pytest.raises(SourceUnavailable):
+        wrapper.run(cancelled=lambda: end == 'cancel' and clock[0] >= 0.5)
+    assert events == [] and wrapper.restarts == 0
+
+
+def test_validation_busy_from_an_active_child_is_not_a_cleanup_receipt(clock):
+    wrapper = module.RecoveringSource(Source(None, [], error=SourceValidationBusy('unknown cleanup')),
+        factory=lambda: pytest.fail('replacement'), valid=lambda: True,
+        retryable=lambda *_: True, clock=lambda: clock[0])
+    with pytest.raises(SourceValidationBusy):
+        wrapper.run(cancelled=lambda: False)
+    assert wrapper.restarts == 0
 
 
 @pytest.mark.parametrize("action", ["cancel", "revoke"])

@@ -1,5 +1,6 @@
 """One explicit account owner, several camera leases; no thread or auto-login."""
 
+import sqlite3
 import threading
 import time
 from collections.abc import Callable
@@ -7,6 +8,7 @@ from contextlib import ExitStack
 
 from ...camera_identity import valid_camera_id
 from ...db import p2p
+from ...db.errors import is_lock_busy
 from ...db.p2p import P2PEnrollment
 from ..contracts import ControlNotReady
 from .leased_read_session import LeasedReadSession
@@ -151,16 +153,22 @@ class NativeAccount:
         root = self._entries[0]
         next_check = 0.0
         changed = False
+        registry_busy = False
         def should_stop() -> bool:
-            nonlocal next_check, changed
-            if self._stop.is_set() or cancelled() or control_channel_contended() or changed:
+            nonlocal next_check, changed, registry_busy
+            if self._stop.is_set() or cancelled() or control_channel_contended() or changed or registry_busy:
                 return True
             if self._clock() >= next_check:
                 next_check = self._clock() + 1
-                changed = self._current(root.camera_id or "") != root
-            return changed
+                try:
+                    changed = self._current(root.camera_id or "") != root
+                except sqlite3.OperationalError as error:
+                    if not is_lock_busy(error):
+                        raise
+                    registry_busy = True  # Retire, never assume stale credentials are valid.
+            return changed or registry_busy
         if should_stop():
-            return SharedReadResult("stopped")
+            return SharedReadResult("busy" if registry_busy else "stopped")
 
         def connect(_: int) -> ReadConnection:
             return open_read_connection(root, camera_id=root.camera_id or "", device_id=root.device_id,
@@ -183,11 +191,11 @@ class NativeAccount:
             with self._lock:
                 self._connection_failure = failure.reason
             # This exception certifies physical socket cleanup, unlike OSError.
-            return SharedReadResult("connection")
+            return SharedReadResult("busy" if registry_busy else "connection")
         except BaseException:
             block_uncertain_channel()
             raise
         if self._lifecycle.state != "idle":
             block_uncertain_channel()
             raise P2PProbeError("shared native account cleanup unconfirmed")
-        return SharedReadResult(result.reason, result)
+        return SharedReadResult("busy" if registry_busy else result.reason, result)

@@ -22,6 +22,10 @@ class SourceCleanupUnconfirmed(SourceUnavailable):
     pass
 
 
+class SourceValidationBusy(SourceUnavailable):
+    """Trusted driver's read-only validation is temporarily unavailable, not revoked."""
+
+
 class ManagedSource(Protocol):
     def run(self, *, cancelled: Callable[[], bool]) -> object: ...
     def subscribe(self) -> Subscription: ...

@@ -1,3 +1,4 @@
+import sqlite3
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -12,6 +13,7 @@ from backend.app.drivers.yoosee import shared_control_reads as publication
 from backend.app.drivers.yoosee.p2p.account_read_connect import ReadConnectFailure
 from backend.app.drivers.yoosee.p2p.account_read_lifecycle import ReadConnection
 from backend.app.drivers.yoosee.p2p.control_ownership import ControlChannelBusy
+from backend.app.drivers.yoosee.p2p.video_delivery import VideoDelivery
 from tests.test_account_media_route import MediaSocket
 from tests.test_av_route import ENROLLMENT
 from tests.test_broker_reads import NODE
@@ -62,6 +64,46 @@ def wait_ready(account):
     while not account.ready:
         assert time.monotonic() < deadline
         time.sleep(0.001)
+
+
+def test_database_busy_before_connect_does_not_poison_an_account_without_a_socket(environment):
+    account, _, _, sock, events, _ = environment
+    def locked(_):
+        error = sqlite3.OperationalError('PRIVATE_DATABASE_DETAIL')
+        error.sqlite_errorcode = sqlite3.SQLITE_BUSY
+        raise error
+    account._current = locked
+    assert account.run(cancelled=lambda: False).reason == 'busy'
+    assert account.cleanup_confirmed and sock.closed == 0
+    assert events == ['sdk_enter', 'sdk_exit']  # No login, no uncertain SDK fence.
+
+
+def test_database_busy_during_media_retires_the_real_owned_lease_before_account_exit(environment):
+    account, entries, current, sock, events, pumps = environment
+    def read(camera_id):
+        if pumps and sock.now >= 1:
+            error = sqlite3.OperationalError('PRIVATE_DATABASE_DETAIL')
+            error.sqlite_errorcode = sqlite3.SQLITE_BUSY
+            raise error
+        return current.get(camera_id)
+    account._current = read
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        owned = pool.submit(account.run, cancelled=lambda: False)
+        try:
+            wait_ready(account)
+            binding = account.binding(entries[0].camera_id)
+            media = pool.submit(binding.run, cancelled=lambda: False, video_delivery=VideoDelivery())
+            assert owned.result(timeout=3).reason == 'busy'
+            try:
+                media.result(timeout=3)
+            except sqlite3.OperationalError as error:
+                assert error.sqlite_errorcode == sqlite3.SQLITE_BUSY
+            assert binding.diagnostics()['session_lease_detached'] is True
+        finally:
+            account.stop()
+            owned.result(timeout=3)
+    assert account.cleanup_confirmed and sock.closed == 1
+    assert events == ['sdk_enter', 'login', 'sdk_exit']
 
 
 def test_one_account_login_binds_three_exact_cameras_and_releases_after_owner_exit(environment):

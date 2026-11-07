@@ -1,5 +1,42 @@
 # Per-camera sources under one native account
 
+## Transient registry reads and refused admission — 2026-11-07
+
+Another reproducible failure was a SQLite lock during read-only enrollment or
+profile validation. Previously even the account's first enrollment read could
+raise before creating any socket, leaving `cleanup_confirmed=false` and retaining
+that failed account forever. A failing-before-fix regression captures this case.
+The original production incident did not retain enough exception detail to claim
+this was its cause.
+
+Only numeric SQLite BUSY/LOCKED codes (including extended codes) are transient.
+Message matching is forbidden; I/O, corruption, missing-schema and unknown errors
+still propagate. An account that cannot revalidate retires normally and reports
+busy, rather than continuing on stale credentials. If media was admitted, its
+existing transport/consumer cleanup receipts remain mandatory before retry.
+
+The driver maps temporary validation-read failure to the generic internal
+`SourceValidationBusy` signal. Source recovery waits between fresh reads, observes
+cancellation and does not run a child, create a replacement or authenticate while
+validation is unavailable. A definitive false result still revokes admission.
+This signal is handled only around validation calls; an exception from a running
+child is never accepted as proof that its cleanup succeeded. Database writes and
+camera commands are not replayed.
+
+There was also a readiness-to-submit race: the account could close the inbox after
+the source's readiness check but before submission. The inbox now distinguishes
+that refused admission from an uncertain admitted lease. A refusal owns no channel
+or decoder session; the existing source consumer still has to exit before retry.
+No broker release or remote ACK is fabricated. Exceptions after a possibly accepted
+submission retain the old conservative cleanup behavior.
+
+Focused result: 91 tests passed, including a real exclusive SQLite lock released
+before child admission, account startup, simulated active-media retirement,
+readiness/submission race, revocation/cancellation and uncertain cleanup rejection.
+Ruff/Mypy passed. Tests used192MiB/no swap/50% CPU, peak104.9MiB; Mypy was capped
+separately at256MiB. No real camera I/O or production database lock was used.
+The three installed sources remain on temporary RTSP; native endurance is still open.
+
 ## Shared retirement correction — 2026-11-07
 
 Production remains on temporary RTSP after the reopened native incident. The

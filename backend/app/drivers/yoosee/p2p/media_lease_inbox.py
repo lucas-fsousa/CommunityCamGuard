@@ -17,6 +17,10 @@ class MediaLeaseTicket:
     serial: int
 
 
+class MediaLeaseUnavailable(ValueError):
+    """Admission refused before a lease exists; not unconfirmed transport cleanup."""
+
+
 @dataclass(frozen=True, slots=True)
 class MediaLeaseOutcome:
     status: str
@@ -92,7 +96,7 @@ class MediaLeaseInbox:
             raise ValueError("fresh exact-account source lease required")
         with self._lock:
             if self._closed or len(self._leases) >= self.capacity or self._serial >= 1 << 64:
-                raise ValueError("media lease capacity unavailable")
+                raise MediaLeaseUnavailable("media lease capacity unavailable")
             if any(lease.camera_id == camera_id
                    or lease.bootstrap.spec.device.device_id == bootstrap.spec.device.device_id
                    or lease.bootstrap.video is bootstrap.video for lease in self._leases.values()):

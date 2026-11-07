@@ -35,6 +35,16 @@ Details and counterfactual tests: docs/internal/native-source-leases.md.
 These are recovery fixes, not evidence that native endurance is resolved; the
 installed cameras remain on RTSP during this work.
 
+Registry contention follow-up: reproduced a transient SQLite read lock poisoning
+an account before any socket opened. Numeric BUSY/LOCKED read failures now wait
+for fresh validation or retire through existing confirmed cleanup, rather than
+using stale credentials or treating contention as unknown transport cleanup.
+Also fixed account closure racing with lease submission: refused admission no
+longer looks like an unconfirmed existing channel.91focused tests/Ruff/Mypy pass,
+including a real temporary SQLite lock. Camera writes are never retried; corruption
+and genuinely uncertain cleanup still fail closed. Native stability remains open;
+production sources remain on RTSP. See docs/internal/native-source-leases.md.
+
 ### Earlier delivery — superseded by the incident above
 
 Control-panel expiry fix: driver-owned `controls_pending` now distinguishes a

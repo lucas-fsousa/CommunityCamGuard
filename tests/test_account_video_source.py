@@ -1,5 +1,6 @@
 """Lazy production bridge: no real account, network, camera or decoder."""
 
+import sqlite3
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -81,3 +82,33 @@ def test_reviewed_motion_grant_and_validator_reach_the_retained_owner(setup_sour
     assert kwargs["motion_grants"] == (grant,) and kwargs["motion_valid"](entry.camera_id)
     valid.return_value = False
     assert not kwargs["motion_valid"](entry.camera_id)
+
+
+def database_busy():
+    error = sqlite3.OperationalError('PRIVATE_DATABASE_DETAIL')
+    error.sqlite_errorcode = sqlite3.SQLITE_BUSY
+    return error
+
+
+def test_busy_validation_before_admission_never_logs_in(setup_source):
+    source, _, _, accounts, factory, _, valid = setup_source
+    valid.side_effect = database_busy()
+    result = source.run(cancelled=lambda: False)
+    assert result.reason == 'busy' and retryable(result, source)
+    accounts.prepare.assert_not_called()
+    factory.assert_not_called()
+
+
+@pytest.mark.parametrize('fault', [None, 'detach', 'consumer', 'decoder'])
+def test_database_busy_after_child_run_requires_full_retirement(setup_source, fault):
+    source, _, _, _, _, child, _ = setup_source
+    child.run.side_effect = database_busy()
+    child.diagnostics.return_value = {'session_scope': 'media_lease',
+        'session_lease_detached': fault != 'detach', 'consumer_alive': fault == 'consumer',
+        'cleanup_failed': fault == 'decoder'}
+    if fault is not None:
+        with pytest.raises(sqlite3.OperationalError):
+            source.run(cancelled=lambda: False)
+    else:
+        result = source.run(cancelled=lambda: False)
+        assert result.reason == 'busy' and retryable(result, source)
