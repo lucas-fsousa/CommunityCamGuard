@@ -44,6 +44,7 @@ from .siren_pulse_inbox import SirenPulseInbox
 from .siren_pulse_job import SirenPulseResult
 from .siren_pulse_pump import SirenPulsePump
 from .siren_socket_cleanup import drain_siren
+from .udp_media_send import send_media, socket_error_label
 from .video_delivery import VideoDelivery
 
 log = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ class AccountReadWorker:
             return WorkerSummary("already_started", 0, 0, 0, failed)
 
         sent = received = beats = 0
+        udp_send_drops = 0
         output = AccountOutputBudget(policy=self._policy, clock=self._clock,
                                      media_capacity=self._media_capacity)
         reason = "stopped"
@@ -303,11 +305,15 @@ class AccountReadWorker:
             def send_udp_media(wire: bytes, peer: tuple[str, int]) -> None:
                 # Per-channel MediaRateBudget charges AV traffic. It must not
                 # consume the separate broker/control cleanup reservation.
-                nonlocal sent
+                nonlocal sent, udp_send_drops
                 sock.settimeout(0.002)
                 sent += 1
-                if sock.sendto(wire, peer) != len(wire):
-                    raise OSError("partial UDP media datagram")
+                outcome = send_media(sock, wire, peer)
+                if outcome != 'sent':
+                    udp_send_drops += 1
+                    if udp_send_drops == 1 or udp_send_drops % 1024 == 0:
+                        log.warning('native UDP media datagram dropped outcome=%s count=%d',
+                                    outcome, udp_send_drops)
 
             def retire_channel(channel: AccountMediaChannel, error: OSError | ValueError) -> None:
                 cause = underlying_receive_error(error)
@@ -318,8 +324,9 @@ class AccountReadWorker:
                     while trace is not None:
                         site = f"{trace.tb_frame.f_code.co_name}:{trace.tb_lineno}"
                         trace = trace.tb_next
-                    log.warning("native UDP transport retired ready=%s protocol_code=%s site=%s",
-                                channel.udp.was_ready, code or "unknown", site)
+                    io_error, io_errno = socket_error_label(cause)
+                    log.warning("native UDP transport retired ready=%s protocol_code=%s site=%s io_error=%s errno=%s",
+                                channel.udp.was_ready, code or "unknown", site, io_error, io_errno)
                     if not channel.udp.was_ready and not code:
                         code = "udp_negotiation_failed"
                 channel.retire("socket" if isinstance(error, OSError) else "protocol",
@@ -494,7 +501,9 @@ class AccountReadWorker:
         except _Stop as stopped:
             reason = stopped.reason
             unexpected_exit = False
-        except OSError:
+        except OSError as socket_error:
+            io_error, io_errno = socket_error_label(socket_error)
+            log.warning('native account socket failure io_error=%s errno=%s', io_error, io_errno)
             reason = "socket"
             unexpected_exit = False
         except ValueError as error:

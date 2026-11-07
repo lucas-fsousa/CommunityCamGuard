@@ -6,17 +6,22 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current delivery — 2026-11-07
 
-FIELD ROLLOUT DONE after explicit owner authorization: garage and yard passed
+FIELD PROTOCOL ACCEPTANCE PASSED after explicit owner authorization: garage and yard passed
 independent private-DB UDP/decoder/original-archive trials with fresh40.1.22
 identities, then joined camera3 in the normal shared-account startup. All THREE
 installed units are native/active, with one server UDP socket and three FFmpeg
-consumers. Concurrent60s authenticated HD MSE consumers and read-only control
+consumers during the initial minute. Concurrent60s authenticated HD MSE consumers and read-only control
 queries passed without source revision changes or reconnects. This is the actual
 group rollout, not a three-camera maximum. Existing footage preserved; no camera
 setting/action commands. See docs/internal/native-field-rollout.md. Camera3's
 earlier overnight result is not overnight group acceptance. The native transport
-delivery for the installed cameras is complete; subsequent work follows actual
-failures and the remaining non-deferred product backlog, not reopened gates.
+delivery subsequently exposed a real group failure at14:15:53Z during UDP
+sendto, blocking all sources. Garage/yard were temporarily restored to RTSP,
+camera3 resumed native; accepted unit profiles and footage remain intact.
+Soft media-send congestion now drops a datagram instead of retiring the account;
+other errors retain failure behavior plus safe errno/type diagnostics.35focused
+tests passed; the normal group must be observed beyond the failed217s window
+before calling this rollout stable. No blanket timeout increase/control retry.
 
 2026-11-07 LAN UDP AV LIVE-CONFIRMED on camera3. SDK-backed INIT application
 repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s

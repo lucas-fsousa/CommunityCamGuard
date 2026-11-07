@@ -144,8 +144,8 @@ def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(mon
     assert inbox.take(ticket).status == "closed"
 
 
-@pytest.mark.parametrize("silent_av", [False, True])
-def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(monkeypatch, caplog, silent_av):
+@pytest.mark.parametrize("silent_av,soft_ack", [(False,False),(False,True),(True,False)])
+def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(monkeypatch, caplog, silent_av,soft_ack):
     from backend.app.drivers.yoosee.p2p.media_protocol import parse_kcp_segments, parse_media_meter
     from backend.app.drivers.yoosee.p2p.stream_protocol import encrypt_media_tlv
     from tests.test_av_handshake import ack
@@ -168,6 +168,7 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
     ticket = inbox.submit(camera(0), item)
     send, receive = sock.sendto, sock.recvfrom
     pending, attempts, replacements, outcomes = [], [], [], []
+    dropped=[]
 
     def sendto(wire, peer):
         if peer != PEER:
@@ -186,6 +187,9 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
                 pending.append((build_media_meter_ack(wire), peer))
             return len(wire)
         segment, = parse_kcp_segments(wire)
+        if soft_ack and not segment.body and not dropped:
+            dropped.append(True)
+            raise TimeoutError('synthetic short media send timeout')
         if not segment.body or silent_av:
             return len(wire)
         pending.append((ack(wire), peer))
@@ -232,3 +236,4 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
         assert not pumps and sock.opens == sock.closes == 1
         assert "native UDP AV ready transport=lan" in caplog.text
     assert sock.closed == 1
+    assert bool(dropped) is soft_ack

@@ -1,6 +1,26 @@
 # Native LAN UDP field rollout — 2026-11-07
 
-## Delivered scope
+## Rollout checkpoint and subsequent incident
+
+IMPORTANT: the initial simultaneous minute passed, but at14:15:53Z the shared
+group failed during send_udp_media. All three sources became blocked. The
+original log preserved the sendto call site, NOT the OSError subtype/errno, so
+it does not prove that congestion was this incident's precise cause. Garage/yard
+were temporarily returned to RTSP under physically stopped app/hub namespaces;
+accepted unit profiles and all footage/index rows were retained. Camera3 resumed
+native operation. The observations below remain real short-test results, not
+uninterrupted group acceptance.
+
+The media writer now treats TimeoutError/EAGAIN/EWOULDBLOCK/ENOBUFS as loss of
+that media datagram, leaving KCP/readiness/idle deadlines to recover. No local
+queue, socket reopening, larger timeout or camera-action replay was added.
+Broker/physical-control sends do NOT use this policy. Other socket errors and
+partial sends still propagate; retirement now logs fixed exception type/errno
+without raw error text. Synthetic coverage injects one media ACK send timeout
+and verifies the same UDP reader reaches readiness and retires cleanly. A new
+normal-group run beyond the observed failure time remains required.
+
+## Initial accepted scope
 
 The owner authorized brief video/recording interruption to migrate garage and
 yard. Both are now native LAN UDP sources alongside camera3 in the NORMAL
@@ -75,7 +95,7 @@ feature wildcard or camera3 control-profile copy was introduced.
 
 ## Remaining boundary
 
-All currently installed units now use the requested native video transport.
+All installed units passed the initial requested native video observation.
 The camera3 overnight checkpoint predates the group rollout and must not be
 advertised as overnight acceptance of three simultaneous native streams. Observe
 the normal group and investigate actual new failures if reported; do not reopen
