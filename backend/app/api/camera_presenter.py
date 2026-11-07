@@ -5,15 +5,15 @@ from __future__ import annotations
 from .. import drivers
 from ..db import registry
 from ..media import go2rtc
-from ..services import control_catalog
 from .public_capabilities import public_capabilities
 
 
 def camera_out(camera: registry.Camera) -> dict:
     """Serialize one camera without leaking its stored password."""
 
-    controls = control_catalog(camera)
     driver = drivers.for_camera(camera)
+    catalogue = driver.control_catalog_snapshot(camera)
+    controls = {item.key: item.public() for item in catalogue.controls}
     audio_messages = driver.supports_audio_messages(camera)
     audio_streams = driver.supports_audio_streams(camera)
     onboard_recordings = driver.supports_onboard_recordings(camera)
@@ -35,6 +35,7 @@ def camera_out(camera: registry.Camera) -> dict:
         "has_substream": camera.substream_url is not None,
         "has_quality_variants": True,
         "controls": controls,
+        "controls_pending": catalogue.pending,
         "audio_messages": audio_messages,
         "audio_streams": audio_streams,
         "onboard_recordings": onboard_recordings,

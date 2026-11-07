@@ -25,6 +25,22 @@ function row(label, widget, reason = "panel.unavailable") {
       ...(!enabled ? [el("small", { textContent: t(reason) })] : [])), content);
 }
 
+function waitForCatalogue(signal) {
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      reject(new Error("Catalogue wait cancelled"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, 500);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+}
+
 export function cameraControls(camera, extras = {}) {
   const trigger = el("button", {
     className: "camera-panel-trigger icon-btn", type: "button", innerHTML: svgIcon("i-settings"),
@@ -45,12 +61,19 @@ export function cameraControls(camera, extras = {}) {
     const timeout = setTimeout(() => controller.abort(), 10000);
     let cam;
     try {
-      // One explicit catalogue read. Never rebuild tiles/players or replay a write.
-      const cameras = await api("/cameras", { signal: controller.signal });
-      if (!active || controller.signal.aborted || !trigger.isConnected) return;
-      const current = Array.isArray(cameras) && cameras.find((item) => item.id === camera.id);
-      if (!current) throw new Error("Camera unavailable");
-      cam = permittedCamera(current);
+      // Only pending driver evidence warrants another read. Never replay writes or rebuild players.
+      while (active && !controller.signal.aborted && trigger.isConnected) {
+        const cameras = await api("/cameras", { signal: controller.signal });
+        if (!active || controller.signal.aborted || !trigger.isConnected) return;
+        const current = Array.isArray(cameras) && cameras.find((item) => item.id === camera.id);
+        if (!current) throw new Error("Camera unavailable");
+        if (current.controls_pending !== true) {
+          cam = permittedCamera(current);
+          break;
+        }
+        await waitForCatalogue(controller.signal);
+      }
+      if (!cam) return;
     } catch (_error) {
       if (active && trigger.isConnected) notify(t("panel.loadFailed"), { anchor: trigger, error: true });
       return;

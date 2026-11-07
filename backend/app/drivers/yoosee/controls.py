@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from ...db import p2p
 from ..base import Unsupported
 from ..contracts import (
+    ControlCatalogueSnapshot,
     ControlDescriptor,
     ControlNotReady,
     ControlOperationError,
@@ -102,27 +103,38 @@ _DESCRIPTORS = (
 def catalog(camera: Camera) -> tuple[ControlDescriptor, ...]:
     """Advertise controls only when this exact camera has durable Yoosee material."""
 
+    return catalog_snapshot(camera).controls
+
+
+def catalog_snapshot(camera: Camera) -> ControlCatalogueSnapshot:
+    """Capture readiness before scheduling a refresh, including fast worker completions."""
+
     if not camera.camera_id or not p2p.has_enrollment_for_camera(camera.camera_id):
-        return ()
+        return ControlCatalogueSnapshot(())
     from .capability_rollout import selected
     from .capability_runtime import request_refresh
 
     rollout = selected(camera.camera_id)
     if rollout is None:
-        return _DESCRIPTORS
+        return ControlCatalogueSnapshot(_DESCRIPTORS)
     identity, managed = rollout
+    now = time.time()
+    current = capability_snapshot_store.is_current(
+        camera_id=camera.camera_id, identity=identity, now=now,
+    )
     validated = {
-        item.key: item for item in stored_catalog(camera, identity=identity, now=time.time())
+        item.key: item for item in stored_catalog(camera, identity=identity, now=now)
     }
     # Refresh is asynchronous and never renews login or allocates camera media.
-    if not capability_snapshot_store.is_current(
-        camera_id=camera.camera_id, identity=identity, now=time.time(),
-    ):
+    if not current:
         request_refresh(camera.camera_id, identity.device_id)
-    return tuple(
+    descriptors = tuple(
         validated[item.key] if item.key in managed else item
         for item in _DESCRIPTORS
         if item.key not in managed or item.key in validated
+    )
+    return ControlCatalogueSnapshot(
+        descriptors, pending=not current and any(item.key in managed for item in _DESCRIPTORS),
     )
 
 

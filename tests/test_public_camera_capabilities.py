@@ -3,6 +3,7 @@
 from backend.app.api.camera_presenter import camera_out
 from backend.app.api.public_capabilities import public_capabilities
 from backend.app.db.registry import Camera
+from backend.app.drivers.contracts import ControlCatalogueSnapshot, ControlDescriptor
 
 
 def test_display_metadata_omits_private_and_unbounded_fields():
@@ -27,15 +28,18 @@ def test_camera_response_omits_paths_but_preserves_driver_control_contract(monke
     camera = Camera(camera_id="cam_" + "a" * 24, capabilities={"ptz": True, "has_audio": True,
         "private_evidence": secret}, stream_path=f"/live?token={secret}")
     observed = []
+    descriptor = ControlDescriptor("orientation", "choice", writable=True, options=("normal",))
 
     def catalogue(value):
         observed.append(value.capabilities["private_evidence"])
-        return {"orientation": {"supported": True}}
+        return ControlCatalogueSnapshot((descriptor,), pending=True)
 
-    monkeypatch.setattr(camera_presenter, "control_catalog", catalogue)
+    driver = camera_presenter.drivers.for_camera(camera)
+    monkeypatch.setattr(driver, "control_catalog_snapshot", catalogue)
     result = camera_out(camera)
     assert secret not in str(result)
     assert "stream_path" not in result
-    assert result["controls"] == {"orientation": {"supported": True}}
+    assert result["controls"] == {"orientation": descriptor.public()}
+    assert result["controls_pending"] is True
     assert observed == [secret]
     assert result["capabilities"]["ptz"] is True

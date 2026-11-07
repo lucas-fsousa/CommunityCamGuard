@@ -44,11 +44,13 @@ def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):
     monkeypatch.setattr(runtime, "request_refresh", lambda *args: requested.append(args))
     camera = SimpleNamespace(camera_id=CAMERA)
     legacy = controls.catalog(camera)
+    assert not controls.catalog_snapshot(camera).pending
     assert requested == []
     profiles.register(
         PROFILE, sources={"night_vision": "sha256:" + "a" * 64 + " proof#night"}, reviewed_at=100
     )
     rollout.activate(PROFILE)
+    assert controls.catalog_snapshot(camera).pending
     assert "night_vision" not in {item.key for item in controls.catalog(camera)}
     snapshots.save(
         CapabilitySnapshot(
@@ -59,6 +61,7 @@ def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):
     )
     requested.clear()
     current = {item.key: item for item in controls.catalog(camera)}
+    assert not controls.catalog_snapshot(camera).pending
     assert current["night_vision"].options == ("automatic", "daytime")
     assert all(current[item.key] == item for item in legacy if item.key != "night_vision")
     assert controls.catalog(SimpleNamespace(camera_id="cam_" + "2" * 24)) == legacy
@@ -81,6 +84,32 @@ def test_runtime_migrates_only_selected_unit_and_controls(monkeypatch):
     restored = {item.key: item for item in controls.catalog(camera)}
     assert restored["night_vision"].options == ("automatic", "daytime")
     assert requested == []
+
+
+def test_catalogue_readiness_ignores_media_only_rollouts(monkeypatch):
+    monkeypatch.setattr(controls.p2p, "has_enrollment_for_camera", lambda _: True)
+    monkeypatch.setattr(rollout, "selected", lambda _: (IDENTITY, frozenset({"native_video"})))
+    monkeypatch.setattr(controls, "stored_catalog", lambda *a, **k: ())
+    monkeypatch.setattr(snapshots, "is_current", lambda **k: False)
+    monkeypatch.setattr(runtime, "request_refresh", lambda *a: None)
+    snapshot = controls.catalog_snapshot(SimpleNamespace(camera_id=CAMERA))
+    assert not snapshot.pending
+    assert snapshot.controls == controls._DESCRIPTORS
+
+
+def test_fast_refresh_cannot_report_an_empty_catalogue_as_ready(monkeypatch):
+    monkeypatch.setattr(controls.p2p, "has_enrollment_for_camera", lambda _: True)
+    monkeypatch.setattr(rollout, "selected", lambda _: (IDENTITY, frozenset({"night_vision"})))
+    monkeypatch.setattr(controls, "stored_catalog", lambda *a, **k: ())
+    monkeypatch.setattr(snapshots, "is_current", lambda **k: False)
+
+    def refresh(*args):
+        monkeypatch.setattr(snapshots, "is_current", lambda **k: True)
+
+    monkeypatch.setattr(runtime, "request_refresh", refresh)
+    snapshot = controls.catalog_snapshot(SimpleNamespace(camera_id=CAMERA))
+    assert snapshot.pending
+    assert "night_vision" not in {item.key for item in snapshot.controls}
 
 
 def test_refresh_is_bounded_single_worker_with_backoff(monkeypatch):

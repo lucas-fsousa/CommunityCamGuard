@@ -8,6 +8,7 @@ from backend.app.db import registry
 from backend.app.drivers.base import CameraDriver, Unsupported
 from backend.app.drivers.contracts import (
     AudioMessageResult,
+    ControlCatalogueSnapshot,
     ControlDescriptor,
     ControlNotReady,
     ControlOption,
@@ -96,6 +97,20 @@ def test_catalog_and_operations_are_dispatched_to_selected_driver(monkeypatch):
     }
     assert read.value is True and read.verified is True
     assert written.value is False and written.changed is True
+
+
+def test_public_catalogue_keeps_driver_readiness_and_support_together(monkeypatch):
+    from backend.app.api.camera_presenter import camera_out
+
+    selected = FakeControlDriver()
+    monkeypatch.setattr(drivers, "for_camera", lambda camera: selected)
+    assert selected.control_catalog_snapshot(_camera()).pending is False
+    assert "white_light" in camera_out(_camera())["controls"]
+    monkeypatch.setattr(selected, "control_catalog_snapshot", lambda camera:
+                        ControlCatalogueSnapshot((), pending=True))
+    public = camera_out(_camera())
+    assert public["controls_pending"] is True
+    assert public["controls"] == public["vendor_controls"] == {}
 
 
 def test_unadvertised_option_never_reaches_driver(monkeypatch):

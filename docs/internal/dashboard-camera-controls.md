@@ -1,5 +1,31 @@
 # Camera control panel — 2026-09-12
 
+## Expired capability evidence — 2026-11-07
+
+The driver now returns a coherent control catalogue plus `controls_pending` in
+the authenticated camera response. Yoosee marks it pending only when stale
+evidence affects managed settings controls, not when only native video/PTZ
+evidence is stale. Unsupported or unverified controls remain absent; this flag
+never authorizes a command or extends proof validity. Other drivers default to
+their existing catalogue without a wait.
+
+Opening settings keeps the existing localized spinner while pending evidence is
+queried. Only then does the panel repeat the catalogue GET at 500 ms intervals,
+within the existing 10-second deadline. Ready catalogues require just one GET.
+Timeout/read failure reports the existing load error and releases the trigger;
+logout cancels both fetch and timer, and detached triggers cannot poll again.
+No write is replayed, player rebuilt, or video source restarted. The driver's
+existing single refresh worker and attempt backoff remain unchanged. Pending
+means evidence is stale, not a guarantee that a refresh worker was admitted.
+
+Focused Python and dependency-free Node checks cover stale/current evidence,
+media-only scope, a refresh completing during catalogue construction, safe public
+projection, pending-to-ready reads, logout, timeout, detachment and read failure.
+These are software checks, not another physical-control homologation.
+Local result: 94 Python tests passed, one optional fixture skipped, Node contracts,
+Ruff and Mypy passed. Python runs peaked at 79 MiB, type checking at 124.5 MiB,
+with zero swap under explicit resource limits; no browser or emulator was started.
+
 ## Direct intercom actions — 2026-10-29
 
 Hold-to-speak and recorded voice messages moved out of the camera-settings popup

@@ -19,6 +19,7 @@ from ...control import device, media, ptz
 from ..base import CameraDriver, Capabilities, DetectContext
 from ..contracts import (
     AudioMessageResult,
+    ControlCatalogueSnapshot,
     ControlDescriptor,
     ControlOption,
     ControlResult,
@@ -148,6 +149,9 @@ class YooseeDriver(CameraDriver):
 
     def control_catalog(self, camera: Camera) -> tuple[ControlDescriptor, ...]:
         return controls.catalog(camera)
+
+    def control_catalog_snapshot(self, camera: Camera) -> ControlCatalogueSnapshot:
+        return controls.catalog_snapshot(camera)
 
     def unavailable_control(self, camera: Camera, key: str) -> None:
         from .capability_availability import unavailable_control

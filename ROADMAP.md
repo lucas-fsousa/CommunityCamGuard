@@ -6,6 +6,12 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current delivery — 2026-11-07
 
+Control-panel expiry fix: driver-owned `controls_pending` now distinguishes a
+temporarily incomplete capability catalogue from a ready one. Opening settings
+waits up to 10s for read-only refresh, without retrying any action or touching the
+players. Other drivers keep their catalogue behavior; model/firmware proof and
+authorization remain authoritative. See docs/internal/dashboard-camera-controls.md.
+
 ALL THREE INSTALLED CAMERAS NOW RUN NATIVE LAN UDP in the normal image:
 7577ece10cd1/build b-c1ad3a34ef0f, code55b7b6f, CI and Image green. The final
 simultaneous300s HD observation PASSED without disconnect/recovery/revision

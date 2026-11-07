@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 from ..discovery import rtsp
 from .contracts import (
     AudioMessageResult,
+    ControlCatalogueSnapshot,
     ControlDescriptor,
     ControlOption,
     ControlResult,
@@ -216,6 +217,11 @@ class CameraDriver:
         """Describe semantic controls available for this exact camera."""
 
         return ()
+
+    def control_catalog_snapshot(self, camera: Camera) -> ControlCatalogueSnapshot:
+        """Drivers with asynchronous evidence can report a temporarily incomplete catalogue."""
+
+        return ControlCatalogueSnapshot(self.control_catalog(camera))
 
     def read_control(self, camera: Camera, key: str) -> ControlResult:
         """Read one allowlisted semantic control; family drivers opt in explicitly."""

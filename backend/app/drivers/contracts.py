@@ -201,6 +201,14 @@ class ControlDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlCatalogueSnapshot:
+    """One coherent catalogue; pending evidence never grants a control."""
+
+    controls: tuple[ControlDescriptor, ...]
+    pending: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class ControlOption:
     """One safe runtime option returned by a camera-family driver."""
 

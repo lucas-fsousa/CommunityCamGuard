@@ -223,6 +223,45 @@ const cameraControls = load("camera-controls.js", {
     } else assert.equal(document.body.children.length, count - (mode === "detached" ? 1 : 0));
     button.remove();
   }
+  for (const mode of ["ready", "session", "timeout", "failure", "detached"]) {
+    let end, expire, resume, calls = 0;
+    const factory = load("camera-controls.js", {
+      el, state, t, controlWidgets, allowed: () => true, permittedCamera: cam => cam,
+      api: async url => {
+        assert.equal(url, "/cameras"); // Reads only; never replay a camera command.
+        calls++;
+        if (calls === 2 && mode === "failure") throw new Error("offline");
+        return [{ id: "pending", controls: {}, controls_pending: calls === 1 }];
+      },
+      onSessionEnd: callback => { end = callback; return () => {}; },
+      setTimeout: (callback, ms) => {
+        if (ms === 10000) expire = callback;
+        else { assert.equal(ms, 500); resume = callback; }
+        return ms;
+      },
+      clearTimeout: () => {},
+    }, "cameraControls");
+    const button = factory({ id: "pending" });
+    document.body.append(button);
+    const count = document.body.children.length;
+    const opening = button.click();
+    await new Promise(setImmediate);
+    assert.equal(calls, 1);
+    assert.equal(button.disabled, true);
+    assert.equal(document.body.children.length, count); // No false unsupported panel.
+    if (mode === "session") end();
+    else if (mode === "timeout") expire();
+    else {
+      if (mode === "detached") button.remove();
+      resume();
+    }
+    await opening;
+    assert.equal(button.disabled, false);
+    assert.equal(calls, ["ready", "failure"].includes(mode) ? 2 : 1);
+    if (mode === "ready") await walk(document.body.children.at(-1)).find(n => n.textContent === "×").click();
+    else assert.equal(document.body.children.length, count - (mode === "detached" ? 1 : 0));
+    button.remove();
+  }
   for (const [file, name] of [["audio-message.js", "audioMessageButton"], ["push-to-talk.js", "pushToTalkButton"]]) {
     const cleanups = new Set();
     const button = load(file, { el, api, t, onSessionEnd: fn => {

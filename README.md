@@ -157,6 +157,8 @@ brand. The selected driver returns a catalogue for the exact model/firmware inst
 dashboard enables only that catalogue. The **Camera controls** panel groups image, audio,
 security, storage and maintenance; unreleased functions may appear as explained disabled
 placeholders, never as a claim of hardware support. Unknown support fails closed.
+If the driver reports expired support evidence, opening the panel waits up to 10 seconds
+for its read-only refresh. This does not resend camera actions or restart live video.
 
 ## Architecture
 
