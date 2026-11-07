@@ -6,6 +6,18 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current delivery — 2026-11-07
 
+FIELD ROLLOUT DONE after explicit owner authorization: garage and yard passed
+independent private-DB UDP/decoder/original-archive trials with fresh40.1.22
+identities, then joined camera3 in the normal shared-account startup. All THREE
+installed units are native/active, with one server UDP socket and three FFmpeg
+consumers. Concurrent60s authenticated HD MSE consumers and read-only control
+queries passed without source revision changes or reconnects. This is the actual
+group rollout, not a three-camera maximum. Existing footage preserved; no camera
+setting/action commands. See docs/internal/native-field-rollout.md. Camera3's
+earlier overnight result is not overnight group acceptance. The native transport
+delivery for the installed cameras is complete; subsequent work follows actual
+failures and the remaining non-deferred product backlog, not reopened gates.
+
 2026-11-07 LAN UDP AV LIVE-CONFIRMED on camera3. SDK-backed INIT application
 repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s
 authenticated MSE observation delivered62fragments without reconnection/source
@@ -38,9 +50,9 @@ identity transport proofs (notably lan_udp) and their original provenance.
 The installer now preserves reviewed supersets with matching read/write scope;
 changed firmware/model/SDK cannot inherit UDP acceptance. Focused offline tests
 cover preservation and identity-change rejection. No running source was restarted.
-Garage/yard migration requires separate authorization for brief video/recording
-interruption. Their enrollments exist but no current native media identity/profile
-is recorded; do not clone camera3's proofs or silently switch their source modes.
+Garage/yard authorization was subsequently granted and the migration delivered
+above. Their exact media profiles now reference their own live acceptance, not
+camera3's review. The initial lack of field identities is historical.
 
 ### Investigation history — pending labels below are superseded above
 

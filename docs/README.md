@@ -32,6 +32,9 @@ Docs are split by audience:
 - **[Native LAN UDP video](internal/native-lan-av.md)** — SDK-backed handshake,
   driver-selected camera3 rollout in the normal image, original1080p archive,
   measured MSE delivery and remaining long-term stability scope.
+- **[Native field rollout](internal/native-field-rollout.md)** — garage/yard
+  acceptance and normal three-camera UDP deployment on one shared account,
+  concurrent HD consumers, original archives and resource measurements.
 
 - **[Yoosee push certification](internal/yoosee-push-certification.md)** — isolated
   wire codecs, E4 correlation, certification/recertification and safe teardown gates.

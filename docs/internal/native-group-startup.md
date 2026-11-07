@@ -2,6 +2,11 @@
 
 ## Delivered path
 
+Live group rollout is now accepted for the three installed units; see
+[field rollout](native-field-rollout.md) for exact identity, archive, simultaneous
+consumer and resource evidence. Older single-unit limitations below are retained
+as implementation history, not the current deployment state.
+
 Ordinary server startup builds a driver-neutral plan from cameras whose persisted
 source mode is already `native`. Legacy RTSP cameras are never passed to the
 planner, migrated, opened or granted new capabilities by this operation.
