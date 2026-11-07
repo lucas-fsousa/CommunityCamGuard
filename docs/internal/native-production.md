@@ -1,5 +1,10 @@
 # Native media delivery, not another finite trial
 
+Current deployment is now native LAN UDP on all three installed units, with
+driver-reviewed identities and a passed simultaneous300s group run after fixing
+measured receive-buffer loss. See [field rollout](native-field-rollout.md) for
+current results and limits. The TCP-relay investigation below is historical.
+
 ## Actual regression — 2026-11-06
 
 Recovery fix4ac0dad is deployed: image6fbcb0cf0171/tag `wsl-native-lease-recovery`,

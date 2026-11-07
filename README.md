@@ -10,19 +10,20 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 
 > Status: working end-to-end — no-auth discovery + opaque driver-independent camera identity,
 > credential-validated add with automatic capability probe, live streaming (go2rtc/WebRTC) with
-> listen-in audio, **PTZ** control (press-and-hold), 24/7 crash-safe recording with browser
+> listen-in audio, **PTZ** control (click/drag pad), 24/7 crash-safe recording with browser
 > playback + time-based retention, storage policy, a localized (en/pt-BR) web dashboard with a
 > dedicated **Cameras** setup tab, and a REST API. Recorded voice messages and bounded push-to-talk
-> are physically validated on the current Yoosee units through the driver's LAN RTSP backchannel.
+> are physically validated on the current Yoosee units, with transport selected by the driver.
 > This does not establish support for every model/firmware or every fallback transport.
 
 Supported intercom actions are directly on each live camera bar: hold to speak
 without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
 
-Yoosee proprietary streaming is now deployed for the test camera3 in the ordinary
-Docker dashboard: one native A/V connection supplies H264/AAC to the existing
-player, original HEVC/AAC recordings and reviewed PTZ on the same session. Speaker
+Yoosee proprietary LAN UDP streaming is deployed for the three currently installed
+units in the ordinary Docker dashboard: one shared account owns independent
+camera A/V leases, supplying H264/AAC to the existing player, original HEVC/AAC
+recordings and reviewed PTZ on the same owner. Camera3's speaker
 volume and normal/inverted image orientation can also be adjusted and verified on
 that owner without interrupting video.
 Control-capability refresh also reuses that account for read-only queries rather
@@ -47,16 +48,18 @@ Bounded siren pulses also have a shared-session adapter with owner-driven OFF an
 independent state confirmation. A two-second native pulse was physically accepted
 on camera3; no other-device/duration support is inferred. See
 [native siren](docs/internal/native-shared-siren.md) for shutdown guarantees and limits.
-Camera3's native video completed a 15-minute continuous MSE acceptance run.
-Recent corrections cover video/AAC fairness, KCP receive credit and repair timing,
-periodic MTP route maintenance, and TCP pump scheduling under CPU load.
-Longer endurance and simultaneous native cameras are not yet established; see the
-[failure investigation](docs/internal/native-transport-investigation.md) and
-[current status](docs/internal/native-production.md).
+Camera3's LAN UDP session passed an overnight observation of over ten hours,
+including127closed original-codec recordings and a fresh authenticated MSE check.
+Garage and yard then passed their own UDP/decoder/original-archive acceptance;
+their different firmware was not treated as permission to copy camera3's proofs.
+The initial group exposed a UDP-send failure after its first successful minute.
+Media-only congestion handling and safe socket-error diagnostics were corrected;
+see the [field rollout](docs/internal/native-field-rollout.md) for the incident,
+subsequent simultaneous observation and the precise remaining endurance boundary.
 The shared-account path has dynamic camera leases, three independent native
 consumers, camera-local decoder recovery and server-owned account shutdown.
-Integration tests use synthetic broker replies and fake decoders; they are not
-a three-real-camera rollout. Reviewed offers and exact-device PTZ now bind lazily
+Integration tests use synthetic broker replies and fake decoders; live acceptance
+is recorded separately in the field rollout. Reviewed offers and exact-device PTZ bind lazily
 to the server account, retaining it across video recovery and closing it when the
 last source ends. Startup supports reviewed Yoosee cameras through that same
 account, without an artificial camera-count ceiling. See
@@ -65,11 +68,12 @@ account, without an artificial camera-count ceiling. See
 Workers are allocated on demand for explicitly admitted cameras; no camera-count
 setting is required. This does not migrate RTSP cameras. The startup/driver/account
 path is tested with five synthetic sources and one login, including recovery from
-TCP EOF without an inner close receipt. Current physical native acceptance
-remains camera3 only. Capacity/domain conflicts preserve unspent checkpoints.
+TCP EOF without an inner close receipt. All three installed units have live native
+video acceptance. Capacity/domain conflicts preserve unspent checkpoints.
 See [native groups](docs/internal/native-group-startup.md) for setup and limits.
-The other two cameras retain their existing RTSP transports. No emulator or temporary
-trial server is needed. Support remains per device/model/firmware, not brand-wide.
+No emulator or temporary trial server is needed for normal operation. Native TCP
+remains the transport fallback; unmigrated cameras retain RTSP/ONVIF. Support stays
+per device/model/firmware, not brand-wide.
 See [deployment and limitations](docs/internal/native-production.md).
 
 That deployment enables `NATIVE_RESUME_ON_START=true`; the distributed default
@@ -79,7 +83,7 @@ support, changed identity/credentials and uncertain retirement still block reuse
 Clean restart and bounded reconnection are implemented. The default Linux PID1
 Docker deployment also restores reviewed native capture after abrupt app death,
 without a clean-shutdown checkpoint; see [startup recovery](docs/internal/native-abrupt-startup.md).
-Other host layouts, multi-day endurance and concurrent native cameras remain
+Other host layouts and multi-day group endurance remain
 follow-ups, not claims of completed validation. Earlier [integration evidence](docs/internal/native-av-delivery.md),
 [storage pause/resume](docs/internal/native-storage-policy.md) and
 [clean startup](docs/internal/native-clean-startup.md) remain available.

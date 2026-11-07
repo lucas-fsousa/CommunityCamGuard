@@ -66,11 +66,12 @@ background-service shutdown. Source restoration remains separate.
 Native relay RE (experimental, not production capabilities): [RTC boundaries and
 decryption](yoosee-push-rtc.md), [fragment ownership and assembly limits](yoosee-push-fragments.md).
 See also [pinned SDK codec enum translation](yoosee-rtc-codecs.md).
-Current camera3 milestone: [native LAN UDP AV](native-lan-av.md) is integrated
-and live-confirmed in the normal server image through the driver's reviewed
-profile. Original1080pHEVC/AAC recording and authenticated MSE reception passed;
-TCP fallback remains. Long-term stability and offline authentication remain
-separate. The following TCP notes retain earlier investigation history.
+Current native milestones: [all-three-camera LAN UDP rollout](native-field-rollout.md)
+passed simultaneous300s MSE delivery, zero receive drops and original1080pHEVC/AAC
+archive rollover in the normal image. The earlier [camera3 LAN AV](native-lan-av.md)
+checkpoint also passed over10hours, separately from group acceptance. TCP fallback
+remains; multi-day stability and offline authentication remain separate.
+The following TCP notes retain earlier investigation history.
 
 Earlier camera-3 live milestone: [native AV over TCP relay](native-av-tcp-relay.md)
 completed negotiation and decoded HEVC at 640×360, then **1920×1080** with the

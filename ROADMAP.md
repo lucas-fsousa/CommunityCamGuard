@@ -6,6 +6,19 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current delivery — 2026-11-07
 
+ALL THREE INSTALLED CAMERAS NOW RUN NATIVE LAN UDP in the normal image:
+7577ece10cd1/build b-c1ad3a34ef0f, code55b7b6f, CI and Image green. The final
+simultaneous300s HD observation PASSED without disconnect/recovery/revision
+change. The owning receive socket stayed at ZERO packet drops with2MiB actual
+capacity; all three original1080pHEVC/AAC archives closed300s segments and the
+next segments grew. No physical-control command, global network setting change
+or artificial camera ceiling. Details: docs/internal/native-field-rollout.md.
+Native transport delivery for the installed units is complete. The failed runs
+below are preserved as investigation history, not remaining implementation gates.
+This is bounded group acceptance, not multi-day or all-hardware certification.
+
+### Recent rollout history — superseded by the current delivery above
+
 FIELD PROTOCOL ACCEPTANCE PASSED after explicit owner authorization: garage and yard passed
 independent private-DB UDP/decoder/original-archive trials with fresh40.1.22
 identities, then joined camera3 in the normal shared-account startup. All THREE

@@ -1,5 +1,10 @@
 # Native LAN UDP field rollout — 2026-11-07
 
+Current deployment: all three units are native/active on image7577ece10cd1,
+with the post-receive-buffer300s group observation passed. See the final run
+below. Earlier failures and temporary RTSP rollback are retained honestly as
+history, not the current operating state.
+
 ## Rollout checkpoint and subsequent incident
 
 IMPORTANT: the initial simultaneous minute passed, but at14:15:53Z the shared
@@ -18,7 +23,8 @@ Broker/physical-control sends do NOT use this policy. Other socket errors and
 partial sends still propagate; retirement now logs fixed exception type/errno
 without raw error text. Synthetic coverage injects one media ACK send timeout
 and verifies the same UDP reader reaches readiness and retires cleanly. A new
-normal-group run beyond the observed failure time remains required.
+normal-group run beyond the observed failure time was required; its final
+accepted result is recorded below, separately from these failed attempts.
 
 ### Second run: isolated decoder recovery and measured socket loss
 
@@ -132,3 +138,33 @@ advertised as overnight acceptance of three simultaneous native streams. Observe
 the normal group and investigate actual new failures if reported; do not reopen
 the delivered handshake or invent additional rollout gates. LAN-only cloud
 independence, SD playback and other brands retain the owner's deferred priority.
+
+## Final normal-image group run — receive headroom enabled
+
+Code55b7b6f passed CI42382911788 and Image42382911745;40focused tests, Ruff
+and Mypy427files passed locally. Capped512MiB/25%-CPU build produced
+image7577ece10cd1/build b-c1ad3a34ef0f. Only the app was replaced at14:46:04Z;
+no additional camera setting/action or host network-policy change was introduced.
+The real server UDP socket had2097152bytes receive capacity (ss/FD inode match),
+with zero receive drops before AND after the simultaneous observation. No
+failure/retry events appeared in the existing persistent log after deployment.
+
+| Unit | MSE interval | Binary fragments | Bytes | Max fragment gap |
+| --- | --- | --- | --- | --- |
+| Camera3 | 300.01s | 597 | 225797078 | 2.598s |
+| Garage | 300.00s | 602 | 228911901 | 2.096s |
+| Yard | 300.00s | 601 | 228627796 | 2.584s |
+
+All consumers ran concurrently, with no closure or source revision change
+(231/15/15). Actual video had been running since startup, before the measured
+interval. Unlike the earlier failed windows, this interval PASSED in full.
+Each unit closed its first full original1920x1080HEVC/16kHz monoAAC segment:
+300.936/300.952/300.956seconds, with the next segments growing. Memory427.9MiB/
+1GiB, CPU approximately136% of one core, OOM=false and automatic restart count0.
+The collector was capped192MiB/25%CPU and peaked51.4MiB; no browser/emulator ran.
+
+This accepts the installed native group for the measured workload, not indefinite
+stability, all other hardware, visual latency or physical-control rehomologation.
+The first fatal send error still lacks an original errno; receive-buffer loss was
+independently MEASURED and removed in this run, not retroactively asserted as the
+only cause of every historical freeze. Keep these distinctions when reporting.
