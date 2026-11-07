@@ -34,6 +34,10 @@ class Tcp:
         self.result = None
         self.steps = self.finishes = 0
 
+    def begin_finish(self):
+        self.ready = False
+        self.events.append(("begin_close", self.bootstrap.spec.device.device_id))
+
     def step(self, *, budget_seconds=0.2):
         assert 0 < budget_seconds <= 0.2 / 3
         self.steps += 1

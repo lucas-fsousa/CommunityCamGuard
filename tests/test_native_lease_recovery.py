@@ -9,7 +9,7 @@ from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
     ("media_complete", "", True), ("stopped", "", True), ("consumer_failed", "TimeoutError", True),
     ("consumer_failed", "DecoderExitedError", True), ("consumer_failed", "ValueError", False),
     ("protocol", "", False), ("connection", "", False), ("busy", "", False),
-    ("enrollment_changed", "", False), ("account_ended", "", False)])
+    ("enrollment_changed", "", False), ("account_ended", "", True)])
 def test_camera_lease_retry_does_not_require_closing_shared_account(monkeypatch, reason, failure, allowed):
     source = NativeVideoSource("test", "123")
     monkeypatch.setattr(source, "diagnostics", lambda: {"session_scope": "media_lease",
@@ -19,11 +19,12 @@ def test_camera_lease_retry_does_not_require_closing_shared_account(monkeypatch,
     assert retryable(result, source) is allowed
 
 
+@pytest.mark.parametrize("reason", ["socket", "account_ended"])
 @pytest.mark.parametrize("fault", ["scope", "detach", "consumer", "decoder"])
-def test_uncertain_source_or_decoder_retirement_cannot_retry(monkeypatch, fault):
+def test_uncertain_source_or_decoder_retirement_cannot_retry(monkeypatch, fault, reason):
     source = NativeVideoSource("test", "123")
     details = {"session_scope": "account" if fault == "scope" else "media_lease",
         "session_lease_detached": fault != "detach", "consumer_alive": fault == "consumer",
         "cleanup_failed": fault == "decoder"}
     monkeypatch.setattr(source, "diagnostics", lambda: details)
-    assert not retryable(NativeVideoResult("socket", SharedReadResult("socket")), source)
+    assert not retryable(NativeVideoResult(reason, SharedReadResult(reason)), source)

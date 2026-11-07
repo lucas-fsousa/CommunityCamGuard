@@ -36,7 +36,10 @@ def retryable(result: object, source: ManagedSource) -> bool:
             "inventory_timeout", "inventory_unavailable", "preparation_budget"}
     if result.reason == "busy":
         return isinstance(source, AccountVideoSource)
-    return result.reason in {"socket", "media_complete", "stopped"}
+    # An account ending is not itself unsafe: the checks above still require
+    # the exact lease's confirmed detach and fully retired consumer. The service
+    # will reuse or replace its account only after its own ownership checks.
+    return result.reason in {"socket", "media_complete", "stopped", "account_ended"}
 
 
 class AccountRecoveringSource(RecoveringSource):

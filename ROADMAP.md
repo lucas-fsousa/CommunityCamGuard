@@ -26,6 +26,15 @@ account-wide recovery fault resolved. Keep the field units on RTSP until that
 separate failure is reproduced and corrected; do not migrate them based on another
 short successful observation.
 
+Recovery follow-up: reproduced serial broker-drain loss of a sibling's valid
+CLOSE receipt, and serial TCP teardown exceeding the caller's retirement budget.
+The worker now drains broker routes together and starts TCP close deadlines
+together. Confirmed `account_ended` exits can retry through the retained service;
+unknown physical close/missing broker receipts/unsafe controls remain fenced.
+Details and counterfactual tests: docs/internal/native-source-leases.md.
+These are recovery fixes, not evidence that native endurance is resolved; the
+installed cameras remain on RTSP during this work.
+
 ### Earlier delivery — superseded by the incident above
 
 Control-panel expiry fix: driver-owned `controls_pending` now distinguishes a

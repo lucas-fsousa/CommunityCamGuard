@@ -159,6 +159,35 @@ def test_source_intent_is_lazy_keeps_account_between_attempts_and_retires_last(t
         owner.close()
 
 
+def test_two_source_intents_share_one_replacement_only_after_clean_account_exit(tmp_path, monkeypatch):
+    created = []
+    def create(entries):
+        account = Account(entries)
+        created.append(account)
+        return account
+    monkeypatch.setattr(module, 'NativeAccount', create)
+    owner = ServerOwner(tmp_path / 'app.db')
+    owner.acquire()
+    service = module.NativeAccounts(owner)
+    first = P2PEnrollment('123456', 123, b'x' * 64, None, '', '', 'cam_' + 'a' * 24)
+    second = P2PEnrollment('123457', 123, b'x' * 64, None, '', '', 'cam_' + 'b' * 24)
+    entries = (first, second)
+    try:
+        with service.source_intent(first), service.source_intent(second):
+            old = service.prepare(entries)
+            assert old.started.wait(1)
+            old.stop()
+            service._thread.join(timeout=1)
+            assert old.cleanup_confirmed and not service._thread.is_alive()
+            replacement = service.prepare(entries)
+            assert replacement is not old and replacement.started.wait(1)
+            assert service.prepare(entries) is replacement and len(created) == 2
+        assert service._account is None
+    finally:
+        service.stop()
+        owner.close()
+
+
 def test_last_source_cannot_hide_uncertain_account_retirement(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "NativeAccount", Account)
     owner = ServerOwner(tmp_path / "app.db")

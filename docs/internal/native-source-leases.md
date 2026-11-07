@@ -1,5 +1,46 @@
 # Per-camera sources under one native account
 
+## Shared retirement correction — 2026-11-07
+
+Production remains on temporary RTSP after the reopened native incident. The
+following defects are reproduced offline; they do not establish the original
+network/decoder failure's cause or prove long-term native recovery.
+
+The account worker previously called a broker CLOSE drain separately for every
+camera. Each drain read the SAME UDP socket but offered validated replies only
+to its current route. A reply for another already-closing route was consumed and
+lost, so that route subsequently expired and fenced the shared account even
+though the broker had replied. A regression reproduces this exact serial loss
+with encrypted synthetic replies. The worker now drains all pending routes
+together, offering each validated reply to every route's existing session,
+sequence, peer and generation checks. No new OPEN, CLOSE retransmission, timeout
+increase, login or socket is introduced. Truly absent/negative receipts still
+fail the existing cleanup contract.
+
+TCP shutdown also used to begin each two-second close only after the previous
+one finished. Three quiet transports could spend six seconds there, exceeding
+the source caller's five-second retirement deadline before broker cleanup.
+All TCP closes now start together and receive an initial bounded pump turn
+(200 ms shared across the group) before the existing final drains. Individual
+deadlines, physical socket-close checks, motor STOP/siren cleanup ordering and
+first-error propagation remain intact. The synthetic timing case completes the
+transport phase in two seconds, not six; it is not a measured camera result.
+
+Finally, `account_ended` is now retryable ONLY after the same confirmed camera
+detach, joined consumer and successful decoder cleanup required for other
+recoverable lease exits. A retained server service, not each camera, owns account
+replacement. Tests prove two intents share one replacement after the old thread
+exits cleanly; missing detach, live consumer or uncertain cleanup still refuse
+retry. No capability, proof validity or command-replay rule changes.
+
+Local focused regressions: 144 tests passed across shared shutdown, real
+cooperative transport fixtures, simulated PTZ safety, source/account recovery,
+driver startup and sanitized events. Ruff/Mypy passed. Runs were sequential,
+capped at 192 MiB/no swap/50% CPU (Mypy256 MiB); test peak103.5 MiB. No real
+camera I/O, speaker/light command, media migration or service restart was used
+to establish these software results. The original all-camera outage is not
+relabelled resolved on the basis of these tests.
+
 ## Dynamic worker ownership — 2026-11-06
 
 `MediaLeaseInbox` and `MediaLeasePump` connect independent source callers to the

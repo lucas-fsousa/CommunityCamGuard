@@ -24,6 +24,7 @@ _counters = {'kcp_next_sequence':2**32-1, 'kcp_pending':128, 'kcp_parts':128,
              'mtp_kind':255, 'mtp_length':2047, 'kcp_window_rejected':2**32-1,
              'kcp_first_rejected':2**32-1, 'kcp_last_rejected':2**32-1}
 _labels = frozenset({'stopped', 'protocol', 'socket', 'connection', 'transport', 'busy', 'consumer_failed',
+    'account_ended',
     'contended', 'heartbeat_timeout', 'media_complete', 'lifetime', 'unavailable',
     'offline', 'socket_timeout', 'socket_error', 'stale_access', 'access_rejected',
     'transport_or_auth', 'list_dns', 'list_timeout', 'broker_heartbeat',

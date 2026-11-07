@@ -137,3 +137,37 @@ class AccountMediaChannel:
                                    self.tcp.result if self.tcp is not None else None, self._failure,
                                    self._protocol_code, self._protocol_facts,
                                    self.udp.result if self.udp is not None else None)
+
+
+def finish_media_channels(channels: tuple[AccountMediaChannel, ...]) -> None:
+    """Start TCP closes together, not a fresh two-second wait per sibling.
+
+    Each transport retains its existing close deadline and physical-close checks.
+    Attempt every retirement even if another raises; never hide the first error.
+    """
+    if len(channels) == 1:
+        channels[0].finish_media()
+        return
+    error: BaseException | None = None
+    for channel in channels:
+        try:
+            if channel.tcp is not None and channel.tcp.result is None:
+                channel.tcp.begin_finish()
+        except BaseException as exc:
+            if error is None:
+                error = exc
+    for channel in channels:
+        try:
+            if channel.tcp is not None and channel.tcp.result is None:
+                channel.tcp.step(budget_seconds=0.2 / len(channels))
+        except BaseException as exc:
+            if error is None:
+                error = exc
+    for channel in channels:
+        try:
+            channel.finish_media()
+        except BaseException as exc:
+            if error is None:
+                error = exc
+    if error is not None:
+        raise error

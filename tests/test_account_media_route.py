@@ -1,6 +1,7 @@
 """Single account reader, synthetic encrypted broker; never opens a media socket."""
 
 import struct
+from dataclasses import replace
 
 import pytest
 
@@ -12,6 +13,7 @@ from backend.app.drivers.yoosee.p2p.account_read_lifecycle import AccountReadLif
 from backend.app.drivers.yoosee.p2p.account_read_worker import AccountReadWorker
 from backend.app.drivers.yoosee.p2p.broker_sequences import BrokerSequences
 from backend.app.drivers.yoosee.p2p.crypto import gute_mode1_xor_checksum, gute_mode2_decrypt
+from backend.app.drivers.yoosee.p2p.media_route_cleanup import close_media_route, close_media_routes
 from backend.app.drivers.yoosee.p2p.media_route_job import MediaRouteJob, MediaRouteSpec
 from backend.app.drivers.yoosee.p2p.mtp_lan_endpoint import parse_mtp_lan_endpoint
 from backend.app.drivers.yoosee.p2p.wire import finish_mode2
@@ -22,6 +24,34 @@ from tests.test_broker_transactions import ack
 from tests.test_tcp_route import advertisement
 
 SPEC = MediaRouteSpec(123, DEVICE)
+
+
+@pytest.mark.parametrize("grouped", [False, True], ids=["old-serial-loss", "shared-drain"])
+def test_inflight_sibling_close_ack_is_not_lost_during_group_shutdown(grouped):
+    sock = MediaSocket()
+    sequences = BrokerSequences(NODE.session_id, 1, 40)
+    output = AccountOutputBudget(media_capacity=2)
+    jobs = tuple(MediaRouteJob(NODE, sequences, output,
+        replace(SPEC, device=replace(DEVICE, device_id=DEVICE.device_id + index)),
+        generation=1, local_ip="192.0.2.1", local_port=1234, clock=lambda: sock.now,
+        link_id=index+1) for index in range(2))
+    for job in jobs:
+        sock.sendto(job.next_packet().wire, NODE.address)
+    sock.queue.clear()  # Opening advertisements are irrelevant to these CLOSE receipts.
+    # The second camera was already being cancelled when account shutdown began.
+    jobs[1].cancel()
+    sock.sendto(jobs[1].next_packet().wire, NODE.address)
+    if grouped:
+        close_media_routes(sock, NODE, jobs, output, generation=1,
+                           clock=lambda: sock.now, wait=sock.wait)
+    else:
+        for job in jobs:
+            close_media_route(sock, NODE, job, output, generation=1,
+                              clock=lambda: sock.now, wait=sock.wait)
+    assert jobs[0].result.broker_release
+    assert jobs[1].result.broker_release is grouped
+    assert sock.opens == sock.closes == 2  # No replay or extra camera action.
+    assert sock.closed == 0  # Socket remains owned by the account worker.
 
 
 def test_broker_lan_candidate_uses_sdk_host_order_port_without_selecting_it():

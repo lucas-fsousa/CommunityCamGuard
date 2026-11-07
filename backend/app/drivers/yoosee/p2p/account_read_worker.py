@@ -13,6 +13,7 @@ from .account_media_channel import (
     AccountMediaChannel,
     MediaBootstrap,
     MediaChannelSummary,
+    finish_media_channels,
     media_channels_closed,
 )
 from .account_output_budget import AccountOutputBudget, OutputExhausted
@@ -32,7 +33,7 @@ from .media_failures import PROTOCOL_CODES, underlying_receive_error
 from .media_lease_inbox import MediaLeaseInbox
 from .media_lease_pump import MediaLeasePump
 from .media_policy import MediaPolicy, validate_media_policy
-from .media_route_cleanup import close_media_route
+from .media_route_cleanup import close_media_routes
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .model_control_inbox import ControlWriteInbox
 from .model_control_pump import ControlWritePump
@@ -558,20 +559,18 @@ class AccountReadWorker:
                         received += cleanup.received_datagrams
                     except BaseException as exc:
                         motion_cleanup_error = exc  # still retire TCP, route and socket
-                for channel in channels:
-                    try:
-                        channel.finish_media()
-                    except BaseException as exc:
-                        if tcp_cleanup_error is None:
-                            tcp_cleanup_error = exc
+                try:
+                    finish_media_channels(tuple(channels))
+                except BaseException as exc:
+                    tcp_cleanup_error = exc
                 self._dispatcher.close()
                 try:
-                    for channel in channels:
-                        if channel.route.result is not None:
-                            continue
+                    pending_routes = tuple(channel.route for channel in channels
+                                           if channel.route.result is None)
+                    if pending_routes:
                         assert node is not None
                         try:
-                            media_sent, media_received = close_media_route(sock, node, channel.route, output,
+                            media_sent, media_received = close_media_routes(sock, node, pending_routes, output,
                                 generation=self._generation, clock=self._clock, wait=wait)
                             sent += media_sent
                             received += media_received

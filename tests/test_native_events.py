@@ -79,6 +79,14 @@ def test_retry_facts_keep_fixed_reason_and_protocol_code_but_never_payload(tmp_p
     assert 'SECRET' not in repr(result)
 
 
+def test_confirmed_account_end_retry_reason_survives_safe_projection(tmp_path):
+    events.configure(tmp_path)
+    events.ended(CAMERA, error='retry_planned', evidence_valid=True,
+                 details={'retry_reason': 'account_ended'})
+    result = json.loads((tmp_path / 'native-events.jsonl').read_text())
+    assert result['facts']['retry_reason'] == 'account_ended'
+
+
 def test_decoder_exit_facts_are_sanitized_and_local_failure_reason_is_preserved(tmp_path):
     events.configure(tmp_path)
     events.ended(CAMERA,error='retry_planned',evidence_valid=True,details={
