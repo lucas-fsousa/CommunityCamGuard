@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+2026-11-07 LAN UDP AV LIVE-CONFIRMED on camera3. SDK-backed INIT application
+repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s
+authenticated MSE observation delivered62fragments without reconnection/source
+revision change; the original1080pHEVC/AAC archive closed correctly. CI1479f1f
+and Image passed. See docs/internal/native-lan-av.md for exact evidence and
+temporary-image restoration. Next: select this proven route through the normal
+driver profile, then observe endurance; earlier "no ACCEPT" notes are history,
+not the current protocol blocker. Other units stay unchanged. No claim of
+long-term freeze resolution or LAN-only authentication.
+
 Owner priority: stop expanding controls/generic architecture; finish native video
 reliability using captured SDK/wire evidence. Permanent shared-lease quarantine
 regression is fixed and live retries were observed, but a600s window still had a

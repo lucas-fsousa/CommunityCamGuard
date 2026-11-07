@@ -1,8 +1,9 @@
 # LAN AV selection on the shared account reader
 
 Current production policy: use native TCP unless the driver has an exact current
-native_video proof containing BOTH hevc and lan_udp. No live unit has received
-the lan_udp proof in this investigation. A successful LAN meter is not AV support.
+native_video proof containing BOTH hevc and lan_udp. Camera3 now has live LAN AV
+evidence documented below; rollout remains exact-unit, not brand-wide. A
+successful LAN meter alone is not AV support.
 
 ## Implemented, awaiting the camera3 live checkpoint
 
@@ -218,3 +219,32 @@ confirming what stops those requests. At0x251614–620 it sends local START
 immediately after ACCEPT, without waiting for peer START. UDP follows that
 ordering too; final readiness still requires the peer's START and encoding.
 The historical TCP ordering remains unchanged.
+
+## Live UDP delivery accepted — 2026-11-07
+
+Code1479f1f passed CI42304469586 and Image42304469733;71targeted tests,
+Ruff and Mypy425files passed locally with caps. Default image7587f34c97a2
+retains driver-selected transport; temporary imagef8b57d021705 changed ONLY
+camera3's private transport preference and added numeric INIT-close diagnostics.
+Neither temporary change was merged or tagged latest.
+
+First40s trial reached `native UDP AV ready transport=lan`; the initially late
+MSE observer was closed with1012 by the PLANNED restore, not a spontaneous stream
+failure. The repeat trial waits for active source before observing, then restores
+the default image only AFTER the observer exits. Results:
+
+- Measured LAN roundtrip in one attempt, then UDP AV ready; no TCP fallback log.
+- Native source revision207 remained active throughout60seconds of authenticated
+  MSE reception:62binary fragments,19941723bytes, maximum fragment gap1.175s,
+  no WebSocket closure or source revision change.
+- The closed archive from this exact trial is62.958s/720263bytes,
+  original1920x1080HEVC plus16kHz monoAAC. No quality reduction was introduced.
+- Both trials restored the default image through EXIT cleanup; no emulator,
+  extra account/login, firewall mutation or light/sound/motor action was used.
+
+This closes the missing live LAN UDP AV acceptance/delivery checkpoint for
+camera3 and justifies its exact driver's lan_udp proof. It does NOT establish
+long-term freeze resolution, end-to-end browser latency, other units' acceptance
+or LAN-only authentication. Native TCP remains the fallback and remains default
+for units lacking this live AV proof. The normal image must be checked once more
+after registering this proof; temporary-image success is not normal rollout.
