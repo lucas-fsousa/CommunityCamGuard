@@ -269,3 +269,30 @@ The active transport integration is delivered. Next investigation is sustained
 operation and any actual new interruption evidence, not another INIT/ACCEPT
 implementation prerequisite. Do not extrapolate this short result to overnight
 stability or silently migrate untested field cameras.
+
+## Overnight observation — 2026-11-07, 13:41–13:46 UTC
+
+The normal image remained up since03:04:20Z; UDP-ready was logged once at
+03:04:23.862Z. Camera3 still held source revision213, with no native failure or
+retry records since rollout in the existing persistent event log (file present).
+No service restart, new negotiation, image change or camera action was needed.
+
+A disposable read-only/no-network archive audit was capped at128MiB/0.25CPU
+and removed automatically. All127closed segments from this exact recording
+epoch passed ffprobe metadata inspection:38100.161s total, individual durations
+294.016–305.632s. Filenames advanced294–305s between segments; the next segment
+was growing. This checks container metadata and segment continuity, not every
+decoded frame or the physical accuracy of the camera's on-screen clock.
+
+A new authenticated60s MSE observation after over10hours delivered62fragments/
+51614066bytes, max inter-fragment gap1.598s, no closure or source revision change.
+The read-only white_light API initially returned409 while the one-hour
+capability snapshot refreshed on demand; the next read returned200/verified/
+authenticated in231ms. No second account login or media session replacement
+was observed. This was a state read, NOT a lamp activation/deactivation test.
+
+App218.3MiB/1GiB, OOM=false/restart count0, WSL available memory over3GiB.
+Both field cameras remained legacy RTSP. This is the first overnight UDP
+checkpoint passed, not a guarantee of indefinite stability or proof of
+end-to-end browser latency. The delivered handshake/transport gates are closed;
+future failures require their own concrete evidence.

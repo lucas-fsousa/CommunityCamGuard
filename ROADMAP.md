@@ -4,6 +4,8 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Current delivery — 2026-11-07
+
 2026-11-07 LAN UDP AV LIVE-CONFIRMED on camera3. SDK-backed INIT application
 repetition and immediate START-after-ACCEPT closed the negotiation gap. A60s
 authenticated MSE observation delivered62fragments without reconnection/source
@@ -12,10 +14,26 @@ and Image passed. See docs/internal/native-lan-av.md for exact evidence and
 temporary-image restoration. Normal-image driver rollout is also DONE:
 build b-dc4b074403bc selected UDP from camera3's exact native_video profile;
 a second60s MSE run delivered62fragments with no reconnection/revision change
-and the archive grew. Next is endurance/actual failure investigation, not another
-transport implementation gate; earlier "no ACCEPT" notes are history,
+and the archive grew. The overnight checkpoint below also passed; earlier
+"no ACCEPT" notes are history,
 not the current protocol blocker. Other units stay unchanged. No claim of
 long-term freeze resolution or LAN-only authentication.
+
+Overnight UDP checkpoint PASSED without restarting services: the same source
+revision213 and recording epoch continued for over10hours.127closed MP4s all
+passed metadata probing (38100.161s total), with the next file still growing.
+Persistent event log present, zero camera3 failure/retry events since rollout;
+one UDP-ready log, no new negotiation. A fresh60s MSE read after that period
+delivered62fragments/51614066bytes, max gap1.598s, no disconnect/revision change.
+Read-only lamp query returned200/verified after the normal stale-capability
+refresh; it did not alter the lamp or replace the account. OOM=false/restarts=0.
+This completes the camera3 native transport implementation and its first
+overnight observation. Other cameras remain unchanged under the current test
+authorization. Further field-unit migration is a separate rollout decision,
+not another prerequisite for this delivered integration. New failures should
+be investigated from actual evidence rather than reopening completed gates.
+
+### Investigation history — pending labels below are superseded above
 
 Owner priority: stop expanding controls/generic architecture; finish native video
 reliability using captured SDK/wire evidence. Permanent shared-lease quarantine
