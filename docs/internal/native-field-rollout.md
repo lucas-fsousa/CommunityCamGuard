@@ -2,6 +2,12 @@
 
 ## Current controlled checkpoint
 
+2026-11-08: the old-image permanent block after one lost close ACK was reproduced
+on camera3. The corrected image recovered from that fault and from combined
+media/decoder stalls; see [before/after evidence](native-lost-ack-recovery.md).
+Garage/yard remain RTSP; this is not their native migration or a claim that every
+earlier stall had the same initial cause.
+
 Camera3 alone has returned to native LAN UDP and recovered from an actual local
 decoder SIGTERM without app restart; garage/yard remain on RTSP. Exact evidence,
 the live-trailer correction and limits: [camera3 recovery check](native-camera3-recovery-check.md).

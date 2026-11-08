@@ -9,6 +9,10 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Current runtime status — 2026-11-07
 
+Latest2026-11-08: [permanent-block correction with real before/after evidence](native-lost-ack-recovery.md).
+Old image blocked after one lost route ACK; fixed image recovered, including
+combined media/decoder stalls, without restarting the source-owning process.
+
 Camera3 alone is back on native LAN UDP: [actual decoder-failure recovery](native-camera3-recovery-check.md).
 The same report now includes real recovery after an outer-validation pause and
 AV session closure, plus an actual account draining before camera binding;

@@ -4,6 +4,25 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Current recovery delivery — 2026-11-08
+
+DONE: the permanent block after a lost route-close ACK was reproduced on the real
+camera3 with the old image, then corrected and tested with the same fault. The
+fixed owner also recovered from media_idle_timeout and an actual paused-decoder
+progress_timeout combined with receipt loss. No process restart during recovery,
+no fake ACK, no unsafe socket/control cleanup bypass. New children appeared after
+5.719/10.289/12.244s respectively and resumed A/V/original recording.
+
+Coreb581416/imagef6fa6fc3f80b passed the real comparison. Final guarded deployment
+3a9b58e/image5d79a1f06e51/buildb-62a15acf3206, CI6250passed/1skip and Image green.
+Normal container native273 plus field RTSP22/22;30s authenticated HD delivery and
+actual original archive growth passed, all three online/recording.
+Full scope, old-version failure and the final
+operator assertion's category mismatch: docs/internal/native-lost-ack-recovery.md.
+This completes that reproduced recovery defect, not a field-camera migration or
+proof that all historical stalls share one initial cause. No arbitrary new soak
+gate is required for this correction; investigate concrete new failures if any.
+
 ### Current controlled checkpoint — 2026-11-07
 
 2026-11-08 central recovery correction: a missing B9 media-route ACK formerly

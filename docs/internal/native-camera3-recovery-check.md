@@ -1,5 +1,9 @@
 # Camera 3 native recovery checks
 
+Latest: [real old/fixed-image lost-ACK comparison](native-lost-ack-recovery.md),
+including media loss and a paused-decoder progress timeout. That correction is
+deployed; the chronological checkpoints below predate it.
+
 ## Follow-up: preparation budget retains the real account — 2026-11-08
 
 Code `baa43d9`, image `71307fff8ab2` passed a controlled preparation-expiry check

@@ -2,6 +2,16 @@
 
 ## Missing route ACK versus physical account retirement — 2026-11-08
 
+Delivered with real old/fixed-image comparison and combined media/decoder stall
+tests: [lost-ACK correction](native-lost-ack-recovery.md). The old permanent block
+was reproduced; the fixed image automatically resumed A/V/original recording.
+The software-only checkpoint below predates that live verification.
+
+Final close-proof guard: account_socket_closed is set only after sock.close()
+returns, not merely from the absence of a caught OSError. Unexpected close
+exceptions still propagate and publish blocked leases, never an account-retired
+receipt.177focused tests passed, including this explicit unknown-close case.
+
 The previous contract permanently fenced the driver after a missing media-route
 B9 receipt, even if its old account socket and every local transport were closed.
 A failing-before-fix worker regression reproduces this failure. The mapped SDK
