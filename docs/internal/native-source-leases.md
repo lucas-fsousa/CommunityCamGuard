@@ -22,6 +22,15 @@ uses the actual account binding method with a deterministic lifecycle transition
 it opens no camera connection. This is not evidence for the original outage's
 cause or multi-day native reliability.
 
+Real follow-up PASSED on616a6d1/image55521abc586c: a private helper stopped the
+actual account after readiness and before its first camera binding. The typed
+refusal produced one retry; only after confirmed account cleanup and thread exit
+did the retained service supply its replacement. Restore-to-ready took8.693s;
+15seconds of A/V and original recording followed. Normal service resumed with
+all three available/online/recording and30seconds authenticated HD delivery.
+CI6240passed/1skip and Image green. See native-camera3-recovery-check.md for the
+public-service interruption, exact scope and resource limits.
+
 ## Active-owner validation recovery — 2026-11-07
 
 Current scope: camera3 is native LAN UDP; garage/yard remain on RTSP. See

@@ -1,5 +1,41 @@
 # Camera 3 native decoder-failure recovery — 2026-11-07 local date
 
+## Follow-up: real account drains before camera binding
+
+Code `616a6d1`, image `55521abc586c` passed the actual readiness-to-binding race
+on camera3. Under the existing clean-checkpoint restore, a private operator hook
+stopped the first real native account immediately before its first binding call.
+The account lifecycle synchronously left `active`; the real binding refused before
+any camera lease/child/decoder existed. The new typed refusal returned `busy`
+instead of permanently ending the source. This stopped a server transport account,
+not the camera: no reboot/reset, speaker/light/motor/settings command was sent.
+
+The retained service admitted one replacement only after the old account reported
+confirmed cleanup and its thread had exited. The source recovered through exactly
+one replacement, without latching its owner stop flag. Restore-to-ready elapsed
+8.693s, including the first connection, injected drain and replacement login;
+this is not a measured mid-stream outage duration. It then delivered15seconds of
+local shared MP4:17chunks/4731514bytes, with original recording active. The
+01:46:29.909Z retry event on2026-11-08 reports busy, lease-detached=true,
+consumer-alive=false and cleanup-failed=false. These facts certify refused camera
+admission, not a fabricated remote camera CLOSE receipt.
+
+The helper saved the actual clean restart checkpoint and exited before normal
+app startup. The field RTSP policies stayed unchanged. Resource limits were
+512MiB/no swap/50% CPU/180s, with a171.2MiB sample. No real DB lock, copied proof,
+new enrollment, public fault endpoint or full local suite was used. As in the
+earlier helper exercise, public dashboard/recording service handoff was briefly
+interrupted; this was not an uninterrupted public-app test.
+
+Normal service started2026-11-08T01:47:11.180Z on that image, camera3
+native/active261 and garage/yard legacy/active22/22. Authenticated HD MSE delivered
+30seconds:32fragments/9450741bytes, with all revisions unchanged during observation
+and all three sources available/online/recording afterward. App184.2MiB and
+hub214.9MiB in one sample; OOM=false/restarts=0. CI42435567176 passed6240tests/
+1skip and all frontend contracts; Image42435567049 passed. Native group/endurance
+reliability remains open: this result does not establish the original incident's
+cause or recovery from genuinely uncertain account cleanup.
+
 ## Follow-up: active validation pause and AV session closure
 
 Code `ac07c7d`, image `28d527a1f00e` passed two further real camera3 exercises.

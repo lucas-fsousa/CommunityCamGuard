@@ -14,6 +14,14 @@ caps. Details: docs/internal/native-source-leases.md. Production before this
 change remained available/online/recording, without new failure events since
 the previous handoff; no new outage is inferred from this software regression.
 
+Delivered616a6d1/image55521abc586c, CI6240passed/1skip and Image green. The actual
+camera3 account-drain-before-binding exercise PASSED: one source retry after
+confirmed old-account cleanup/thread retirement, then A/V and original recording.
+Normal service resumed native/active261 plus field RTSP22/22;30seconds HD MSE
+passed, all three available/online/recording. Exact scope and interruption:
+docs/internal/native-camera3-recovery-check.md. Group/endurance reliability remains
+open; this targeted result does not establish the original outage's cause.
+
 Active-owner recovery follow-up: reproduced a temporary evidence-read lock
 latching `PreparedNative` into permanent stop despite inner-account BUSY handling.
 The driver now classifies the outer guard too; recovery fully retires the child
