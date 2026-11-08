@@ -185,6 +185,7 @@ class AccountReadWorker:
         protocol_code = ""
         protocol_facts: tuple[tuple[str, int], ...] = ()
         close_failed = False
+        broker_socket_closed = False
         maintenance = None
         motion: PtzScheduler | None = None
         motion_device_id: int | None = None
@@ -591,6 +592,7 @@ class AccountReadWorker:
                     self.motion_inbox.finish(motion_ticket, motion.result)
                 try:
                     sock.close()
+                    broker_socket_closed = True
                 except OSError:
                     close_failed = True
                 finally:
@@ -598,10 +600,10 @@ class AccountReadWorker:
                         final_motion = motion.result if motion is not None else last_motion
                         motion_uncertain = (final_motion is not None and final_motion.start_attempted
                                             and not final_motion.release_delivery_confirmed)
-                        leases.finish(uncertain=unexpected_exit or close_failed or tcp_cleanup_error is not None
+                        leases.finish(uncertain=unexpected_exit or not broker_socket_closed or tcp_cleanup_error is not None
                             or media_cleanup_error is not None or motion_cleanup_error is not None
                             or motion_uncertain or siren_cleanup_error is not None or (siren is not None and siren.unsafe),
-                            account_socket_closed=not close_failed)
+                            account_socket_closed=broker_socket_closed)
                     if isinstance(video_delivery, VideoDelivery):
                         video_delivery.close()
                     with self._claim:
