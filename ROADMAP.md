@@ -6,6 +6,14 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current controlled checkpoint — 2026-11-07
 
+2026-11-08 follow-up: camera3 still native/active261 at03:38Z, with no new
+failure events or container restart since01:47Z; all three online/recording.
+Reproduced source preparation exceeding22s being mislabeled uncertain camera
+cleanup before any lease/decoder exists. That expiry now yields unadmitted busy,
+retaining the pending account under the existing service's ownership checks.
+82focused tests passed under caps; cancellation/revocation/unknown cleanup remain
+conservative. See docs/internal/native-source-leases.md for scope and limits.
+
 Readiness-to-binding follow-up: reproduced account drain between the source's
 ready check and binding creation. Only the exact typed, pre-lease refusal now
 returns retryable busy; unknown/identity/later-child errors remain terminal and

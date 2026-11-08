@@ -1,5 +1,28 @@
 # Per-camera sources under one native account
 
+## Pending account preparation is not camera cleanup failure — 2026-11-08
+
+The next failing-before-fix regression holds account readiness beyond the existing
+22-second source wait budget. Previously the source raised `SourceCleanupUnconfirmed`
+despite never borrowing a camera lease or constructing a child/decoder. This
+ended recovery while the retained service still owned a pending account.
+
+The wait budget is unchanged. Expiry now returns the same unadmitted `busy`
+result used by other pre-lease refusals. The existing recovery backoff and fresh
+evidence checks precede another attempt. The source neither stops the account
+nor asserts its socket cleanup; `NativeAccounts.prepare()` still reuses a matching
+live/uncertain account and can replace it only after thread exit and confirmed
+account cleanup. No second account/login or retry worker is added. Unknown
+exceptions and uncertain cleanup after a real lease/decoder remain terminal.
+
+82 focused tests passed under192MiB/no swap/50% CPU, peak105.8MiB, including
+resuming against the same account after the deadline, cancellation/revocation
+while waiting, account reuse and uncertain retirement rejection. The regression
+uses virtual time, not a production network delay or camera action. It does not
+establish the original outage's cause. Before this change the running camera3
+source was still native/active261 without new failure events since01:47:11Z;
+all three sources were available/online/recording at03:38Z.
+
 ## Readiness-to-binding race — 2026-11-07
 
 A failing-before-fix regression reproduces an account entering drain between

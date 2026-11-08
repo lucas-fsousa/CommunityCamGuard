@@ -8,7 +8,6 @@ from collections.abc import Callable
 from ...db.errors import is_lock_busy
 from ...db.p2p import P2PEnrollment
 from ...media.mp4_fanout import StreamClosedError, Subscription
-from ...media.source_registry import SourceCleanupUnconfirmed
 from .leased_read_session import LeasedReadSession
 from .native_account import NativeBindingUnavailable
 from .native_account_service import NativeAccounts
@@ -114,7 +113,10 @@ class AccountVideoSource:
                 self._connection_failure = account.connection_failure
                 return self._without_lease("busy" if account.result_reason == "busy" else "connection")
             if self._clock() >= deadline:
-                raise SourceCleanupUnconfirmed("native account preparation did not finish")
+                # This source has not borrowed a lease or created a decoder.
+                # The retained service still owns the preparing account; its
+                # own thread/cleanup checks decide whether it can be replaced.
+                return self._without_lease("busy")
             time.sleep(0.01)
         if cancelled():
             return self._without_lease("stopped")

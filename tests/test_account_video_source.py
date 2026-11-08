@@ -14,6 +14,7 @@ from backend.app.drivers.yoosee.native_lease_recovery import retryable
 from backend.app.drivers.yoosee.native_video_source import NativeVideoResult
 from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
 from backend.app.drivers.yoosee.shared_read_session import SharedReadResult
+from backend.app.media import recovering_source
 from backend.app.media.mp4_fanout import StreamClosedError
 
 
@@ -133,6 +134,51 @@ def test_changed_enrollment_is_not_a_temporary_binding_refusal(setup_source):
     with pytest.raises(ControlNotReady) as result:
         account.binding(entry.camera_id)
     assert not isinstance(result.value, NativeBindingUnavailable)
+
+
+def test_slow_account_preparation_can_resume_without_stopping_or_replacing_account(setup_source, monkeypatch):
+    initial, entry, account, accounts, factory, child, valid = setup_source
+    now, stopped = [0.0], [False]
+    account.ready, account.stop = False, Mock()
+    initial._clock = lambda: now[0]
+    def sleep(duration):
+        now[0] += duration
+        if now[0] >= 23:
+            account.ready = True
+    monkeypatch.setattr(recovering_source.time, 'sleep', sleep)
+    def finished(**kwargs):
+        stopped[0] = True
+        return NativeVideoResult('stopped', SharedReadResult('stopped'))
+    child.run.side_effect = finished
+    def replacement():
+        assert now[0] >= 24 and initial.current is None
+        assert not account.cleanup_confirmed  # Still the same independently owned account.
+        return AccountVideoSource(entry, accounts, factory=factory, valid=valid, clock=lambda: now[0])
+    source = recovering_source.RecoveringSource(initial, factory=replacement, valid=valid,
+        retryable=retryable, clock=lambda: now[0])
+    assert source.run(cancelled=lambda: stopped[0]).reason == 'stopped'
+    assert source.restarts == 1 and accounts.prepare.call_count == 2
+    accounts.binding.assert_called_once_with(entry)
+    factory.assert_called_once()
+    account.stop.assert_not_called()
+
+
+@pytest.mark.parametrize('reason', ['stopped', 'enrollment_changed'])
+def test_pending_account_preparation_still_observes_cancel_and_revocation(setup_source, monkeypatch, reason):
+    source, _, account, accounts, factory, _, valid = setup_source
+    now = [0.0]
+    account.ready = False
+    source._clock = lambda: now[0]
+    def sleep(duration):
+        now[0] += duration
+    monkeypatch.setattr(recovering_source.time, 'sleep', sleep)
+    if reason == 'enrollment_changed':
+        valid.side_effect = lambda: now[0] < 1
+    result = source.run(cancelled=lambda: reason == 'stopped' and now[0] >= 1)
+    assert result.reason == reason and now[0] < 2
+    assert source.current is None and not account.cleanup_confirmed
+    accounts.binding.assert_not_called()
+    factory.assert_not_called()
 
 
 @pytest.mark.parametrize('fault', [None, 'detach', 'consumer', 'decoder'])
