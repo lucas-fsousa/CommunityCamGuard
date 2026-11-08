@@ -17,7 +17,13 @@ docs/internal/native-camera3-recovery-check.md.
 That test exposed the live muxer's terminal mfra being misclassified as corrupt
 MP4. The live-only command now omits the seek-index trailer; original archives
 keep it. A real FFmpeg counterfactual/strict-parser regression and70targeted tests
-passed. This mitigation's deployment check is separate from the live baseline.
+passed. Deployment e0c7bed/image e321897153c6/build b-0f412f7d8a1d and repeat
+PASSED: decoder replaced in3.006s on the same UDP socket, attached viewer closed
+1013, fresh MSE delivered30s, source revision246 unchanged and all recordings
+active. Failure now logs DecoderExitedError/255, not Mp4OrderError; the original
+1080pHEVC/AAC archive retained its final index. CI/Image green. This is actual
+local-fault recovery on camera3, not a claim that the earlier group incident or
+all network failure modes are resolved.
 
 ### Earlier incident — native reliability remains reopened
 

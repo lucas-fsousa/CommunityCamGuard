@@ -60,8 +60,36 @@ strict live parser and its memory/order limits are not weakened. A real bounded
 FFmpeg regression proves that the former command emits a rejected mfra, the
 new command feeds complete initialization/media pairs successfully, and the
 original archive still ends in mfro with the original codecs/timestamps.
-Seventy targeted tests, Ruff passed under resource caps; this is separate from
-the live baseline result above. Post-deployment verification belongs below.
+Seventy targeted tests, Ruff/Mypy passed under resource caps; this is separate
+from the live baseline result above.
+
+## Post-deployment repeat — passed
+
+Code `e0c7bed`, image `e321897153c6`, build `b-0f412f7d8a1d` replaced only the
+app at2026-11-08T00:20:11.802Z. CI42429008509 passed6229tests/1skip and all Node
+contracts; Image42429008498 passed. Camera3 resumed native/active246; garage/yard
+remained legacy/active22/22. The restart was an explicit deployment, not automatic
+failure recovery. No protocol profiles or field-source intents changed.
+
+The same bounded probe again sent SIGTERM only to the uniquely matched camera3
+decoder, PID38. PID59 replaced it after3.006seconds, on the SAME UDP socket.
+An already attached MSE viewer received close1013 instead of silently hanging;
+a replacement connection delivered30seconds of media. Counts were17fragments/
+5321993bytes in the15seconds before the fault and32fragments/10056781bytes after.
+App start time, source modes/revisions stayed unchanged throughout the injection.
+All three sources were available, online and recording afterward.
+
+The event at00:21:38.304Z now correctly identified DecoderExitedError/returncode255,
+not Mp4OrderError. Lease detach, UDP CLOSE receipt and broker release were confirmed;
+consumer_alive=false/cleanup_failed=false. The interrupted original independently
+probed as81.876seconds,1920×1080HEVC plus16kHz monoAAC, and its final mfro index
+was retained. Thus skip_trailer affected only the live pipe, not the archive.
+
+Observer peak54MiB/zero swap,1.025s CPU or less in the measured run; app182.5MiB
+and hub25.69MiB in the final sample, each under its existing1GiB ceiling.
+OOM=false/restarts=0. No browser, decoded-frame audit or absolute live-latency
+measurement was performed. This is measured server delivery and local fault
+recovery, not multi-day/group endurance certification.
 
 ## Reproduction notes and limits
 
