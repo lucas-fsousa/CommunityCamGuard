@@ -21,7 +21,7 @@ from backend.app.drivers.yoosee.capability_policy import OperationProof, Validat
 from backend.app.drivers.yoosee.capability_snapshot import CapabilitySnapshot
 from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
 from backend.app.media.server_owner import ServerOwner
-from backend.app.media.source_registry import SourceUnavailable
+from backend.app.media.source_registry import SourceUnavailable, SourceValidationBusy
 
 
 @pytest.fixture
@@ -54,6 +54,23 @@ def test_offer_is_lazy_exact_unit_and_does_not_expose_enrollment(evidence, monke
     offer.factory()
     factory.assert_called_once_with(camera.camera_id, "7000000002")
     assert CameraDriver().native_media_offer(camera) is None
+
+
+@pytest.mark.parametrize('code', [sqlite3.SQLITE_BUSY, sqlite3.SQLITE_IOERR])
+def test_outer_offer_guard_classifies_only_transient_lock_codes(evidence, monkeypatch, code):
+    camera, _, _, _ = evidence
+    offer = YooseeDriver().native_media_offer(camera)
+    assert offer is not None and offer.valid()
+    def unavailable(_):
+        error = sqlite3.OperationalError('PRIVATE_DATABASE_DETAIL')
+        error.sqlite_errorcode = code
+        raise error
+    monkeypatch.setattr(capability_rollout, 'selected', unavailable)
+    expected = SourceValidationBusy if code == sqlite3.SQLITE_BUSY else sqlite3.OperationalError
+    with pytest.raises(expected) as caught:
+        offer.valid()
+    if code == sqlite3.SQLITE_BUSY:
+        assert 'PRIVATE_DATABASE_DETAIL' not in str(caught.value)
 
 
 def test_server_owned_offer_is_lazy_and_keeps_existing_checkpoint_domain(evidence, tmp_path, monkeypatch):
@@ -173,9 +190,13 @@ def test_factory_gets_only_explicit_exact_unit_combined_motion_proof(evidence, m
     assert offer is not None and offer.valid()
     factory.assert_not_called()
     offer.factory()
+    motion_valid = factory.call_args.kwargs['motion_valid']
     factory.assert_called_once_with(camera.camera_id, enrollment.device_id, motion_grants=(
         PtzGrant(enrollment.access_id, int(enrollment.device_id), frozenset({"left", "right"})),),
-        motion_valid=offer.valid)
+        motion_valid=motion_valid)
+    assert motion_valid() and offer.valid()
+    capability_snapshot_store.begin(camera.camera_id)
+    assert not motion_valid() and not offer.valid()
 
 
 @pytest.mark.parametrize("proof", [

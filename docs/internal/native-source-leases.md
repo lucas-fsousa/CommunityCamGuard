@@ -1,5 +1,34 @@
 # Per-camera sources under one native account
 
+## Active-owner validation recovery — 2026-11-07
+
+Current scope: camera3 is native LAN UDP; garage/yard remain on RTSP. See
+native-camera3-recovery-check.md for the separate real decoder-termination tests.
+
+A further failing-before-fix regression found that `PreparedNative.cancelled()`
+treated even temporary evidence-read contention as definitive revocation and
+latched the owner's stop flag. The recovering child could therefore never resume,
+despite the earlier inner-account BUSY handling. This reproduces a software defect,
+not the cause of the original production outage.
+
+The driver now classifies numeric SQLite BUSY/LOCKED reads at the outer offer
+guard as well. The generic owner propagates only the typed transient signal
+without latching stop. Recovery requests full child retirement, keeps that stop
+request pinned until the child returns, then waits for fresh evidence before
+constructing/running another child. It does not continue active media on stale
+grants. Existing detach/consumer/decoder cleanup checks remain mandatory; a child
+exception is never interpreted as successful retirement.
+
+Definitive revocation, unknown validation failures and explicit operator stop
+remain terminal. Initial activation failures before the recovering child exists
+are not covered by this active-source correction. No camera command or database
+write is replayed; no production database lock or physical action was used.
+
+Focused tests: 98 passed, including the outer-owner/recovery integration matrix,
+driver BUSY versus I/O classification, proof revocation, and existing recovery
+cleanup checks. Sequential run capped at192MiB/no swap/50% CPU, peak160MiB.
+These software results do not establish native endurance or network recovery.
+
 ## Transient registry reads and refused admission — 2026-11-07
 
 Another reproducible failure was a SQLite lock during read-only enrollment or

@@ -12,6 +12,7 @@ from .native_cohort import NativeCohort
 from .native_lease_recovery import wrap as wrap_lease
 from .native_media_evidence import NativeMediaEvidence, capture
 from .native_recovery import wrap
+from .native_validation import checked
 from .native_video_source import NativeVideoSource
 
 
@@ -61,8 +62,11 @@ def build(camera: Camera, *, archive: NativeArchiveSpec | None, accounts: Native
                               accounts=accounts, entry=enrollment)
         return wrap(construct(), camera_id=camera_id, factory=construct, valid=valid)
 
+    def offered_valid() -> bool:
+        return checked(valid)
+
     if cohort is not None:
-        return NativeSourceOffer(camera_id, "yoosee/media-lease/" + camera_id, factory, valid,
+        return NativeSourceOffer(camera_id, "yoosee/media-lease/" + camera_id, factory, offered_valid,
                                  restart_domains=frozenset({NativeVideoSource.admission_domain}))
-    return NativeSourceOffer(camera_id, NativeVideoSource.admission_domain, factory, valid,
+    return NativeSourceOffer(camera_id, NativeVideoSource.admission_domain, factory, offered_valid,
         restart_domains=frozenset({"yoosee/media-lease/" + camera_id}) if accounts is not None else frozenset())

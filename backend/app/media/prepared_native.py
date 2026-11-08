@@ -16,6 +16,7 @@ from .source_registry import (
     SourceCleanupUnconfirmed,
     SourceRegistry,
     SourceUnavailable,
+    SourceValidationBusy,
 )
 from .viewer_gate import ViewerGate
 
@@ -57,11 +58,15 @@ class PreparedNative:
             return True
         now = self._clock()
         if now >= self._next_check:
-            self._next_check = now + 1
             try:
                 valid = self.offer.valid() is True
+            except SourceValidationBusy:
+                # The recovering child must retire and await fresh evidence.
+                # This is not a confirmed revocation or an operator stop latch.
+                raise
             except Exception:
                 valid = False
+            self._next_check = now + 1
             if not valid:
                 self._stop.set()
         return self._stop.is_set()

@@ -6,6 +6,15 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current controlled checkpoint — 2026-11-07
 
+Active-owner recovery follow-up: reproduced a temporary evidence-read lock
+latching `PreparedNative` into permanent stop despite inner-account BUSY handling.
+The driver now classifies the outer guard too; recovery fully retires the child
+and awaits fresh validation without latching owner stop. Revocation, unknown
+errors, explicit stop and uncertain cleanup still fail closed.98focused tests
+passed under192MiB/no swap/50% CPU. This is an offline-reproduced defect, not
+proof of the earlier outage's cause; initial activation and native endurance
+remain distinct. Details: docs/internal/native-source-leases.md.
+
 Camera3 alone is back on native LAN UDP; garage/yard remain on RTSP. A real,
 exactly targeted local FFmpeg SIGTERM was followed by automatic replacement in
 3.515s on the SAME account UDP socket, with no app restart or source revision

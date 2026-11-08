@@ -8,6 +8,15 @@ from .mp4_fanout import StreamClosedError, Subscription
 from .source_registry import ManagedSource, SourceUnavailable, SourceValidationBusy
 
 
+def _cancelled_without_child_io(cancelled: Callable[[], bool]) -> bool:
+    try:
+        return cancelled()
+    except SourceValidationBusy:
+        # This caller owns no running child. Fresh validation still precedes
+        # every factory/run; uncertainty here never grants admission.
+        return False
+
+
 class RecoveringSource:
     """Only a normal run return certifies cleanup. Exceptions never cause retry.
 
@@ -62,15 +71,16 @@ class RecoveringSource:
             previous = self._recovering
         waiting = False
         try:
-            while not cancelled():
+            while True:
                 try:
+                    if cancelled():
+                        return False
                     return self._valid() is True
                 except SourceValidationBusy:
                     waiting = True
                     with self._lock:
                         self._recovering = True
                     time.sleep(0.25)
-            return False
         finally:
             if waiting:
                 with self._lock:
@@ -81,7 +91,7 @@ class RecoveringSource:
             if self._claimed:
                 raise ValueError("source recovery already started")
             self._claimed = True
-        if cancelled() or not self._validated(cancelled):
+        if _cancelled_without_child_io(cancelled) or not self._validated(cancelled):
             raise SourceUnavailable("source recovery admission unavailable")
         delay = 2.0
         while True:
@@ -89,8 +99,18 @@ class RecoveringSource:
             if source is None:
                 raise RuntimeError("missing owned source")
             started = self._clock()
-            result = source.run(cancelled=cancelled)  # exceptions retain old source; NO retry
-            if cancelled() or not self._retryable(result, source):
+            validation_paused = False
+            def child_cancelled() -> bool:
+                nonlocal validation_paused
+                if validation_paused:
+                    return True
+                try:
+                    return cancelled()
+                except SourceValidationBusy:
+                    validation_paused = True
+                    return True  # Complete child retirement before waiting or retrying.
+            result = source.run(cancelled=child_cancelled)  # exceptions retain old source; NO retry
+            if _cancelled_without_child_io(cancelled) or not self._retryable(result, source):
                 return result
             if not self._validated(cancelled):
                 return result
@@ -101,7 +121,7 @@ class RecoveringSource:
             until = self._clock() + delay
             check_at = self._clock()
             while self._clock() < until:
-                if cancelled():
+                if _cancelled_without_child_io(cancelled):
                     return result
                 if self._clock() >= check_at:
                     if not self._validated(cancelled):
@@ -109,12 +129,12 @@ class RecoveringSource:
                     check_at = self._clock() + 1
                 # Caller still owns this run; no worker per retry or unbounded queue.
                 time.sleep(min(0.1, max(0.0, until - self._clock())))
-            if cancelled() or not self._validated(cancelled):
+            if _cancelled_without_child_io(cancelled) or not self._validated(cancelled):
                 return result
             replacement = self._factory()  # only after confirmed old retirement and backoff
             with self._lock:
                 self._current, self._recovering = replacement, False
                 self._restarts += 1
-            if cancelled() or not self._validated(cancelled):
+            if _cancelled_without_child_io(cancelled) or not self._validated(cancelled):
                 return result
             delay = min(60.0, delay * 2)
