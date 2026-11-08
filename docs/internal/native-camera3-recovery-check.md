@@ -1,5 +1,41 @@
 # Camera 3 native decoder-failure recovery — 2026-11-07 local date
 
+## Follow-up: active validation pause and AV session closure
+
+Code `ac07c7d`, image `28d527a1f00e` passed two further real camera3 exercises.
+A private, resource-capped operator process restored its existing clean checkpoint
+using the normal driver offer/runtime; no migration, enrollment, proof grant or
+camera-setting action was performed. The field units retained their RTSP intents.
+The public app was stopped during this exercise; it was not a fault injected into
+an uninterrupted public dashboard. Original recording was enabled and field
+recorders used the existing hub. Normal service handoff caused brief interruption.
+
+The first fault was an in-memory `SourceValidationBusy` at the actual outer
+offer guard, not a production SQLite lock. The real camera lease detached and
+consumer exited. During a further two-second pause there was no replacement,
+the owner stop flag remained clear, and its completion remained pending. After
+fresh validation was allowed, the next child appeared after5.413s measured from
+the pause's start, including retirement and the intentional hold. Shared MP4
+output delivered8chunks/2392362bytes during the following8seconds.
+
+The second fault called only the active camera3 AV session's `stop()`; it did
+not stop the owner, reset/reboot the camera or send physical controls. A new
+child appeared after4.114s and delivered7chunks/1775865bytes over8seconds.
+Both replacements retained the SAME account UDP socket and native policy
+revision. Source recording was active afterward. Events at00:53:25.003Z and
+00:53:37.360Z on2026-11-08 confirm lease detach, inner UDP CLOSE receipt and
+broker release, with consumer_alive=false/cleanup_failed=false. The helper then
+saved a real clean restart checkpoint and exited. These results are not evidence
+for absent broker receipts, group outages or indefinite native endurance.
+
+The helper was capped at512MiB/no swap/50% CPU/180s; one sample was88.25MiB.
+The normal container resumed at00:54:39.689Z, camera3 native/active255 and field
+units legacy/active22/22. The corrected image then delivered30seconds of
+authenticated HD MSE:32fragments/9535893bytes, without source revision change.
+All three were available, online and recording; OOM=false/restarts=0.
+CI42431693157 passed6235tests/1skip and frontend contracts; Image42431693070
+passed. No GUI, emulator or full local test suite was launched.
+
 ## Scope and actual outcome
 
 Camera 3 alone returned to native LAN UDP on code `1afcf37`, image

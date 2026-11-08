@@ -15,6 +15,14 @@ passed under192MiB/no swap/50% CPU. This is an offline-reproduced defect, not
 proof of the earlier outage's cause; initial activation and native endurance
 remain distinct. Details: docs/internal/native-source-leases.md.
 
+Deliveredac07c7d/image28d527a1f00e; CI6235passed/1skip and Image green. Real
+camera3 pause/revalidation and AV-session-stop exercises both recovered on the
+same account UDP socket, with confirmed lease/consumer cleanup. The helper saved
+a clean restart checkpoint; normal service resumed native/active255 and field
+RTSP22/22. Authenticated HD MSE delivered30s after handoff, all three sources
+available/online/recording. See native-camera3-recovery-check.md for exact scope;
+the original group incident and endurance are not relabelled resolved.
+
 Camera3 alone is back on native LAN UDP; garage/yard remain on RTSP. A real,
 exactly targeted local FFmpeg SIGTERM was followed by automatic replacement in
 3.515s on the SAME account UDP socket, with no app restart or source revision

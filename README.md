@@ -21,8 +21,9 @@ without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
 
 After the native account-wide outage on 2026-11-07, garage and yard remain on RTSP.
-Camera3 is back on native for controlled recovery testing: one actual local decoder
-termination recovered automatically without restarting the app. This is not full
+Camera3 is back on native for controlled recovery testing: local decoder termination,
+a temporary validation pause and AV-session closure each recovered automatically.
+These are targeted recovery checks, not full
 native stability acceptance; see [results and limits](docs/internal/native-camera3-recovery-check.md).
 The Yoosee proprietary LAN UDP implementation uses one shared account with independent
 camera A/V leases, supplying H264/AAC to the existing player, original HEVC/AAC

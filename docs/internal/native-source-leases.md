@@ -29,6 +29,14 @@ driver BUSY versus I/O classification, proof revocation, and existing recovery
 cleanup checks. Sequential run capped at192MiB/no swap/50% CPU, peak160MiB.
 These software results do not establish native endurance or network recovery.
 
+Subsequent real camera3 exercise PASSED onac07c7d: the outer guard's simulated
+transient pause retired the actual lease without latching owner stop; after fresh
+validation, replacement delivered media. An actual AV session stop then recovered
+too, on the same UDP socket and source revision. This was not a real database lock.
+Normal container resumed with all three sources available/online/recording and
+30seconds authenticated HD MSE delivery. Exact measurements and limits are in
+native-camera3-recovery-check.md. Full CI6235passed/1skip and Image passed.
+
 ## Transient registry reads and refused admission — 2026-11-07
 
 Another reproducible failure was a SQLite lock during read-only enrollment or

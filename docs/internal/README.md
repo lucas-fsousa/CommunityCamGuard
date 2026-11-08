@@ -10,6 +10,8 @@ remains the fuller narrative record and the source for decisions not yet migrate
 ## Current runtime status — 2026-11-07
 
 Camera3 alone is back on native LAN UDP: [actual decoder-failure recovery](native-camera3-recovery-check.md).
+The same report now includes real recovery after an outer-validation pause and
+AV session closure, with confirmed cleanup and normal service restored.
 Garage/yard remain on RTSP after the [reopened group incident](native-field-rollout.md).
 The test source recovered automatically without app restart, but full native
 reliability remains open. Older checkpoint descriptions below are historical,
