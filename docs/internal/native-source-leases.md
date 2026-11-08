@@ -23,6 +23,14 @@ establish the original outage's cause. Before this change the running camera3
 source was still native/active261 without new failure events since01:47:11Z;
 all three sources were available/online/recording at03:38Z.
 
+Controlled real-account follow-up PASSED onbaa43d9/image71307fff8ab2: hiding only
+the first readiness notification exercised the unchanged22s budget, then reused
+the same actual account/thread without another login. A/V was ready26.442s from
+restore start;15seconds of media/original recording followed. After handoff the
+normal app delivered30seconds HD MSE and its original archive grew, all three
+sources available/online/recording. CI/Image passed. This was not a real WAN
+delay or uninterrupted public-app injection; see native-camera3-recovery-check.md.
+
 ## Readiness-to-binding race — 2026-11-07
 
 A failing-before-fix regression reproduces an account entering drain between

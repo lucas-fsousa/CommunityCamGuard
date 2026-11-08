@@ -13,6 +13,8 @@ Camera3 alone is back on native LAN UDP: [actual decoder-failure recovery](nativ
 The same report now includes real recovery after an outer-validation pause and
 AV session closure, plus an actual account draining before camera binding;
 replacement waits for account cleanup/thread exit, with normal service restored.
+Preparation-budget expiry was also exercised with the real account retained:
+the next source attempt reused its existing account/thread without a second login.
 Garage/yard remain on RTSP after the [reopened group incident](native-field-rollout.md).
 The test source recovered automatically without app restart, but full native
 reliability remains open. Older checkpoint descriptions below are historical,

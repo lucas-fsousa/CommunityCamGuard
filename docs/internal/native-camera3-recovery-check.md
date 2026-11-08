@@ -1,4 +1,38 @@
-# Camera 3 native decoder-failure recovery — 2026-11-07 local date
+# Camera 3 native recovery checks
+
+## Follow-up: preparation budget retains the real account — 2026-11-08
+
+Code `baa43d9`, image `71307fff8ab2` passed a controlled preparation-expiry check
+on camera3. A private operator wrapper hid readiness for the first source attempt
+while the real native account connected normally. It did not delay network I/O,
+change protocol timeouts, modify the database or exercise a physical control.
+This is an injected readiness-notification delay, not a measured slow WAN event.
+
+At the unchanged22s wait budget, the unadmitted source returned busy. After the
+normal recovery backoff, its replacement used the SAME actual account and SAME
+live thread; the account was not stopped/replaced and no second login occurred.
+Ready A/V was observed26.442s from the beginning of checkpoint restore. It then
+delivered15seconds of shared MP4:17chunks/5122404bytes, with original recording
+active. The01:47Z deployment had still been healthy before this exercise: at
+03:38Z all three sources were available/online/recording, camera3 revision261,
+with no new failure events or app restart. This was a status/event observation,
+not continuous browser/endurance measurement over that whole interval.
+
+The03:42:13.170Z retry event on2026-11-08 reports busy with confirmed unadmitted
+source retirement (no camera lease/consumer/decoder). It is not a shared-socket
+cleanup receipt. The helper started field RTSP recorders during its wait and left
+their policies unchanged. It saved the actual clean restart checkpoint and exited
+before normal app startup. Public service handoff was briefly interrupted, as in
+the earlier helper checks. Limits:512MiB/no swap/50% CPU/180s; sample86.51MiB.
+
+The normal container resumed at03:42:59.361Z on that image. Startup logged two
+additional busy retries at03:43:11.635Z and03:43:14.778Z, then recovered; their
+specific trigger was not measured. Subsequent authenticated HD MSE delivered
+30seconds/32fragments/9300142bytes. The original archive actually grew during
+that observation. Camera3 remained native/active267 and field units legacy/
+active22/22; all three were available/online/recording. OOM=false/restarts=0.
+CI42443703220 and Image42443703227 passed. This validates this bounded preparation
+path, not the original group outage's cause or all native failure modes.
 
 ## Follow-up: real account drains before camera binding
 

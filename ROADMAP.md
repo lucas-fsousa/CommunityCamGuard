@@ -14,6 +14,13 @@ retaining the pending account under the existing service's ownership checks.
 82focused tests passed under caps; cancellation/revocation/unknown cleanup remain
 conservative. See docs/internal/native-source-leases.md for scope and limits.
 
+Deliveredbaa43d9/image71307fff8ab2, CI/Image green. Controlled real-account
+preparation-budget check PASSED: one source retry reused the same actual account
+and live thread, with no second login. Normal service resumed native/active267
+and field RTSP22/22;30seconds HD MSE passed and the original archive grew. All
+three available/online/recording. The injected readiness delay is not a real WAN
+outage; exact results/limits: docs/internal/native-camera3-recovery-check.md.
+
 Readiness-to-binding follow-up: reproduced account drain between the source's
 ready check and binding creation. Only the exact typed, pre-lease refusal now
 returns retryable busy; unknown/identity/later-child errors remain terminal and
