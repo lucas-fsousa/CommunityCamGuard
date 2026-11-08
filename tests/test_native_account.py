@@ -176,6 +176,32 @@ def test_unknown_socket_close_retains_fencing(environment, monkeypatch):
     assert len(publication._owners) == 3
 
 
+def test_missing_broker_close_ack_retires_account_without_fabricating_remote_release(environment):
+    account, entries, _, sock, events, pumps = environment
+    sock.media_fault = 'silent'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        owned = pool.submit(account.run, cancelled=lambda: False)
+        try:
+            wait_ready(account)
+            binding = account.binding(entries[0].camera_id)
+            media = pool.submit(binding.run, cancelled=lambda: False, video_delivery=VideoDelivery())
+            deadline = time.monotonic() + 2
+            while not pumps:
+                assert time.monotonic() < deadline
+                time.sleep(.001)
+            binding.stop()
+            assert owned.result(timeout=3).reason == 'account_ended'
+            assert media.result(timeout=3).reason == 'account_ended'
+            facts = binding.diagnostics()
+            assert facts['session_lease_detached'] and facts['session_broker_socket_closed']
+            assert not facts['session_broker_release']
+        finally:
+            account.stop()
+            owned.result(timeout=3)
+    assert account.cleanup_confirmed and sock.closed == 1
+    assert events == ['sdk_enter', 'login', 'sdk_exit'] and not publication._owners
+
+
 def test_changed_root_credentials_stop_owner_without_a_reauthentication(environment):
     account, entries, current, _, events, _ = environment
     with ThreadPoolExecutor(max_workers=1) as pool:

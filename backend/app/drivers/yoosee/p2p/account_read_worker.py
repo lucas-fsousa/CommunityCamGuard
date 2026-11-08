@@ -31,7 +31,7 @@ from .lamp_read_inbox import LampReadInbox
 from .lamp_read_pump import LampReadPump
 from .media_failures import PROTOCOL_CODES, underlying_receive_error
 from .media_lease_inbox import MediaLeaseInbox
-from .media_lease_pump import MediaLeasePump
+from .media_lease_pump import MediaAccountRetirement, MediaLeasePump
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_cleanup import close_media_routes
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
@@ -67,6 +67,7 @@ class WorkerSummary:
     protocol_facts: tuple[tuple[str, int], ...] = ()
     media_channels: tuple[MediaChannelSummary, ...] = ()
     lease_cleanup_uncertain: bool = False
+    media_account_retired: bool = False
 
 
 class _Stop(Exception):
@@ -502,6 +503,9 @@ class AccountReadWorker:
         except _Stop as stopped:
             reason = stopped.reason
             unexpected_exit = False
+        except MediaAccountRetirement:
+            reason = "transport"
+            unexpected_exit = False
         except OSError as socket_error:
             io_error, io_errno = socket_error_label(socket_error)
             log.warning('native account socket failure io_error=%s errno=%s', io_error, io_errno)
@@ -596,7 +600,8 @@ class AccountReadWorker:
                                             and not final_motion.release_delivery_confirmed)
                         leases.finish(uncertain=unexpected_exit or close_failed or tcp_cleanup_error is not None
                             or media_cleanup_error is not None or motion_cleanup_error is not None
-                            or motion_uncertain or siren_cleanup_error is not None or (siren is not None and siren.unsafe))
+                            or motion_uncertain or siren_cleanup_error is not None or (siren is not None and siren.unsafe),
+                            account_socket_closed=not close_failed)
                     if isinstance(video_delivery, VideoDelivery):
                         video_delivery.close()
                     with self._claim:
@@ -617,4 +622,5 @@ class AccountReadWorker:
                              tcp.result if tcp is not None else None,protocol_site,protocol_code,
                              siren.last_result if siren is not None else None, protocol_facts,
                              tuple(channel.summary() for channel in channels),
-                             leases.cleanup_uncertain if leases is not None else False)
+                             leases.cleanup_uncertain if leases is not None else False,
+                             leases.account_retired if leases is not None else False)

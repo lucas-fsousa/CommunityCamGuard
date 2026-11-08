@@ -144,8 +144,10 @@ def test_existing_worker_handles_lan_reply_while_tcp_and_broker_keep_running(mon
     assert inbox.take(ticket).status == "closed"
 
 
-@pytest.mark.parametrize("silent_av,soft_ack", [(False,False),(False,True),(True,False)])
-def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(monkeypatch, caplog, silent_av,soft_ack):
+@pytest.mark.parametrize("silent_av,soft_ack,lost_close_ack", [
+    (False,False,False),(False,True,False),(True,False,False),(False,False,True)])
+def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(
+        monkeypatch, caplog, silent_av,soft_ack,lost_close_ack):
     from backend.app.drivers.yoosee.p2p.media_protocol import parse_kcp_segments, parse_media_meter
     from backend.app.drivers.yoosee.p2p.stream_protocol import encrypt_media_tlv
     from tests.test_av_handshake import ack
@@ -156,6 +158,8 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
 
     caplog.set_level(logging.INFO)
     sock, inbox, pumps, owner = setup(monkeypatch)
+    if lost_close_ack:
+        sock.media_fault = 'silent'
     item = bootstrap(0)
     item = replace(item, spec=replace(item.spec, prefer_lan_udp=True))
     records = []
@@ -231,7 +235,9 @@ def test_udp_video_and_failed_negotiation_fallback_use_the_same_account_reader(m
     else:
         outcome = inbox.take(ticket)
         assert outcome.channel.udp.ready and outcome.channel.udp.detached
-        assert outcome.channel.media.broker_release and outcome.channel.tcp is None
+        assert outcome.channel.media.broker_release is not lost_close_ack and outcome.channel.tcp is None
+        assert outcome.status == ('account_retired' if lost_close_ack else 'closed')
+        assert result.media_account_retired is lost_close_ack
         assert any(record.video == idr() for record in records)
         assert not pumps and sock.opens == sock.closes == 1
         assert "native UDP AV ready transport=lan" in caplog.text

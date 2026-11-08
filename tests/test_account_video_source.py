@@ -64,6 +64,7 @@ def test_unadmitted_source_retires_without_login_or_consumer(setup_source, cance
 
 
 @pytest.mark.parametrize("reason,failure,allowed", [("busy", "", True),
+    ("account_ended", "", True),
     ("connection", "socket_timeout", True), ("connection", "credentials", False)])
 def test_only_confirmed_preparation_failures_can_retry(setup_source, reason, failure, allowed):
     source, _, account, accounts, factory, _, _ = setup_source

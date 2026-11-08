@@ -40,6 +40,19 @@ def media_channels_closed(channels: tuple[MediaChannelSummary, ...], *,
                for item in channels)
 
 
+def media_channels_locally_retired(channels: tuple[MediaChannelSummary, ...]) -> bool:
+    """Only for a physically closed ACCOUNT, never reuse of a live broker route.
+
+    A missing broker ACK is not a remote release receipt. After the account
+    socket closes, no old local reader/transport can compete with a new account.
+    Explicit rejection and uncertain TCP/UDP retirement remain unsafe.
+    """
+    return all(item.media is not None and not item.media.close_rejected
+               and (not item.media.opened or item.media.close_attempted)
+               and (item.tcp is None or not item.tcp.socket_close_failed)
+               and (item.udp is None or item.udp.detached) for item in channels)
+
+
 class AccountMediaChannel:
     """One selected LAN/relay transport; no thread/login/decoder creation."""
 

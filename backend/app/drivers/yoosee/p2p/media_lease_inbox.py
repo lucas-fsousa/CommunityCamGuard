@@ -4,7 +4,12 @@ import threading
 from dataclasses import dataclass, field
 
 from ....camera_identity import valid_camera_id
-from .account_media_channel import MediaBootstrap, MediaChannelSummary, media_channels_closed
+from .account_media_channel import (
+    MediaBootstrap,
+    MediaChannelSummary,
+    media_channels_closed,
+    media_channels_locally_retired,
+)
 from .account_policy import validate_media_capacity
 from .contracts import OnlineDevice
 from .media_route_job import MediaRouteSpec
@@ -140,7 +145,8 @@ class MediaLeaseInbox:
             return (self._closed or lease is None or lease.cancelled
                     or lease.bootstrap.video is None or lease.bootstrap.video.closed)
 
-    def finish(self, ticket: MediaLeaseTicket, channel: MediaChannelSummary, *, uncertain: bool = False) -> None:
+    def finish(self, ticket: MediaLeaseTicket, channel: MediaChannelSummary, *, uncertain: bool = False,
+               account_retired: bool = False) -> None:
         with self._lock:
             lease = self._leases.get(ticket)
             if lease is None or not lease.claimed or lease.result is not None:
@@ -148,8 +154,9 @@ class MediaLeaseInbox:
             if channel.device_id != lease.bootstrap.spec.device.device_id:
                 raise ValueError("media lease completion identity mismatch")
             clean = not uncertain and media_channels_closed((channel,), require_tcp_receipt=False)
-            lease.result = MediaLeaseOutcome("closed" if clean else "blocked", channel)
-            if not clean:
+            retired = not uncertain and account_retired and media_channels_locally_retired((channel,))
+            lease.result = MediaLeaseOutcome("closed" if clean else "account_retired" if retired else "blocked", channel)
+            if not clean or account_retired:
                 self._closed = True
 
     def take(self, ticket: MediaLeaseTicket) -> MediaLeaseOutcome | None:

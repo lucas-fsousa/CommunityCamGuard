@@ -3,10 +3,19 @@
 import time
 from collections.abc import Callable
 
-from .account_media_channel import AccountMediaChannel, MediaChannelSummary, media_channels_closed
+from .account_media_channel import (
+    AccountMediaChannel,
+    MediaChannelSummary,
+    media_channels_closed,
+    media_channels_locally_retired,
+)
 from .media_lease_inbox import MediaLeaseInbox, MediaLeaseTicket
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
+
+
+class MediaAccountRetirement(Exception):
+    """Stop the account rather than publish a missing remote ACK as success."""
 
 
 class MediaLeasePump:
@@ -15,13 +24,17 @@ class MediaLeasePump:
         self.inbox, self._channels, self._clock = inbox, channels, clock
         self._active: dict[MediaLeaseTicket, AccountMediaChannel] = {}
         self.cleanup_uncertain = False
+        self.account_retired = False
 
-    def _complete(self, ticket: MediaLeaseTicket, channel: AccountMediaChannel, *, uncertain: bool = False) -> bool:
+    def _complete(self, ticket: MediaLeaseTicket, channel: AccountMediaChannel, *, uncertain: bool = False,
+                  account_retired: bool = False) -> bool:
         summary = channel.summary()
         clean = media_channels_closed((summary,), require_tcp_receipt=False) and not uncertain
-        self.cleanup_uncertain |= not clean
-        self.inbox.finish(ticket, summary, uncertain=not clean)
-        return clean
+        retired = not uncertain and account_retired and media_channels_locally_retired((summary,))
+        self.cleanup_uncertain |= not (clean or retired)
+        self.account_retired |= retired and not clean
+        self.inbox.finish(ticket, summary, uncertain=not (clean or retired), account_retired=retired)
+        return clean or retired
 
     def motion_ready(self, device_id: int) -> bool:
         return any(channel.bootstrap.spec.device.device_id == device_id
@@ -41,6 +54,11 @@ class MediaLeasePump:
             if channel.route.result is not None:
                 if channel.transport_running:
                     raise ValueError("media route ended before transport retirement")
+                summary = channel.summary()
+                if (not media_channels_closed((summary,), require_tcp_receipt=False)
+                        and media_channels_locally_retired((summary,))):
+                    self.inbox.close()
+                    raise MediaAccountRetirement
                 if not self._complete(ticket, channel):
                     raise ValueError("media lease cleanup unconfirmed")
                 self._channels.remove(channel)
@@ -63,9 +81,11 @@ class MediaLeasePump:
         self._active[ticket] = channel
         self._channels.append(channel)
 
-    def finish(self, *, uncertain: bool) -> None:
+    def finish(self, *, uncertain: bool, account_socket_closed: bool = False) -> None:
         self.inbox.close()
+        retired = (account_socket_closed and not uncertain
+                   and media_channels_locally_retired(tuple(c.summary() for c in self._active.values())))
         for ticket, channel in self._active.items():
             if channel.bootstrap.video is not None:
                 channel.bootstrap.video.close()
-            self._complete(ticket, channel, uncertain=uncertain)
+            self._complete(ticket, channel, uncertain=uncertain, account_retired=retired)

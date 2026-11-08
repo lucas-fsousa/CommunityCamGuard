@@ -111,7 +111,7 @@ def test_cancel_before_claim_never_opens_camera_route(monkeypatch):
     assert sock.opens == sock.closes == 0 and sock.closed == 1
 
 
-def test_missing_close_receipt_fences_dynamic_source_replacement(monkeypatch):
+def test_missing_close_receipt_retires_account_after_physical_close_not_remote_success(monkeypatch):
     sock, inbox, pumps, owner = setup(monkeypatch)
     ticket = inbox.submit(camera(0), bootstrap(0))
     sock.media_fault = "silent"
@@ -122,11 +122,38 @@ def test_missing_close_receipt_fences_dynamic_source_replacement(monkeypatch):
         return receive(size)
     monkeypatch.setattr(sock, "recvfrom", poll)
     result = execute(sock, inbox, owner, duration=2)
-    assert result.reason == "transport" and result.lease_cleanup_uncertain
-    assert inbox.take(ticket).status == "blocked"
+    assert result.reason == "transport" and not result.lease_cleanup_uncertain
+    outcome = inbox.take(ticket)
+    assert outcome.status == "account_retired" and not outcome.channel.media.broker_release
+    assert result.media_account_retired
     with pytest.raises(ValueError):
         inbox.submit(camera(0), bootstrap(0))
     assert len(pumps) == sock.opens == sock.closes == sock.closed == 1
+
+
+@pytest.mark.parametrize('fault', ['negative', 'socket_close', 'tcp_close'])
+def test_account_retirement_cannot_hide_negative_receipt_or_failed_physical_close(monkeypatch, fault):
+    sock, inbox, _, owner = setup(monkeypatch)
+    ticket = inbox.submit(camera(0), bootstrap(0))
+    sock.media_fault = 'negative' if fault == 'negative' else 'silent'
+    if fault == 'socket_close':
+        def failed_socket_close():
+            raise OSError('close failed')
+        monkeypatch.setattr(sock, 'close', failed_socket_close)
+    if fault == 'tcp_close':
+        def failed_close(self):
+            self.video.close()
+            self.result = TcpMediaResult(True, False, True, 0, 0, 0)
+            return self.result
+        monkeypatch.setattr(Tcp, 'finish', failed_close)
+    receive = sock.recvfrom
+    def poll(size):
+        if sock.now >= .02: inbox.cancel(ticket)
+        return receive(size)
+    monkeypatch.setattr(sock, 'recvfrom', poll)
+    result = execute(sock, inbox, owner, duration=2)
+    assert result.lease_cleanup_uncertain and not result.media_account_retired
+    assert inbox.take(ticket).status == 'blocked'
 
 
 @pytest.mark.parametrize("failure", ["cleanup", "interrupt", "unexpected"])

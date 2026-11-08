@@ -79,9 +79,9 @@ class LeasedReadSession(SharedDeviceControls):
         return {"session_scope": "media_lease", "session_worker": "leased",
                 **({key: str(value) for key, value in channel.protocol_facts} if channel is not None else {}),
                 "session_lease_detached": self._unadmitted_retired or (
-                    outcome is not None and outcome.status in {"closed", "cancelled"}),
+                    outcome is not None and outcome.status in {"closed", "cancelled", "account_retired"}),
                 # Detaching a source is NOT physical closure of the shared socket.
-                "session_broker_socket_closed": False,
+                "session_broker_socket_closed": outcome is not None and outcome.status == "account_retired",
                 "session_broker_release": channel is not None and channel.media is not None and channel.media.broker_release,
                 "session_tcp_socket_closed": channel is not None and channel.tcp is not None and not channel.tcp.socket_close_failed,
                 "session_tcp_receipt": channel is not None and channel.tcp is not None and channel.tcp.close_acknowledged,
@@ -137,6 +137,8 @@ class LeasedReadSession(SharedDeviceControls):
                     raise P2PProbeError("native media lease cleanup unconfirmed")
                 if failure is not None:
                     raise failure
+                if outcome.status == "account_retired":
+                    return SharedReadResult("account_ended")
                 ended = outcome.channel.failure if outcome.channel is not None else ""
                 if not reason and self._stop.is_set():
                     reason = "stopped"

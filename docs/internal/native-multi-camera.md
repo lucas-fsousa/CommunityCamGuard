@@ -1,5 +1,10 @@
 # Native multi-camera ownership
 
+Current retirement contract: a missing route ACK still prevents reuse of that
+live account, but verified physical account retirement can now permit a new
+account. See native-source-leases.md; the checkpoints below describe the earlier
+strict-fencing implementation, not the current missing-ACK recovery policy.
+
 ## Implementation checkpoint — 2026-11-06
 
 Production admission remains **one native camera**. Cameras 1/2 are still legacy

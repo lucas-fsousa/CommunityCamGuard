@@ -203,4 +203,5 @@ class NativeAccount:
         if self._lifecycle.state != "idle":
             block_uncertain_channel()
             raise P2PProbeError("shared native account cleanup unconfirmed")
-        return SharedReadResult("busy" if registry_busy else result.reason, result)
+        return SharedReadResult("busy" if registry_busy else
+                                "account_ended" if result.media_account_retired else result.reason, result)

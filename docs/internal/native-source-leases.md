@@ -1,5 +1,34 @@
 # Per-camera sources under one native account
 
+## Missing route ACK versus physical account retirement — 2026-11-08
+
+The previous contract permanently fenced the driver after a missing media-route
+B9 receipt, even if its old account socket and every local transport were closed.
+A failing-before-fix worker regression reproduces this failure. The mapped SDK
+ACK callback distinguishes delivery timeout from semantic camera resource release
+(native-tcp-cleanup-checkpoint.md); a positive transport ACK is not remote physical
+reclamation proof, and an absent ACK is not proof that a local socket remains live.
+
+Live-account route reuse still requires its exact positive B9 receipt. If that
+receipt is absent, admission to the old inbox closes and the WHOLE account retires.
+Only after actual broker-socket closure, TCP physical close/UDP detach and existing
+motor STOP/siren OFF cleanup may it publish a distinct `account_retired` outcome.
+That outcome retains broker_release=false and reports the local socket closed;
+it does not fabricate remote ACK/cleanup. Every source must still join its own
+consumer/decoder before retry, and the service must observe old-account thread exit
+before creating a new account. No same-socket route reuse or action replay occurs.
+
+Explicit negative B9 status/error ACK, failed socket close, uncertain opener,
+unknown exceptions or unsafe physical-control cleanup continue to fence admission.
+Legacy/standalone media paths retain their previous strict receipt requirements.
+The new account-retirement proof applies only to the existing shared lease worker.
+No wire fields, handshake, timeout, capability grant or camera-count limit changes.
+
+176 focused tests passed under192MiB/no swap/50% CPU, peak74MiB, including TCP,
+LAN UDP, actual account/lifecycle integration and negative/failed-close guards.
+Ruff/Mypy passed. Live loss-injection comparison remains to be recorded; this
+software reproduction alone does not prove the historical outage's full cause.
+
 ## Pending account preparation is not camera cleanup failure — 2026-11-08
 
 The next failing-before-fix regression holds account readiness beyond the existing

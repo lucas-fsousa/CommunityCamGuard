@@ -110,6 +110,8 @@ class AccountVideoSource:
                 if not self._valid():
                     return self._without_lease("enrollment_changed")
             if account.cleanup_confirmed:
+                if account.result_reason == "account_ended":
+                    return self._without_lease("account_ended")
                 self._connection_failure = account.connection_failure
                 return self._without_lease("busy" if account.result_reason == "busy" else "connection")
             if self._clock() >= deadline:

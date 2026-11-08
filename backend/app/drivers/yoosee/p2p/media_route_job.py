@@ -46,6 +46,7 @@ class MediaRouteResult:
     opened: bool
     close_attempted: bool
     broker_release: bool
+    close_rejected: bool = False
 
 
 class MediaRouteJob:
@@ -127,8 +128,8 @@ class MediaRouteJob:
     def send_failed(self) -> None:
         self.cancel()
 
-    def _finish(self, confirmed: bool = False) -> None:
-        self.result = MediaRouteResult(self._opened, self._closing_sent, confirmed)
+    def _finish(self, confirmed: bool = False, *, rejected: bool = False) -> None:
+        self.result = MediaRouteResult(self._opened, self._closing_sent, confirmed, rejected)
         if confirmed or not self._opened:
             self._reserve.close()
         self._opening = self._closing = b""
@@ -190,5 +191,7 @@ class MediaRouteJob:
                 or struct.unpack_from("<I", plain, 16)[0] != gute_mode1_xor_checksum(plain)):
             return
         flags = struct.unpack_from("<I", plain, 20)[0]
-        if ((flags >> 16) & 3) == 2 and flags & (1 << 20) and not flags & (1 << 21):
-            self._finish(struct.unpack_from("<H", plain, 26)[0] == 0)
+        if ((flags >> 16) & 3) == 2 and flags & (1 << 20):
+            status = struct.unpack_from("<H", plain, 26)[0]
+            rejected = status != 0 or bool(flags & (1 << 21))
+            self._finish(not rejected, rejected=rejected)

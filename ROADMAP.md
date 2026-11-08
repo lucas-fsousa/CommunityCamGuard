@@ -6,6 +6,16 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current controlled checkpoint — 2026-11-07
 
+2026-11-08 central recovery correction: a missing B9 media-route ACK formerly
+poisoned the whole driver despite physical account-socket closure. Shared lease
+retirement now distinguishes confirmed LOCAL account retirement from absent
+REMOTE acknowledgement: no route reuse on the old inbox, no fabricated ACK,
+new account only after old thread exit and confirmed local/control cleanup.
+Negative ACK/unknown close/motor STOP/siren OFF uncertainty remain fenced.
+176focused TCP/UDP/account tests passed; actual before/after loss injection is
+the next verification, not a claim that the original outage is already resolved.
+Details: docs/internal/native-source-leases.md.
+
 2026-11-08 follow-up: camera3 still native/active261 at03:38Z, with no new
 failure events or container restart since01:47Z; all three online/recording.
 Reproduced source preparation exceeding22s being mislabeled uncertain camera
