@@ -6,6 +6,14 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Current controlled checkpoint — 2026-11-07
 
+Readiness-to-binding follow-up: reproduced account drain between the source's
+ready check and binding creation. Only the exact typed, pre-lease refusal now
+returns retryable busy; unknown/identity/later-child errors remain terminal and
+account retirement checks are unchanged.79focused tests passed under resource
+caps. Details: docs/internal/native-source-leases.md. Production before this
+change remained available/online/recording, without new failure events since
+the previous handoff; no new outage is inferred from this software regression.
+
 Active-owner recovery follow-up: reproduced a temporary evidence-read lock
 latching `PreparedNative` into permanent stop despite inner-account BUSY handling.
 The driver now classifies the outer guard too; recovery fully retires the child

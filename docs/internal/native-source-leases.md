@@ -1,5 +1,27 @@
 # Per-camera sources under one native account
 
+## Readiness-to-binding race — 2026-11-07
+
+A failing-before-fix regression reproduces an account entering drain between
+`AccountVideoSource` checking `ready` and requesting its binding. Previously this
+raised generic `ControlNotReady`, ending recovery even though no camera lease,
+child source or decoder had been admitted. The account's retirement was still
+independently owned by the retained service.
+
+For an unchanged enrolled camera only, `NativeAccount.binding()` now reports a
+typed refusal when its lifecycle no longer accepts bindings. The source converts
+that specific binding-call refusal into its existing unadmitted `busy` result.
+Replacement still requires fresh evidence and the service's existing account
+thread/cleanup checks; this does not assert shared-socket cleanup or create
+another login while the old account is live/uncertain. Missing/changed enrollment,
+offline inventory, unknown refusals, and errors from the factory or running child
+are not swallowed by this catch.
+
+79 focused tests passed under192MiB/no swap/50% CPU, peak105.3MiB. The regression
+uses the actual account binding method with a deterministic lifecycle transition;
+it opens no camera connection. This is not evidence for the original outage's
+cause or multi-day native reliability.
+
 ## Active-owner validation recovery — 2026-11-07
 
 Current scope: camera3 is native LAN UDP; garage/yard remain on RTSP. See

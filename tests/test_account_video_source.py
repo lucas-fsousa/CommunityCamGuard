@@ -7,7 +7,9 @@ from unittest.mock import Mock
 import pytest
 
 from backend.app.db.p2p import P2PEnrollment
+from backend.app.drivers.contracts import ControlNotReady
 from backend.app.drivers.yoosee.account_video_source import AccountVideoSource
+from backend.app.drivers.yoosee.native_account import NativeAccount, NativeBindingUnavailable
 from backend.app.drivers.yoosee.native_lease_recovery import retryable
 from backend.app.drivers.yoosee.native_video_source import NativeVideoResult
 from backend.app.drivers.yoosee.p2p.ptz_authority import PtzGrant
@@ -97,6 +99,40 @@ def test_busy_validation_before_admission_never_logs_in(setup_source):
     assert result.reason == 'busy' and retryable(result, source)
     accounts.prepare.assert_not_called()
     factory.assert_not_called()
+
+
+def test_account_draining_between_ready_and_binding_is_unadmitted_not_fatal(setup_source, monkeypatch):
+    source, entry, _, accounts, factory, _, _ = setup_source
+    account = NativeAccount((entry,), current_enrollment=lambda _: entry)
+    account._inbox = Mock()  # No lease, socket or worker is created by this fixture.
+    owns = Mock(side_effect=[True, False])
+    monkeypatch.setattr(account._lifecycle, 'owns_media_leases', owns)
+    accounts.prepare.return_value = account
+    accounts.binding.side_effect = lambda selected: account.binding(selected.camera_id)
+    result = source.run(cancelled=lambda: False)
+    assert result.reason == 'busy' and retryable(result, source)
+    assert source.current is None and source.diagnostics()['session_lease_detached'] is True
+    assert not account.cleanup_confirmed  # Refused camera admission is not account cleanup.
+    assert owns.call_count == 2
+    factory.assert_not_called()
+
+
+@pytest.mark.parametrize('stage', ['binding', 'factory', 'child'])
+def test_only_typed_binding_refusal_is_retryable_not_unknown_or_later_errors(setup_source, stage):
+    source, _, _, accounts, factory, child, _ = setup_source
+    error = ControlNotReady('unknown binding refusal') if stage == 'binding' else NativeBindingUnavailable('late failure')
+    target = {'binding': accounts.binding, 'factory': factory, 'child': child.run}[stage]
+    target.side_effect = error
+    with pytest.raises(type(error)):
+        source.run(cancelled=lambda: False)
+
+
+def test_changed_enrollment_is_not_a_temporary_binding_refusal(setup_source):
+    _, entry, _, _, _, _, _ = setup_source
+    account = NativeAccount((entry,), current_enrollment=lambda _: None)
+    with pytest.raises(ControlNotReady) as result:
+        account.binding(entry.camera_id)
+    assert not isinstance(result.value, NativeBindingUnavailable)
 
 
 @pytest.mark.parametrize('fault', [None, 'detach', 'consumer', 'decoder'])

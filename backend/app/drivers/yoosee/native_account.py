@@ -28,6 +28,10 @@ from .shared_control_reads import reserve_native_group
 from .shared_read_session import SharedReadResult
 
 
+class NativeBindingUnavailable(ControlNotReady):
+    """Account is no longer accepting bindings; no camera lease was admitted."""
+
+
 class NativeAccount:
     """Caller owns run() and SDK exclusion through confirmed account retirement.
 
@@ -110,9 +114,10 @@ class NativeAccount:
             inbox = self._inbox
             targets = self._targets
         entry = next((entry for entry in self._entries if entry.camera_id == camera_id), None)
-        if (entry is None or inbox is None or not self._lifecycle.owns_media_leases(inbox)
-                or self._current(camera_id) != entry):
+        if entry is None or self._current(camera_id) != entry:
             raise ControlNotReady("shared native account is not ready for this enrollment")
+        if inbox is None or not self._lifecycle.owns_media_leases(inbox):
+            raise NativeBindingUnavailable("shared native account is not accepting bindings")
         # Only exact records retained by the authenticated connection can bind.
         target = next((target for target in targets if str(target.device_id) == entry.device_id), None)
         if target is None or not target.status:

@@ -10,6 +10,7 @@ from ...db.p2p import P2PEnrollment
 from ...media.mp4_fanout import StreamClosedError, Subscription
 from ...media.source_registry import SourceCleanupUnconfirmed
 from .leased_read_session import LeasedReadSession
+from .native_account import NativeBindingUnavailable
 from .native_account_service import NativeAccounts
 from .native_cohort import NativeCohort
 from .native_video_source import NativeVideoResult, NativeVideoSource
@@ -119,7 +120,13 @@ class AccountVideoSource:
             return self._without_lease("stopped")
         if not self._valid():
             return self._without_lease("enrollment_changed")
-        session = self._accounts.binding(self._entry)
+        try:
+            session = self._accounts.binding(self._entry)
+        except NativeBindingUnavailable:
+            # Readiness can disappear between the check above and binding.
+            # No child/lease/decoder exists yet; account retirement is still
+            # owned and checked independently by the retained account service.
+            return self._without_lease("busy")
         source = self._factory(session)
         with self._lock:
             self._current = source
