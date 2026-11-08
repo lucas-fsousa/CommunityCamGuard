@@ -8,6 +8,7 @@ from itertools import pairwise
 import pytest
 
 from backend.app.media.decoder_command import decoder_command
+from backend.app.media.fragmented_mp4 import FragmentedMp4, Mp4OrderError
 
 
 def duplicate_video_timestamp(data):
@@ -57,6 +58,21 @@ def test_original_archive_repairs_duplicate_dts_without_disabling_xerror(tmp_pat
     assert failed.returncode!=0
     result=subprocess.run(command,input=broken,capture_output=True,timeout=15,check=True)
     assert '-xerror' in command and b'ftyp' in result.stdout[:32]
+    # A normal live-pipe EOF must not look like malformed MP4. Keep a real
+    # counterfactual: without skip_trailer the same muxer appends mfra.
+    previous=command.copy()
+    previous[previous.index('-movflags')+1]=previous[previous.index('-movflags')+1].replace('+skip_trailer','')
+    previous[-1]=str(tmp_path/'with-trailer.mp4')
+    trailer=subprocess.run(previous,input=broken,capture_output=True,timeout=15,check=True)
+    with pytest.raises(Mp4OrderError) as caught:
+        FragmentedMp4().feed(trailer.stdout)
+    assert caught.value.actual == 'mfra'
+    live=FragmentedMp4()
+    live.feed(result.stdout)
+    assert live.take().initialization and not live.take().initialization
+    assert live.take() is None
+    # Original recordings retain their final random-access index.
+    assert archive.read_bytes()[-12:-8] == b'mfro'
     probe=subprocess.run(['ffprobe','-v','error','-show_packets','-show_streams',
         '-show_entries','packet=stream_index,dts:stream=codec_name,time_base,sample_rate,channels',
         '-of','json',str(archive)],capture_output=True,check=True,timeout=10)

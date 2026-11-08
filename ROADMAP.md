@@ -4,7 +4,22 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
-### Current incident — 2026-11-07 (supersedes acceptance below)
+### Current controlled checkpoint — 2026-11-07
+
+Camera3 alone is back on native LAN UDP; garage/yard remain on RTSP. A real,
+exactly targeted local FFmpeg SIGTERM was followed by automatic replacement in
+3.515s on the SAME account UDP socket, with no app restart or source revision
+change. Authenticated HD MSE delivered before and for30s after the fault, and
+original recording resumed. No physical camera action. This is one actual local
+failure recovery, not full native reliability acceptance. Details and limits:
+docs/internal/native-camera3-recovery-check.md.
+
+That test exposed the live muxer's terminal mfra being misclassified as corrupt
+MP4. The live-only command now omits the seek-index trailer; original archives
+keep it. A real FFmpeg counterfactual/strict-parser regression and70targeted tests
+passed. This mitigation's deployment check is separate from the live baseline.
+
+### Earlier incident — native reliability remains reopened
 
 REOPENED: native streaming reliability is NOT resolved. All three sources were
 blocked again, including after the app start at18:28:52Z. Consumer progress/input

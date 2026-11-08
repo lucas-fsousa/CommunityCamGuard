@@ -20,9 +20,10 @@ Supported intercom actions are directly on each live camera bar: hold to speak
 without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
 
-The installed units were temporarily restored to RTSP after another native
-account-wide outage on 2026-11-07. Native streaming is NOT considered resolved;
-see [the incident and current deployment](docs/internal/native-field-rollout.md).
+After the native account-wide outage on 2026-11-07, garage and yard remain on RTSP.
+Camera3 is back on native for controlled recovery testing: one actual local decoder
+termination recovered automatically without restarting the app. This is not full
+native stability acceptance; see [results and limits](docs/internal/native-camera3-recovery-check.md).
 The Yoosee proprietary LAN UDP implementation uses one shared account with independent
 camera A/V leases, supplying H264/AAC to the existing player, original HEVC/AAC
 recordings and reviewed PTZ on the same owner. Camera3's speaker

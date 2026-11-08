@@ -42,7 +42,10 @@ def decoder_command(*, output: bool, live_timing: bool, frame_rate: int | None,
     if audio:
         cmd += ["-c:a", "copy", "-bsf:a", "aac_adtstoasc", "-max_muxing_queue_size", "128",
                 "-muxing_queue_data_threshold", "1048576", "-max_interleave_delta", "1000000"]
-    flags = "+frag_keyframe+empty_moov+default_base_moof" + ("+delay_moov" if audio else "")
+    # The live pipe has no seek index. A normal FFmpeg exit must not append
+    # mfra/tfra/mfro boxes that our live fragment collector treats as corruption.
+    # Keep the separately configured original archive's trailer/index unchanged.
+    flags = "+frag_keyframe+empty_moov+default_base_moof+skip_trailer" + ("+delay_moov" if audio else "")
     cmd += ["-flush_packets", "1", "-movflags", flags,
             "-f", "mp4", "pipe:1"]
     if archive is not None:

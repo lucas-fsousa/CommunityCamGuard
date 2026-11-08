@@ -1,6 +1,13 @@
 # Native LAN UDP field rollout — 2026-11-07
 
-## Reopened incident — current deployment
+## Current controlled checkpoint
+
+Camera3 alone has returned to native LAN UDP and recovered from an actual local
+decoder SIGTERM without app restart; garage/yard remain on RTSP. Exact evidence,
+the live-trailer correction and limits: [camera3 recovery check](native-camera3-recovery-check.md).
+This does not close the native reliability incident or certify group recovery.
+
+## Earlier reopened incident
 
 The owner reported all three cameras unavailable again. All three native sources
 were blocked (revisions237/21/21), with app start18:28:52Z, OOM=false/restarts=0.

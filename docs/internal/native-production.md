@@ -1,9 +1,10 @@
 # Native media delivery, not another finite trial
 
-Current deployment is now native LAN UDP on all three installed units, with
-driver-reviewed identities and a passed simultaneous300s group run after fixing
-measured receive-buffer loss. See [field rollout](native-field-rollout.md) for
-current results and limits. The TCP-relay investigation below is historical.
+Current deployment: camera3 alone is back on native LAN UDP for a real decoder-
+failure recovery check; garage/yard remain on RTSP after another group outage.
+See [current recovery result](native-camera3-recovery-check.md) and
+[field incident](native-field-rollout.md). The earlier successful300s group run
+did not establish long-term stability. The TCP-relay investigation below is historical.
 
 ## Actual regression — 2026-11-06
 

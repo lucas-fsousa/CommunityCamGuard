@@ -45,6 +45,8 @@ def test_aac_is_copied_and_native_pts_are_not_replaced_by_arrival_clock(tmp_path
     assert command[command.index("-c:a")+1] == "copy"
     assert "-use_wallclock_as_timestamps" not in command and "-r" not in command
     assert "+delay_moov" in command[command.index("-movflags")+1]
+    assert "+skip_trailer" in command[command.index("-movflags")+1]
+    assert "skip_trailer" not in command[command.index("-segment_format_options")+1]
     assert command[command.index("-segment_time")+1] == "60"
     assert command[command.index("-c")+1] == "copy"
     with pytest.raises(ValueError):

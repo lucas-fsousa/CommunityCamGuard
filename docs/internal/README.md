@@ -7,6 +7,14 @@ These are being distilled from the historical [`../DECISIONS.md`](../DECISIONS.m
 numbered journal). The ADRs below are authoritative for the decisions they cover; `DECISIONS.md`
 remains the fuller narrative record and the source for decisions not yet migrated.
 
+## Current runtime status — 2026-11-07
+
+Camera3 alone is back on native LAN UDP: [actual decoder-failure recovery](native-camera3-recovery-check.md).
+Garage/yard remain on RTSP after the [reopened group incident](native-field-rollout.md).
+The test source recovered automatically without app restart, but full native
+reliability remains open. Older checkpoint descriptions below are historical,
+not claims that all installed cameras are currently native or fully homologated.
+
 ## Index
 
 [Shared native siren](native-shared-siren.md): typed owner-timed pulse and reserved
