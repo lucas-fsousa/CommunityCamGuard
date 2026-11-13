@@ -9,7 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from backend.app.api import media as media_routes
-from backend.app.db import registry
+from backend.app.db import registry, source_policy
 from backend.app.media import go2rtc
 from backend.app.media.owned_bindings import OwnedIngressBindings
 from backend.app.media.owned_retirement import OwnedRetirementCoordinator
@@ -23,6 +23,57 @@ from backend.app.services.camera_runtime import resync_services
 class FastGuard(ReconciliationGuard):
     def exclusive(self, *, timeout=0.01):
         return super().exclusive(timeout=timeout)
+
+
+@pytest.mark.parametrize("modes,reload", [
+    ((), False), (("native",), False), (("native", "native"), False),
+    (("legacy_rtsp",), True), (("owned_rtsp",), True),
+    (("native", "legacy_rtsp"), True),
+])
+def test_address_only_resync_skips_hub_only_for_native_sources(monkeypatch, modes, reload):
+    engine, rec = Mock(), Mock()
+    recovery = AddressRecovery(engine, rec)
+    recovery.request_apply()  # An unrelated pending reload must not be cleared.
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
+        media=engine, rec=rec, address_recovery=recovery)))
+    ids = tuple("cam_" + str(index) * 24 for index in range(len(modes)))
+    read = Mock(return_value={cid: source_policy.Selection(mode=mode)
+                              for cid, mode in zip(ids, modes, strict=True)})
+    monkeypatch.setattr(source_policy, "read_for", read)
+    resync_services(request, address_changes=ids)
+    assert engine.restart.call_count == int(reload)
+    assert engine.wait_healthy.call_count == int(reload)
+    assert rec.start.call_count == int(reload)
+    assert recovery._pending_apply.is_set()
+
+
+@pytest.mark.parametrize("address_only", [False, True])
+def test_default_or_missing_policy_does_not_skip_reconciliation(monkeypatch, address_only):
+    engine, rec = Mock(), Mock()
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(media=engine, rec=rec)))
+    read = Mock(return_value={})
+    monkeypatch.setattr(source_policy, "read_for", read)
+    if address_only:
+        resync_services(request, address_changes=("cam_" + "a" * 24,))
+        read.assert_called_once()
+    else:
+        resync_services(request)
+        read.assert_not_called()
+    engine.restart.assert_called_once_with()
+    engine.wait_healthy.assert_called_once_with(timeout=6)
+    rec.start.assert_called_once_with()
+
+
+def test_address_policy_failure_defers_instead_of_claiming_success(monkeypatch):
+    engine, rec = Mock(), Mock()
+    recovery = AddressRecovery(engine, rec)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
+        media=engine, rec=rec, address_recovery=recovery)))
+    monkeypatch.setattr(source_policy, "read_for", Mock(side_effect=OSError("database unavailable")))
+    resync_services(request, address_changes=("cam_" + "a" * 24,))
+    assert recovery._pending_apply.is_set()
+    engine.restart.assert_not_called()
+    rec.start.assert_not_called()
 
 
 def test_owned_binding_composition_shares_one_guard_without_manual_reassignment():

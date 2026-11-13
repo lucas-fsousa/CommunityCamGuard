@@ -7,7 +7,7 @@ from typing import Any
 
 from .. import drivers
 from ..camera_identity import valid_camera_id
-from ..db import registry
+from ..db import registry, source_policy
 from ..discovery import active_scan
 from ..media import go2rtc
 from ..media.reconciliation import mutation_scope
@@ -61,12 +61,22 @@ def runtime_statuses(request: Any, cameras: list[registry.Camera]) -> list[dict]
     ]
 
 
-def resync_services(request: Any) -> None:
+def resync_services(request: Any, *, address_changes: tuple[str, ...] | None = None) -> None:
     """Best-effort reconciliation of media and recorder state after registry changes."""
 
     media = getattr(request.app.state, "media", None)
     recorder = getattr(request.app.state, "rec", None)
     try:
+        if address_changes is not None:
+            if not address_changes:
+                return
+            selections = source_policy.read_for(address_changes)
+            # Native routes do not embed registry IPs in the shared RTSP hub.
+            # This is only an address-metadata update, not a source handoff or
+            # evidence that a previously pending hub reload has been applied.
+            if all(cid in selections and selections[cid].mode == "native"
+                   for cid in address_changes):
+                return
         with mutation_scope(media):
             if media is not None:
                 media.restart()

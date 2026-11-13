@@ -2046,8 +2046,10 @@ earlier right-only milestones below describe the previous stage.
 
 DHCP recovery (2026-09-14): automatic bounded MAC rediscovery and manual-scan media
 resync implemented; see `docs/internal/dhcp-address-recovery.md`. Healthy-address
-identity audit is implemented2026-11-13. Remaining: driver-specific discovery for cameras
-without a known MAC; targeted source replacement without whole-media reload.
+identity audit is implemented (2026-11-13). Manual scans updating only native
+camera addresses now skip unrelated hub/recorder reloads. Remaining: driver-specific
+discovery for cameras without a known MAC; targeted active RTSP source replacement
+without whole-media reload (not safely provided by the pinned hub's stream API).
 
 Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the
 camera's maximum resolution; Auto/SD are explicit user choices for weaker hosts. Diagnostic

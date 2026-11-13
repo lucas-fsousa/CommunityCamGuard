@@ -98,6 +98,10 @@ was no automatic recovery worker, and manual scanning did not resync live servic
   viewers too; unchanged/unresolved scans do not reload. Failed application is
   retried on the next worker tick. A deliberate recorder pause is preserved.
 - Manual dashboard scanning now also resyncs media when registered IPs changed.
+  Native-only address updates skip the shared hub and legacy recorder reload:
+  these routes do not embed the registry IP. This does not reconnect the native
+  actor or clear an unrelated pending reload. Mixed, owned-RTSP and legacy-RTSP
+  batches retain the conservative existing reload; ordinary camera CRUD is unchanged.
   Manual and automatic discovery share a non-overlapping scan gate (manual: 409 if
   busy; automatic: skip this cycle). Shutdown cancels queued network probes.
 
@@ -114,6 +118,17 @@ Missing media progress (also catches wrong-device authentication) and the period
 healthy-address audit above trigger recovery. The audit relies on available LAN
 identity hints; it cannot detect a reassigned endpoint that impersonates the same
 MAC or offers no contradictory identity. Targeted hot replacement remains pending.
+
+The pinned go2rtc 1.9.14 API is not a physical retirement receipt: PUT replaces a
+stream reference and DELETE removes it without stopping the previous object;
+PATCH updates the producer URL without closing its active connection. Therefore
+an HTTP success alone must not authorize a replacement capture or prove that a
+healthy wrong-device connection has ended. See the upstream
+[stream API](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/api.go),
+[stream registry](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/streams.go)
+and [producer lifecycle](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/producer.go).
+The native-only optimization deliberately does not claim to solve active RTSP
+replacement. No additional producer, encoder, scan or camera control is introduced.
 
 Tests cover debounce/cooldown, unchanged/healthy cameras, duplicate identity,
 ONVIF fallback, cancellation, address CAS/deletion, preserved credentials/ID,

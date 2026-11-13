@@ -39,8 +39,9 @@ def discovery_scan(request: Request, credentials: ScanCredentials = Depends(read
             log.warning("could not migrate recordings %s -> %s error_type=%s", old, new, type(exc).__name__)
 
     configured, candidates = registry.reconcile(hosts, on_rekey=on_rekey)
-    if any(before.get(cam.camera_id) != cam.last_ip for cam in configured):
-        resync_services(request)
+    changed = tuple(cam.camera_id for cam in configured if before.get(cam.camera_id) != cam.last_ip)
+    if changed:
+        resync_services(request, address_changes=changed)
     for index, camera in enumerate(configured):
         if camera.capabilities or not camera.last_ip:
             continue
