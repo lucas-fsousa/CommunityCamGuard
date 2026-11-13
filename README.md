@@ -24,6 +24,9 @@ After the native account-wide outage on 2026-11-07, garage and yard remain on RT
 The permanent block caused by a lost route-close ACK is now fixed and verified
 against the old image on camera3, including combined media/decoder stalls;
 see [before/after recovery evidence](docs/internal/native-lost-ack-recovery.md).
+The decoder also tolerates delayed consumer scheduling without treating a writable
+pipe as stalled; genuine pipe/frame-progress watchdogs remain active. See
+[decoder backpressure](docs/internal/native-decoder-scheduling.md).
 Camera3 is back on native for controlled recovery testing: local decoder termination,
 a temporary validation pause and AV-session closure each recovered automatically.
 These are targeted recovery checks, not full

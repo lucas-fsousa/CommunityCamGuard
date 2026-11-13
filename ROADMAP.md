@@ -17,6 +17,11 @@ active.96focused tests passed under192MiB/no swap/25% CPU; Ruff/Mypy pass.
 This reproduces a false-timeout path, not the exact cause of today's earlier
 event. Details: docs/internal/native-decoder-scheduling.md.
 
+Delivered29b289a/image01353ecc9d0c/buildb-9bd59f4d3f94; CI6253passed/1skip and
+Image green. Normal service native282 plus field RTSP22/22;30s HD MSE passed,
+all three online/recording and actual archive growth verified on all three.
+No physical action, quality reduction, extra encoder or other-project shutdown.
+
 ### Current recovery delivery — 2026-11-08
 
 DONE: the permanent block after a lost route-close ACK was reproduced on the real

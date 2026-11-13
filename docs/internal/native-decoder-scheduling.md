@@ -39,3 +39,22 @@ not backdate the next deadline. Byte-for-byte frame order remains covered.
 were capped at192MiB/no swap/25% CPU, peak128.4MiB; Mypy separately capped192MiB.
 No broad local suite, browser/emulator, physical camera command, recording
 deletion or unrelated process termination was used.
+
+## Deployment and actual delivery
+
+Code29b289a, image01353ecc9d0c/tag `wsl-decoder-poll`, buildb-9bd59f4d3f94.
+CI43513071311 passed6253tests/1skip and all frontend contracts;
+Image43513071412 passed. Build used a clean tracked-files context (2.943MB),
+384MiB/no swap/25% CPU; no APK, footage or private environment files entered it.
+
+Only the app container was replaced, starting2026-11-13T21:45:25.601Z. Camera3
+resumed native/active282; field units stayed legacy RTSP/active22/22. A30s
+authenticated HD MSE check delivered32fragments/13939633bytes without source
+revision change. All three were available/online/recording, and archive files
+actually grew for EACH camera during the observation, not just a process flag.
+OOM=false/restarts=0. No camera settings, physical commands or test fault was sent.
+
+Before deployment there were exactly3FFmpeg processes inside the app (one native
+pipeline and two legacy recorders). No extra encoder was created for this reader.
+Other WSL projects were neither stopped nor tuned. The field units remain on RTSP;
+this backend correction does not grant native capabilities or migrate cameras.
