@@ -130,6 +130,26 @@ and [producer lifecycle](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal
 The native-only optimization deliberately does not claim to solve active RTSP
 replacement. No additional producer, encoder, scan or camera control is introduced.
 
+The 2026-11-13 regression batch covers empty/native-only/mixed/owned/legacy
+updates, missing policy, policy-read failure, preserved pending work, unchanged
+ordinary reconciliation and exact changed-ID forwarding from the manual scan.
+All 54 focused recovery/reconciliation/SOAP tests passed with a 160 MiB memory
+cap and no swap (70.6 MiB peak); Ruff and mypy also passed (114.9 MiB peak).
+
+Deployment of code `9b7336c`: clean tracked-files Docker context (2.948 MB),
+384 MiB/no swap/25% CPU build limit, image `69ea21bd8625`, build
+`b-87e7476695c8`. CI `43521061781` passed 6274 tests/1 skip and every frontend
+contract; image workflow `43521061801` passed. Only the app was recreated, at
+2026-11-13T22:41:53.562Z; the shared hub retained its prior start time.
+
+An authenticated 40-second native-HD MSE reader received 43 binary fragments /
+8141299 bytes, with no negative online/recording samples and unchanged source
+revisions (native 294, legacy 22/22). Original archive files grew for each of the
+three cameras. Three FFmpeg processes remained; app memory sampled 214.5 MiB,
+hub 7.754 MiB, OOM=false/restarts=0. No camera address was deliberately changed,
+so this is deployment/delivery verification, not a real DHCP-change acceptance
+test. No sound/light/motion/settings command or extra encoder was used.
+
 Tests cover debounce/cooldown, unchanged/healthy cameras, duplicate identity,
 ONVIF fallback, cancellation, address CAS/deletion, preserved credentials/ID,
 reload retry, recorder pause, manual resync and scan exclusion.

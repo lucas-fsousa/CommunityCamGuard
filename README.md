@@ -404,7 +404,9 @@ Tip: clients see a stable opaque camera ID. The current ONVIF/RTSP driver re-mat
 MAC identity after DHCP changes; future drivers may map a serial or vendor-native ID instead.
 Legacy RTSP recovery also audits apparently healthy LAN endpoints: a contradictory MAC
 triggers bounded rediscovery of the original identity, not reassignment to the new device.
-Unknown identity alone does not interrupt a healthy stream. See
+Unknown identity alone does not interrupt a healthy stream. Manual scans that only
+refresh native-camera addresses do not restart the unrelated RTSP hub or recorders;
+RTSP address changes still require the existing shared reload. See
 [address recovery and limits](docs/internal/dhcp-address-recovery.md).
 
 ## Roadmap
