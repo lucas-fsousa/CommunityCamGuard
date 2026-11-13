@@ -15,6 +15,13 @@ owned sources are excluded.65focused tests/Ruff/Mypy pass under resource caps.
 No real IP swap or physical action. Deployment/read-only evidence is recorded in
 docs/internal/dhcp-address-recovery.md; this is not cryptographic stream binding.
 
+Delivered32c3633 plus ONVIF response bound1385f2f/imagea95b0ad8419e/buildb-2085f459f9c3;
+CI6265passed/1skip and Image green. Read-only identity checks matched both legacy
+units without registry/source changes; native was excluded. Repeated40s HD read
+passed, no negative status samples and actual archive growth on all three.
+Native288/field RTSP22/22. The initial combined status assertion failure is
+documented explicitly; no recording outage or real IP swap is claimed from it.
+
 ### Decoder scheduling follow-up — 2026-11-13
 
 The lost-ACK correction remains installed; camera3 active279 and field RTSP22/22

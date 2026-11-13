@@ -44,6 +44,29 @@ remain inactivity timeouts, not a new absolute slow-body deadline.90focused
 tests/Ruff/Mypy passed, with explicit oversized success/error guards, capped at
 160MiB/no swap/25% CPU (peak109MiB). No large live response or load test was sent.
 
+### Current deployment and actual delivery
+
+Core identity audit32c3633 passed CI43516409858 (6263tests/1skip) and
+Image43516409848. Final response-bound guard1385f2f passed CI43517280652
+(6265tests/1skip plus frontend contracts) and Image43517280751.
+Installed imagea95b0ad8419e/tag `wsl-dhcp-identity-final`, buildb-2085f459f9c3;
+app start2026-11-13T22:14:24.103Z, OOM=false/restarts=0. Builds were capped at
+384MiB/no swap/25% CPU from clean tracked-file contexts; private data/footage
+were excluded. Only the app was replaced; the hub/other projects were not stopped.
+
+One initial post-deployment probe failed its combined online/recording assertion
+without recording which flag/unit was negative. The next separate status query
+reported all three healthy, and inspected logs showed no DHCP update/worker error,
+recorder exit or terminal native-source event in that interval. This does NOT
+establish an actual recording interruption or its cause.
+
+A repeated40s authenticated HD check delivered82fragments/28856472bytes, polling
+per-camera status every5s with ZERO negative samples. Actual archive files grew
+for all three; source revisions stayed unchanged during observation. Final state:
+camera3 native/active288, garage/yard legacy RTSP/active22/22, all online/recording.
+This verifies compatibility and delivery, not a deliberate real DHCP reassignment,
+cryptographic identity guarantee or decoded-frame/mobile audit.
+
 ## Incident and cause — 2026-09-14
 
 After a power outage/router restart, DHCP reassigned camera addresses. The API and
