@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 ONVIF_PORT = 5000
 DEVICE_PATH = "/onvif/device_service"
 TDS = "http://www.onvif.org/ver10/device/wsdl"   # ONVIF device wsdl namespace
+MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 def _post(ip: str, body: str, *, port: int = ONVIF_PORT, timeout: float = 6.0) -> tuple[int | None, str]:
@@ -36,9 +37,16 @@ def _post(ip: str, body: str, *, port: int = ONVIF_PORT, timeout: float = 6.0) -
                                  headers={"Content-Type": "application/soap+xml; charset=utf-8"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, resp.read().decode("latin-1", "replace")
+            raw = resp.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                return None, ""  # Unavailable, never parse a truncated identity/action reply.
+            return resp.status, raw.decode("latin-1", "replace")
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.read().decode("latin-1", "replace")
+        with exc:
+            raw = exc.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                return None, ""
+            return exc.code, raw.decode("latin-1", "replace")
     except OSError:
         return None, ""
 

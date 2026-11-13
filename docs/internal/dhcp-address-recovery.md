@@ -31,6 +31,19 @@ cover healthy match/unknown, interface fallback, cooldown, cancellation, scan
 exclusion, unchanged-address confirmation, native exclusion and preserved identity/
 credentials. No real DHCP change, wrong-IP injection or camera command was used.
 
+Read-only live probe with the built identity-audit image returned matching
+identities for both installed legacy cameras; registry addresses/MACs and all
+source revisions remained unchanged. The native source was not probed. This
+confirms compatibility, not a real reassignment test.
+
+The standard ONVIF device poster now bounds successful and HTTP-error bodies to
+1MiB plus one overflow-detection byte. Oversized replies return unavailable,
+never a truncated identity/success; responses close in both paths. This matters
+when an old camera IP answers as some unrelated HTTP endpoint. Socket timeouts
+remain inactivity timeouts, not a new absolute slow-body deadline.90focused
+tests/Ruff/Mypy passed, with explicit oversized success/error guards, capped at
+160MiB/no swap/25% CPU (peak109MiB). No large live response or load test was sent.
+
 ## Incident and cause — 2026-09-14
 
 After a power outage/router restart, DHCP reassigned camera addresses. The API and
