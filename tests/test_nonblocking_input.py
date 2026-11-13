@@ -121,10 +121,54 @@ def test_partial_progress_does_not_hide_a_subsequent_real_stall(pipe):
         now[0] = instant
         assert writer.pump() > 0
         os.read(read, 65536)
+    while writer.pump():
+        pass  # Leave the real pipe full: elapsed time alone is not backpressure.
     now[0] = 1.8
     with pytest.raises(TimeoutError):
         writer.pump()
     assert writer.closed
+
+
+def test_delayed_poll_resumes_writable_pipe_without_false_stdin_timeout(pipe):
+    read, writer, now = pipe
+    payload = b'x' * (128 * 1024)
+    writer.offer(payload)
+    assert writer.pump() > 0
+    received = bytearray(os.read(read, 65536))
+    now[0] = 1.5  # Consumer scheduling pause, not a blocked decoder input.
+    assert writer.pump() > 0
+    received.extend(os.read(read, 65536))
+    while writer.pending_bytes:
+        assert writer.pump() > 0
+        received.extend(os.read(read, 65536))
+    assert received == payload and not writer.closed
+
+
+def test_first_scheduled_write_can_progress_after_offer_deadline(pipe):
+    read, writer, now = pipe
+    assert writer.offer(b'frame')
+    now[0] = 1.5
+    assert writer.pump() == 5 and os.read(read, 65536) == b'frame'
+    assert not writer.closed
+
+
+def test_successful_write_deadline_uses_completion_time_not_poll_start(pipe, monkeypatch):
+    _, writer, now = pipe
+    write = os.write
+    def delayed_write(fd, payload):
+        now[0] = 2.0  # Descheduled during the syscall, before returning its progress.
+        return write(fd, payload)
+    monkeypatch.setattr(os, 'write', delayed_write)
+    writer.offer(b'x' * MAX_PENDING_BYTES)
+    assert writer.pump() > 0
+    monkeypatch.setattr(os, 'write', write)
+    while writer.pump():
+        pass
+    now[0] = 2.5
+    assert writer.pump() == 0 and not writer.closed
+    now[0] = 3.0
+    with pytest.raises(TimeoutError):
+        writer.pump()
 
 
 def test_failed_initialization_releases_owned_descriptor():

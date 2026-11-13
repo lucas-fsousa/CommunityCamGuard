@@ -9,6 +9,10 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Current runtime status — 2026-11-07
 
+Latest2026-11-13: [decoder scheduling/backpressure correction](native-decoder-scheduling.md).
+The installed lost-ACK fix still delivers video; the follow-up removes a
+reproduced false stdin timeout without increasing buffers or watchdog deadlines.
+
 Latest2026-11-08: [permanent-block correction with real before/after evidence](native-lost-ack-recovery.md).
 Old image blocked after one lost route ACK; fixed image recovered, including
 combined media/decoder stalls, without restarting the source-owning process.

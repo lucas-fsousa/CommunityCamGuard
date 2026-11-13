@@ -73,13 +73,14 @@ class NonblockingInput:
             now = self._now()
             if self._pending is None:
                 return 0
-            if now >= self._deadline:
-                raise TimeoutError("decoder input stalled")
             try:
                 count = os.write(self._fd, self._pending[:WRITE_SLICE])
-            except BlockingIOError:
-                return 0
-            except InterruptedError:
+            except (BlockingIOError, InterruptedError):
+                # A delayed caller is not evidence of a blocked pipe. Attempt
+                # this bounded nonblocking write before deciding no progress;
+                # successful writes still reset the unchanged stall deadline.
+                if now >= self._deadline:
+                    raise TimeoutError("decoder input stalled") from None
                 return 0
             if count <= 0:
                 raise BrokenPipeError("decoder input made no progress")
@@ -87,7 +88,7 @@ class NonblockingInput:
             # This is a no-progress deadline, not a maximum frame transfer time.
             # A large IDR can span many scheduled turns while the decoder is healthy.
             # The decoder's separate frame-progress deadline bounds actual decoding.
-            self._deadline = now + self._timeout
+            self._deadline = self._now() + self._timeout
             return count
         except Exception:
             self.close()

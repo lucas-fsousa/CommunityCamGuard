@@ -4,6 +4,19 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Decoder scheduling follow-up — 2026-11-13
+
+The lost-ACK correction remains installed; camera3 active279 and field RTSP22/22
+were online/recording. A fresh15s HD read passed on the same container started
+Nov11; event history includes retries rather than another permanent block.
+Investigated today's stdin_timeout: reproduced the writer rejecting an actually
+writable pipe after delayed consumer scheduling. It now attempts its bounded
+write before checking stall, with the unchanged1s deadline measured from actual
+write completion. Genuine full-pipe and independent frame-progress timeouts stay
+active.96focused tests passed under192MiB/no swap/25% CPU; Ruff/Mypy pass.
+This reproduces a false-timeout path, not the exact cause of today's earlier
+event. Details: docs/internal/native-decoder-scheduling.md.
+
 ### Current recovery delivery — 2026-11-08
 
 DONE: the permanent block after a lost route-close ACK was reproduced on the real
