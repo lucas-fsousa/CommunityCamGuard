@@ -9,7 +9,7 @@ from typing import Any
 
 from ..config import get_settings
 from ..db import registry, source_policy
-from ..discovery.address_refresh import find_addresses
+from ..discovery.address_refresh import address_matches, find_addresses
 from ..media.go2rtc import stream_id
 from ..media.reconciliation import mutation_scope
 from .thread_shutdown import join_thread, require_retired
@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class AddressRecovery:
-    """Two offline observations, one scan per five minutes, one worker lifecycle."""
+    """Debounced missing/wrong identity, five-minute scans, one worker lifecycle."""
 
     def __init__(self, media: Any, recorder: Any) -> None:
         self.media = media
@@ -27,6 +27,8 @@ class AddressRecovery:
         self._thread: threading.Thread | None = None
         self._missing: dict[str, int] = {}
         self._next_scan = 0.0
+        self._next_identity_check = 0.0
+        self._identity_mismatch: set[str] = set()
         self._pending_apply = threading.Event()
         self._applying = threading.Lock()
 
@@ -92,8 +94,19 @@ class AddressRecovery:
         selections=source_policy.read_for(cam.camera_id for cam in cameras)
         cameras=[cam for cam in cameras if selections[cam.camera_id].permits_legacy_rtsp]
         online = self.media.stream_online()
+        now = time.monotonic()
+        if now >= self._next_identity_check and not self._stop.is_set():
+            self._next_identity_check = now + 300
+            mismatched = set()
+            for cam in cameras:
+                if self._stop.is_set():
+                    return
+                if (cam.mac and cam.last_ip and cam.rtsp_url and online.get(stream_id(cam.camera_id))
+                        and address_matches(cam.last_ip, cam.mac, self._stop) is False):
+                    mismatched.add(cam.camera_id)
+            self._identity_mismatch = mismatched
         self._missing = {
-            cam.camera_id: (0 if online.get(stream_id(cam.camera_id)) else
+            cam.camera_id: (0 if online.get(stream_id(cam.camera_id)) and cam.camera_id not in self._identity_mismatch else
                             self._missing.get(cam.camera_id, 0) + 1)
             for cam in cameras if cam.mac and cam.rtsp_url
         }
@@ -109,9 +122,11 @@ class AddressRecovery:
             return
         for cam in missing:
             ip = found.get(cam.mac.lower())
+            if ip:
+                self._identity_mismatch.discard(cam.camera_id)
+                self._missing[cam.camera_id] = 0
             if ip and ip != cam.last_ip and registry.refresh_address(cam, ip):
                 self.request_apply()
-                log.warning("DHCP address updated camera=%s old_ip=%s new_ip=%s",
-                            cam.camera_id, cam.last_ip, ip)
+                log.warning("DHCP address updated camera=%s", cam.camera_id)
         if self._pending_apply.is_set():
             self._apply_pending()

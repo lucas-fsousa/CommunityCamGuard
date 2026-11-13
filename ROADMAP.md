@@ -4,6 +4,17 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Healthy DHCP address identity — 2026-11-13
+
+Completed the software follow-up for a healthy-looking RTSP stream served by the
+wrong DHCP endpoint. A five-minute, credential-free neighbor/one-IP identity audit
+feeds the existing debounce and bounded exact-MAC rediscovery. Unknown identity
+does not mark a healthy stream missing; contradictory MAC never replaces the
+registered identity. CAS/grants/credentials/recordings remain unchanged, and native/
+owned sources are excluded.65focused tests/Ruff/Mypy pass under resource caps.
+No real IP swap or physical action. Deployment/read-only evidence is recorded in
+docs/internal/dhcp-address-recovery.md; this is not cryptographic stream binding.
+
 ### Decoder scheduling follow-up — 2026-11-13
 
 The lost-ACK correction remains installed; camera3 active279 and field RTSP22/22
@@ -2027,8 +2038,8 @@ earlier right-only milestones below describe the previous stage.
 ## Milestone M1 — Live video quality (Feature 1)  ⟶ CORE DONE
 
 DHCP recovery (2026-09-14): automatic bounded MAC rediscovery and manual-scan media
-resync implemented; see `docs/internal/dhcp-address-recovery.md`. Follow-ups: identity
-audit of apparently healthy reassigned IPs; driver-specific discovery for cameras
+resync implemented; see `docs/internal/dhcp-address-recovery.md`. Healthy-address
+identity audit is implemented2026-11-13. Remaining: driver-specific discovery for cameras
 without a known MAC; targeted source replacement without whole-media reload.
 
 Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the

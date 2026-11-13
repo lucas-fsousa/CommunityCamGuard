@@ -9,6 +9,9 @@ remains the fuller narrative record and the source for decisions not yet migrate
 
 ## Current runtime status — 2026-11-07
 
+2026-11-13 follow-up: [healthy DHCP endpoint identity audit](dhcp-address-recovery.md)
+now covers apparently healthy legacy streams without changing native-driver ownership.
+
 Latest2026-11-13: [decoder scheduling/backpressure correction](native-decoder-scheduling.md).
 The installed lost-ACK fix still delivers video; the follow-up removes a
 reproduced false stdin timeout without increasing buffers or watchdog deadlines.

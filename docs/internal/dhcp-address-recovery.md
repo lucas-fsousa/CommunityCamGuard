@@ -1,5 +1,36 @@
 # Automatic camera address recovery
 
+## Healthy-address identity audit — 2026-11-13
+
+The worker now checks apparently healthy LEGACY RTSP addresses too, at most once
+per five minutes. A matching neighbor MAC needs no network request. No ARP entry
+(routed/NAT/unresolved) is unknown, not a mismatch. For a different neighbor, a
+bounded credential-free lookup of that ONE registered IP (/32) first allows the
+expected ONVIF identity to resolve Wi-Fi/Ethernet/proxy differences. Its existing
+port/time limits and shared scan gate apply. No RTSP SETUP/PLAY, FFmpeg, stored
+password or camera action is used by the audit.
+
+A persistent mismatch enters the existing two-observation/full-scan/cooldown path.
+The observed different MAC NEVER becomes the registered identity: only finding
+the original exact MAC at another unique address allows the existing CAS update
+and batched reload. A lookup that reconfirms the old address clears the hint and
+does not reload. Names, IDs, credentials, capabilities and footage stay unchanged.
+Native/owned sources are excluded; drivers keep ownership of their own transport.
+Logs project only the public camera ID, not old/new IP or MAC.
+
+This is best-effort LAN correction, NOT a cryptographic identity or pre-stream
+security barrier. Wrong-device media can remain visible during detection/lookup.
+MAC spoofing, absent neighbor data, unsupported ONVIF/interface identity and
+misconfigured scan ranges remain limits. There is no camera-count limit; lookups
+reuse the existing bounded scan worker/host budget. Driver-ID discovery and hot
+per-source replacement remain separate follow-ups.
+
+The healthy-wrong-camera case failed before the change and now passes.65focused
+tests passed under160MiB/no swap/25% CPU, peak78.6MiB; Ruff/Mypy430 passed. Tests
+cover healthy match/unknown, interface fallback, cooldown, cancellation, scan
+exclusion, unchanged-address confirmation, native exclusion and preserved identity/
+credentials. No real DHCP change, wrong-IP injection or camera command was used.
+
 ## Incident and cause — 2026-09-14
 
 After a power outage/router restart, DHCP reassigned camera addresses. The API and
@@ -43,10 +74,10 @@ serial/device-ID discovery remains future work. ONVIF requiring authentication,
 nonstandard identity ports, routed NAT and incorrect subnet selection may prevent
 automatic matching. Configure explicit bounded LAN subnets when needed.
 
-The trigger is missing media progress (also catches wrong-device authentication),
-not just TCP connectivity. It does not audit an apparently healthy stream whose
-old IP was reassigned to another device accepting the same credentials. Periodic
-identity verification and targeted hot source replacement are separate follow-ups.
+Missing media progress (also catches wrong-device authentication) and the periodic
+healthy-address audit above trigger recovery. The audit relies on available LAN
+identity hints; it cannot detect a reassigned endpoint that impersonates the same
+MAC or offers no contradictory identity. Targeted hot replacement remains pending.
 
 Tests cover debounce/cooldown, unchanged/healthy cameras, duplicate identity,
 ONVIF fallback, cancellation, address CAS/deletion, preserved credentials/ID,

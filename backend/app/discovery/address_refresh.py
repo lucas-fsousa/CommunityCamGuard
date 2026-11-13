@@ -41,6 +41,36 @@ def find_addresses(
         scan_lock.release()
 
 
+def address_matches(ip: str, mac: str, stop: threading.Event) -> bool | None:
+    """Cheap healthy-address audit; None means unknown, never a mismatch.
+
+    Matching ARP needs no network request. A different MAC is only a lookup
+    trigger, never authority to rebind: first allow the known ONVIF identity to
+    resolve interface/proxy differences using one bounded /32 lookup. No camera
+    password, SETUP/PLAY or control command is sent.
+    """
+    try:
+        if ipaddress.ip_address(ip).version != 4:
+            return None
+    except ValueError:
+        return None
+    if stop.is_set() or not mac or not scan_lock.acquire(blocking=False):
+        return None
+    try:
+        observed = active_scan._mac_for(ip)
+        if not observed:
+            return None  # Routed/NAT or unresolved neighbor is not a mismatch.
+        expected = mac.lower()
+        if observed.lower() == expected:
+            return True
+        found = _find_addresses({expected}, [ip + '/32'], stop)
+        if stop.is_set():
+            return None
+        return found.get(expected) == ip
+    finally:
+        scan_lock.release()
+
+
 def _find_addresses(
     macs: set[str], subnets: list[str], stop: threading.Event,
 ) -> dict[str, str]:
