@@ -75,6 +75,10 @@ class OwnedSourceRuntime:
             return bool(prepared and not self._closed and prepared.completion is not None
                         and not prepared.completion.done() and prepared.worker.restream_url is not None)
 
+    def reserved(self, camera_id: str) -> bool:
+        with self._condition:
+            return camera_id in self._runs
+
     def replace(self, worker: OwnedRtspIngress, *, apply_routes: Callable[[], None]) -> OwnedRun:
         """Retire only this camera, then spend its one-use receipt for replacement."""
         with self.retirement.reconciliation.exclusive():

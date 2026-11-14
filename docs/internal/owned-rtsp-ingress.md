@@ -129,6 +129,46 @@ restarting either. Existing cameras are never silently auto-migrated on startup.
 Live migration/verification is pending at this code checkpoint; historical notes
 below describe the original pre-integration state.
 
+#### Initial live rollout and recovery evidence
+
+The authorized migration ran with code `5cd1bbc`, image `16aa40324f55`, build
+`b-5393a0133185`. CI `43602052146` passed6286tests/1skip and all frontend
+contracts; Image `43602052210` passed. Clean build context2.967MB,
+384MiB/no swap/25%CPU. Before initial receipts, both old app and hub were stopped
+with PID=0/exit=0/OOM=false. A private0600 SQLite backup was saved under an
+owner-only `data/owned-rollout-*` directory. The neutral hub config contained
+zero direct camera routes before restart.
+
+Both field cameras activated as owned RTSP26; camera3 stayed native300. App/hub
+started2026-11-14T13:57:06.626Z/13:57:06.454Z. FD/inode checks found exactly
+one camera RTSP TCP connection per owned child and zero direct port554 camera
+connections in the hub. Sequential ten-second HD MSE reads delivered22/174/234
+fragments (native/garage/yard); original archive growth passed on all three.
+
+During the authorized rollout window, only the garage's server-side ingress child
+received SIGTERM (not the camera). Automatic recovery completed in57.959s, advanced
+only garage26→29, reaped the old child and retained the app/hub PID/start times.
+Yard26/native300 and registry contents stayed unchanged. Native delivery continued
+with119fragments/44978890bytes and no negative non-target online/recording samples.
+The target HD follow-up delivered322fragments/7879795bytes.
+
+The initial archive-growth assertion failed: its current-hour-only sampler crossed
+14:00UTC while non-target segments remained open in their13:00UTC directories.
+Recent mtimes there and a corrected bounded current+previous-hour sample verified
+growth on ALL three. This failed measurement is not evidence of an archive outage
+and is not silently reported as a passing test.
+
+Deferred startup also retries an unspent clean receipt if no run was admitted yet.
+Publication includes the base and lazy HD/SD routes, so recovering recording does
+not leave missing browser variants. The pinned API rejects whitespace in source
+URLs; its existing named `#raw` templates preserve exact bitrate/audio-clock
+arguments without changing quality or bypassing validation. See upstream
+[source validation](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/handlers.go)
+and [raw-template expansion](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/ffmpeg/ffmpeg.go).
+The real pinned-hub fixture verifies creation of missing HD/SD routes without
+replacing the hub or an unrelated stream. Final publication follow-up:171focused
+tests passed under192MiB/no swap/25%CPU; Ruff/mypy passed.
+
 The old shared go2rtc process still pulls production camera URLs directly. This
 new receipt applies only to an ingress started inside this boundary. A
 [durable intent guard](durable-source-policy.md) now protects config regeneration

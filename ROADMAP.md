@@ -11,7 +11,12 @@ brief video/recording interruption and no device reboot/settings changes. The
 generic owned runtime now supports durable restart receipts, per-camera replace
 and separate DHCP/dead-child retry without restarting the shared hub. Application
 composition uses automatic source capacity, not a fixed camera-count ceiling.
-Isolated/pinned-hub tests pass; live migration is pending at this checkpoint.
+Live migration passed: garage/yard owned26, camera3 native300. A garage-only
+server-ingress termination recovered in57.959s to revision29 while yard/native
+stayed unchanged and the app/hub were not restarted. HD delivery and original
+archive growth verified on all three; the initial hour-rollover sampling assertion
+failure and corrected two-hour observation are documented explicitly. Deferred
+startup and missing-variant publication are also covered by pinned-hub tests.
 See docs/internal/owned-rtsp-ingress.md for closure/route-publication boundaries.
 
 ### Healthy DHCP address identity — 2026-11-13
@@ -2068,8 +2073,9 @@ DHCP recovery (2026-09-14): automatic bounded MAC rediscovery and manual-scan me
 resync implemented; see `docs/internal/dhcp-address-recovery.md`. Healthy-address
 identity audit is implemented (2026-11-13). Manual scans updating only native
 camera addresses now skip unrelated hub/recorder reloads. Remaining: driver-specific
-discovery for cameras without a known MAC; targeted active RTSP source replacement
-without whole-media reload (not safely provided by the pinned hub's stream API).
+discovery for cameras without a known MAC. Isolated RTSP sources now support
+targeted replacement after physical child retirement. Direct legacy sources still
+require an explicit migration, not an unsafe stream-map overwrite.
 
 Goal: get the picture close to the vendor app, with a **quality selector** that defaults to the
 camera's maximum resolution; Auto/SD are explicit user choices for weaker hosts. Diagnostic

@@ -45,5 +45,16 @@ class OwnedRtspService:
         return self.runtime.available(camera_id)
 
     def refresh(self, camera_id: str) -> None:
-        self.runtime.replace(self._worker(camera_id),
-                             apply_routes=lambda: self.media.patch_owned_source(camera_id))
+        worker = self._worker(camera_id)
+        def publish() -> None:
+            self.media.patch_owned_source(camera_id)
+        if self.runtime.reserved(camera_id):
+            self.runtime.replace(worker, apply_routes=publish)
+            return
+        # Startup may be deferred before admission (e.g. reconciliation busy).
+        # Retry only its still-unspent physical-retirement receipt, never mode alone.
+        checkpoint = next((item for item in owned_restart.pending() if item.camera_id == camera_id), None)
+        if checkpoint is None:
+            raise SourceUnavailable("clean owned restart receipt required")
+        receipt = self.runtime.retirement.resume_owned(checkpoint)
+        self.runtime.activate(receipt, worker, apply_routes=publish)

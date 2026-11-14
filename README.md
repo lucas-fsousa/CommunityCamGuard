@@ -405,8 +405,10 @@ MAC identity after DHCP changes; future drivers may map a serial or vendor-nativ
 Legacy RTSP recovery also audits apparently healthy LAN endpoints: a contradictory MAC
 triggers bounded rediscovery of the original identity, not reassignment to the new device.
 Unknown identity alone does not interrupt a healthy stream. Manual scans that only
-refresh native-camera addresses do not restart the unrelated RTSP hub or recorders;
-RTSP address changes still require the existing shared reload. See
+refresh native-camera addresses do not restart the unrelated RTSP hub or recorders.
+Isolated RTSP sources replace only the affected camera after retiring its old
+ingress; direct legacy RTSP sources still require the shared reload until explicitly
+migrated. No extra encoder or second camera connection is added by isolation. See
 [address recovery and limits](docs/internal/dhcp-address-recovery.md).
 Manual discovery rejects conflicting MAC/IP claims and ambiguous registered ARP
 aliases before changing saved identities; repeating the same observation does not

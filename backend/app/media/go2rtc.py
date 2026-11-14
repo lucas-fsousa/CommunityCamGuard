@@ -154,6 +154,13 @@ def build_config(cameras: list[Camera] | None = None, *,
             s.live_quality, s.live_fps, hd=True,
             repair_audio_clock=repair_audio_clock,
         )
+        if selection.mode == 'owned_rtsp':
+            # go2rtc's PATCH rejects whitespace in source URLs. Its documented
+            # raw-template expansion preserves the exact bitrate/audio options
+            # without smuggling command strings through the stream API.
+            track = 'audio' if repair_audio_clock else 'video'
+            main_raw = f'#raw=ccg_owned_hd_{track}'
+            sub_raw = f'#raw=ccg_owned_sd_{track}'
         # The video codec directive, optionally hardware-accelerated (see live_hwaccel). Empty
         # hwaccel -> plain `#video=h264` (software), which is the default and current behaviour.
         vid = quality.video_h264_directive(s.live_hwaccel)
@@ -185,6 +192,10 @@ def build_config(cameras: list[Camera] | None = None, *,
         # Override the built-in software preset so frame pacing/GOP are the *last* video options.
         # Hardware presets remain go2rtc's own when LIVE_HWACCEL is explicitly selected.
         "ffmpeg": {
+            **{f'ccg_owned_{level}_{track}': quality.encode_raw_args(
+                s.live_quality, s.live_fps, hd=level == 'hd',
+                repair_audio_clock=track == 'audio').removeprefix('#raw=')
+               for level in ('hd', 'sd') for track in ('audio', 'video')},
             # go2rtc's default RTSP input forces ``-fflags nobuffer -flags low_delay``. That is a
             # poor fit for these cameras' HEVC restream: a local FFmpeg consumer normally joins in
             # the middle of a long GOP and needs to retain packets until the next complete
@@ -351,11 +362,18 @@ class Go2rtc:
         if not url or not url.startswith('rtsp://127.0.0.1:'):
             raise RuntimeError("ready isolated RTSP binding required")
         self.write_config()
-        request = urllib.request.Request(
-            f"{self.api}/api/streams?{urlencode({'name': sid, 'src': url})}", method='PATCH')
-        with urllib.request.urlopen(request, timeout=5) as response:
-            if not 200 <= response.status < 300:
-                raise RuntimeError("isolated RTSP route publication failed")
+        streams = json.loads(self.config_path.read_text())['streams']
+        names = (sid, hd_stream_id(sid), web_stream_id(sid))
+        if any(not isinstance(streams.get(name), str) for name in names):
+            raise RuntimeError("complete isolated RTSP routes required")
+        # A startup deferred before admission may have no runtime variants yet.
+        # Publish those lazy aliases too, without preloads or starting encoders.
+        for name in names:
+            request = urllib.request.Request(
+                f"{self.api}/api/streams?{urlencode({'name': name, 'src': streams[name]})}", method='PATCH')
+            with urllib.request.urlopen(request, timeout=5) as response:
+                if not 200 <= response.status < 300:
+                    raise RuntimeError("isolated RTSP route publication failed")
 
     def stream_activity(self) -> dict[str, dict]:
         """Per-stream liveness for the freeze watchdog: ``{stream_id: {video_packets, consumers}}``.

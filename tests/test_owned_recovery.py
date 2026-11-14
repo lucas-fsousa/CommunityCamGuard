@@ -78,6 +78,7 @@ def test_clean_shutdown_checkpoint_restores_once_without_falling_back():
 
 def test_owned_route_patch_does_not_restart_hub(tmp_path, monkeypatch):
     camera, runtime, receipt = retired_owned_target()
+    registry.upsert_camera(camera_id=camera.camera_id, stream_path='/synthetic', last_ip='192.0.2.3')
     worker, _ = fake_worker(camera)
     runtime.activate(receipt, worker, apply_routes=lambda: None)
     engine = go2rtc.Go2rtc(manage=False, config_path=tmp_path/'hub.json', owned_ingress=runtime._bindings)
@@ -89,9 +90,18 @@ def test_owned_route_patch_does_not_restart_hub(tmp_path, monkeypatch):
     monkeypatch.setattr(go2rtc.urllib.request, 'urlopen', request)
     try:
         engine.patch_owned_source(camera.camera_id)
-        sent = request.call_args.args[0]
+        sent = request.call_args_list[0].args[0]
         assert sent.method == 'PATCH'
         assert parse_qs(urlsplit(sent.full_url).query) == {'name':[camera.camera_id], 'src':[worker.restream_url]}
+        assert {parse_qs(urlsplit(call.args[0].full_url).query)['name'][0]
+                for call in request.call_args_list} == {camera.camera_id, camera.camera_id+'_hd', camera.camera_id+'_web'}
+        rendered = json.loads(engine.config_path.read_text())
+        for hd, level in ((True, 'hd'), (False, 'sd')):
+            key = f'ccg_owned_{level}_video'
+            assert rendered['ffmpeg'][key] == go2rtc.quality.encode_raw_args(
+                go2rtc.get_settings().live_quality, go2rtc.get_settings().live_fps, hd=hd).removeprefix('#raw=')
+        assert all(not any(char.isspace() for char in rendered['streams'][name])
+                   for name in (camera.camera_id+'_hd', camera.camera_id+'_web'))
         engine.restart.assert_not_called()
         selected = source_policy.read_for((camera.camera_id,))[camera.camera_id]
         source_policy.block(camera.camera_id, expected_revision=selected.revision)
@@ -101,6 +111,27 @@ def test_owned_route_patch_does_not_restart_hub(tmp_path, monkeypatch):
         request.assert_not_called()
     finally:
         runtime.stop()
+
+
+def test_deferred_startup_retries_only_unspent_clean_receipt():
+    camera, runtime, receipt = retired_owned_target()
+    runtime._restart_checkpoints = True
+    worker, _ = fake_worker(camera)
+    runtime.activate(receipt, worker, apply_routes=lambda: None)
+    runtime.stop()
+    fresh = OwnedSourceRuntime(viewers=runtime._viewers, recordings=runtime._recordings,
+                               bindings=runtime._bindings)
+    media = Mock()
+    service = OwnedRtspService(fresh, media)
+    replacement, _ = fake_worker(camera)
+    service._worker = lambda cid: replacement
+    try:
+        assert not fresh.reserved(camera.camera_id)
+        service.refresh(camera.camera_id)
+        assert fresh.available(camera.camera_id) and not owned_restart.pending()
+        media.patch_owned_source.assert_called_once_with(camera.camera_id)
+    finally:
+        fresh.stop()
 
 
 def test_owned_dhcp_change_and_retry_never_reload_other_sources(monkeypatch):
@@ -144,11 +175,12 @@ def test_dead_owned_worker_recovers_at_confirmed_address_despite_scan_cooldown(m
                     reason='pinned Linux go2rtc fixture required')
 def test_patch_against_real_pinned_hub_keeps_other_stream_and_process(tmp_path):
     camera, runtime, receipt = retired_owned_target()
+    registry.upsert_camera(camera_id=camera.camera_id, stream_path='/synthetic', last_ip='192.0.2.3')
     worker, _ = fake_worker(camera)
     runtime.activate(receipt, worker, apply_routes=lambda: None)
     other = 'cam_' + 'b'*24
     path = tmp_path/'api-only.json'
-    path.write_text(json.dumps({'app':{'modules':['api', 'rtsp']}, 'api':{'listen':'127.0.0.1:0'},
+    path.write_text(json.dumps({'app':{'modules':['api', 'rtsp', 'ffmpeg', 'exec']}, 'api':{'listen':'127.0.0.1:0'},
         'rtsp':{'listen':''},
         'streams':{camera.camera_id:'rtsp://127.0.0.1:9/old', other:'rtsp://127.0.0.1:9/other'},
         'log':{'level':'disabled'}}))
@@ -172,6 +204,7 @@ def test_patch_against_real_pinned_hub_keeps_other_stream_and_process(tmp_path):
         engine.patch_owned_source(camera.camera_id)
         after = read()
         assert worker.restream_url in json.dumps(after[camera.camera_id])
+        assert camera.camera_id+'_hd' in after and camera.camera_id+'_web' in after
         assert after[other] == before[other] and process.poll() is None
     finally:
         process.terminate()
