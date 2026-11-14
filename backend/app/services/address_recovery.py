@@ -44,10 +44,10 @@ class AddressRecovery:
         with self._owned_lock:
             self._owned_pending.update(camera_ids)
 
-    def _apply_owned_pending(self) -> bool:
+    def _apply_owned_pending(self, *, exclude: set[str] | None = None) -> set[str]:
         with self._owned_lock:
-            pending = tuple(self._owned_pending)
-            self._owned_pending.clear()
+            pending = tuple(self._owned_pending.difference(exclude or ()))
+            self._owned_pending.difference_update(pending)
         for cid in pending:
             if self._stop.is_set():
                 self.request_owned_apply((cid,))
@@ -60,7 +60,7 @@ class AddressRecovery:
             except Exception as exc:
                 self.request_owned_apply((cid,))
                 log.warning("isolated RTSP recovery deferred camera_id=%s error_type=%s", cid, type(exc).__name__)
-        return bool(pending)
+        return set(pending)
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -113,8 +113,9 @@ class AddressRecovery:
             self._applying.release()
 
     def tick(self) -> None:
-        if self._apply_owned_pending():
+        if self._stop.is_set():
             return
+        attempted = self._apply_owned_pending()
         if self._pending_apply.is_set():
             self._apply_pending()
             return
@@ -143,7 +144,8 @@ class AddressRecovery:
                             self._missing.get(cam.camera_id, 0) + 1)
             for cam in cameras if cam.mac and cam.rtsp_url
         }
-        missing = [cam for cam in cameras if self._missing.get(cam.camera_id, 0) >= 2]
+        missing = [cam for cam in cameras if self._missing.get(cam.camera_id, 0) >= 2
+                   and cam.camera_id not in attempted]
         # A dead isolated process at an independently reconfirmed address needs
         # no whole-subnet scan and must not wait out another camera's scan cooldown.
         if self.owned is not None:
@@ -152,8 +154,8 @@ class AddressRecovery:
                         and not self.owned.available(cam.camera_id)
                         and address_matches(cam.last_ip, cam.mac, self._stop) is True):
                     self.request_owned_apply((cam.camera_id,))
-            if self._apply_owned_pending():
-                return
+            attempted.update(self._apply_owned_pending(exclude=attempted))
+            missing = [cam for cam in missing if cam.camera_id not in attempted]
         if not missing or time.monotonic() < self._next_scan or self._stop.is_set():
             return
         self._next_scan = time.monotonic() + 300
@@ -176,6 +178,6 @@ class AddressRecovery:
                 log.warning("DHCP address updated camera=%s", cam.camera_id)
             elif ip and selections[cam.camera_id].mode == 'owned_rtsp':
                 self.request_owned_apply((cam.camera_id,))
-        self._apply_owned_pending()
+        self._apply_owned_pending(exclude=attempted)
         if self._pending_apply.is_set():
             self._apply_pending()

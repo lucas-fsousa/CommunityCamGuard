@@ -4,6 +4,17 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Recovery-worker fairness — 2026-11-14
+
+Corrected a concrete regression in isolated RTSP integration: returning after any
+queued/confirmed-dead owned repair let one persistent failure starve all other
+camera discovery and pending registry reconciliation. The shared worker now
+continues its round, attempts each owned camera at most once per tick and retains
+failed/concurrently arriving requests for the next round. No new thread, camera
+connection, transport migration, shorter retry interval or global reload fallback.
+Four before-fix failures now pass;59focused recovery/reconciliation tests passed
+under160MiB/no swap/25%CPU (96.6MiB peak); Ruff/mypy passed. Deployment follows.
+
 ### Authorized isolated RTSP rollout — 2026-11-14
 
 Owner authorized migrating both field RTSP cameras to per-camera ingress, with

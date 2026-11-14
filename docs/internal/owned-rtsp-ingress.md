@@ -118,6 +118,12 @@ The existing 30-second recovery worker queues/retries owned updates separately;
 failure does not fall back to a global hub reload or direct camera URL. A dead
 owned child at an independently reconfirmed address can recover despite the
 subnet-scan cooldown. Native cameras are still handled by their native runtime.
+Each owned camera is attempted at most once per worker tick. A failed or freshly
+requeued repair does not end the round: other cameras' identity/discovery checks
+and explicitly pending registry reconciliation continue. The worker preserves
+requests arriving during an attempt rather than consuming them a second time in
+the same tick. This fixes reproducible starvation at both early-return sites,
+without concurrent repair workers, a shorter retry interval or live fault injection.
 Ordinary configuration changes and fresh owned startup still apply shared config;
 this change targets per-camera address/process recovery, not arbitrary config reload.
 

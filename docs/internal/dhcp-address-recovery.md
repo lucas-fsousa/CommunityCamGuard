@@ -6,6 +6,9 @@ Garage/yard now use generic isolated RTSP ingress; camera3 remains native. Owned
 address updates and confirmed dead-child recovery replace only the affected child
 and publish its loopback route, without restarting the shared hub. Failed owned
 repairs stay queued, not downgraded to direct camera URLs or a global reload.
+Failed owned repairs do not short-circuit checks for other cameras or pending
+registry reconciliation. Each target gets at most one attempt per30-second worker
+tick; failures and concurrently arriving requests remain queued for a later round.
 The real garage-only recovery passed with unchanged non-target source generations
 and unchanged app/hub PID/start times; actual HD and original recording delivery
 were verified. Details and the initial hour-rollover measurement failure are in
