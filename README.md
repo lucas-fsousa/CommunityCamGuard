@@ -9,7 +9,8 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 <sub>open-source NVR · ONVIF · RTSP · Yoosee · self-hosted camera dashboard · WebRTC · go2rtc · home surveillance</sub>
 
 > Status: working end-to-end — no-auth discovery + opaque driver-independent camera identity,
-> credential-validated add with automatic capability probe, live streaming (go2rtc/WebRTC) with
+> credential-validated add with automatic capability probe, driver-native live streaming or
+> go2rtc/WebRTC fallback with
 > listen-in audio, **PTZ** control (click/drag pad), 24/7 crash-safe recording with browser
 > playback + time-based retention, storage policy, a localized (en/pt-BR) web dashboard with a
 > dedicated **Cameras** setup tab, and a REST API. Recorded voice messages and bounded push-to-talk
@@ -19,18 +20,25 @@ flows still depend on vendor services; fully WAN-independent operation remains o
 Supported intercom actions are directly on each live camera bar: hold to speak
 without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
+Outgoing voice currently uses Yoosee's homologated proprietary RTSP/PCM extension;
+this is direct, app-independent LAN audio, not shared-session P2P talkback.
 
-After the native account-wide outage on 2026-11-07, garage and yard remain on RTSP.
-The permanent block caused by a lost route-close ACK is now fixed and verified
+All three installed Yoosee cameras returned to native LAN UDP on 2026-11-14,
+after a gradual garage/yard migration. A simultaneous five-minute HD check passed
+without disconnection or source-generation change, using one shared account/UDP
+socket with zero sampled kernel drops. Original HEVC/AAC archives grew and their
+closed segments were independently verified. This is bounded acceptance, not
+multi-day or zero-lag certification; see [results and limits](docs/internal/native-field-rollout.md).
+The earlier permanent block caused by a lost route-close ACK was fixed and verified
 against the old image on camera3, including combined media/decoder stalls;
 see [before/after recovery evidence](docs/internal/native-lost-ack-recovery.md).
 The decoder also tolerates delayed consumer scheduling without treating a writable
 pipe as stalled; genuine pipe/frame-progress watchdogs remain active. See
 [decoder backpressure](docs/internal/native-decoder-scheduling.md).
-Camera3 is back on native for controlled recovery testing: local decoder termination,
-a temporary validation pause and AV-session closure each recovered automatically.
-These are targeted recovery checks, not full
-native stability acceptance; see [results and limits](docs/internal/native-camera3-recovery-check.md).
+Earlier camera3-only tests showed automatic recovery after local decoder termination,
+a temporary validation pause and AV-session closure.
+These remain targeted recovery evidence, not a claim of indefinite reliability;
+see [recovery scope](docs/internal/native-camera3-recovery-check.md).
 The Yoosee proprietary LAN UDP implementation uses one shared account with independent
 camera A/V leases, supplying H264/AAC to the existing player, original HEVC/AAC
 recordings and reviewed PTZ on the same owner. Camera3's speaker
