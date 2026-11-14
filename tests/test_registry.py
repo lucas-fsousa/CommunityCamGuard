@@ -3,6 +3,59 @@ from backend.app.db import connect, registry
 from backend.app.discovery.active_scan import RtspStream, ScannedHost
 
 
+def test_reconcile_ambiguous_mac_does_not_move_registered_camera():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:00:11:22", name="Saved", password="saved",
+                                    stream_path="/live", last_ip="192.168.1.10")
+    hosts = [ScannedHost(address=ip, mac=camera.mac) for ip in ("192.168.1.20", "192.168.1.21")]
+    for batch in (hosts, list(reversed(hosts))):
+        configured, candidates = registry.reconcile(batch)
+        assert not configured and not candidates
+        assert registry.get_camera_by_id(camera.camera_id) == camera
+
+
+def test_reconcile_ambiguous_arp_alias_does_not_rekey_saved_identity():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:00:11:22", last_ip="192.168.1.10")
+    moves = []
+    hosts = [ScannedHost(address="192.168.1.20", mac="aa:bb:cc:dd:ee:01", arp_mac=camera.mac),
+             ScannedHost(address="192.168.1.21", mac="aa:bb:cc:dd:ee:02", arp_mac=camera.mac)]
+    configured, candidates = registry.reconcile(hosts, on_rekey=lambda old, new: moves.append((old, new)))
+    assert not configured and not candidates and not moves
+    assert registry.get_camera_by_id(camera.camera_id) == camera
+
+
+def test_reconcile_duplicate_observation_is_processed_once():
+    registry.init_db()
+    camera = registry.upsert_camera("aa:bb:cc:00:11:22", last_ip="192.168.1.10")
+    host = ScannedHost(address="192.168.1.20", mac=camera.mac)
+    configured, candidates = registry.reconcile([host, host])
+    assert len(configured) == 1 and not candidates
+    assert configured[0].camera_id == camera.camera_id
+    assert configured[0].last_ip == host.address
+
+
+def test_reconcile_conflict_does_not_block_unrelated_unique_camera():
+    registry.init_db()
+    conflicted = registry.upsert_camera("aa:bb:cc:00:11:22", last_ip="192.168.1.10")
+    healthy = registry.upsert_camera("aa:bb:cc:00:11:33", last_ip="192.168.1.11")
+    hosts = [ScannedHost(address="192.168.1.20", mac=conflicted.mac),
+             ScannedHost(address="192.168.1.21", mac=conflicted.mac.upper()),
+             ScannedHost(address="192.168.1.22", mac=healthy.mac.upper())]
+    configured, candidates = registry.reconcile(hosts)
+    assert [cam.camera_id for cam in configured] == [healthy.camera_id] and not candidates
+    assert configured[0].last_ip == "192.168.1.22"
+    assert registry.get_camera_by_id(conflicted.camera_id) == conflicted
+
+
+def test_reconcile_conflicting_identities_at_same_ip_are_not_candidates():
+    registry.init_db()
+    hosts = [ScannedHost(address="192.168.1.20", mac=mac, open_ports=[554])
+             for mac in ("aa:bb:cc:00:11:22", "aa:bb:cc:00:11:33")]
+    assert registry.reconcile(hosts) == ([], [])
+    assert not registry.list_cameras()
+
+
 def test_password_encrypted_at_rest_and_roundtrips():
     registry.init_db()
     registry.upsert_camera("AA:BB:CC:00:11:22", name="Front", password="s3cr3t",

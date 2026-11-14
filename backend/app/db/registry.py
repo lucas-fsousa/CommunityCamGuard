@@ -27,6 +27,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from ..camera_identity import stable_camera_id, valid_camera_id
 from ..config import get_settings
 from ..discovery.active_scan import ScannedHost
+from ..discovery.identity_claims import unambiguous_identities
 from . import connect
 
 log = logging.getLogger(__name__)
@@ -411,11 +412,19 @@ def reconcile(hosts: list[ScannedHost],
     """
     configured: list[Camera] = []
     candidates: list[Candidate] = []
+    unique = unambiguous_identities(hosts)
+    seen: set[str] = set()
     for host in hosts:
         if not host.mac:
             continue
+        identity = host.mac.lower()
+        if identity not in unique or identity in seen:
+            continue
+        seen.add(identity)
         existing = get_camera(host.mac)
         if existing is None and host.arp_mac and host.arp_mac != host.mac:
+            if host.arp_mac.lower() not in unique and get_camera(host.arp_mac) is not None:
+                continue  # Never rekey a registered alias claimed by several endpoints.
             moved = rekey_camera(host.arp_mac, host.mac)
             if moved is not None:
                 existing = moved

@@ -98,6 +98,17 @@ was no automatic recovery worker, and manual scanning did not resync live servic
   viewers too; unchanged/unresolved scans do not reload. Failed application is
   retried on the next worker tick. A deliberate recorder pause is preserved.
 - Manual dashboard scanning now also resyncs media when registered IPs changed.
+  Before registry writes, the complete batch is checked for conflicting MAC/IP
+  claims and competing ARP-to-ONVIF aliases. Ambiguous primary identities cannot
+  update a saved camera or become new candidates; ambiguous registered ARP aliases
+  cannot rekey a saved camera. Identical observations are
+  processed once; unrelated unambiguous devices remain discoverable. Matching is
+  case-insensitive and still only a LAN hint, not cryptographic authentication.
+  The matcher lives in `discovery/identity_claims.py`, separate from persistence.
+  Three regressions first reproduced wrong-address updates, unsafe alias rekeys
+  and duplicate results. The final registry/discovery/reconciliation batch passed
+  68 tests under 160 MiB/no swap/25% CPU (79.2 MiB peak), plus Ruff and mypy
+  (91.9 MiB peak). These tests use temporary databases, not real camera changes.
   Native-only address updates skip the shared hub and legacy recorder reload:
   these routes do not embed the registry IP. This does not reconnect the native
   actor or clear an unrelated pending reload. Mixed, owned-RTSP and legacy-RTSP

@@ -6,6 +6,13 @@ This section overrides the priorities and pending labels in the chronological hi
 
 ### Healthy DHCP address identity — 2026-11-13
 
+Manual-scan follow-up (2026-11-14): batch-local MAC/IP and ARP-alias ambiguity
+checks now precede registry updates/rekeys/candidate creation. Repeated identical
+observations are deduplicated; unrelated unambiguous cameras continue normally.
+The wrong-address/rekey regressions failed before the fix. This does not implement
+individual legacy RTSP replacement or migrate field-camera transports; those
+still need the owned-ingress handoff rather than an unsafe stream-map overwrite.
+
 Completed the software follow-up for a healthy-looking RTSP stream served by the
 wrong DHCP endpoint. A five-minute, credential-free neighbor/one-IP identity audit
 feeds the existing debounce and bounded exact-MAC rediscovery. Unknown identity

@@ -265,3 +265,21 @@ def test_scan_gate_prevents_overlap():
         assert address_refresh.find_addresses(
             {"aa:bb:cc:dd:ee:01"}, ["10.0.0.0/8"], threading.Event(),
         ) == {}
+
+
+def test_manual_scan_ambiguous_identity_does_not_reload_media(monkeypatch):
+    from types import SimpleNamespace
+
+    from backend.app.api import discovery
+    from backend.app.discovery.active_scan import ScannedHost
+
+    cam = camera()
+    monkeypatch.setattr(discovery.active_scan, "scan", lambda **kw: [
+        ScannedHost(address="192.168.1.20", mac=cam.mac),
+        ScannedHost(address="192.168.1.21", mac=cam.mac),
+    ])
+    resync = Mock()
+    monkeypatch.setattr(discovery, "resync_services", resync)
+    discovery.discovery_scan(SimpleNamespace(), discovery.ScanCredentials())
+    resync.assert_not_called()
+    assert registry.get_camera_by_id(cam.camera_id) == cam
