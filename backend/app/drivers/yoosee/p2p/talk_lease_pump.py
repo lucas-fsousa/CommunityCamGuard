@@ -1,11 +1,14 @@
 """Account-thread handoff to the exact existing media lease, never a new route."""
 
+import logging
 from collections.abc import Callable
 
 from .account_media_channel import AccountMediaChannel
 from .cooperative_talk import CooperativeTalk
 from .kcp_receive import ReceiveError
 from .talk_inbox import TalkInbox, TalkOutcome, TalkTicket
+
+log = logging.getLogger(__name__)
 
 
 class TalkLeasePump:
@@ -37,7 +40,8 @@ class TalkLeasePump:
             return
         try:
             talk = channel.begin_talk(frames)
-        except (ReceiveError, ValueError):
+        except (ReceiveError, ValueError) as exc:
+            log.warning("native talk admission refused: %s", exc)
             self._inbox.finish(ticket, TalkOutcome("unavailable"))
             return
         self._active[ticket] = lease, talk

@@ -117,3 +117,14 @@ lease binding, queued/active cancellation and shutdown receipts are covered.
 Ruff and application mypy passed (93.6MiB peak for the latter). Tests initially
 used an incorrect summary field/reason; those assertions were corrected to the
 worker's existing `reason="stopped"`, without changing worker termination logic.
+
+## Physical review preparation
+
+Owner authorized a physical camera3 speaker test, followed by dashboard selection
+only after confirmation. Added the canonical16kPCM-to-AMR adapter and an opt-in
+single-use `/api/internal/diagnostics/native-talk` route: primary session, direct
+loopback only (no forwarded/proxy headers), fixed server-configured camera ID,
+bounded PCM body, normal camera operation lock. Defaults are disabled; no public
+target/transport/credential parameters or capability grants. It submits through
+the live shared account, never an independent login or RTSP fallback, and returns
+transport receipts with `speaker_verified=false`. No physical result yet.
