@@ -24,8 +24,61 @@ revision change; original archives grew for each. The server owned one UDP socke
 with zero drops before/after. Pre-observation app287.4MiB, CPU89.69% of one core;
 host available memory3594MiB. This is phase-A evidence, not three-native acceptance.
 
-Phase B (yard) follows using the same physical-retirement procedure. No physical
-camera action, firmware change, credential replacement or old-footage deletion.
+Phase B used the same physical-retirement procedure and a separate0600backup
+under ignored `data/native-return-yard-*`. Only yard's retired source intent was
+retargeted; exact-unit profiles, enrollments and registry records were unchanged.
+Both old containers again stopped at PID0/exit0/OOM=false before the operator
+issued a checkpoint and regenerated a neutral config. No physical camera action,
+firmware change, credential replacement or old-footage deletion.
+
+### Normal three-native result
+
+The unchanged normal image (`55c53c24afa7`, code `87b36e6`, build
+`b-03a652ae6898`) now runs ALL installed sources natively: camera3 native312,
+garage native42, yard native39. App/hub started2026-11-14T19:44:00.309Z/
+19:44:00.186Z. The app contains exactly three FFmpeg consumers and ZERO owned
+RTSP children; FD/inode inspection found zero established camera-RTSP connections
+and the generated hub config contains zero streams. This verifies the video
+cutover, not a claim that RTSP is disabled on the devices.
+
+One simultaneous300s authenticated HD observation covered the previously observed
+group-failure window, without reader errors, negative online/recording samples,
+source revision change, account/socket replacement or app restart:
+
+| Source | Binary fragments | Bytes | Maximum fragment gap |
+| --- | ---: | ---: | ---: |
+| Camera3 | 587 | 200404004 | 2.207s |
+| Garage | 588 | 221086624 | 2.726s |
+| Yard | 585 | 219716303 | 4.735s |
+
+There was ONE owning UDP socket throughout, ONE socket generation, zero sampled
+kernel drops. Original archive files grew on all three. A finalized segment from
+each, modified AFTER this application start, independently passed ffprobe as
+1920×1080 HEVC video plus AAC16kHz mono. No original media was re-encoded or moved.
+Sample during the observation: app459.6MiB/1GiB and141.22% of one CPU core, hub
+3.598MiB; OOM=false/restarts=0. This is bounded group acceptance, NOT multi-day
+certification or a claim of zero pauses: the4.735s yard gap remains measured data,
+without enough timing evidence to attribute it to network/decoder/disk/CPU.
+
+### Control reads and remaining audio distinction
+
+All three expose eight existing control descriptors and both voice UI operations;
+no new feature grant was created. Read-only native-session lamp/volume requests
+passed on garage/yard. Camera3's initial catalogue was pending until the existing
+asynchronous refresh completed. A subsequent camera3 lamp GET returned502 while
+volume and the field reads passed. Three later explicit read-only lamp checks
+passed200/verified in233/196/201ms; no LED action was sent. Its original cause is
+UNKNOWN and is not labelled fixed by a successful repeat. Do not automatically
+retry physical writes or change protocol/deadlines on this single failed read.
+
+Incoming audio now accompanies the native video. Outgoing recorded voice and
+hold-to-speak still prefer the previously homologated proprietary RTSP/PCM
+backchannel. Camera3's exact audio proofs explicitly grant `rtsp_pcm`, not P2P;
+the field units retain their legacy driver audio selection. This is app-independent
+LAN audio, NOT proof of audio transmission through the shared P2P media session.
+Clarification was requested whether the owner's complete-native milestone also
+requires eliminating this remaining RTSP dependency; no codec/proof was changed
+and no sonic test was sent to infer that acceptance.
 
 ## Earlier controlled checkpoint
 

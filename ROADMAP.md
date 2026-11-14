@@ -18,7 +18,16 @@ Phase A delivered on the existing image: garage native39 plus camera3 native309,
 yard still owned35. Simultaneous60s HD and archive-growth checks passed on all
 three; one native UDP socket, zero drops, no source generation changes. Exact
 evidence/backups: docs/internal/native-field-rollout.md. Yard migration follows;
-this is not yet a claim of three simultaneous native sources.
+Phase B subsequently passed: ALL installed sources now run native312/42/39 on
+the unchanged normal image. One simultaneous300s HD run had no disconnect,
+negative status sample or generation change; one UDP socket/generation, zero
+drops, original HEVC1080p/AAC16k mono segments verified for all three. No active
+RTSP capture remains. Max fragment gaps2.207/2.726/4.735s are recorded, not hidden
+as zero-lag delivery. A single camera3 lamp-state502 was not reproduced in three
+later read-only checks; its cause remains unknown, not labelled corrected.
+Remaining scope decision: outgoing voice still uses the homologated proprietary
+RTSP/PCM path; incoming audio/video is native. Owner clarification requested on
+whether shared-P2P voice transmission is required for the complete-native target.
 
 ### Recovery-worker fairness — 2026-11-14
 
