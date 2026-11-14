@@ -13,7 +13,12 @@ continues its round, attempts each owned camera at most once per tick and retain
 failed/concurrently arriving requests for the next round. No new thread, camera
 connection, transport migration, shorter retry interval or global reload fallback.
 Four before-fix failures now pass;59focused recovery/reconciliation tests passed
-under160MiB/no swap/25%CPU (96.6MiB peak); Ruff/mypy passed. Deployment follows.
+under160MiB/no swap/25%CPU (96.6MiB peak); Ruff/mypy passed.
+Delivered `87b36e6`/image `55c53c24afa7`/build `b-03a652ae6898`; CI6291passed/
+1skip and Image green. App-only rollout restored native306/garage owned35/yard
+owned32. HD delivery and original archive growth passed on all three, no negative
+status samples or revision change during observation. Three FFmpeg/two owned
+ingress processes; OOM=false/restarts=0. No live camera fault/control was injected.
 
 ### Authorized isolated RTSP rollout — 2026-11-14
 

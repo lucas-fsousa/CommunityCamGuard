@@ -199,6 +199,30 @@ The pinned real-process fixture separately verifies PATCH without replacing its
 hub process. No real DHCP reassignment was injected; physical camera settings,
 device power, existing footage and unrelated WSL projects were untouched.
 
+#### Recovery-worker fairness rollout
+
+`87b36e6` removes both early returns that let a permanently failing owned repair
+starve unrelated discovery or an explicitly pending registry reconciliation.
+Each round tracks attempted camera IDs and excludes them from later repair
+passes, preserving failures and requests arriving during an attempt for the next
+tick. Four before-fix regressions failed; all59focused tests now pass, plus Ruff/
+mypy. Tests were capped at160MiB/no swap/25%CPU (96.6MiB peak); mypy at192MiB.
+
+Image `55c53c24afa7` / `wsl-recovery-fairness`, build `b-03a652ae6898` deployed
+after CI `43631874258` (6291passed/1skip plus all frontend contracts) and Image
+`43631874318` passed. Clean context2.971MB, build capped384MiB/no swap/25%CPU.
+Only the app was recreated, starting2026-11-14T19:27:26.612Z; the hub container
+retained its13:57:06.454Z start time.
+
+Sequential ten-second HD reads delivered23/235/243fragments and
+8255434/5848152/5958827bytes (native/garage/yard). Current+previous-hour archive
+growth passed on each, no negative online/recording samples, unchanged revisions
+during observation: native306/garage owned35/yard owned32. Three FFmpeg and two
+owned RTSP children remained; sampled233.2MiB app/46.68MiB hub; OOM=false/
+restarts=0. No live fault, physical command or real DHCP swap was injected: the
+starvation correction is proven by temporary-DB regressions, not attributed to
+an observed outage in this healthy live window.
+
 Historical pre-rollout integration note (superseded for the migrated field cameras):
 the old shared go2rtc process pulled production camera URLs directly. This
 new receipt applies only to an ingress started inside this boundary. A
