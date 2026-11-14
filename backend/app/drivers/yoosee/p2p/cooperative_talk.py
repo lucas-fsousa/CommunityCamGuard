@@ -53,6 +53,10 @@ class CooperativeTalk:
         self.microphone_started = self.microphone_stopped = False
         self.acknowledged_frames = 0
 
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
+
     def cancel(self) -> None:
         """Drain an already emitted PUSH, then send only microphone OFF."""
         self._cancelled = True

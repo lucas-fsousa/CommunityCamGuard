@@ -43,10 +43,12 @@ Microphone controls start after every allocated high-channel INIT sequence, not
 at zero or a hard-coded one. Repeated messages keep both counters.
 
 If a superseded UDP INIT lacked its receipt, video reception may legitimately be
-ready under the existing policy, but talk admission is refused without affecting
-that video. This candidate does not assume those outgoing sequence gaps are safe
-or force an account reconnect to obtain permission. Handling that ambiguity in
-the future adapter remains explicit work, not a hidden retry or readiness change.
+ready under the existing policy. Its exact emitted wire is now retained for late
+ACKs without a video deadline. A requested utterance resumes a bounded receipt
+drain of those identical wires before allocating audio/microphone commands: no
+new INIT sequence, application request, authentication or camera connection.
+Cancellation before microphone use suspends that drain and leaves video active.
+An unsuccessful active drain still fails rather than inventing receipt evidence.
 
 The existing reader feeds ACKs to the outstanding talk request AND feeds the same
 datagram to the AV receiver. UDP uses its existing validated route; TCP keeps its
@@ -128,3 +130,11 @@ bounded PCM body, normal camera operation lock. Defaults are disabled; no public
 target/transport/credential parameters or capability grants. It submits through
 the live shared account, never an independent login or RTSP fallback, and returns
 transport receipts with `speaker_verified=false`. No physical result yet.
+
+First authorized live attempt: diagnostic HTTP200/unavailable in0.134seconds,
+zero audio-frame/OFF receipts. Account log explicitly identified unconfirmed
+outgoing INIT sequences; no audio was emitted. All three stayed online/recording.
+The prior implementation discarded superseded INIT senders at ACCEPT, preventing
+late receipts from being counted. Retaining them and draining identical emitted
+packets on explicit talk demand corrects that concrete prerequisite; acoustic
+acceptance remains pending. No volume change (readback50%, verified).

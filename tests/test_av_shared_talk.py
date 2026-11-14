@@ -199,7 +199,8 @@ def test_microphone_control_starts_after_all_allocated_sdk_init_sequences():
     assert sent(s)[1].sequence == 4  # High channel, after four INITs, not sequence one.
 
 
-def test_missing_superseded_init_receipt_blocks_talk_not_the_existing_video():
+@pytest.mark.parametrize("cancel", [False, True])
+def test_missing_superseded_init_receipt_drains_identical_bytes_before_talk_not_new_login(cancel):
     from tests.test_av_receive_channels import CONTROL, start
     from tests.test_captured_media import control
 
@@ -207,16 +208,27 @@ def test_missing_superseded_init_receipt_blocks_talk_not_the_existing_video():
     s = AvHandshake(PEER, 42, 123, COOKIE, repeat_init=True, clock=lambda: now[0])
     sent(s)
     now[0] = .05
-    assert s.due()  # An extra INIT whose receipt never arrives.
+    missing, = s.due()  # An extra INIT whose receipt never arrives.
     s.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
     s.receive(packet(0, 0, start()), PEER)
     sent(s)
     s.receive(packet(1, 0, media(header() + av())), PEER)
     assert s.ready
-    with pytest.raises(ReceiveError, match="INIT sequences"):
-        s.begin_talk((FRAME,))
-    assert s.ready and not s.due()
-    assert s.receive(packet(2, 0, media(av())), PEER).records[0].video == b"video"
+    now[0] = 3
+    s.receive(packet(2, 0, media(av())), PEER)
+    talk = s.begin_talk((FRAME,))
+    retried, = s.due()
+    assert retried == missing and s.ready
+    assert s.receive(packet(3, 0, media(av())), PEER).records[0].video == b"video"
+    if cancel:
+        talk.cancel()
+        now[0] = 6
+        assert s.receive(packet(4, 0, media(av())), PEER).records[0].video == b"video"
+        assert not s.due() and talk.done and not talk.microphone_started and s.ready
+        return
+    s.receive(ack(retried), PEER)
+    assert sent(s)[1].sequence == 1  # Only now send the audio encoding header.
+    assert sent(s)[1].sequence == 2  # Mic command after both INIT sequences.
 
 
 @pytest.mark.parametrize('frames', [(), (FRAME,) * 501, (b"invalid",), [FRAME], (bytearray(FRAME),)])

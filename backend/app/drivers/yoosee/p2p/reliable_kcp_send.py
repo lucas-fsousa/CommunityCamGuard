@@ -31,6 +31,19 @@ class ReliableKcpPush:
         self.attempts = 0
         self.acknowledged = False
         self.closed = False
+        self._suspended = False
+
+    def suspend_receipt(self) -> None:
+        """Retain an emitted INIT for late receipts without expiring live video."""
+        self._suspended = True
+
+    def resume_receipt(self) -> None:
+        """A bounded owner-requested drain; same wire, sequence and timestamp."""
+        if self._suspended and not self.acknowledged:
+            self._created = self._clock()
+            self._last_sent = None
+            self.attempts = 0
+        self._suspended = False
 
     def close(self) -> None:
         self._wire = b""
@@ -39,14 +52,14 @@ class ReliableKcpPush:
     def poll(self) -> None:
         if self.closed:
             raise ReceiveError(f"{self._label} sender is closed")
-        if not self.acknowledged and self._clock() - self._created >= 2:
+        if not self._suspended and not self.acknowledged and self._clock() - self._created >= 2:
             self.close()
             raise ReceiveError(f"{self._label} receipt deadline exceeded")
 
     def due(self) -> bytes | None:
         self.poll()
         now = self._clock()
-        if self.acknowledged or self.attempts >= 4:
+        if self._suspended or self.acknowledged or self.attempts >= 4:
             return None
         if self._last_sent is not None and now - self._last_sent < 0.25:
             return None

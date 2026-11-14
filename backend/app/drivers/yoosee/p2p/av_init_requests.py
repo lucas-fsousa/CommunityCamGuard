@@ -48,9 +48,22 @@ class AvInitRequests:
         self._clear()
 
     def stop_repeating(self) -> None:
+        if self._stopped:
+            return
         self._stopped = True
-        if self.acknowledged:
-            self._clear()
+        self.suspend_pending()
+
+    def suspend_pending(self) -> None:
+        for request in self._requests:
+            if not request.acknowledged:
+                request.suspend_receipt()
+
+    def drain_pending(self) -> None:
+        if not self._stopped or not self.acknowledged:
+            raise ReceiveError("INIT drain requires accepted media")
+        for request in self._requests:
+            if not request.acknowledged:
+                request.resume_receipt()
 
     def poll(self) -> None:
         if self.closed:
@@ -86,6 +99,4 @@ class AvInitRequests:
             if request.acknowledged:
                 self._confirmed.add(sequence)
         self.acknowledged |= received
-        if self.acknowledged and self._stopped:
-            self._clear()
         return received
