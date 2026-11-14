@@ -76,9 +76,11 @@ hold-to-speak still prefer the previously homologated proprietary RTSP/PCM
 backchannel. Camera3's exact audio proofs explicitly grant `rtsp_pcm`, not P2P;
 the field units retain their legacy driver audio selection. This is app-independent
 LAN audio, NOT proof of audio transmission through the shared P2P media session.
-Clarification was requested whether the owner's complete-native milestone also
-requires eliminating this remaining RTSP dependency; no codec/proof was changed
-and no sonic test was sent to infer that acceptance.
+Owner subsequently approved proceeding toward shared-P2P outgoing voice. Its
+finite transmitter is now implemented inside the existing AV/UDP/TCP owner, not
+selected by the dashboard and not acoustically accepted. No production codec or
+proof was changed and no sonic test was sent. Implementation and next integration
+boundary: [shared-session outgoing voice](native-shared-talk.md).
 
 ## Earlier controlled checkpoint
 

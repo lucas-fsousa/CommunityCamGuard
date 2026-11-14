@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from .contracts import P2PProbeError
+from .cooperative_talk import CooperativeTalk
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_route_job import MediaRouteJob, MediaRouteSpec
@@ -59,6 +60,11 @@ class CooperativeTcpMedia:
     @property
     def ready(self) -> bool:
         return self._ready_at is not None and not self._closing and self.result is None
+
+    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+        if not self.ready:
+            raise ReceiveError("TCP talk requires a running media pump")
+        return self._owner.begin_talk(frames)
 
     def _close(self) -> TcpMediaResult:
         if self.result is not None:

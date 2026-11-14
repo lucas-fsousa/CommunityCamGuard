@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from .av_handshake import AvHandshake
 from .av_meter import AvMeter
+from .cooperative_talk import CooperativeTalk
+from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, MediaRateBudget
 from .media_protocol import build_media_meter_request, parse_kcp_segments, parse_media_meter
 from .media_route_job import MediaRouteJob, MediaRouteSpec
@@ -65,6 +67,12 @@ class CooperativeUdpMedia:
     @property
     def ready(self) -> bool:
         return self.result is None and self._owner.ready and self._close_until is None
+
+    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+        """Owner-thread only; reuse this exact route, sender and incoming reader."""
+        if not self.ready:
+            raise ReceiveError("UDP talk requires an active AV route")
+        return self._owner.begin_talk(frames)
 
     def _write(self, wire: bytes, peer: tuple[str, int] | None = None) -> None:
         self._traffic.charge(tx=len(wire))

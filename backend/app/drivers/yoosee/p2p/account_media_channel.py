@@ -4,8 +4,10 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from .cooperative_talk import CooperativeTalk
 from .cooperative_tcp_media import CooperativeTcpMedia, TcpMediaResult
 from .cooperative_udp_media import CooperativeUdpMedia, UdpMediaResult, UdpSend
+from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
 from .video_delivery import VideoDelivery
@@ -78,6 +80,15 @@ class AccountMediaChannel:
     def transport_running(self) -> bool:
         return ((self.tcp is not None and self.tcp.result is None)
                 or (self.udp is not None and self.udp.result is None))
+
+    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+        """Trusted owner-thread candidate, on the already selected transport only."""
+        if self._retiring or self._stopping or not self.ready:
+            raise ReceiveError("talk requires a running media channel")
+        if self.udp is not None:
+            return self.udp.begin_talk(frames)
+        assert self.tcp is not None
+        return self.tcp.begin_talk(frames)
 
     def step(self, opener: Callable[..., CooperativeTcpMedia], *, budget_seconds: float = 0.2,
              udp_send: UdpSend | None = None) -> None:

@@ -25,9 +25,14 @@ drops, original HEVC1080p/AAC16k mono segments verified for all three. No active
 RTSP capture remains. Max fragment gaps2.207/2.726/4.735s are recorded, not hidden
 as zero-lag delivery. A single camera3 lamp-state502 was not reproduced in three
 later read-only checks; its cause remains unknown, not labelled corrected.
-Remaining scope decision: outgoing voice still uses the homologated proprietary
-RTSP/PCM path; incoming audio/video is native. Owner clarification requested on
-whether shared-P2P voice transmission is required for the complete-native target.
+Outgoing voice still uses the homologated proprietary RTSP/PCM path; incoming
+audio/video is native. Owner approved proceeding with shared-P2P voice. The finite
+AMR transmitter is now integrated into the existing AV/UDP/TCP owner with shared
+sequence allocation, paced batches and microphone-only termination; it is not yet
+selected by the dashboard or acoustically accepted. Next: account-thread bridge,
+capture adapters and authorized camera3 known-speech acceptance. No sonic command
+or production transport/capability change for this step. See
+docs/internal/native-shared-talk.md for the exact implementation and limits.
 
 ### Recovery-worker fairness — 2026-11-14
 

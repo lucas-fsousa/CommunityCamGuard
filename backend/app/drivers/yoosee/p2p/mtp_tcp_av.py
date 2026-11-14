@@ -12,6 +12,7 @@ from typing import NoReturn
 
 from .av_handshake import AvHandshake
 from .av_receive import AvReceiveBatch
+from .cooperative_talk import CooperativeTalk
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, MediaRateBudget, validate_media_policy
 from .mtp_tcp_ack import build_mtp_tcp_meter_ack, build_mtp_tcp_plain_meter_ack
@@ -85,6 +86,12 @@ class TcpAvSession:
     @property
     def ready(self) -> bool:
         return not self.closed and self._av is not None and self._av.ready
+
+    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+        """Use existing relay framing/output; never creates a second AV session."""
+        if not self.ready or self._av is None:
+            raise ReceiveError("TCP talk requires an active AV route")
+        return self._av.begin_talk(frames)
 
     @property
     def close_acknowledged(self) -> bool:
