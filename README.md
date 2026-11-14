@@ -408,6 +408,10 @@ Unknown identity alone does not interrupt a healthy stream. Manual scans that on
 refresh native-camera addresses do not restart the unrelated RTSP hub or recorders;
 RTSP address changes still require the existing shared reload. See
 [address recovery and limits](docs/internal/dhcp-address-recovery.md).
+Manual discovery rejects conflicting MAC/IP claims and ambiguous registered ARP
+aliases before changing saved identities; repeating the same observation does not
+create duplicate results. A conflict does not prevent other uniquely identified
+cameras from being discovered.
 
 ## Roadmap
 

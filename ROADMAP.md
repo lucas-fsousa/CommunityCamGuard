@@ -12,6 +12,9 @@ observations are deduplicated; unrelated unambiguous cameras continue normally.
 The wrong-address/rekey regressions failed before the fix. This does not implement
 individual legacy RTSP replacement or migrate field-camera transports; those
 still need the owned-ingress handoff rather than an unsafe stream-map overwrite.
+Delivered `2a3fa66`, build `b-f7f4fc01e8b6`; CI 6280 passed/1 skip and Image
+green. Native HD delivery and archive growth on all three cameras passed after
+the app-only rollout, with three FFmpeg processes and no physical commands.
 
 Completed the software follow-up for a healthy-looking RTSP stream served by the
 wrong DHCP endpoint. A five-minute, credential-free neighbor/one-IP identity audit

@@ -179,3 +179,24 @@ Node camera-panel/PTZ contracts passed. No WSL OOM; no container OOM/restart loo
 The next natural DHCP change still needs end-to-end observation of the scheduled
 worker: this incident was restored using the verified lookup results directly,
 without deliberately causing another outage or falsifying database addresses.
+
+## Manual scan ambiguity rollout — 2026-11-14
+
+Code `2a3fa66`, image `32fc979effe6` / tag `wsl-identity-conflicts`, build
+`b-f7f4fc01e8b6`. CI `43600621028` passed 6280 tests/1 skip and all frontend
+contracts; Image `43600621036` passed. Clean tracked-files build context was
+2.951 MB, capped at 384 MiB/no swap/25% CPU. Only the app was recreated, starting
+2026-11-14T13:39:44.027Z; the shared hub retained its previous start time.
+
+The 40-second authenticated native-HD MSE reader received 83 binary fragments /
+34859124 bytes. Online/recording polling had no negative samples, original archive
+files grew for all three cameras and source revisions remained unchanged during
+the check (native 297, field legacy RTSP 22/22). Three FFmpeg processes remained;
+memory sampled at 244.6 MiB app / 47.39 MiB hub; OOM=false/restarts=0.
+
+No real duplicate identity or DHCP reassignment was injected, no field-camera
+transport was migrated and no sound/light/motion/configuration command was sent.
+The ambiguity correction is proven by isolated registry/API regressions; the live
+check verifies deployment and delivery, not a simulated physical identity clash.
+Individual active legacy-RTSP replacement still requires the owned-ingress
+migration and is not claimed by this rollout.
