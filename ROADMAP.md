@@ -4,6 +4,22 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Native delivery deadline — owner request, 2026-11-14
+
+Owner authorized gradual native migration and set end of next week as the delivery
+goal. Internal target: Friday2026-11-20. Critical path: migrate garage, verify and
+retain an owned-RTSP rollback; migrate yard; verify the normal shared-account
+runtime, original archives and existing native audio/control paths; close concrete
+failures rather than add cosmetic work or arbitrary acceptance gates. No physical
+sound/light/movement/reboot tests are authorized by this migration. Exact-unit
+driver capabilities remain authoritative; no family-wide feature grants or camera
+count ceilings. LAN-only, SD playback and other brands remain deferred.
+Phase A delivered on the existing image: garage native39 plus camera3 native309,
+yard still owned35. Simultaneous60s HD and archive-growth checks passed on all
+three; one native UDP socket, zero drops, no source generation changes. Exact
+evidence/backups: docs/internal/native-field-rollout.md. Yard migration follows;
+this is not yet a claim of three simultaneous native sources.
+
 ### Recovery-worker fairness — 2026-11-14
 
 Corrected a concrete regression in isolated RTSP integration: returning after any

@@ -1,6 +1,33 @@
 # Native LAN UDP field rollout — 2026-11-07
 
-## Current controlled checkpoint
+## Gradual native return — 2026-11-14
+
+Owner authorized native migration of garage/yard one at a time, with owned-RTSP
+rollback if unavailable or too expensive. Goal: finish native core by end of next
+week (internal target Friday2026-11-20), not reopen deferred LAN-only/SD/new-brand
+work or repeat sound/light/movement tests.
+
+Phase A passed on the existing reviewed runtime `87b36e6` / image `55c53c24afa7`
+/ build `b-03a652ae6898`, without changing camera profiles, enrollments or settings.
+Metadata-only checks confirmed each unit's own current native AV and LAN-UDP
+proof, plus a valid shared-account cohort; no camera3 capability copy was used.
+After both app/hub namespaces stopped (PID0/exit0), a locked, network-disabled
+operator saved a0600SQLite/config backup under ignored `data/native-return-garage-*`,
+CAS-retargeted only garage's retired owned intent, and issued its one-use native
+checkpoint. The neutral hub config had zero direct camera routes before restart.
+
+Normal startup returned native camera3/garage at309/39 and owned-RTSP yard35.
+The simultaneous60s authenticated HD observation delivered123/124/1536fragments
+and45703234/47016973/34847542bytes (camera3/garage/yard), max binary-fragment
+gaps1.249/1.269/0.616s. No reader error, negative online/recording sample or source
+revision change; original archives grew for each. The server owned one UDP socket
+with zero drops before/after. Pre-observation app287.4MiB, CPU89.69% of one core;
+host available memory3594MiB. This is phase-A evidence, not three-native acceptance.
+
+Phase B (yard) follows using the same physical-retirement procedure. No physical
+camera action, firmware change, credential replacement or old-footage deletion.
+
+## Earlier controlled checkpoint
 
 2026-11-08: the old-image permanent block after one lost close ACK was reproduced
 on camera3. The corrected image recovered from that fault and from combined
