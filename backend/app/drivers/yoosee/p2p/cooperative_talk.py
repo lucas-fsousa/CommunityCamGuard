@@ -8,12 +8,12 @@ transport candidate, not a claim of speaker compatibility or acoustic success.
 import time
 from collections.abc import Callable
 
-from .audio_sender import FRAME_INTERVAL_SECONDS, validate_amr_audio_frames
+from .audio_sender import validate_amr_audio_frames
+from .cooperative_talk_audio import TalkAudioWindow
 from .kcp_receive import ReceiveError
 from .reliable_kcp_send import ReliableKcpPush
 from .stream_protocol import (
     V1EncodingHeader,
-    build_v1_audio_packet,
     encrypt_command_tlv,
     encrypt_media_tlv,
     pack_microphone_command,
@@ -25,7 +25,7 @@ TALK_FORMAT = V1EncodingHeader(0x0102, 5, 0, 1, 16, 8000, 160, 0, 0, 0, 0)
 
 
 class CooperativeTalk:
-    """Account-thread only, at most 16KiB of audio and one in-flight PUSH.
+    """Account-thread only, at most16KiB audio and eight in-flight audio PUSHes.
 
     No sleeps, receive loop, sockets, authentication, or AV START/CLOSE. Sequence
     allocation belongs to the parent handshake. Missing receipts invalidate that
@@ -45,9 +45,8 @@ class CooperativeTalk:
         self._frames, self._allocate, self._clock, self._wall_us = frames, allocate, clock, wall_us
         self._deadline = clock() + 16
         self._request: ReliableKcpPush | None = None
+        self._audio = TalkAudioWindow(peer, link, cookie, frames, allocate, clock=clock, wall_us=wall_us)
         self._stage = "header"
-        self._offset = self._batch_frames = 0
-        self._next_audio = clock()
         self._cancelled = False
         self.done = self.closed = False
         self.microphone_started = self.microphone_stopped = False
@@ -61,11 +60,13 @@ class CooperativeTalk:
         """Drain an already emitted PUSH, then send only microphone OFF."""
         self._cancelled = True
         self._frames = ()
+        self._audio.cancel()
 
     def close(self) -> None:
         """Local retirement only; never invent remote microphone OFF evidence."""
         self.closed = True
         self._cookie, self._frames = b"", ()
+        self._audio.close()
         if self._request is not None:
             self._request.close()
             self._request = None
@@ -79,10 +80,12 @@ class CooperativeTalk:
             raise ReceiveError("native talk deadline exceeded")
         if self._request is not None:
             self._request.poll()
+        self._audio.poll()
 
     def _complete(self) -> None:
         self.done = True
         self._cookie, self._frames = b"", ()
+        self._audio.close()
 
     def _prepare(self) -> None:
         high = False
@@ -98,16 +101,6 @@ class CooperativeTalk:
             high = True
             body = encrypt_command_tlv(pack_microphone_command(True,
                 timestamp_us=self._wall_us()), self._cookie)
-        elif self._stage == "audio":
-            if self._cancelled or self._offset >= len(self._frames):
-                self._stage = "stop"
-                self._prepare()
-                return
-            frames = self._frames[self._offset:self._offset + 4]
-            self._batch_frames = len(frames)
-            body = encrypt_media_tlv(build_v1_audio_packet(frames, self._wall_us()), self._cookie)
-            # Pace from actual emission, never catch up in a burst after a stall.
-            self._next_audio = self._clock() + len(frames) * FRAME_INTERVAL_SECONDS
         else:
             high = True
             body = encrypt_command_tlv(pack_microphone_command(False,
@@ -120,15 +113,20 @@ class CooperativeTalk:
         self.poll()
         if self.done:
             return None
+        if self._stage == "audio":
+            if not self._audio.finished:
+                return self._audio.due()
+            self._stage = "stop"
         if self._request is None:
-            # Also let the final burst finish before microphone OFF.
-            if self._stage == "audio" and not self._cancelled and self._clock() < self._next_audio:
-                return None
             self._prepare()
         return self._request.due() if self._request is not None else None
 
     def receive_ack(self, wire: bytes, peer: tuple[str, int]) -> None:
         self.poll()
+        if self._stage == "audio":
+            self._audio.receive_ack(wire, peer)
+            self.acknowledged_frames = self._audio.acknowledged_frames
+            return
         request = self._request
         if request is None or not request.receive_ack(wire, peer):
             return
@@ -139,9 +137,6 @@ class CooperativeTalk:
         elif self._stage == "start":
             self.microphone_started = True  # Transport receipt ONLY.
             self._stage = "audio"
-        elif self._stage == "audio":
-            self.acknowledged_frames += self._batch_frames
-            self._offset += self._batch_frames
         else:
             self.microphone_stopped = True  # Transport receipt ONLY.
             self._complete()

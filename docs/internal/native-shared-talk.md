@@ -57,8 +57,10 @@ existing relay wrapper/output pump. There is no additional camera connection.
 ## Bounds and termination
 
 Input is an immutable tuple of1–500 validated AMR frames (maximum16KiB/ten seconds).
-One PUSH is outstanding at a time: at most four identical transmissions at250ms
-intervals, with an absolute two-second receipt deadline. The entire utterance is
+Header/microphone controls remain sequential. Audio now has a bounded window of
+at most eight outstanding PUSHes (32frames/640ms of content), rather than waiting
+for each batch's ACK before the next80ms batch. Each PUSH retains at most four
+identical transmissions at250ms intervals and a two-second receipt deadline. The entire utterance is
 bounded to16seconds including negotiation, playback cadence and termination.
 Pacing follows actual emission; scheduler stalls cannot produce catch-up bursts.
 The final burst gets its playback duration before normal microphone OFF.
@@ -138,3 +140,18 @@ The prior implementation discarded superseded INIT senders at ACCEPT, preventing
 late receipts from being counted. Retaining them and draining identical emitted
 packets on explicit talk demand corrects that concrete prerequisite; acoustic
 acceptance remains pending. No volume change (readback50%, verified).
+
+Second live attempt after INIT correction: HTTP200/cancelled in16.581seconds,
+132/500 audio frames acknowledged, no OFF receipt. Owner explicitly confirmed
+**no sound**. This is a failed speaker test. Camera3 then became blocked while the
+other two stayed active. Returning the app to the previously accepted stable
+image restored all three online/recording; no camera reboot/settings operation.
+
+The transmitter also differed from the SDK ring-buffer callback by waiting for
+each audio-batch ACK before producing another. That can stretch the20ms codec
+cadence under delayed receipts. Audio now uses an eight-PUSH bounded window with
+independent80ms pacing, while still draining all outstanding sequences before
+OFF. A synthetic350ms-ACK-delay test completes all500frames under13seconds with
+video still active. This corrects that pacing discrepancy; it does NOT establish
+that it caused the physical silence, nor an acoustic pass. New physical review
+remains required before dashboard selection.

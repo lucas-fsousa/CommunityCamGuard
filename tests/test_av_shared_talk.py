@@ -252,3 +252,32 @@ def test_ten_second_message_is_bounded_and_scheduler_stalls_do_not_create_catchu
         now[0] += .081 if batch != 60 else .5
     sent(s)  # Microphone OFF, never AV CLOSE.
     assert talk.done and talk.acknowledged_frames == 500 and s.ready
+
+
+def test_delayed_audio_receipts_do_not_slow_a_ten_second_message_to_sixteen_seconds():
+    now = [0.0]
+    s = active(now)
+    talk = s.begin_talk((FRAME,) * 500)
+    sent(s)
+    sent(s)
+    pending = {}
+    video_sequence = 2
+    maximum = 0
+    for tick in range(1400):
+        now[0] = tick * .01
+        if tick % 20 == 0:
+            s.receive(packet(video_sequence, 0, media(av())), PEER)
+            video_sequence += 1
+        for wire in s.due():
+            segment, = parse_kcp_segments(wire)
+            key = segment.conv, segment.sequence
+            pending.setdefault(key, (now[0] + .35, wire))
+        maximum = max(maximum, len(pending))
+        for key, (at, wire) in tuple(pending.items()):
+            if at <= now[0]:
+                s.receive(ack(wire), PEER)
+                del pending[key]
+        if talk.done:
+            break
+    assert talk.done and talk.acknowledged_frames == 500 and talk.microphone_stopped
+    assert 10 <= now[0] < 13 and 2 <= maximum <= 8 and s.ready
