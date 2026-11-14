@@ -35,7 +35,8 @@ def test_credentials_and_operator_boundaries_are_not_dashboard_candidates():
         "native_resume_on_start",
     }
     required.update(name for name in Settings.model_fields
-                    if name.startswith(("native_av_diagnostic_", "broker_read_diagnostic_", "go2rtc_")))
+                    if name.startswith(("native_av_diagnostic_", "native_talk_diagnostic_",
+                                        "broker_read_diagnostic_", "go2rtc_")))
     assert required <= set(server_only)
 
 

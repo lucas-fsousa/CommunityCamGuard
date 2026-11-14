@@ -31,6 +31,7 @@
         "native_av_diagnostic_shared_tcp",
         "native_av_diagnostic_tcp_profile",
         "native_av_diagnostic_camera_id", "native_av_diagnostic_device_id",
+        "native_talk_diagnostic_enabled", "native_talk_diagnostic_camera_id",
         "provisioning_ble_material_file", "provisioning_ble_material_max_age_seconds",
         "provisioning_remote_ble_enabled", "aws_access_key_id", "aws_secret_access_key",
         "go2rtc_api", "go2rtc_host", "go2rtc_rtsp_port", "go2rtc_webrtc_port",
