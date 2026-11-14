@@ -12,7 +12,8 @@ Implemented: a finite encoded-message transmitter inside the existing AV owner,
 accessible through `AccountMediaChannel.begin_talk` on its selected UDP or TCP
 transport. It is **not yet a dashboard transport**, an acoustic acceptance, a
 streaming hold-to-speak adapter, or an automatically granted driver capability.
-The API is account-thread-only, not safe for direct calls from HTTP workers.
+The raw channel API is account-thread-only. A bounded thread-safe bridge now
+connects the driver view to that owner, but no dashboard route selects it yet.
 
 ## Recovered protocol, not a codec guess
 
@@ -73,8 +74,6 @@ on the returned handle mean transport receipt only, never sound reproduction.
 
 ## What remains before selecting this in production
 
-- A bounded, generation-bound submission/result/cancellation bridge from the
-  driver to the existing account thread and exact active camera lease.
 - PCM capture/encoding and hold-to-speak adapters using that bridge, preserving
   the generic driver's per-unit capability decision and current working fallback.
 - One announced, authorized known-speech test on camera3, with speaker confirmation
@@ -90,3 +89,31 @@ Local result:144 focused tests passed under160MiB/no swap/25%CPU,62.6MiB peak;
 Ruff and application-wide mypy passed (192MiB cap,97.9MiB peak). Full-suite CI
 runs remotely rather than loading the WSL host. Existing AV control deadline
 messages remain unchanged for the production failure classifier.
+
+## Driver/account bridge, same-session continuation
+
+`SharedDeviceControls` now delegates submit/take/cancel to its current
+`AccountReadLifecycle`. Submission accepts encoded frames only, not an arbitrary
+device ID; `MediaLeaseInbox` resolves the driver's own camera ID to a claimed,
+uncancelled, live lease. Tickets carry the account generation and the request
+retains the exact lease serial. Replacement leases cannot inherit queued audio.
+
+`TalkInbox` uses a lock and at most one utterance per lease; unread outcomes also
+retain their slot. Total capacity follows the account's camera cohort, without a
+fixed camera-count ceiling. Cancelled queued audio is cleared immediately. Active
+cancellation is consumed cooperatively by the account owner, not another socket
+reader or a blocking request thread. The existing `MediaLeasePump` polls this
+handoff on normal worker turns; no new worker/authentication/media route is opened.
+
+Results say `transport_received`, `cancelled` or `unavailable`, with exact audio
+frame/OFF receipt fields. Account shutdown never fabricates an OFF confirmation.
+The bridge itself does not grant a capability, select the unhomologated transport,
+or issue commands without a future explicitly admitted driver operation.
+
+Bridge verification:88 focused tests passed under160MiB/no swap/25%CPU
+(70.1MiB peak), including an actual synthetic `AccountReadWorker` run proving
+the utterance uses its existing transport. Stale-generation cancellation, exact
+lease binding, queued/active cancellation and shutdown receipts are covered.
+Ruff and application mypy passed (93.6MiB peak for the latter). Tests initially
+used an incorrect summary field/reason; those assertions were corrected to the
+worker's existing `reason="stopped"`, without changing worker termination logic.

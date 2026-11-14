@@ -13,6 +13,7 @@ from .account_media_channel import (
 from .account_policy import validate_media_capacity
 from .contracts import OnlineDevice
 from .media_route_job import MediaRouteSpec
+from .talk_inbox import TalkInbox, TalkTicket
 from .video_delivery import VideoDelivery
 
 
@@ -69,6 +70,18 @@ class MediaLeaseInbox:
         self._closed = False
         self._serial = 0
         self._leases: dict[MediaLeaseTicket, _Lease] = {}
+        self.talk = TalkInbox(generation, capacity)
+
+    def submit_talk(self, camera_id: str, frames: tuple[bytes, ...]) -> TalkTicket:
+        """Bind to an already claimed exact-camera lease, never its replacement."""
+        with self._lock:
+            if not self._closed:
+                for ticket, lease in self._leases.items():
+                    if (lease.camera_id == camera_id and lease.claimed and not lease.cancelled
+                            and lease.result is None and lease.bootstrap.video is not None
+                            and not lease.bootstrap.video.closed):
+                        return self.talk.submit(ticket.serial, frames)
+            raise ValueError("active exact-camera media lease required for talk")
 
     @property
     def generation(self) -> int:
@@ -169,6 +182,7 @@ class MediaLeaseInbox:
             return result
 
     def close(self) -> None:
+        self.talk.close()
         with self._lock:
             self._closed = True
             tickets = tuple(self._leases)

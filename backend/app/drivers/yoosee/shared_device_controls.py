@@ -25,6 +25,7 @@ from .p2p.ptz_inbox import MotionTicket
 from .p2p.ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .p2p.siren_pulse_inbox import SirenPulseTicket
 from .p2p.siren_pulse_job import SirenPulseResult, SirenPulseSpec
+from .p2p.talk_inbox import TalkOutcome, TalkTicket
 
 
 class SharedDeviceControls:
@@ -37,6 +38,16 @@ class SharedDeviceControls:
 
     def matches_target(self, camera_id: str, device_id: str) -> bool:
         return self._camera_id == camera_id and self._device_id == device_id
+
+    def submit_talk(self, frames: tuple[bytes, ...]) -> TalkTicket:
+        """Internal candidate only; driver must admit shared-P2P audio explicitly."""
+        return self._lifecycle.submit_talk(self._camera_id, frames)
+
+    def take_talk(self, ticket: TalkTicket) -> TalkOutcome | None:
+        return self._lifecycle.take_talk(ticket)
+
+    def cancel_talk(self, ticket: TalkTicket) -> None:
+        self._lifecycle.cancel_talk(ticket)
 
     def submit(self, path: str) -> MailboxTicket:
         """Only the fixed identity/state read scope; no caller device ID or write."""

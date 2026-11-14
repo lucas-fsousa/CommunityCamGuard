@@ -12,6 +12,7 @@ from .account_media_channel import (
 from .media_lease_inbox import MediaLeaseInbox, MediaLeaseTicket
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
+from .talk_lease_pump import TalkLeasePump
 
 
 class MediaAccountRetirement(Exception):
@@ -25,6 +26,12 @@ class MediaLeasePump:
         self._active: dict[MediaLeaseTicket, AccountMediaChannel] = {}
         self.cleanup_uncertain = False
         self.account_retired = False
+        self._talk = TalkLeasePump(inbox.talk)
+
+    def _talk_channel(self, serial: int) -> AccountMediaChannel | None:
+        return next((channel for ticket, channel in self._active.items()
+                     if ticket.serial == serial and not self.inbox.should_cancel(ticket)
+                     and channel.ready), None)
 
     def _complete(self, ticket: MediaLeaseTicket, channel: AccountMediaChannel, *, uncertain: bool = False,
                   account_retired: bool = False) -> bool:
@@ -48,6 +55,7 @@ class MediaLeasePump:
 
     def poll(self, prepare: Callable[[MediaRouteSpec], MediaRouteJob], *,
              defer_stop_device: int | None = None) -> None:
+        self._talk.poll(self._talk_channel)
         for ticket, channel in tuple(self._active.items()):
             if channel.bootstrap.spec.device.device_id == defer_stop_device:
                 continue  # Motor STOP/receipt precedes detach/result publication.
@@ -82,6 +90,7 @@ class MediaLeasePump:
         self._channels.append(channel)
 
     def finish(self, *, uncertain: bool, account_socket_closed: bool = False) -> None:
+        self._talk.finish()
         self.inbox.close()
         retired = (account_socket_closed and not uncertain
                    and media_channels_locally_retired(tuple(c.summary() for c in self._active.values())))

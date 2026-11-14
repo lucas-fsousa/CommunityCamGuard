@@ -27,6 +27,7 @@ from .ptz_inbox import MotionTicket
 from .ptz_scheduler import PtzSpec, ScheduledPtzResult
 from .siren_pulse_inbox import SirenPulseTicket
 from .siren_pulse_job import SirenPulseResult, SirenPulseSpec
+from .talk_inbox import TalkOutcome, TalkTicket
 from .video_delivery import VideoDelivery
 
 
@@ -84,6 +85,23 @@ class AccountReadLifecycle:
         with self._lock:
             return (self._state == "active" and self._lease_inbox is inbox
                     and inbox.generation == self._generation)
+
+    def submit_talk(self, camera_id: str, frames: tuple[bytes, ...]) -> TalkTicket:
+        with self._lock:
+            if self._state != "active" or self._lease_inbox is None:
+                raise ValueError("account not accepting shared talk")
+            return self._lease_inbox.submit_talk(camera_id, frames)
+
+    def take_talk(self, ticket: TalkTicket) -> TalkOutcome | None:
+        with self._lock:
+            if self._lease_inbox is None or ticket.generation != self._generation:
+                return None
+            return self._lease_inbox.talk.take(ticket)
+
+    def cancel_talk(self, ticket: TalkTicket) -> None:
+        with self._lock:
+            if self._lease_inbox is not None and ticket.generation == self._generation:
+                self._lease_inbox.talk.cancel(ticket)
 
     def submit(self, device_id: int, path: str, timeout: float = 2.0) -> MailboxTicket:
         with self._lock:

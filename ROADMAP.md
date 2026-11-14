@@ -29,8 +29,9 @@ Outgoing voice still uses the homologated proprietary RTSP/PCM path; incoming
 audio/video is native. Owner approved proceeding with shared-P2P voice. The finite
 AMR transmitter is now integrated into the existing AV/UDP/TCP owner with shared
 sequence allocation, paced batches and microphone-only termination; it is not yet
-selected by the dashboard or acoustically accepted. Next: account-thread bridge,
-capture adapters and authorized camera3 known-speech acceptance. No sonic command
+selected by the dashboard or acoustically accepted. The generation/exact-lease
+account-thread bridge is implemented too, without extra routes or worker threads.
+Next: capture adapters and authorized camera3 known-speech acceptance. No sonic command
 or production transport/capability change for this step. See
 docs/internal/native-shared-talk.md for the exact implementation and limits.
 
