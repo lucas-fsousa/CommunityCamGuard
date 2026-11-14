@@ -17,6 +17,12 @@ stayed unchanged and the app/hub were not restarted. HD delivery and original
 archive growth verified on all three; the initial hour-rollover sampling assertion
 failure and corrected two-hour observation are documented explicitly. Deferred
 startup and missing-variant publication are also covered by pinned-hub tests.
+Final `7624ddc`/image `f7176cb3685a`/build `b-297dbb16d751`: CI6287passed/1skip
+and Image green. App-only rebuild restored both owned cameras without manual
+intervention. Final native303/garage owned32/yard owned29 all delivered HD and
+grew original archives; unchanged revisions during observation, three FFmpeg
+processes, OOM=false/restarts=0. This closes the authorized isolated-ingress rollout;
+it does not claim a real DHCP-address swap or migrate newly added legacy cameras.
 See docs/internal/owned-rtsp-ingress.md for closure/route-publication boundaries.
 
 ### Healthy DHCP address identity — 2026-11-13

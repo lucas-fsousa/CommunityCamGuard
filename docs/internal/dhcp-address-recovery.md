@@ -1,5 +1,18 @@
 # Automatic camera address recovery
 
+## Current isolated-source integration — 2026-11-14
+
+Garage/yard now use generic isolated RTSP ingress; camera3 remains native. Owned
+address updates and confirmed dead-child recovery replace only the affected child
+and publish its loopback route, without restarting the shared hub. Failed owned
+repairs stay queued, not downgraded to direct camera URLs or a global reload.
+The real garage-only recovery passed with unchanged non-target source generations
+and unchanged app/hub PID/start times; actual HD and original recording delivery
+were verified. Details and the initial hour-rollover measurement failure are in
+[owned ingress rollout evidence](owned-rtsp-ingress.md#initial-live-rollout-and-recovery-evidence).
+Direct legacy cameras still use the conservative shared reload until explicitly
+migrated. No camera settings or footage are changed by migration.
+
 ## Healthy-address identity audit — 2026-11-13
 
 The worker now checks apparently healthy LEGACY RTSP addresses too, at most once
@@ -15,7 +28,9 @@ The observed different MAC NEVER becomes the registered identity: only finding
 the original exact MAC at another unique address allows the existing CAS update
 and batched reload. A lookup that reconfirms the old address clears the hint and
 does not reload. Names, IDs, credentials, capabilities and footage stay unchanged.
-Native/owned sources are excluded; drivers keep ownership of their own transport.
+At the initial audit checkpoint, native/owned sources were excluded. The later
+owned integration above extends the same identity checks to isolated RTSP; native
+transport remains under its driver/runtime.
 Logs project only the public camera ID, not old/new IP or MAC.
 
 This is best-effort LAN correction, NOT a cryptographic identity or pre-stream
@@ -93,8 +108,8 @@ was no automatic recovery worker, and manual scanning did not resync live servic
   cameras are not registered. Public ID, driver, capabilities, password, name and
   recordings remain unchanged. SQLite compare-and-swap rejects a stale result if
   that camera was removed or its address/MAC changed while scanning.
-- Changed addresses are persisted together with a sanitized log, then the existing
-  media reload is invoked once per batch. This reload can briefly interrupt other
+- Changed addresses are persisted together with a sanitized log. Direct legacy
+  RTSP uses the existing media reload once per batch, which can briefly interrupt other
   viewers too; unchanged/unresolved scans do not reload. Failed application is
   retried on the next worker tick. A deliberate recorder pause is preserved.
 - Manual dashboard scanning now also resyncs media when registered IPs changed.
@@ -111,8 +126,9 @@ was no automatic recovery worker, and manual scanning did not resync live servic
   (91.9 MiB peak). These tests use temporary databases, not real camera changes.
   Native-only address updates skip the shared hub and legacy recorder reload:
   these routes do not embed the registry IP. This does not reconnect the native
-  actor or clear an unrelated pending reload. Mixed, owned-RTSP and legacy-RTSP
-  batches retain the conservative existing reload; ordinary camera CRUD is unchanged.
+  actor or clear an unrelated pending reload. Owned/native-only batches queue
+  per-camera owned repair when its runtime is present; batches involving direct
+  legacy RTSP retain the existing reload. Ordinary camera CRUD is unchanged.
   Manual and automatic discovery share a non-overlapping scan gate (manual: 409 if
   busy; automatic: skip this cycle). Shutdown cancels queued network probes.
 
@@ -128,7 +144,8 @@ automatic matching. Configure explicit bounded LAN subnets when needed.
 Missing media progress (also catches wrong-device authentication) and the periodic
 healthy-address audit above trigger recovery. The audit relies on available LAN
 identity hints; it cannot detect a reassigned endpoint that impersonates the same
-MAC or offers no contradictory identity. Targeted hot replacement remains pending.
+MAC or offers no contradictory identity. Targeted replacement is implemented for
+isolated RTSP; direct legacy ingress needs an explicit owned migration first.
 
 The pinned go2rtc 1.9.14 API is not a physical retirement receipt: PUT replaces a
 stream reference and DELETE removes it without stopping the previous object;

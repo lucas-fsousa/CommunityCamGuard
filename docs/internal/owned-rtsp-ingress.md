@@ -1,8 +1,8 @@
 # Owned RTSP ingress boundary — 2026-10-23
 
-Status: implemented and verified with real go2rtc1.9.14 and loopback RTSP fixtures.
-This component is not started by application startup or an API. Production camera
-sources, containers and recordings were not migrated or interrupted.
+Current status (2026-11-14): integrated into server startup/recovery. The authorized
+garage/yard migration and garage-only automatic recovery passed; camera3 remains
+native. Initial component-only fixture evidence is retained below as history.
 
 ## Boundary selected
 
@@ -126,8 +126,8 @@ recording interruption and no camera reboot/settings change. Deployment must fir
 stop the old app AND external hub, confirm both old processes exited, then create
 the initial owned receipts and write a config without direct camera routes before
 restarting either. Existing cameras are never silently auto-migrated on startup.
-Live migration/verification is pending at this code checkpoint; historical notes
-below describe the original pre-integration state.
+The live rollout evidence follows. The pre-integration notes retained afterward
+describe the original boundary, not the current production selection.
 
 #### Initial live rollout and recovery evidence
 
@@ -169,7 +169,32 @@ The real pinned-hub fixture verifies creation of missing HD/SD routes without
 replacing the hub or an unrelated stream. Final publication follow-up:171focused
 tests passed under192MiB/no swap/25%CPU; Ruff/mypy passed.
 
-The old shared go2rtc process still pulls production camera URLs directly. This
+#### Final image and normal application restart
+
+Final code `7624ddc`, image `f7176cb3685a` / `wsl-owned-final`, build
+`b-297dbb16d751`. CI `43603505604` passed6287tests/1skip and all frontend
+contracts; Image `43603505548` passed. Build context2.970MB, capped at384MiB/
+no swap/25%CPU. The app-only rollout started2026-11-14T14:13:25.111Z; the hub
+container retained its13:57:06.454Z start time. Both migrated sources restored
+automatically from clean retirement; no operator receipt recreation was needed.
+No owned restart receipt remained unspent after startup.
+
+Final ten-second HD reads delivered23/200/210binary fragments and
+8398299/4868181/5533877bytes (native/garage/yard). The bounded current+previous-hour
+archive check passed for all three, no negative status samples, with unchanged
+revisions during observation: native303, garage owned32, yard owned29. The app
+contained two RTSP go2rtc children and the same three FFmpeg processes; sampled
+memory293.6MiB app/132.5MiB hub during the media checks. OOM=false/restarts=0.
+
+The initial recovery FD check also confirmed yard's child stayed PID19 while
+garage alone changed PID11→95. Reported live app/hub PID/start comparisons refer
+to Docker's container-init observations, not a claimed trace of every hub syscall.
+The pinned real-process fixture separately verifies PATCH without replacing its
+hub process. No real DHCP reassignment was injected; physical camera settings,
+device power, existing footage and unrelated WSL projects were untouched.
+
+Historical pre-rollout integration note (superseded for the migrated field cameras):
+the old shared go2rtc process pulled production camera URLs directly. This
 new receipt applies only to an ingress started inside this boundary. A
 [durable intent guard](durable-source-policy.md) now protects config regeneration
 and new recording admission. [Runtime bindings](owned-runtime-bindings.md) now
