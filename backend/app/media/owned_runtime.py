@@ -5,6 +5,7 @@ import threading
 import time
 from collections.abc import Callable
 
+from ..db import owned_restart, source_policy
 from ..recording.ingress_gate import RecordingIngressGate
 from .owned_bindings import OwnedIngressBindings
 from .owned_retirement import OwnedRetirementCoordinator, OwnedRun, RetiredIngress
@@ -17,11 +18,12 @@ from .viewer_gate import ViewerGate
 
 class OwnedSourceRuntime:
     def __init__(self, *, viewers: ViewerGate, recordings: RecordingIngressGate,
-                 bindings: OwnedIngressBindings, capacity: int = 1):
+                 bindings: OwnedIngressBindings, capacity: int | None = 1, restart_checkpoints: bool = False):
         self.retirement = OwnedRetirementCoordinator(viewers=viewers, recordings=recordings, bindings=bindings)
         self._viewers, self._recordings, self._bindings = viewers, recordings, bindings
         self._executor = SourceExecutor(capacity=capacity)
         self._capacity = capacity
+        self._restart_checkpoints = restart_checkpoints
         self._condition = threading.Condition()
         self._shutdown = threading.Lock()
         self._closed = False
@@ -39,7 +41,8 @@ class OwnedSourceRuntime:
                 or worker.pid is not None or worker.restream_url is not None):
             raise SourceUnavailable("matching retired owned target required")
         with self._condition:
-            if self._closed or worker.camera_id in self._runs or len(self._runs) >= self._capacity:
+            if (self._closed or worker.camera_id in self._runs
+                    or (self._capacity is not None and len(self._runs) >= self._capacity)):
                 raise SourceUnavailable("owned runtime admission unavailable")
             prepared = PreparedOwned(worker, receipt.selection, viewers=self._viewers,
                                      recordings=self._recordings, bindings=self._bindings)
@@ -65,6 +68,34 @@ class OwnedSourceRuntime:
             with self._condition:
                 self._operations -= 1
                 self._condition.notify_all()
+
+    def available(self, camera_id: str) -> bool:
+        with self._condition:
+            prepared = self._runs.get(camera_id)
+            return bool(prepared and not self._closed and prepared.completion is not None
+                        and not prepared.completion.done() and prepared.worker.restream_url is not None)
+
+    def replace(self, worker: OwnedRtspIngress, *, apply_routes: Callable[[], None]) -> OwnedRun:
+        """Retire only this camera, then spend its one-use receipt for replacement."""
+        with self.retirement.reconciliation.exclusive():
+            with self._condition:
+                old = self._runs.get(worker.camera_id)
+                if self._closed or old is None:
+                    raise SourceUnavailable("current owned run required")
+                self._operations += 1
+            try:
+                old.close()  # includes viewer/recorder drain and physical child reap
+                selected = source_policy.read_for((worker.camera_id,))[worker.camera_id]
+                checkpoint = owned_restart.CleanRestart(worker.camera_id, selected.revision)
+                owned_restart.save((checkpoint,))
+                receipt = self.retirement.resume_owned(checkpoint)
+                with self._condition:
+                    del self._runs[worker.camera_id]
+                return self.activate(receipt, worker, apply_routes=apply_routes)
+            finally:
+                with self._condition:
+                    self._operations -= 1
+                    self._condition.notify_all()
 
     def stop(self, *, timeout: float = 30) -> None:
         if isinstance(timeout, bool) or not math.isfinite(timeout) or not 0 < timeout <= 30:
@@ -111,6 +142,11 @@ class OwnedSourceRuntime:
             failed = True
         if failed:
             raise SourceCleanupUnconfirmed("owned runtime shutdown unconfirmed") from None
+        if self._restart_checkpoints:
+            policies = source_policy.read_for(session.worker.camera_id for session in prepared)
+            owned_restart.save(tuple(owned_restart.CleanRestart(cid, selected.revision)
+                                     for cid, selected in policies.items()
+                                     if selected.mode == 'owned_rtsp' and selected.phase == 'blocked'))
         with self._condition:
             self._stopped = True
             self._runs.clear()

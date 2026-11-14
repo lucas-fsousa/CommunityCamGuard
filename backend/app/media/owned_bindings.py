@@ -35,9 +35,9 @@ class BoundIngress:
 
 
 class OwnedIngressBindings:
-    def __init__(self, *, capacity: int = 1, reconciliation: ReconciliationGuard | None = None):
-        if type(capacity) is not int or not 1 <= capacity <= 32:
-            raise ValueError("owned ingress capacity must be between 1 and 32")
+    def __init__(self, *, capacity: int | None = 1, reconciliation: ReconciliationGuard | None = None):
+        if capacity is not None and (type(capacity) is not int or capacity < 1):
+            raise ValueError("owned ingress capacity must be positive or automatic")
         self._capacity = capacity
         self.reconciliation = reconciliation if reconciliation is not None else ReconciliationGuard()
         self._lock = threading.Lock()
@@ -52,7 +52,7 @@ class OwnedIngressBindings:
             selection = selections[worker.camera_id]
             if selection.mode != "owned_rtsp" or selection.phase != "active":
                 raise SourceUnavailable("owned source selection is not active")
-            if worker.camera_id in self._entries or len(self._entries) >= self._capacity:
+            if worker.camera_id in self._entries or (self._capacity is not None and len(self._entries) >= self._capacity):
                 raise SourceUnavailable("owned ingress binding already reserved")
             binding = BoundIngress(worker.camera_id, selection.revision, worker)
             if binding.url is None:

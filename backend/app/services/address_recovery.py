@@ -12,6 +12,7 @@ from ..db import registry, source_policy
 from ..discovery.address_refresh import address_matches, find_addresses
 from ..media.go2rtc import stream_id
 from ..media.reconciliation import mutation_scope
+from .owned_rtsp import OwnedRtspService
 from .thread_shutdown import join_thread, require_retired
 
 log = logging.getLogger(__name__)
@@ -20,9 +21,12 @@ log = logging.getLogger(__name__)
 class AddressRecovery:
     """Debounced missing/wrong identity, five-minute scans, one worker lifecycle."""
 
-    def __init__(self, media: Any, recorder: Any) -> None:
+    def __init__(self, media: Any, recorder: Any, *, owned: OwnedRtspService | None = None) -> None:
         self.media = media
         self.recorder = recorder
+        self.owned = owned
+        self._owned_pending: set[str] = set()
+        self._owned_lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._missing: dict[str, int] = {}
@@ -35,6 +39,28 @@ class AddressRecovery:
     def request_apply(self) -> None:
         """Coalesce deferred registry/config changes into the existing worker."""
         self._pending_apply.set()
+
+    def request_owned_apply(self, camera_ids: tuple[str, ...]) -> None:
+        with self._owned_lock:
+            self._owned_pending.update(camera_ids)
+
+    def _apply_owned_pending(self) -> bool:
+        with self._owned_lock:
+            pending = tuple(self._owned_pending)
+            self._owned_pending.clear()
+        for cid in pending:
+            if self._stop.is_set():
+                self.request_owned_apply((cid,))
+                continue
+            try:
+                selected = source_policy.read_for((cid,))[cid]
+                if selected.mode != 'owned_rtsp' or self.owned is None:
+                    continue
+                self.owned.refresh(cid)
+            except Exception as exc:
+                self.request_owned_apply((cid,))
+                log.warning("isolated RTSP recovery deferred camera_id=%s error_type=%s", cid, type(exc).__name__)
+        return bool(pending)
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -87,13 +113,20 @@ class AddressRecovery:
             self._applying.release()
 
     def tick(self) -> None:
+        if self._apply_owned_pending():
+            return
         if self._pending_apply.is_set():
             self._apply_pending()
             return
         cameras = registry.list_cameras()
         selections=source_policy.read_for(cam.camera_id for cam in cameras)
-        cameras=[cam for cam in cameras if selections[cam.camera_id].permits_legacy_rtsp]
+        cameras=[cam for cam in cameras if selections[cam.camera_id].permits_legacy_rtsp
+                 or (self.owned is not None and selections[cam.camera_id].mode == 'owned_rtsp')]
         online = self.media.stream_online()
+        if self.owned is not None:
+            for cam in cameras:
+                if selections[cam.camera_id].mode == 'owned_rtsp' and not self.owned.available(cam.camera_id):
+                    online[stream_id(cam.camera_id)] = False
         now = time.monotonic()
         if now >= self._next_identity_check and not self._stop.is_set():
             self._next_identity_check = now + 300
@@ -111,6 +144,16 @@ class AddressRecovery:
             for cam in cameras if cam.mac and cam.rtsp_url
         }
         missing = [cam for cam in cameras if self._missing.get(cam.camera_id, 0) >= 2]
+        # A dead isolated process at an independently reconfirmed address needs
+        # no whole-subnet scan and must not wait out another camera's scan cooldown.
+        if self.owned is not None:
+            for cam in missing:
+                if (selections[cam.camera_id].mode == 'owned_rtsp'
+                        and not self.owned.available(cam.camera_id)
+                        and address_matches(cam.last_ip, cam.mac, self._stop) is True):
+                    self.request_owned_apply((cam.camera_id,))
+            if self._apply_owned_pending():
+                return
         if not missing or time.monotonic() < self._next_scan or self._stop.is_set():
             return
         self._next_scan = time.monotonic() + 300
@@ -126,7 +169,13 @@ class AddressRecovery:
                 self._identity_mismatch.discard(cam.camera_id)
                 self._missing[cam.camera_id] = 0
             if ip and ip != cam.last_ip and registry.refresh_address(cam, ip):
-                self.request_apply()
+                if selections[cam.camera_id].mode == 'owned_rtsp':
+                    self.request_owned_apply((cam.camera_id,))
+                else:
+                    self.request_apply()
                 log.warning("DHCP address updated camera=%s", cam.camera_id)
+            elif ip and selections[cam.camera_id].mode == 'owned_rtsp':
+                self.request_owned_apply((cam.camera_id,))
+        self._apply_owned_pending()
         if self._pending_apply.is_set():
             self._apply_pending()

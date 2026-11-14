@@ -63,6 +63,7 @@ from .services.address_recovery import AddressRecovery
 from .services.control_sessions import ControlSessions
 from .services.lifetime import ServiceLifetime
 from .services.native_startup import restore_reviewed
+from .services.owned_rtsp import OwnedRtspService
 from .validation_errors import invalid_request
 
 
@@ -89,23 +90,26 @@ async def lifespan(app: FastAPI):
             for service in driver.runtime_services(owner):
                 lifetime.own(service)
 
-        owned_bindings = OwnedIngressBindings()
+        owned_bindings = OwnedIngressBindings(capacity=None)
         viewers = ViewerGate()
         media = lifetime.own(Go2rtc(owned_ingress=owned_bindings))
         rec = lifetime.own(Recorder(owned_ingress=owned_bindings))
-        owned_runtime = lifetime.own(OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress, bindings=owned_bindings))
+        owned_runtime = lifetime.own(OwnedSourceRuntime(viewers=viewers, recordings=rec.ingress,
+            bindings=owned_bindings, capacity=None, restart_checkpoints=True))
+        owned_rtsp = OwnedRtspService(owned_runtime, media)
         native_runtime = lifetime.own(NativeSourceRuntime(viewers=viewers,
             capacity=None, restart_checkpoints=True))
         storage = lifetime.own(StorageMonitor(rec))
         retention = lifetime.own(RetentionCleaner())
         warmer = lifetime.own(Warmer())
-        address_recovery = lifetime.own(AddressRecovery(media, rec))
+        address_recovery = lifetime.own(AddressRecovery(media, rec, owned=owned_rtsp))
         control_sessions = lifetime.own(ControlSessions())
         app.state.media = media
         app.state.viewer_sessions = viewers
         app.state.native_runtime = native_runtime
         app.state.native_sources = native_runtime.sources
         app.state.owned_runtime = owned_runtime
+        app.state.owned_rtsp = owned_rtsp
         app.state.rec = rec
         app.state.storage = storage
         app.state.retention = retention
@@ -127,11 +131,18 @@ async def lifespan(app: FastAPI):
                     # Broken native state must not prevent the other legacy cameras
                     # from starting. Source policy still excludes native fallback.
                     app.state.native_startup = {"status":"unavailable"}
+            owned_startup = await asyncio.to_thread(owned_rtsp.restore, owner)
+            app.state.owned_startup = owned_startup
             try:
                 if settings.manage_go2rtc:
                     media.start()
                 # The external container does not watch its config. Apply only
                 # real changes: unnecessary restart can leave overlapping producers.
+                elif owned_startup:
+                    # New loopback generations require one startup reload. Do
+                    # not mistake a file written by native publication for an
+                    # already-applied external runtime configuration.
+                    media.restart()
                 elif not media.ensure_external_config():
                     raise RuntimeError("external go2rtc did not apply its generated configuration")
                 if media.wait_healthy(timeout=15):

@@ -11,7 +11,7 @@ from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from ..db import native_restart, source_policy
+from ..db import native_restart, owned_restart, source_policy
 from ..recording.ingress_gate import RecordingIngressGate
 from .owned_bindings import OwnedIngressBindings
 from .reconciliation import ReconciliationGuard, serialized_mutation
@@ -49,6 +49,24 @@ class OwnedRetirementCoordinator:
     @property
     def viewer_gate(self) -> ViewerGate:
         return self._viewers
+
+    @serialized_mutation
+    def resume_owned(self, checkpoint: owned_restart.CleanRestart) -> RetiredIngress:
+        """Spend a clean receipt; durable source intent alone is insufficient."""
+        if not self._operation.acquire(blocking=False):
+            raise SourceUnavailable("source handoff already in progress")
+        try:
+            if self._failed is not None:
+                raise SourceUnavailable("owned restart admission unavailable")
+            camera_id = checkpoint.camera_id
+            self._viewers.suspend(camera_id)
+            self._recordings.suspend(camera_id)
+            selection = owned_restart.consume(checkpoint)
+            receipt = RetiredIngress(camera_id, selection)
+            self._receipts[camera_id] = receipt
+            return receipt
+        finally:
+            self._operation.release()
 
     @serialized_mutation
     def resume_native(self, checkpoint: native_restart.CleanRestart) -> RetiredIngress:

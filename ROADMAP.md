@@ -4,6 +4,16 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Authorized isolated RTSP rollout — 2026-11-14
+
+Owner authorized migrating both field RTSP cameras to per-camera ingress, with
+brief video/recording interruption and no device reboot/settings changes. The
+generic owned runtime now supports durable restart receipts, per-camera replace
+and separate DHCP/dead-child retry without restarting the shared hub. Application
+composition uses automatic source capacity, not a fixed camera-count ceiling.
+Isolated/pinned-hub tests pass; live migration is pending at this checkpoint.
+See docs/internal/owned-rtsp-ingress.md for closure/route-publication boundaries.
+
 ### Healthy DHCP address identity — 2026-11-13
 
 Manual-scan follow-up (2026-11-14): batch-local MAC/IP and ARP-alias ambiguity

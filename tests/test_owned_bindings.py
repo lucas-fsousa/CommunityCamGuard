@@ -171,7 +171,7 @@ def test_withdraw_waits_for_prior_config_write_or_consumer_birth(cameras, tmp_pa
         assert retiring.result(timeout=3)
 
 
-@pytest.mark.parametrize("capacity", [0, 33, True, -1])
+@pytest.mark.parametrize("capacity", [0, True, -1])
 def test_binding_capacity_is_bounded(capacity):
     with pytest.raises(ValueError):
         OwnedIngressBindings(capacity=capacity)

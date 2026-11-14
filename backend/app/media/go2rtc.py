@@ -336,6 +336,27 @@ class Go2rtc:
             if not self.reload_external():
                 raise RuntimeError("external media configuration reload failed")
 
+    @serialized_mutation
+    def patch_owned_source(self, camera_id: str) -> None:
+        """Publish a replacement loopback route AFTER its old owned child was reaped.
+
+        PATCH is only URL publication, never an ingress-retirement receipt. Unlike
+        legacy sources, a dead owned child cannot keep a camera connection alive.
+        Derived HD/SD streams retain their shared base and other cameras are untouched.
+        """
+        sid = stream_id(camera_id)
+        selected = source_policy.read_for((sid,))[sid]
+        binding = self.owned_ingress.binding(sid, selected) if self.owned_ingress is not None else None
+        url = binding.url if binding is not None else None
+        if not url or not url.startswith('rtsp://127.0.0.1:'):
+            raise RuntimeError("ready isolated RTSP binding required")
+        self.write_config()
+        request = urllib.request.Request(
+            f"{self.api}/api/streams?{urlencode({'name': sid, 'src': url})}", method='PATCH')
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if not 200 <= response.status < 300:
+                raise RuntimeError("isolated RTSP route publication failed")
+
     def stream_activity(self) -> dict[str, dict]:
         """Per-stream liveness for the freeze watchdog: ``{stream_id: {video_packets, consumers}}``.
 

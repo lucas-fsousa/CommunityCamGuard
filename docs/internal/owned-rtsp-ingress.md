@@ -97,6 +97,38 @@ ownership/gate test run peaked at105.7MiB with zero swap, under a192MiB cgroup a
 
 ## Remaining integration
 
+### Per-camera lifecycle integration — 2026-11-14
+
+The server now composes owned RTSP workers without an artificial source-count
+ceiling. Startup spends one-use `media_owned_restart` receipts; graceful shutdown
+saves them only after child and executor retirement. Recovery after an abandoned
+container requires the existing exclusive-owner/changed-PID-namespace fence.
+Durable `owned_rtsp` intent alone never authorizes host-orphan takeover.
+
+`OwnedRtspService` joins startup, address discovery and runtime replacement.
+Replacement drains the target's registered viewers/recorder, reaps its old child,
+then publishes the new loopback URL using PATCH. PATCH is URL publication, NOT
+proof of closure: that proof still comes from the isolated child. The pinned
+[stream API](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/api.go)
+and [Patch implementation](https://github.com/AlexxIT/go2rtc/blob/v1.9.14/internal/streams/streams.go)
+confirm this distinction. No stream-map DELETE/PUT is used as a retirement receipt.
+Other source generations and the shared hub remain running during address repair.
+
+The existing 30-second recovery worker queues/retries owned updates separately;
+failure does not fall back to a global hub reload or direct camera URL. A dead
+owned child at an independently reconfirmed address can recover despite the
+subnet-scan cooldown. Native cameras are still handled by their native runtime.
+Ordinary configuration changes and fresh owned startup still apply shared config;
+this change targets per-camera address/process recovery, not arbitrary config reload.
+
+The owner authorized migration of the two field RTSP cameras, with a brief video/
+recording interruption and no camera reboot/settings change. Deployment must first
+stop the old app AND external hub, confirm both old processes exited, then create
+the initial owned receipts and write a config without direct camera routes before
+restarting either. Existing cameras are never silently auto-migrated on startup.
+Live migration/verification is pending at this code checkpoint; historical notes
+below describe the original pre-integration state.
+
 The old shared go2rtc process still pulls production camera URLs directly. This
 new receipt applies only to an ingress started inside this boundary. A
 [durable intent guard](durable-source-policy.md) now protects config regeneration

@@ -77,6 +77,13 @@ def resync_services(request: Any, *, address_changes: tuple[str, ...] | None = N
             if all(cid in selections and selections[cid].mode == "native"
                    for cid in address_changes):
                 return
+            recovery = getattr(request.app.state, "address_recovery", None)
+            if (isinstance(recovery, AddressRecovery) and recovery.owned is not None
+                    and all(cid in selections and selections[cid].mode in {'native', 'owned_rtsp'}
+                            for cid in address_changes)):
+                recovery.request_owned_apply(tuple(cid for cid in address_changes
+                                                  if selections[cid].mode == 'owned_rtsp'))
+                return
         with mutation_scope(media):
             if media is not None:
                 media.restart()
