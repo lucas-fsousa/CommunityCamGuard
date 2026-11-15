@@ -177,7 +177,7 @@ def test_missing_scheduler_cannot_start_source_from_websocket(env, registry_pres
 
 @pytest.mark.parametrize("path_kind", ["native", "alias"])
 def test_drain_releases_native_readers_without_stopping_shared_source(env, path_kind):
-    client, camera, source, sources, app, _finished = env
+    client, camera, source, sources, app, finished = env
     gate = ViewerGate()
     app.state.viewer_sessions = gate
     path = (f"/api/media/native/{camera.camera_id}/ws" if path_kind == "native"
@@ -190,12 +190,20 @@ def test_drain_releases_native_readers_without_stopping_shared_source(env, path_
                 socket.receive_bytes()
             drain.result(timeout=2)
             assert source.hub.reader_count == 0
+            assert finished.wait(2)
     assert sources.state(camera.camera_id) == "running" and not source.cleanup.is_set()
     with pytest.raises(WebSocketDisconnect), client.websocket_connect(path):
         pytest.fail("Held native source admitted a viewer")
+    assert finished.wait(2)
     gate.resume(camera.camera_id)
     with client.websocket_connect(path) as socket:
         start(socket)
+        # A received frame is not ASGI completion. Explicitly disconnect and
+        # wait before TestClient tears down/cancels its connection context.
+        socket.close()
+        assert finished.wait(2)
+        assert source.hub.reader_count == 0
+    assert sources.state(camera.camera_id) == "running" and not source.cleanup.is_set()
 
 
 @pytest.mark.parametrize("suffix", ["", "_hd", "_web"])

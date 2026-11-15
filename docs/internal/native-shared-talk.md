@@ -303,3 +303,12 @@ all three online/recording before and after. App355.9MiB/1GiB,103.14% of one cor
 hub5.91MiB/0%; OOM=false/restarts=0. This checks ordinary post-deploy delivery,
 not new talk playback or camera-side failure recovery. Physical message/hold
 acceptance, then explicit driver activation/dashboard testing, remain deferred.
+
+CI follow-up: the documentation-only run `43669541763` exposed an intermittent
+`CancelledError` at TestClient context exit in the existing native viewer drain/
+resume test. The resumed connection received media, then its context cancelled
+ASGI before handler cleanup finished. The test now explicitly disconnects and
+awaits its existing ASGI-completion event for each sequential connection; it still
+asserts reader retirement and that the shared source remains running. No exception
+suppression, longer production timeout or server-code change. Both endpoint paths
+passed ten consecutive isolated runs (20case executions),160MiB cap/71.2MiB peak.
