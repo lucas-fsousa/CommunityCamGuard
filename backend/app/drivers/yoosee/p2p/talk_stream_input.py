@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Callable
 
 from .audio_sender import MAX_AUDIO_FRAMES, validate_amr_audio_frame, validate_amr_audio_frames
+from .legacy_talk_input import LegacyTalkInput
 
 MAX_QUEUED_FRAMES = 25  # 500ms,800 bytes; additional transport backlog has its own bound.
 MAX_INPUT_SECONDS = 11  # Ten-second capture + startup margin; leave time for owned OFF drain.
@@ -99,10 +100,12 @@ class StreamingTalkInput:
                 self._condition.notify_all()
 
 
-TalkFrames = tuple[bytes, ...] | StreamingTalkInput
+TalkFrames = tuple[bytes, ...] | StreamingTalkInput | LegacyTalkInput
 
 
 def validate_talk_frames(frames: TalkFrames) -> None:
+    if isinstance(frames, LegacyTalkInput):
+        return  # Immutable and validated at construction; finite review only.
     if isinstance(frames, StreamingTalkInput):
         if frames.aborted:
             raise ValueError("talk input is cancelled")

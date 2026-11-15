@@ -11,11 +11,14 @@ from collections.abc import Callable
 
 from .cooperative_talk_audio import TalkAudioWindow
 from .kcp_receive import ReceiveError
+from .legacy_talk_input import LegacyTalkInput
 from .microphone_reply import MicrophoneReply
 from .reliable_kcp_send import ReliableKcpPush
 from .stream_protocol import (
     V1EncodingHeader,
     encrypt_media_tlv,
+    pack_legacy_capture_header,
+    pack_legacy_talk_control,
     pack_microphone_command,
     pack_v1_audio_encoding_header,
 )
@@ -41,6 +44,9 @@ class CooperativeTalk:
         if not isinstance(cookie, bytes) or len(cookie) != 8:
             raise ValueError("invalid talk cookie")
         validate_talk_frames(frames)
+        self._legacy = isinstance(frames, LegacyTalkInput)
+        if isinstance(frames, LegacyTalkInput):
+            frames = frames.frames
         self._stream = frames if isinstance(frames, StreamingTalkInput) else None
         if self._stream is not None:
             self._stream.claim()
@@ -109,7 +115,9 @@ class CooperativeTalk:
             if self._cancelled:
                 self._complete()
                 return
-            body = encrypt_media_tlv(pack_v1_audio_encoding_header(TALK_FORMAT), self._cookie)
+            header = (pack_legacy_capture_header() if self._legacy
+                      else pack_v1_audio_encoding_header(TALK_FORMAT))
+            body = encrypt_media_tlv(header, self._cookie)
         elif self._stage == "start":
             if self._cancelled:
                 self._complete()
@@ -117,17 +125,18 @@ class CooperativeTalk:
             # StreamPipe v1: sequenced user data goes through send_data_link_chn
             # and the AV ring (base KCP/type4). Only v2 takes the separate command
             # channel here; see pinned StreamPipe::Impl::send_data at0x13714c.
-            timestamp = self._wall_us()
-            self._microphone_tokens[timestamp & 0xFFFFFFFF] = 'start'
-            body = encrypt_media_tlv(pack_microphone_command(True,
-                timestamp_us=timestamp), self._cookie)
+            body = self._microphone_command(True)
         else:
-            timestamp = self._wall_us()
-            self._microphone_tokens[timestamp & 0xFFFFFFFF] = 'stop'
-            body = encrypt_media_tlv(pack_microphone_command(False,
-                timestamp_us=timestamp), self._cookie)
+            body = self._microphone_command(False)
         self._request = ReliableKcpPush(self._peer, self._link,
             self._allocate(False), body, clock=self._clock)
+
+    def _microphone_command(self, enabled: bool) -> bytes:
+        if self._legacy:
+            return encrypt_media_tlv(pack_legacy_talk_control(enabled), self._cookie)
+        timestamp = self._wall_us()
+        self._microphone_tokens[timestamp & 0xFFFFFFFF] = 'start' if enabled else 'stop'
+        return encrypt_media_tlv(pack_microphone_command(enabled, timestamp_us=timestamp), self._cookie)
 
     def due(self) -> bytes | None:
         self.poll()

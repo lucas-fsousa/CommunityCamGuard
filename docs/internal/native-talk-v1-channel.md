@@ -104,3 +104,31 @@ optional exact eight-byte scalar result. No raw packet, cookie, identifier,
 audio or command timestamp is logged. These observations neither grant a
 capability nor mean a request was executed; the existing transport-only outcome
 is unchanged. This closes a receive-observability gap, not the acoustic failure.
+
+Instrumented short modern attempt on `7ab38c5`: HTTP200,100frames/OFF receipt,
+2.726seconds, zero correlated microphone messages. No acoustic pass follows.
+Absence of a correlated message is not proof of rejection: earlier SDK notes also
+record this firmware not publishing that reply. Do not stall indefinitely waiting
+for it or report microphone execution based on a KCP receipt.
+
+## Explicit legacy V1 comparison
+
+The APK also supplies a different, recovered intercom path:
+`GwMonitorPlayer.startTalk -> nativeStartTalk -> GwVideoPlayer::startTalk ->
+fgSendUserData(type=5,status=1)`, with status0 for termination. Its fixed28-byte
+controls (`ffffff88 0002 05 01|00` plus20zero bytes) and legacy AMR capture header
+are already implemented in `stream_protocol.py` and the historical standalone
+legacy sender. They are not the modern built-in0x32/HEADER_ENC0x0500 path.
+
+An explicit finite `LegacyTalkInput` now transports this reviewed variant through
+the existing lease inbox and cooperative AV owner. It uses the existing AMR codec,
+bounded audio window, base sequence allocator and microphone-only cleanup. No
+second socket/login, AV START/CLOSE, codec guessing or automatic retry/fallback
+is added. The normal driver still submits the modern variant; this does not
+grant legacy shared voice to any camera based on numeric ID or video protocol.
+
+`/api/internal/diagnostics/native-talk-legacy` is restricted by the same disabled-
+by-default server flag, server-pinned camera, primary login and direct-loopback
+checks. Both review paths consume **one shared single-use guard**; arbitrary
+protocol/target query parameters are refused. A physical comparison, not an ACK,
+must establish whether this firmware accepts the legacy microphone path.

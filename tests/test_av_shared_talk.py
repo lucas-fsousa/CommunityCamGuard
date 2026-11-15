@@ -78,6 +78,38 @@ def test_cancel_before_transmission_uses_no_sequence_and_does_not_touch_micropho
     assert sent(s)[1].sequence == 1
 
 
+def test_explicit_legacy_review_uses_recovered_header_and_microphone_only_controls():
+    from backend.app.drivers.yoosee.p2p.legacy_talk_input import LegacyTalkInput
+    from backend.app.drivers.yoosee.p2p.stream_protocol import (
+        pack_legacy_capture_header,
+        pack_legacy_talk_control,
+    )
+
+    now = [0.0]
+    s = active(now)
+    talk = s.begin_talk(LegacyTalkInput((FRAME,) * 4))
+    _, header = sent(s)
+    assert decrypt_media_tlv(header.body, COOKIE) == pack_legacy_capture_header()
+    _, start = sent(s)
+    assert decrypt_media_tlv(start.body, COOKIE) == pack_legacy_talk_control(True)
+    _, audio = sent(s)
+    assert talk.acknowledged_frames == 4
+    now[0] = .081
+    _, stop = sent(s)
+    assert decrypt_media_tlv(stop.body, COOKIE) == pack_legacy_talk_control(False)
+    assert [header.sequence, start.sequence, audio.sequence, stop.sequence] == [1, 2, 3, 4]
+    assert all(p.conv == 42 for p in (header, start, audio, stop))
+    assert talk.done and talk.microphone_stopped and s.ready and not s.due()
+
+
+@pytest.mark.parametrize('frames', [(), [FRAME], (b'bad',), (FRAME,) * 501])
+def test_legacy_review_input_is_immutable_and_bounded(frames):
+    from backend.app.drivers.yoosee.p2p.legacy_talk_input import LegacyTalkInput
+
+    with pytest.raises(ValueError):
+        LegacyTalkInput(frames)
+
+
 def test_v1_sequenced_reply_on_av_channel_does_not_kill_incoming_video():
     from backend.app.drivers.yoosee.p2p.stream_protocol import pack_microphone_command
 

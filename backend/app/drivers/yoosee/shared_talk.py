@@ -6,11 +6,12 @@ from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, PCM_FRAME_MS, downsa
 from ...db.p2p import P2PEnrollment
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
 from .p2p.amr_nb import encode_pcm16le
+from .p2p.legacy_talk_input import LegacyTalkInput
 from .p2p.talk_inbox import TalkOutcome
 from .shared_control_reads import session_for
 
 
-def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
+def send_candidate(entry: P2PEnrollment, pcm: bytes, *, legacy: bool = False) -> TalkOutcome:
     """Low-level submission; caller owns diagnostic permission or exact route proof."""
     if not isinstance(pcm, bytes) or not PCM_FRAME_BYTES <= len(pcm) <= MAX_PCM_BYTES or len(pcm) % PCM_FRAME_BYTES:
         raise ValueError("complete bounded canonical PCM frames required")
@@ -21,7 +22,7 @@ def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
     if session_for(entry) is not session:
         raise ControlNotReady("native owner changed before audio submission")
     try:
-        ticket = session.submit_talk(frames)
+        ticket = session.submit_talk(LegacyTalkInput(frames) if legacy else frames)
     except ValueError:
         raise ControlNotReady("native owner is not accepting this utterance") from None
     try:

@@ -42,6 +42,35 @@ def test_pinned_single_use_does_not_claim_speaker_success(setup):
     assert post(client).status_code == 409 and len(calls) == 1
 
 
+def test_legacy_review_is_explicit_and_consumes_the_same_one_use_guard(setup, monkeypatch):
+    client, _, _ = setup
+    calls = []
+
+    def send(camera_id, pcm, *, legacy=False):
+        calls.append((camera_id, pcm, legacy))
+        return dict(status='transport_received', acknowledged_frames=1, stop_acknowledged=True)
+
+    monkeypatch.setattr(api, '_send', send)
+    r = client.post(PATH+'-legacy', content=PCM, headers={'content-type': 'audio/pcm'})
+    assert r.status_code == 200 and r.json()['speaker_verified'] is False
+    assert calls == [(CAMERA, PCM, True)]
+    assert post(client).status_code == 409
+    assert client.post(PATH+'-legacy', content=PCM, headers={'content-type': 'audio/pcm'}).status_code == 409
+
+
+def test_legacy_review_requires_enabled_pin_and_direct_authenticated_operator(setup):
+    client, settings, calls = setup
+    headers = {'content-type': 'audio/pcm'}
+    settings.native_talk_diagnostic_enabled = False
+    assert client.post(PATH+'-legacy', content=PCM, headers=headers).status_code == 404
+    settings.native_talk_diagnostic_enabled = True
+    assert client.post(PATH+'-legacy', content=PCM, headers={**headers, 'x-forwarded-for': '127.0.0.1'}).status_code == 403
+    assert client.post(PATH+'-legacy', content=PCM, headers=headers, params={'protocol': 'anything'}).status_code == 400
+    client.cookies.clear()
+    assert client.post(PATH+'-legacy', content=PCM, headers=headers).status_code == 401
+    assert not calls
+
+
 def test_disabled_invalid_target_and_parameters_send_nothing(setup):
     client, settings, calls = setup
     settings.native_talk_diagnostic_enabled = False

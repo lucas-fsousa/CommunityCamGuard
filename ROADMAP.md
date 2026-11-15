@@ -69,6 +69,16 @@ The correction uses base AV KCP/type4 for microphone ON/OFF, without changing th
 codec/volume or granting capabilities. Physical retest remains required; evidence
 in docs/internal/native-talk-v1-channel.md.
 
+Latest physical comparison (2026-11-15): modern shared talk remained silent after
+the V1 channel correction, including a repeat at verified100% speaker volume.
+The same reference phrase through the established non-shared message endpoint
+was audible, confirmed by the owner. Volume is therefore not a demonstrated
+native-path fix. A short instrumented modern attempt delivered100frames/OFF but
+logged zero correlated microphone replies. No shared audio proof is granted.
+The next explicit comparison uses the independently recovered legacy V1 header
+and type5 microphone controls on the same AV owner. It is pinned diagnostic work,
+not an automatic fallback, a family-wide grant, or a change to dashboard routing.
+
 ### Recovery-worker fairness — 2026-11-14
 
 Corrected a concrete regression in isolated RTSP integration: returning after any
