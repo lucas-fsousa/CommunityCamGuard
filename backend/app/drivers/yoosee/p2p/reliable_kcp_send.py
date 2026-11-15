@@ -30,8 +30,13 @@ class ReliableKcpPush:
         self._last_sent: float | None = None
         self.attempts = 0
         self.acknowledged = False
+        self.peer_next_sequence: int | None = None
         self.closed = False
         self._suspended = False
+
+    @property
+    def sequence(self) -> int:
+        return self._sequence
 
     def suspend_receipt(self) -> None:
         """Retain an emitted INIT for late receipts without expiring live video."""
@@ -80,6 +85,7 @@ class ReliableKcpPush:
                     and segment.sequence == self._sequence and segment.timestamp == self._timestamp
                     and segment.fragment == 0 and not segment.body):
                 self.acknowledged = True
+                self.peer_next_sequence = segment.unacknowledged
                 self._wire = b""
                 return True
         return False

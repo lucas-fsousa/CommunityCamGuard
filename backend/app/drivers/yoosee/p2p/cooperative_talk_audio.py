@@ -1,5 +1,6 @@
 """SDK-cadenced audio, with a small reliable window rather than stop-and-wait."""
 
+import logging
 from collections.abc import Callable
 
 from .media_protocol import KCP_ACK, parse_kcp_segments
@@ -8,6 +9,7 @@ from .stream_protocol import build_v1_audio_packet, encrypt_media_tlv
 from .talk_stream_input import StreamingTalkInput, TalkFrames
 
 MAX_INFLIGHT = 8  # At most640ms/32 AMR frames awaiting receipts, never unbounded.
+log = logging.getLogger(__name__)
 
 
 class TalkAudioWindow:
@@ -27,6 +29,7 @@ class TalkAudioWindow:
         self._next_audio = clock()
         self._cancelled = False
         self.acknowledged_frames = 0
+        self._reported_receipt = False
 
     @property
     def finished(self) -> bool:
@@ -84,6 +87,10 @@ class TalkAudioWindow:
             return
         for request, count in tuple(self._pending):
             if request.receive_ack(wire, peer):
+                if not self._reported_receipt:
+                    self._reported_receipt = True
+                    log.warning('native_talk_first_audio_receipt sequence=%s peer_next=%s',
+                                request.sequence, request.peer_next_sequence)
                 self.acknowledged_frames += count
                 request.close()
                 self._pending.remove((request, count))

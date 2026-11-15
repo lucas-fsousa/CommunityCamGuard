@@ -83,6 +83,10 @@ SDK reinspection then established that the received-header callback reconfigures
 the intercom encoder after the initial Java AMR setup. A pinned exact-descriptor
 AAC comparison is prepared (full MPEG-4 ADTS,1024samples/64ms, same AV owner);
 no production codec selection or audio proof changes before physical acceptance.
+The exact-descriptor AAC reference also produced no sound, confirmed by owner;
+do not describe the format correction as acoustic success. Next narrow check:
+peer cumulative KCP receive progress, using short silent input, not another
+unmodified voice replay or any automatic fallback.
 
 ### Recovery-worker fairness — 2026-11-14
 

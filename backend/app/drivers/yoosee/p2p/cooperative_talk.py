@@ -164,6 +164,8 @@ class CooperativeTalk:
         request = self._request
         if request is None or not request.receive_ack(wire, peer):
             return
+        log.warning('native_talk_control_receipt stage=%s sequence=%s peer_next=%s',
+                    self._stage, request.sequence, request.peer_next_sequence)
         request.close()
         self._request = None
         if self._stage == "header":

@@ -187,3 +187,23 @@ at0x20b4cc..0x20b4dc, initializes an8-byte-block/6-round RC5 context at0x20b584
 and installs that8-byte key at0x20b5d8. `iv_send_av_ringbuf` uses that context at
 0x211354..0x211384 on full8-byte blocks after the TLV header. This matches the
 current transmitter; no speculative key/cipher change was made.
+
+### Exact-descriptor AAC physical attempt
+
+Deployed `e813bd9`, image `2bf8e02e05e1`, after CI and Image workflows passed.
+149focused contracts passed locally (86.3MiB peak); Ruff and app-wide mypy passed.
+The exact live descriptor guard allowed the reference test. HTTP200,
+158AAC frames/OFF transport receipt in10.951seconds; HD24binary messages,
+8606381bytes, maximum gap1.063seconds, no observer error. All sources remained
+available/native in unchanged revisions348/78/75 during the attempt.
+The owner confirmed **no sound** in the exact-descriptor AAC comparison as well.
+Neither codec variant has acoustic acceptance. No production audio proof,
+normal-driver route change or hold-to-speak acceptance follows from these ACKs.
+
+The next bounded transport inspection records the peer's cumulative KCP next
+sequence from the already-correlated receipt for header/ON/first audio/OFF. It
+does not change ACK acceptance, retry, sequence allocation, camera settings or
+normal driver routing. A selective ACK is not a guarantee that prior sequence
+gaps have been filled and the byte stream has reached the application. No raw
+packets, audio, endpoint, key or timestamp are logged. A short silent PCM sample
+can measure this distinction without another acoustic acceptance request.
