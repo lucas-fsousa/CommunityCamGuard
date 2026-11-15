@@ -39,6 +39,13 @@ pending; do not confuse transport receipt with acoustic acceptance. Dashboard
 selection and the incremental hold-to-speak adapter remain pending. See
 docs/internal/native-shared-talk.md for the exact implementation and limits.
 
+Owner is no longer near camera3: acoustic acceptance is deferred, not passed;
+no further physical tests or dashboard P2P voice activation. Software follow-up
+classifies talk-session/KCP-send timeouts for the existing verified-retirement
+video recovery path, without repeating audio or bypassing cleanup fences. Route
+failure now returns `unavailable`, not a false user cancellation. The review-only
+operator override is disabled for subsequent deployments.
+
 ### Recovery-worker fairness — 2026-11-14
 
 Corrected a concrete regression in isolated RTSP integration: returning after any

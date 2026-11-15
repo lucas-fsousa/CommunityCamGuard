@@ -28,3 +28,14 @@ def test_uncertain_source_or_decoder_retirement_cannot_retry(monkeypatch, fault,
         "cleanup_failed": fault == "decoder"}
     monkeypatch.setattr(source, "diagnostics", lambda: details)
     assert not retryable(NativeVideoResult(reason, SharedReadResult(reason)), source)
+
+
+@pytest.mark.parametrize("code", ["talk_session_timeout", "kcp_send_timeout"])
+@pytest.mark.parametrize("fault", [None, "detach", "consumer", "cleanup"])
+def test_talk_failure_can_recover_video_only_after_confirmed_lease_retirement(monkeypatch, code, fault):
+    source = NativeVideoSource("test", "123")
+    details = {"session_scope": "media_lease", "session_protocol_code": code,
+        "session_lease_detached": fault != "detach", "consumer_alive": fault == "consumer",
+        "cleanup_failed": fault == "cleanup"}
+    monkeypatch.setattr(source, "diagnostics", lambda: details)
+    assert retryable(NativeVideoResult("protocol", SharedReadResult("protocol")), source) is (fault is None)

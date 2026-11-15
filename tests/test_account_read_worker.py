@@ -129,6 +129,8 @@ def test_input_flood_has_fixed_bound(monkeypatch):
     ('TCP AV session deadline exceeded','tcp_session_timeout'),
     ('AV handshake readiness deadline exceeded','av_handshake_timeout'),
     ('AV control receipt deadline exceeded','av_control_timeout'),
+    ('native talk deadline exceeded','talk_session_timeout'),
+    ('KCP receipt deadline exceeded','kcp_send_timeout'),
     ('receive progress deadline exceeded','media_idle_timeout'),
     ('receive initialization deadline exceeded','media_initialization_timeout'),
     ('TCP media EOF before CLOSE receipt','tcp_eof'),

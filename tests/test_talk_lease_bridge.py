@@ -116,6 +116,22 @@ def test_account_shutdown_never_fabricates_microphone_stop_receipt():
     assert result.status == "unavailable" and not result.stop_acknowledged
 
 
+def test_route_failure_is_not_reported_as_a_user_cancellation():
+    owner, now, _output, inbox, _, pump = configured()
+    ticket = inbox.submit_talk(camera(0), (FRAME,))
+    pump.poll(lambda _: pytest.fail("no new route"))
+    owner.step()  # Header emitted, receipt never arrives.
+    now[0] = 2
+    from backend.app.drivers.yoosee.p2p.kcp_receive import ReceiveError
+
+    with pytest.raises(ReceiveError):
+        owner.step()
+    pump.poll(lambda _: pytest.fail("no audio replay or new route"))
+    result = inbox.talk.take(ticket)
+    assert result.status == "unavailable" and not result.stop_acknowledged
+    assert result.acknowledged_frames == 0
+
+
 def test_actual_account_worker_services_audio_on_existing_channel(monkeypatch):
     from types import SimpleNamespace
 

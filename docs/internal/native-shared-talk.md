@@ -171,3 +171,27 @@ inventory classification omission in the first diagnostic commit was separately
 fixed by `1100fa5`; its CI passed too. Current container runs the review image,
 not a promoted `latest` tag. The local diagnostic has consumed its one attempt;
 normal dashboard voice operations still select their existing RTSP/PCM route.
+
+## Physical validation deferred; software-only continuation
+
+Owner subsequently confirmed they are no longer near the camera. The third
+attempt remains acoustically unvalidated; no further physical test is permitted
+in this continuation and shared-P2P voice is not selected in the dashboard.
+
+The failed second attempt exposed an independent recovery integration omission:
+`native talk deadline exceeded` and generic KCP send receipt timeouts were not in
+the fixed failure-code table. They now project `talk_session_timeout` and
+`kcp_send_timeout` and are eligible for the **existing** media-lease recovery only
+after confirmed detach, stopped consumer/decoder and no cleanup failure. Unknown
+protocol failures and uncertain closure remain fenced. This permits video-only
+recovery; no utterance is queued/repeated and no capabilities/checkpoints are
+fabricated. Live fault injection is not part of this software-only verification.
+
+`TalkLeasePump` also distinguishes route disappearance from caller cancellation:
+the former returns `unavailable`, retaining actual frame/OFF receipts, not the
+misleading `cancelled` observed in attempt2. Explicit caller cancellation keeps
+its existing result and cooperative microphone-OFF drain.
+
+The ignored operator compose override now disables the physical-review endpoint
+for subsequent deployments. Local recovery/worker/bridge regressions passed
+210tests under160MiB/no swap/25%CPU (86.5MiB peak); no camera command was used.
