@@ -16,8 +16,9 @@ from .av_pending import PendingAv
 from .kcp_receive import KcpReceiver, ReceiveError
 from .media_policy import MediaPolicy, validate_media_policy
 from .media_receive import MediaReceiver
+from .microphone_reply import MicrophoneReply, microphone_reply, wrapped_microphone_replies
 from .receive_lifecycle import ReceiveLifecycle
-from .stream_protocol import V1EncodingHeader, decrypt_media_tlv
+from .stream_protocol import V1EncodingHeader, decrypt_command_tlv, decrypt_media_tlv
 from .v1_receive import V1Receiver, V1Record
 
 
@@ -26,6 +27,7 @@ class AvReceiveBatch:
     acknowledgements: tuple[bytes, ...] = field(default=(), repr=False)
     records: tuple[V1Record, ...] = field(default=(), repr=False)
     unhandled_commands: int = 0
+    microphone_replies: tuple[MicrophoneReply, ...] = field(default=(), repr=False)
 
 
 class AvReceiver:
@@ -145,6 +147,7 @@ class AvReceiver:
             self.poll()
             control_acks: tuple[bytes, ...] = ()
             unhandled = 0
+            microphone_replies: list[MicrophoneReply] = []
             if self._control is not None:
                 controls = self._control.receive(wire, peer)
                 control_acks = controls.acknowledgements
@@ -155,6 +158,10 @@ class AvReceiver:
                         # Command TLVs share the control conversation. Do not
                         # interpret them as ACCEPT or claim command execution.
                         unhandled += 1
+                        if len(message) <= 1028:
+                            body = (decrypt_command_tlv(message, self._cookie)
+                                    if message[1] == 2 else message[4:])
+                            microphone_replies.extend(wrapped_microphone_replies(body))
                         continue
                     self._check_control(message, 2)
                     self._accepted = True
@@ -166,7 +173,10 @@ class AvReceiver:
             for message in batch.messages:
                 records.extend(self._message(message))
             unhandled += sum(bool(record.user_data) for record in records)
-            return AvReceiveBatch(control_acks + batch.acknowledgements, tuple(records), unhandled)
+            microphone_replies.extend(reply for record in records if record.user_data
+                                      and (reply := microphone_reply(record.user_data)) is not None)
+            return AvReceiveBatch(control_acks + batch.acknowledgements, tuple(records), unhandled,
+                                  tuple(microphone_replies))
         except ValueError:
             # No payload/cookie in exceptions; a fatal parser failure also kills
             # acknowledged transport state. The owner must close its real socket.

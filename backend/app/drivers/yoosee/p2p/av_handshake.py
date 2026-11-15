@@ -198,6 +198,9 @@ the same parser/decoder owner, but do not claim ready or present a live source y
             if self._talk is not None and not self._talk.done:
                 self._talk.receive_ack(wire, peer)
             batch = self._receiver.receive(wire, peer)
+            if self._talk is not None:
+                for reply in batch.microphone_replies:
+                    self._talk.receive_microphone_reply(reply)
             if self._receiver.accepted and isinstance(self._init, AvInitRequests):
                 self._init.stop_repeating()
             return batch

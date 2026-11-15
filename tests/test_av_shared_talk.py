@@ -85,6 +85,7 @@ def test_v1_sequenced_reply_on_av_channel_does_not_kill_incoming_video():
     command = pack_microphone_command(True, timestamp_us=123)
     batch = s.receive(packet(2, 0, media(command + av())), PEER)
     assert batch.unhandled_commands == 1 and batch.records[0].user_data == command[28:]
+    assert len(batch.microphone_replies) == 1 and batch.microphone_replies[0].timestamp == 123
     assert batch.records[1].video == b"video" and s.ready and not s.due()
     assert "user_data" not in repr(batch.records[0])
 

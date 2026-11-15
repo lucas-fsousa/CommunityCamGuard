@@ -5,11 +5,13 @@ four mode-7 frames per burst (SDK threshold 64ms), microphone OFF. This is a
 transport candidate, not a claim of speaker compatibility or acoustic success.
 """
 
+import logging
 import time
 from collections.abc import Callable
 
 from .cooperative_talk_audio import TalkAudioWindow
 from .kcp_receive import ReceiveError
+from .microphone_reply import MicrophoneReply
 from .reliable_kcp_send import ReliableKcpPush
 from .stream_protocol import (
     V1EncodingHeader,
@@ -21,6 +23,7 @@ from .talk_stream_input import StreamingTalkInput, TalkFrames, validate_talk_fra
 
 # df.a.P / LivePlayer: independent of the camera's incoming AAC descriptor.
 TALK_FORMAT = V1EncodingHeader(0x0102, 5, 0, 1, 16, 8000, 160, 0, 0, 0, 0)
+log = logging.getLogger(__name__)
 
 
 class CooperativeTalk:
@@ -51,6 +54,16 @@ class CooperativeTalk:
         self.done = self.closed = False
         self.microphone_started = self.microphone_stopped = False
         self.acknowledged_frames = 0
+        self._microphone_tokens: dict[int, str] = {}
+        self._microphone_replies: set[int] = set()
+
+    def receive_microphone_reply(self, reply: MicrophoneReply) -> None:
+        stage = self._microphone_tokens.get(reply.timestamp)
+        if stage is None or reply.timestamp in self._microphone_replies:
+            return
+        self._microphone_replies.add(reply.timestamp)
+        log.warning('native_talk_microphone_reply stage=%s origin=%s flags=%s payload_size=%s result=%s',
+                    stage, reply.origin, reply.flags, reply.payload_size, reply.result)
 
     @property
     def cancelled(self) -> bool:
@@ -85,6 +98,8 @@ class CooperativeTalk:
             self.cancel()
 
     def _complete(self) -> None:
+        log.warning('native_talk_microphone_receipts commands=%s correlated_replies=%s',
+                    len(self._microphone_tokens), len(self._microphone_replies))
         self.done = True
         self._cookie, self._frames = b"", ()
         self._audio.close()
@@ -102,11 +117,15 @@ class CooperativeTalk:
             # StreamPipe v1: sequenced user data goes through send_data_link_chn
             # and the AV ring (base KCP/type4). Only v2 takes the separate command
             # channel here; see pinned StreamPipe::Impl::send_data at0x13714c.
+            timestamp = self._wall_us()
+            self._microphone_tokens[timestamp & 0xFFFFFFFF] = 'start'
             body = encrypt_media_tlv(pack_microphone_command(True,
-                timestamp_us=self._wall_us()), self._cookie)
+                timestamp_us=timestamp), self._cookie)
         else:
+            timestamp = self._wall_us()
+            self._microphone_tokens[timestamp & 0xFFFFFFFF] = 'stop'
             body = encrypt_media_tlv(pack_microphone_command(False,
-                timestamp_us=self._wall_us()), self._cookie)
+                timestamp_us=timestamp), self._cookie)
         self._request = ReliableKcpPush(self._peer, self._link,
             self._allocate(False), body, clock=self._clock)
 

@@ -95,6 +95,26 @@ def test_command_tlv_does_not_authorize_session_and_is_reported_after_accept():
         session.receive(packet(0, 0, media(header())), PEER)
 
 
+@pytest.mark.parametrize('encrypted', [False, True])
+def test_microphone_reply_metadata_on_control_channel_keeps_video_alive(encrypted):
+    from backend.app.drivers.yoosee.p2p.stream_protocol import (
+        encrypt_command_tlv,
+        pack_v1_sequence_user_data,
+    )
+
+    session = receiver()
+    session.receive(packet(0, 0, control(123), conv=CONTROL), PEER)
+    session.receive(packet(0, 0, start()), PEER)
+    session.receive(packet(1, 0, media(header())), PEER)
+    data = pack_v1_sequence_user_data(struct.pack('<BBHIQ', 0, 0x32, 1, 456, 5))
+    wire = (encrypt_command_tlv(data, COOKIE) if encrypted
+            else bytes((2, 1)) + struct.pack('<H', len(data)+4) + data)
+    batch = session.receive(packet(1, 0, wire, conv=CONTROL), PEER)
+    assert len(batch.microphone_replies) == 1
+    assert (batch.microphone_replies[0].timestamp, batch.microphone_replies[0].result) == (456, 5)
+    assert session.phase == 'active'
+
+
 @pytest.mark.parametrize("conv", [42, 43 | 0x80000000, True, -1])
 def test_rejects_unrelated_conversation_pair(conv):
     with pytest.raises(ValueError):

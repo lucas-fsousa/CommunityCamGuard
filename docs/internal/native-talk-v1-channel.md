@@ -63,3 +63,44 @@ probes remain unhomologated and are not selected by the current driver.
 This is a concrete static protocol discrepancy, not yet proof that the corrected
 speaker output works. A fresh authorized physical reference test is required;
 no production audio proof or dashboard activation is made by this correction.
+
+## Corrected-channel physical retest
+
+The test on `ae5f0f7` completed in11.496seconds with500/500 audio frames and
+microphone-OFF transport receipt. The concurrent HD observer received26binary
+messages/9395054bytes, maximum gap1.040seconds, no observer error. All three
+sources remained available in native mode (revisions336/66/63).
+
+The owner explicitly confirmed **no sound** in this corrected-channel attempt
+as well. The channel correction therefore does not establish a working native
+speaker path. Recorded-message and hold-to-speak shared-native capability proofs
+remain ungranted; do not substitute transport receipts for acoustic acceptance.
+
+Following that feedback, a fresh read-only canonical speaker-volume GET returned
+HTTP200, `value=50`, `verified=true`. The speaker setting was50%, not100%; this
+check neither changed volume nor sent audio. Audible behavior at100% has not
+been tested in this attempt.
+
+### Speaker reference at100%
+
+On the owner's request to continue correcting the issue, the canonical control
+PUT changed camera3 from50% to100%, with `verified=true`, `changed=true`, error0.
+The existing normal message endpoint then sent the same ten-second reference PCM
+through the established non-shared audio path: HTTP200, `completed=true`, elapsed
+10.77seconds. The owner confirmed “agora eu ouvi”. This accepts the speaker
+reference, not shared-native talk. No shared-native capability was granted.
+
+The subsequent isolated native comparison at100% also produced **no sound**,
+confirmed by the owner. It completed transport in10.628seconds (500frames/OFF);
+HD delivered24binary messages,8126385bytes, maximum gap0.769seconds, no error.
+All sources remained native and available (revisions339/69/66). Raising volume
+is not a demonstrated fix for the native path.
+
+The next diagnostic preserves bounded microphone command metadata from both V1
+AV sequenced records and control-channel compact/sequenced wrappers. Only0x32
+messages of8–16bytes are retained; unknown wrappers stay unhandled. The talk
+owner logs only correlated command stage, origin, flags, payload size and an
+optional exact eight-byte scalar result. No raw packet, cookie, identifier,
+audio or command timestamp is logged. These observations neither grant a
+capability nor mean a request was executed; the existing transport-only outcome
+is unchanged. This closes a receive-observability gap, not the acoustic failure.
