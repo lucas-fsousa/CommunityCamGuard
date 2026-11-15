@@ -31,8 +31,12 @@ AMR transmitter is now integrated into the existing AV/UDP/TCP owner with shared
 sequence allocation, paced batches and microphone-only termination; it is not yet
 selected by the dashboard or acoustically accepted. The generation/exact-lease
 account-thread bridge is implemented too, without extra routes or worker threads.
-Next: capture adapters and authorized camera3 known-speech acceptance. No sonic command
-or production transport/capability change for this step. See
+Finite PCM adapter and pinned primary/loopback-only review are implemented. After
+one prerequisite refusal and one interrupted/silent attempt, the corrected paced
+window delivered500/500frames and OFF receipt in10.409seconds with HD still active
+and all three recording. Physical speaker confirmation for that final attempt is
+pending; do not confuse transport receipt with acoustic acceptance. Dashboard
+selection and the incremental hold-to-speak adapter remain pending. See
 docs/internal/native-shared-talk.md for the exact implementation and limits.
 
 ### Recovery-worker fairness — 2026-11-14

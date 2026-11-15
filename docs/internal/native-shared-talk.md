@@ -155,3 +155,19 @@ OFF. A synthetic350ms-ACK-delay test completes all500frames under13seconds with
 video still active. This corrects that pacing discrepancy; it does NOT establish
 that it caused the physical silence, nor an acoustic pass. New physical review
 remains required before dashboard selection.
+
+Third authorized attempt on `5ae4a97` / image `119a3995f452`: HTTP200,
+`transport_received`,500/500 AMR frames and microphone OFF transport receipt,
+10.409seconds. A simultaneous authenticated camera3 HD observer received13 binary
+WebSocket messages/4292860bytes, maximum measured gap1.078seconds, trailing gap
+0.5seconds, no observer error. Final sources were native/active324/54/51 and a
+subsequent status check confirmed all three online/recording. No volume change,
+siren/light/movement command, second camera connection or dashboard route grant.
+
+**Speaker confirmation is still pending for this third attempt.** The owner's
+earlier "Não saiu som" applies to the second, interrupted attempt, not acceptance
+or rejection of this later completed one. CI and Image for `5ae4a97` passed. The
+inventory classification omission in the first diagnostic commit was separately
+fixed by `1100fa5`; its CI passed too. Current container runs the review image,
+not a promoted `latest` tag. The local diagnostic has consumed its one attempt;
+normal dashboard voice operations still select their existing RTSP/PCM route.
