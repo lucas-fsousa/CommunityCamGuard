@@ -13,7 +13,6 @@ from .kcp_receive import ReceiveError
 from .reliable_kcp_send import ReliableKcpPush
 from .stream_protocol import (
     V1EncodingHeader,
-    encrypt_command_tlv,
     encrypt_media_tlv,
     pack_microphone_command,
     pack_v1_audio_encoding_header,
@@ -91,7 +90,6 @@ class CooperativeTalk:
         self._audio.close()
 
     def _prepare(self) -> None:
-        high = False
         if self._stage == "header":
             if self._cancelled:
                 self._complete()
@@ -101,16 +99,16 @@ class CooperativeTalk:
             if self._cancelled:
                 self._complete()
                 return
-            high = True
-            body = encrypt_command_tlv(pack_microphone_command(True,
+            # StreamPipe v1: sequenced user data goes through send_data_link_chn
+            # and the AV ring (base KCP/type4). Only v2 takes the separate command
+            # channel here; see pinned StreamPipe::Impl::send_data at0x13714c.
+            body = encrypt_media_tlv(pack_microphone_command(True,
                 timestamp_us=self._wall_us()), self._cookie)
         else:
-            high = True
-            body = encrypt_command_tlv(pack_microphone_command(False,
+            body = encrypt_media_tlv(pack_microphone_command(False,
                 timestamp_us=self._wall_us()), self._cookie)
-        self._request = ReliableKcpPush(self._peer,
-            self._link | 0x80000000 if high else self._link,
-            self._allocate(high), body, clock=self._clock)
+        self._request = ReliableKcpPush(self._peer, self._link,
+            self._allocate(False), body, clock=self._clock)
 
     def due(self) -> bytes | None:
         self.poll()

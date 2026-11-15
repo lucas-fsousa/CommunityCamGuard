@@ -8,7 +8,7 @@ no wall-clock conversion, codec decoding or keyframe inference is performed.
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import NoReturn
 
 from .stream_protocol import V1_MAGIC, V1EncodingHeader, unpack_v1_encoding_header
@@ -25,6 +25,7 @@ class V1Record:
     video: bytes = b""
     audio_timestamp: int = 0
     video_timestamp: int = 0
+    user_data: bytes = field(default=b"", repr=False)
 
 
 class V1Receiver:
@@ -57,6 +58,17 @@ class V1Receiver:
             if header[:4] != V1_MAGIC:
                 self._fail("V1 record boundary mismatch")
             marker, count = struct.unpack_from("<HH", header, 4)
+            if marker == 0x0300:
+                # V1 sequenced builtins share the AV ring, unlike the V2
+                # command-channel shortcut. They are not audio/video samples.
+                if not 0 < count <= 1024 or any(header[8:28]):
+                    self._fail("invalid V1 sequenced user data")
+                total = 28 + count
+                if len(self._buffer) - cursor < total:
+                    break
+                records.append(V1Record(user_data=bytes(self._buffer[cursor+28:cursor+total])))
+                cursor += total
+                continue
             if marker >> 8 == 1:
                 try:
                     encoding = unpack_v1_encoding_header(bytes(header))

@@ -23,10 +23,14 @@ codec5/option0, mono/16bit/8000Hz,160 samples and mode7 (32-byte frames, TOC0x3c
 It does not copy the incoming AAC descriptor. The recovered v1 serializer sends:
 
 1. Audio-only `HEADER_ENC`, marker0x0500, on the base KCP conversation.
-2. Encrypted sequenced builtin0x32 with payload1 on the high-bit conversation.
+2. Encrypted sequenced builtin0x32 with payload1 on the base AV conversation.
 3. V1 audio records with epoch-microsecond PTS and four20ms frames per burst
    (native threshold64000us), followed by any one-to-three-frame tail.
-4. Builtin0x32 with payload0 on the high-bit conversation.
+4. Builtin0x32 with payload0 on that same base AV conversation.
+
+The channel selection above is corrected by the narrow SDK reinspection on
+2026-11-15; the earlier high-channel assumption belonged to the V2 special case,
+not this V1 receiver. See [binary evidence](native-talk-v1-channel.md).
 
 The existing protocol packers are reused. Old standalone `ModernIntercomSession`
 is **not** attached to the live socket: it owns blocking reads and AV START/CLOSE,
@@ -40,8 +44,8 @@ homologated on the strength of ACKs.
 `AvHandshake` remains the only owner of parsing, incoming media and outgoing
 sequences. START retains base sequence0; the encoding header, audio bursts and
 eventual AV CLOSE allocate subsequent base sequences without resetting them.
-Microphone controls start after every allocated high-channel INIT sequence, not
-at zero or a hard-coded one. Repeated messages keep both counters.
+Microphone ON/OFF now allocate base sequences after the encoding header/audio,
+not high-channel INIT sequences. Repeated messages never reset that counter.
 
 If a superseded UDP INIT lacked its receipt, video reception may legitimately be
 ready under the existing policy. Its exact emitted wire is now retained for late
@@ -312,3 +316,9 @@ awaits its existing ASGI-completion event for each sequential connection; it sti
 asserts reader retirement and that the shared source remains running. No exception
 suppression, longer production timeout or server-code change. Both endpoint paths
 passed ten consecutive isolated runs (20case executions),160MiB cap/71.2MiB peak.
+
+Physical tests were later authorized again. A finite known-speech retest completed
+500/500frames/OFF receipt in10.680s, with HD still active, but the owner confirmed
+silence. This is a failed acoustic test, not pending/accepted playback. Narrow SDK
+analysis then identified the V1/V2 microphone channel mismatch; see
+[correction evidence](native-talk-v1-channel.md). No new route proof was granted.

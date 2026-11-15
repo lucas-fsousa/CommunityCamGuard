@@ -48,6 +48,17 @@ def test_header_change_and_empty_record():
     assert records[1].encoding is None and not records[1].audio and not records[1].video
 
 
+def test_sequenced_user_data_can_be_split_without_becoming_media():
+    from backend.app.drivers.yoosee.p2p.stream_protocol import pack_microphone_command
+
+    source = pack_microphone_command(False, timestamp_us=456)
+    receiver = V1Receiver()
+    assert not receiver.feed(source[:-1])
+    result, = receiver.feed(source[-1:])
+    assert result.user_data == source[28:] and not result.audio and not result.video
+    assert receiver.buffered_bytes == 0
+
+
 @pytest.mark.parametrize("fault", ["magic", "marker", "count", "length", "zero_audio", "chunk"])
 def test_bad_lengths_and_unknown_records_close_without_unbounded_allocation(fault):
     receiver = V1Receiver()

@@ -41,10 +41,13 @@ def test_message_shares_sequences_and_reader_without_starting_or_closing_video()
     assert decrypt_media_tlv(encoding.body, COOKIE).hex() == (
         "ffffff8800050000000100020000401f0000a0000110050000000000")
     _, start = sent(s)
-    assert (start.conv, start.sequence) == (42 | 0x80000000, 1)
+    assert (start.conv, start.sequence) == (42, 2)
+    assert start.body[:2] == b"\x04\x02"
+    assert decrypt_media_tlv(start.body, COOKIE) == (
+        bytes.fromhex("ffffff8800030900") + bytes(20) + bytes.fromhex("0032000015cd5b0701"))
     _, burst = sent(s)
     body = decrypt_media_tlv(burst.body, COOKIE)
-    assert (burst.conv, burst.sequence) == (42, 2)
+    assert (burst.conv, burst.sequence) == (42, 3)
     assert struct.unpack_from('<H', body, 6)[0] == 4
     assert struct.unpack_from('<Q', body, 20)[0] == 123456789
     assert talk.acknowledged_frames == 4
@@ -53,15 +56,16 @@ def test_message_shares_sequences_and_reader_without_starting_or_closing_video()
     assert records[0].video == b"video" and s.ready
     now[0] = .08
     _, tail = sent(s)
-    assert tail.sequence == 3 and talk.acknowledged_frames == 5
+    assert tail.sequence == 4 and talk.acknowledged_frames == 5
     assert not s.due()  # Do not cut off the final 20ms frame.
     now[0] = .101
     _, stop = sent(s)
-    assert (stop.conv, stop.sequence) == (42 | 0x80000000, 2)
+    assert (stop.conv, stop.sequence) == (42, 5)
+    assert stop.body[:2] == b"\x04\x02" and decrypt_media_tlv(stop.body, COOKIE)[-1] == 0
     assert talk.done and talk.microphone_stopped and s.ready and not s.due()
     s.begin_finish()
     _, close = sent(s)
-    assert close.sequence == 4 and struct.unpack_from('<I', close.body, 8)[0] == 7
+    assert close.sequence == 6 and struct.unpack_from('<I', close.body, 8)[0] == 7
     assert s.close_acknowledged
 
 
@@ -72,6 +76,17 @@ def test_cancel_before_transmission_uses_no_sequence_and_does_not_touch_micropho
     assert not s.due() and talk.done and not talk.microphone_started
     s.begin_finish()
     assert sent(s)[1].sequence == 1
+
+
+def test_v1_sequenced_reply_on_av_channel_does_not_kill_incoming_video():
+    from backend.app.drivers.yoosee.p2p.stream_protocol import pack_microphone_command
+
+    s = active([0.0])
+    command = pack_microphone_command(True, timestamp_us=123)
+    batch = s.receive(packet(2, 0, media(command + av())), PEER)
+    assert batch.unhandled_commands == 1 and batch.records[0].user_data == command[28:]
+    assert batch.records[1].video == b"video" and s.ready and not s.due()
+    assert "user_data" not in repr(batch.records[0])
 
 
 @pytest.mark.parametrize("stage", ["header", "start", "audio"])
@@ -91,7 +106,7 @@ def test_finish_drains_inflight_push_then_stops_only_the_microphone_before_av_cl
         assert not s.due() and talk.done and not talk.microphone_started
     else:
         _, stop = sent(s)
-        assert stop.conv == 42 | 0x80000000 and talk.microphone_stopped
+        assert stop.conv == 42 and talk.microphone_stopped
     _, close = sent(s)
     assert struct.unpack_from('<I', close.body, 8)[0] == 7
     assert s.close_acknowledged
@@ -116,11 +131,11 @@ def test_repeated_talk_and_rejected_input_do_not_reset_or_poison_sequence_owners
     s = active(now)
     for index in range(2):
         talk = s.begin_talk((FRAME,))
-        assert sent(s)[1].sequence == 1 + index * 2
-        assert sent(s)[1].sequence == 1 + index * 2
-        assert sent(s)[1].sequence == 2 + index * 2
+        assert sent(s)[1].sequence == 1 + index * 4
+        assert sent(s)[1].sequence == 2 + index * 4
+        assert sent(s)[1].sequence == 3 + index * 4
         now[0] += .021
-        assert sent(s)[1].sequence == 2 + index * 2
+        assert sent(s)[1].sequence == 4 + index * 4
         assert talk.done and s.ready
         with pytest.raises(ValueError):
             s.begin_talk((b"invalid",))
@@ -177,11 +192,11 @@ def test_tcp_candidate_uses_the_existing_relay_wrapper_and_keeps_incoming_video(
         s.receive(incoming(ack(normalized)), PEER)
         now[0] += .021
     assert talk.done and talk.microphone_stopped and s.ready
-    assert sequences == [(42, 1), (42 | 0x80000000, 1), (42, 2), (42 | 0x80000000, 2)]
+    assert sequences == [(42, 1), (42, 2), (42, 3), (42, 4)]
     assert s.receive(incoming(packet(2, 0, media(av()))), PEER).records[0].video == b"video"
 
 
-def test_microphone_control_starts_after_all_allocated_sdk_init_sequences():
+def test_v1_microphone_uses_base_channel_not_the_sdk_init_sequence_space():
     from tests.test_av_receive_channels import CONTROL, start
     from tests.test_captured_media import control
 
@@ -196,7 +211,8 @@ def test_microphone_control_starts_after_all_allocated_sdk_init_sequences():
     s.receive(packet(1, 0, media(header() + av())), PEER)
     s.begin_talk((FRAME,))
     assert sent(s)[1].sequence == 1  # Base channel, after START.
-    assert sent(s)[1].sequence == 4  # High channel, after four INITs, not sequence one.
+    microphone = sent(s)[1]
+    assert (microphone.conv, microphone.sequence) == (42, 2)  # INITs are independent.
 
 
 @pytest.mark.parametrize("cancel", [False, True])

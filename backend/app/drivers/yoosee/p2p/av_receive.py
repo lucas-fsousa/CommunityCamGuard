@@ -165,6 +165,7 @@ class AvReceiver:
                     records.extend(self._message(message))
             for message in batch.messages:
                 records.extend(self._message(message))
+            unhandled += sum(bool(record.user_data) for record in records)
             return AvReceiveBatch(control_acks + batch.acknowledgements, tuple(records), unhandled)
         except ValueError:
             # No payload/cookie in exceptions; a fatal parser failure also kills

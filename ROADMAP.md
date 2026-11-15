@@ -62,6 +62,12 @@ Delivered `156c3e1`, CI/Image green, normal image `d57eeff18fec`; diagnostic off
 no new audio grants. Native330/60/57 online/recording; read-only camera3 HD30s
 passed, OOM=false/restarts=0. Both native audio adapters are installed but unused
 until independent physical acceptance and explicit per-operation activation.
+New authorized finite retest:500/500frames/OFF transport receipt in10.680s with
+video active, but owner confirmed **no sound**. SDK reinspection then proved the
+V1 sequenced microphone command was incorrectly using V2's separate-command path.
+The correction uses base AV KCP/type4 for microphone ON/OFF, without changing the
+codec/volume or granting capabilities. Physical retest remains required; evidence
+in docs/internal/native-talk-v1-channel.md.
 
 ### Recovery-worker fairness — 2026-11-14
 
