@@ -11,8 +11,8 @@ speech trials and their actual results are documented below.
 
 Implemented: finite and incremental encoded-audio transmission inside the existing AV owner,
 accessible through `AccountMediaChannel.begin_talk` on its selected UDP or TCP
-transport. It is **not yet a dashboard transport**, an acoustic acceptance, a
-physically homologated hold-to-speak route, or an automatically granted driver capability.
+transport. Neither route is selected by the dashboard or acoustically homologated;
+their implementation is not an automatically granted driver capability.
 The raw channel API is account-thread-only. A bounded thread-safe bridge now
 connects the driver view to that owner, but no dashboard route selects it yet.
 
@@ -246,8 +246,9 @@ hold-to-speak or consume its microphone iterator. The incremental adapter below
 now handles separately admitted streams; both physical checks remain pending.
 
 62focused driver/capability/PCM/HTTP regressions passed under160MiB/no swap/25%CPU
-(72.9MiB peak); Ruff/mypy passed. This final dispatch preparation is source-only,
-not another container rollout: the running recovery image remains `2e6889c0b4ef`.
+(72.9MiB peak); Ruff/mypy passed. That dispatch-only checkpoint was source-only,
+with recovery image `2e6889c0b4ef` then running; the incremental rollout below
+supersedes that runtime.
 No physical test, capability registration or route activation was performed.
 
 ## Incremental hold-to-speak software implementation
@@ -283,3 +284,22 @@ vendor-specific frontend protocol or speculative feature grant is introduced.
 frame every20ms, delays transport receipts350ms, confirms500frames/OFF under13s
 and continues incoming video. These are software contracts, not microphone,
 speaker or browser-device acceptance. No production proof was registered.
+
+### Incremental software rollout (no physical test)
+
+Commit `156c3e1`, CI/Image green, image `d57eeff18fec` built under384MiB/no swap/
+25%CPU and promoted through normal base compose. An isolated96MiB/no-network
+container also verified the actual native AMR encoder and three-frame EOF tail.
+No emulator, GUI browser, camera write, synthetic sound or microphone was used.
+
+Running configuration confirms the physical diagnostic disabled (HTTP404).
+Read-only persisted-proof inspection found camera3's message/stream grants still
+`rtsp_pcm`; field units retain legacy audio selection. No installed unit has a
+`shared_p2p_amr` grant for either operation. The new adapter is installed but idle.
+
+Read-only camera3 HD observation:30seconds,32 binary messages/10676603bytes,
+max measured gap1.185seconds, no observer error. All sources native/active330/60/57;
+all three online/recording before and after. App355.9MiB/1GiB,103.14% of one core;
+hub5.91MiB/0%; OOM=false/restarts=0. This checks ordinary post-deploy delivery,
+not new talk playback or camera-side failure recovery. Physical message/hold
+acceptance, then explicit driver activation/dashboard testing, remain deferred.

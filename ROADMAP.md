@@ -58,6 +58,10 @@ No activation before physical acceptance. Incremental native hold-to-speak is no
 implemented on the same owner:25-frame input queue, bounded reliable window,
 EOF-tail/OFF drain and producer-idle cancellation without video teardown. It needs
 its own exact-unit `audio_stream` proof; the message proof cannot enable it.
+Delivered `156c3e1`, CI/Image green, normal image `d57eeff18fec`; diagnostic off,
+no new audio grants. Native330/60/57 online/recording; read-only camera3 HD30s
+passed, OOM=false/restarts=0. Both native audio adapters are installed but unused
+until independent physical acceptance and explicit per-operation activation.
 
 ### Recovery-worker fairness — 2026-11-14
 
