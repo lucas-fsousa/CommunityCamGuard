@@ -36,7 +36,7 @@ one prerequisite refusal and one interrupted/silent attempt, the corrected paced
 window delivered500/500frames and OFF receipt in10.409seconds with HD still active
 and all three recording. Physical speaker confirmation for that final attempt is
 pending; do not confuse transport receipt with acoustic acceptance. Dashboard
-selection and the incremental hold-to-speak adapter remain pending. See
+activation and physical acceptance remain pending. See
 docs/internal/native-shared-talk.md for the exact implementation and limits.
 
 Owner is no longer near camera3: acoustic acceptance is deferred, not passed;
@@ -54,8 +54,10 @@ camera3 read-only30s HD delivery passed; no physical command or fault injection.
 Finite-message dispatch through the existing API is prepared behind a distinct
 exact-unit `shared_p2p_amr` proof, not granted to any production camera. Generic
 results now represent retained shared sessions without claiming route release.
-No activation before physical acceptance; incremental native hold-to-speak remains
-unimplemented and cannot be enabled by the message proof.
+No activation before physical acceptance. Incremental native hold-to-speak is now
+implemented on the same owner:25-frame input queue, bounded reliable window,
+EOF-tail/OFF drain and producer-idle cancellation without video teardown. It needs
+its own exact-unit `audio_stream` proof; the message proof cannot enable it.
 
 ### Recovery-worker fairness — 2026-11-14
 

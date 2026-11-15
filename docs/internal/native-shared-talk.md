@@ -6,12 +6,13 @@ The owner approved continuing toward shared-P2P outgoing voice. Production still
 uses the physically accepted Yoosee RTSP/PCM backchannel. Incoming audio/video on
 all installed cameras already uses native LAN UDP; this work does not change
 those sources, their capabilities, credentials, settings or original recordings.
-No sound/light/movement command was sent for this implementation.
+No physical command was issued for the incremental implementation; earlier finite
+speech trials and their actual results are documented below.
 
-Implemented: a finite encoded-message transmitter inside the existing AV owner,
+Implemented: finite and incremental encoded-audio transmission inside the existing AV owner,
 accessible through `AccountMediaChannel.begin_talk` on its selected UDP or TCP
 transport. It is **not yet a dashboard transport**, an acoustic acceptance, a
-streaming hold-to-speak adapter, or an automatically granted driver capability.
+physically homologated hold-to-speak route, or an automatically granted driver capability.
 The raw channel API is account-thread-only. A bounded thread-safe bridge now
 connects the driver view to that owner, but no dashboard route selects it yet.
 
@@ -78,10 +79,9 @@ on the returned handle mean transport receipt only, never sound reproduction.
 
 ## What remains before selecting this in production
 
-- Incremental hold-to-speak adapter using that bridge, preserving the generic
-  driver's per-unit capability decision and current working fallback.
 - One announced, authorized known-speech test on camera3, with speaker confirmation
   and video/recording observation. No family-wide `p2p_amr` grant from video success.
+- Separate physical hold-to-speak acceptance before enabling its stream proof.
 
 Deterministic regressions exercise actual UDP/TCP framing, shared-reader video,
 INIT and repeated-message sequence ownership, rejected input, cancellation during
@@ -241,11 +241,45 @@ verification. Backend route failures do not replay the message via RTSP or anoth
 P2P login. The existing UI consumes the same `completed` outcome; no new button,
 automatic test or default route change is needed.
 
-This route is message-only: declaring its option for `audio_stream` cannot enable
-hold-to-speak, consume its microphone iterator or infer independent stream proof.
-That incremental adapter and both corresponding physical checks remain pending.
+Message and stream remain independent operations: a message proof cannot enable
+hold-to-speak or consume its microphone iterator. The incremental adapter below
+now handles separately admitted streams; both physical checks remain pending.
 
 62focused driver/capability/PCM/HTTP regressions passed under160MiB/no swap/25%CPU
 (72.9MiB peak); Ruff/mypy passed. This final dispatch preparation is source-only,
 not another container rollout: the running recovery image remains `2e6889c0b4ef`.
 No physical test, capability registration or route activation was performed.
+
+## Incremental hold-to-speak software implementation
+
+`StreamingTalkInput` is a single-use, exact-lease handoff: at most25 encoded frames
+(500ms/800bytes) queued,500frames total. Only the existing HTTP producer may wait
+for queue space (bounded to one second); the AV account reader only takes available
+four-frame bursts without blocking. EOF flushes a one-to-three-frame tail. Binding
+the same input to another lease or consuming it twice is rejected.
+
+The existing `TalkAudioWindow` handles either immutable messages or incremental
+input with the same eight-PUSH reliability/pacing bound. Cancellation discards
+unsent input, wakes blocked producers and drains already emitted sequences before
+microphone OFF; video stays open. Two seconds without producer progress, or an
+eleven-second input wall bound (ten-second capture plus startup margin), cancels
+only the utterance rather than raising a video receive error. Genuine missing
+KCP receipts still require the existing safe route-retirement policy.
+
+`shared_talk_stream` encodes canonical16kPCM incrementally through one8kAMR encoder,
+submits to the current account and returns only after full frame/OFF receipts.
+Codec initialization precedes microphone submission. Bad/empty/oversized PCM,
+owner changes and producer failure abandon the exact ticket without replay/login
+or early slot reuse. There is no new socket, account thread or audio-history file.
+
+Driver `audio_stream` selection requires its own fresh exact-unit/firmware writable
+`shared_p2p_amr` proof and a retained native owner. No production proof was created;
+RTSP/PCM remains selected for all installed cameras. The existing browser hold
+control/WebSocket can use this adapter after explicit physical homologation; no
+vendor-specific frontend protocol or speculative feature grant is introduced.
+
+119focused protocol/queue/driver/API regressions passed under160MiB/no swap/25%CPU
+(76.3MiB peak); Ruff/mypy passed. The synthetic maximum-duration stream feeds one
+frame every20ms, delays transport receipts350ms, confirms500frames/OFF under13s
+and continues incoming video. These are software contracts, not microphone,
+speaker or browser-device acceptance. No production proof was registered.

@@ -14,6 +14,7 @@ from .account_policy import validate_media_capacity
 from .contracts import OnlineDevice
 from .media_route_job import MediaRouteSpec
 from .talk_inbox import TalkInbox, TalkTicket
+from .talk_stream_input import TalkFrames
 from .video_delivery import VideoDelivery
 
 
@@ -72,7 +73,7 @@ class MediaLeaseInbox:
         self._leases: dict[MediaLeaseTicket, _Lease] = {}
         self.talk = TalkInbox(generation, capacity)
 
-    def submit_talk(self, camera_id: str, frames: tuple[bytes, ...]) -> TalkTicket:
+    def submit_talk(self, camera_id: str, frames: TalkFrames) -> TalkTicket:
         """Bind to an already claimed exact-camera lease, never its replacement."""
         with self._lock:
             if not self._closed:

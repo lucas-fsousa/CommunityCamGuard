@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ...audio_format import downsample_to_8khz, duration_ms
 from ...db import p2p
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
-from . import audio_capabilities, rtsp_backchannel, shared_talk
+from . import audio_capabilities, rtsp_backchannel, shared_talk, shared_talk_stream
 from .p2p import P2PProbeError, send_pcm_intercom
 from .p2p.intercom_stream import send_pcm_intercom_chunks
 
@@ -77,7 +77,12 @@ def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
 def send_stream(camera: Camera, pcm16le_chunks: Iterable[bytes]) -> AudioMessageResult:
     """Consume one trusted bounded PCM iterator through a single direct route."""
 
-    if _use_rtsp(camera, audio_capabilities.STREAM):
+    route = _route(camera, audio_capabilities.STREAM)
+    if route == audio_capabilities.SHARED:
+        if not camera.camera_id or (entry := p2p.get_enrollment_for_camera(camera.camera_id)) is None:
+            raise ControlNotReady("camera has no linked native owner")
+        return shared_talk_stream.send_stream(entry, pcm16le_chunks)
+    if route == audio_capabilities.RTSP:
         try:
             return rtsp_backchannel.send_stream(camera, pcm16le_chunks)
         except (OSError, RuntimeError, ValueError) as exc:

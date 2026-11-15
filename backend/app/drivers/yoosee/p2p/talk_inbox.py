@@ -3,7 +3,7 @@
 import threading
 from dataclasses import dataclass, field
 
-from .audio_sender import validate_amr_audio_frames
+from .talk_stream_input import StreamingTalkInput, TalkFrames, validate_talk_frames
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +22,7 @@ class TalkOutcome:
 @dataclass(slots=True)
 class _Utterance:
     lease: int
-    frames: tuple[bytes, ...] = field(repr=False)
+    frames: TalkFrames = field(repr=False)
     claimed: bool = False
     cancelled: bool = False
     abandoned: bool = False
@@ -43,27 +43,29 @@ class TalkInbox:
         self._closed = False
         self._items: dict[TalkTicket, _Utterance] = {}
 
-    def submit(self, lease: int, frames: tuple[bytes, ...]) -> TalkTicket:
-        if not isinstance(frames, tuple) or any(not isinstance(f, bytes) for f in frames):
-            raise ValueError("immutable talk frames required")
-        validate_amr_audio_frames(frames)
+    def submit(self, lease: int, frames: TalkFrames) -> TalkTicket:
+        validate_talk_frames(frames)
         with self._lock:
             if (self._closed or len(self._items) >= self._capacity or self._serial >= 1 << 64
                     or any(item.lease == lease for item in self._items.values())):
                 raise ValueError("talk slot unavailable")
+            if isinstance(frames, StreamingTalkInput):
+                frames.bind()
             ticket = TalkTicket(self._generation, self._serial)
             self._serial += 1
             self._items[ticket] = _Utterance(lease, frames)
             return ticket
 
-    def claim(self) -> tuple[TalkTicket, int, tuple[bytes, ...]] | None:
+    def claim(self) -> tuple[TalkTicket, int, TalkFrames] | None:
         with self._lock:
             if self._closed:
                 return None
             for ticket, item in self._items.items():
                 if not item.claimed and item.result is None:
                     item.claimed = True
-                    frames, item.frames = item.frames, ()
+                    frames = item.frames
+                    if not isinstance(frames, StreamingTalkInput):
+                        item.frames = ()
                     return ticket, item.lease, frames
             return None
 
@@ -72,7 +74,12 @@ class TalkInbox:
             item = self._items.get(ticket)
             if item is not None and item.result is None:
                 item.cancelled = True
-                item.frames = ()
+                if isinstance(item.frames, StreamingTalkInput):
+                    item.frames.cancel()
+                    if not item.claimed:
+                        item.frames.close()
+                else:
+                    item.frames = ()
                 if not item.claimed:
                     item.result = TalkOutcome("cancelled")
 
@@ -91,7 +98,12 @@ class TalkInbox:
             item = self._items.get(ticket)
             if item is None:
                 return
-            item.frames = ()
+            if isinstance(item.frames, StreamingTalkInput):
+                item.frames.cancel()
+                if not item.claimed or item.result is not None:
+                    item.frames.close()
+            else:
+                item.frames = ()
             if not item.claimed or item.result is not None:
                 del self._items[ticket]
             else:
@@ -101,6 +113,8 @@ class TalkInbox:
         with self._lock:
             item = self._items.get(ticket)
             if item is not None and item.claimed and item.result is None:
+                if isinstance(item.frames, StreamingTalkInput):
+                    item.frames.close()
                 item.frames = ()
                 if item.abandoned:
                     del self._items[ticket]
@@ -121,6 +135,11 @@ class TalkInbox:
             for item in self._items.values():
                 if item.result is None:
                     item.cancelled = True
-                    item.frames = ()
+                    if isinstance(item.frames, StreamingTalkInput):
+                        item.frames.cancel()
+                        if not item.claimed:
+                            item.frames.close()
+                    else:
+                        item.frames = ()
                     if not item.claimed:
                         item.result = TalkOutcome("cancelled")

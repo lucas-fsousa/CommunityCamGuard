@@ -24,7 +24,7 @@ class TalkLeasePump:
             if self._inbox.should_cancel(ticket) or ticket in self._unavailable:
                 talk.cancel()
             if talk.done or talk.closed:
-                cancelled = self._inbox.should_cancel(ticket)
+                cancelled = self._inbox.should_cancel(ticket) or talk.cancelled
                 self._inbox.finish(ticket, TalkOutcome(
                     "unavailable" if ticket in self._unavailable else
                     "cancelled" if cancelled else "transport_received" if talk.done else "unavailable",

@@ -20,6 +20,7 @@ from .mtp_tcp_framing import MtpTcpFramer
 from .mtp_tcp_heartbeat import TcpMeterHeartbeat
 from .mtp_tcp_kcp import unwrap_tcp_relay_kcp, wrap_tcp_relay_kcp
 from .mtp_tcp_measurement import build_mtp_tcp_measurement, matches_mtp_tcp_measurement_ack
+from .talk_stream_input import TalkFrames
 from .tcp_budget import TcpProfile, validate_profile
 from .v1_receive import V1Record
 
@@ -87,7 +88,7 @@ class TcpAvSession:
     def ready(self) -> bool:
         return not self.closed and self._av is not None and self._av.ready
 
-    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+    def begin_talk(self, frames: TalkFrames) -> CooperativeTalk:
         """Use existing relay framing/output; never creates a second AV session."""
         if not self.ready or self._av is None:
             raise ReceiveError("TCP talk requires an active AV route")

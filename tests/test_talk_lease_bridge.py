@@ -145,7 +145,7 @@ def test_actual_account_worker_services_audio_on_existing_channel(monkeypatch):
     def begin(tcp, frames):
         calls.append(tcp)
         assert frames == (FRAME,)
-        return SimpleNamespace(done=True, closed=False, acknowledged_frames=1,
+        return SimpleNamespace(done=True, closed=False, cancelled=False, acknowledged_frames=1,
                                microphone_stopped=True, cancel=lambda: None)
 
     def poll(size):

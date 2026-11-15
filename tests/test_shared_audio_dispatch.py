@@ -85,15 +85,19 @@ def test_only_complete_outcome_maps_to_shared_contract(monkeypatch):
     assert result.completed and result.shared_session and not result.route_released
 
 
-def test_shared_option_cannot_enable_an_unimplemented_stream(monkeypatch, managed):
+def test_shared_stream_requires_its_own_proof_and_uses_existing_owner(monkeypatch, managed):
     from tests.test_audio_capability_routes import IDENTITY
 
     shared_profile(monkeypatch, managed, operation=policy.STREAM)
     monkeypatch.setattr(policy.rollout, "selected", lambda _: (IDENTITY, {policy.STREAM}))
-    assert policy.allowed_routes(CAMERA, policy.STREAM) == set()
-    assert not audio.supported(CAMERA, streaming=True)
-    def chunks():
-        pytest.fail("unimplemented shared stream cannot consume microphone input")
-        yield b""
-    with pytest.raises(ControlNotReady):
-        audio.send_stream(CAMERA, chunks())
+    assert policy.allowed_routes(CAMERA, policy.STREAM) == {policy.SHARED}
+    assert policy.allowed_routes(CAMERA, policy.MESSAGE) == set()
+    assert audio.supported(CAMERA, streaming=True)
+    chunks = iter((bytes(640),))
+    expected = object()
+    calls = []
+    monkeypatch.setattr(audio.shared_talk_stream, "send_stream",
+                        lambda entry, payload: calls.append(payload) or expected)
+    monkeypatch.setattr(audio.rtsp_backchannel, "send_stream", lambda *_: pytest.fail("no replay"))
+    monkeypatch.setattr(audio, "send_pcm_intercom_chunks", lambda *_: pytest.fail("no second session"))
+    assert audio.send_stream(CAMERA, chunks) is expected and calls == [chunks]

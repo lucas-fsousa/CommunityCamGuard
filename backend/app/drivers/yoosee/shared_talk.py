@@ -2,7 +2,7 @@
 
 import time
 
-from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, downsample_to_8khz, duration_ms
+from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, PCM_FRAME_MS, downsample_to_8khz
 from ...db.p2p import P2PEnrollment
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
 from .p2p.amr_nb import encode_pcm16le
@@ -48,10 +48,16 @@ def send_message(entry: P2PEnrollment, pcm: bytes) -> AudioMessageResult:
         raise
     except (OSError, RuntimeError, ValueError) as exc:
         raise ControlOperationError("shared audio transport failed; not repeated") from exc
-    frames = len(pcm) // PCM_FRAME_BYTES
+    return completed_result(len(pcm), outcome)
+
+
+def completed_result(pcm_bytes: int, outcome: TalkOutcome) -> AudioMessageResult:
+    frames = pcm_bytes // PCM_FRAME_BYTES
+    if not PCM_FRAME_BYTES <= pcm_bytes <= MAX_PCM_BYTES or pcm_bytes % PCM_FRAME_BYTES:
+        raise ControlOperationError("shared audio duration is invalid")
     if (outcome.status != "transport_received" or outcome.acknowledged_frames != frames
             or not outcome.stop_acknowledged):
         raise ControlOperationError("shared audio transmission unconfirmed; not repeated")
-    return AudioMessageResult(duration_ms(pcm), frames, frames, frames,
+    return AudioMessageResult(frames * PCM_FRAME_MS, frames, frames, frames,
         direct_connection=False, session_completed=True, route_released=False,
         shared_session=True, microphone_stop_acknowledged=True)

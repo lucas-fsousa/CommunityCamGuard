@@ -22,6 +22,9 @@ without opening settings, or open the voice-message recorder with preview/send.
 Visibility still follows the selected driver's capabilities and access permissions.
 Outgoing voice currently uses Yoosee's homologated proprietary RTSP/PCM extension;
 this is direct, app-independent LAN audio, not shared-session P2P talkback.
+Shared-P2P message and incremental push-to-talk adapters are implemented but remain
+disabled pending independent physical acceptance and driver admission for each operation;
+see [native talk status](docs/internal/native-shared-talk.md).
 
 All three installed Yoosee cameras returned to native LAN UDP on 2026-11-14,
 after a gradual garage/yard migration. A simultaneous five-minute HD check passed

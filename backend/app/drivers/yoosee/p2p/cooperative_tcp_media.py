@@ -15,6 +15,7 @@ from .media_route_job import MediaRouteJob, MediaRouteSpec
 from .mtp_tcp_av import TcpAvSession
 from .mtp_tcp_handshake import build_mtp_tcp_pair_request
 from .mtp_tcp_receive import PairedSocket
+from .talk_stream_input import TalkFrames
 from .tcp_pending_output import PendingTcpOutput
 from .video_delivery import VideoDelivery
 
@@ -61,7 +62,7 @@ class CooperativeTcpMedia:
     def ready(self) -> bool:
         return self._ready_at is not None and not self._closing and self.result is None
 
-    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+    def begin_talk(self, frames: TalkFrames) -> CooperativeTalk:
         if not self.ready:
             raise ReceiveError("TCP talk requires a running media pump")
         return self._owner.begin_talk(frames)

@@ -324,6 +324,10 @@ and may contain at most 320,000 bytes (10 seconds). The server executes the bloc
 outside the HTTP event loop and serializes it with other operations on that camera. A successful
 response reports only duration, frame counts, direct-connection/session-cleanup/route-cleanup booleans and
 `completed`; it exposes no codec bytes, enrollment ID, peer address, token or protocol state.
+Shared-session drivers may additionally report `shared_session` and
+`microphone_stop_acknowledged`. In that case `completed=true` can coexist with
+`route_released=false`: the utterance ended while the shared video connection was retained.
+These are transport/lifecycle results, not acoustic verification or automatic capability grants.
 
 This endpoint is the generic recorded-message transport. `audio_messages` in the camera response
 indicates whether the selected driver and exact camera enrollment support it. The current endpoint
@@ -337,11 +341,12 @@ HTTPS dashboard origin for microphone capture.
 ### Bounded push-to-talk WebSocket (authenticated local or configured HTTPS origin)
 
 `WS /api/cameras/{camera_id}/intercom/stream` is advertised by `audio_streams` separately from
-recorded messages. After the server completes the driver-owned camera setup it sends
+recorded messages. Once the driver accepts the bounded input stream, the server sends
 `{"type":"ready","max_ms":10000}`. The client may then send exactly one 640-byte signed
 16-bit little-endian, mono, 16 kHz PCM frame per binary WebSocket message. Text `stop` ends the
 utterance. A successful teardown returns `type: "complete"` with the same transport-neutral fields
 as a bounded message; errors use `type: "error"` and a `detail` string.
+Readiness permits PCM input; it does not certify audible speaker output.
 
 The server retains at most 25 frames (500 ms) between the event loop and its blocking driver worker,
 stops an idle source after two seconds and caps the complete utterance at 500 frames/10 seconds.

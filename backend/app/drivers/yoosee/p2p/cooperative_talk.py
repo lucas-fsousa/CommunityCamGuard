@@ -1,4 +1,4 @@
-"""Finite AMR message on an already active AV route; never opens/closes AV.
+"""Bounded AMR message or incremental utterance on the already active AV route.
 
 Pinned IoTVideo LivePlayer TX: HEADER_ENC(0x0500), builtin microphone 0x32,
 four mode-7 frames per burst (SDK threshold 64ms), microphone OFF. This is a
@@ -8,7 +8,6 @@ transport candidate, not a claim of speaker compatibility or acoustic success.
 import time
 from collections.abc import Callable
 
-from .audio_sender import validate_amr_audio_frames
 from .cooperative_talk_audio import TalkAudioWindow
 from .kcp_receive import ReceiveError
 from .reliable_kcp_send import ReliableKcpPush
@@ -19,6 +18,7 @@ from .stream_protocol import (
     pack_microphone_command,
     pack_v1_audio_encoding_header,
 )
+from .talk_stream_input import StreamingTalkInput, TalkFrames, validate_talk_frames
 
 # df.a.P / LivePlayer: independent of the camera's incoming AAC descriptor.
 TALK_FORMAT = V1EncodingHeader(0x0102, 5, 0, 1, 16, 8000, 160, 0, 0, 0, 0)
@@ -33,14 +33,15 @@ class CooperativeTalk:
     """
 
     def __init__(self, peer: tuple[str, int], link: int, cookie: bytes,
-                 frames: tuple[bytes, ...], allocate: Callable[[bool], int], *,
+                 frames: TalkFrames, allocate: Callable[[bool], int], *,
                  clock: Callable[[], float] = time.monotonic,
                  wall_us: Callable[[], int] = lambda: time.time_ns() // 1000):
         if not isinstance(cookie, bytes) or len(cookie) != 8:
             raise ValueError("invalid talk cookie")
-        if not isinstance(frames, tuple) or any(not isinstance(f, bytes) for f in frames):
-            raise ValueError("talk requires immutable encoded frames")
-        validate_amr_audio_frames(frames)
+        validate_talk_frames(frames)
+        self._stream = frames if isinstance(frames, StreamingTalkInput) else None
+        if self._stream is not None:
+            self._stream.claim()
         self._peer, self._link, self._cookie = peer, link, cookie
         self._frames, self._allocate, self._clock, self._wall_us = frames, allocate, clock, wall_us
         self._deadline = clock() + 16
@@ -81,6 +82,8 @@ class CooperativeTalk:
         if self._request is not None:
             self._request.poll()
         self._audio.poll()
+        if self._stream is not None and self._stream.aborted and not self.cancelled:
+            self.cancel()
 
     def _complete(self) -> None:
         self.done = True

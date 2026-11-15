@@ -15,6 +15,7 @@ from .av_receive import AvReceiveBatch, AvReceiver
 from .cooperative_talk import CooperativeTalk
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, validate_media_policy
+from .talk_stream_input import TalkFrames
 
 
 class AvHandshake:
@@ -70,7 +71,7 @@ the same parser/decoder owner, but do not claim ready or present a live source y
             raise ReceiveError("AV outgoing sequence exhausted")
         return sequence
 
-    def begin_talk(self, frames: tuple[bytes, ...], *,
+    def begin_talk(self, frames: TalkFrames, *,
                    wall_us: Callable[[], int] = lambda: time.time_ns() // 1000) -> CooperativeTalk:
         """Owner-thread candidate only; no capability grant or dashboard routing.
 

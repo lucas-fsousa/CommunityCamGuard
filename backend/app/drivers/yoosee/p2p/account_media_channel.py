@@ -10,6 +10,7 @@ from .cooperative_udp_media import CooperativeUdpMedia, UdpMediaResult, UdpSend
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy
 from .media_route_job import MediaRouteJob, MediaRouteResult, MediaRouteSpec
+from .talk_stream_input import TalkFrames
 from .video_delivery import VideoDelivery
 
 
@@ -81,7 +82,7 @@ class AccountMediaChannel:
         return ((self.tcp is not None and self.tcp.result is None)
                 or (self.udp is not None and self.udp.result is None))
 
-    def begin_talk(self, frames: tuple[bytes, ...]) -> CooperativeTalk:
+    def begin_talk(self, frames: TalkFrames) -> CooperativeTalk:
         """Trusted owner-thread candidate, on the already selected transport only."""
         if self._retiring or self._stopping or not self.ready:
             raise ReceiveError("talk requires a running media channel")
