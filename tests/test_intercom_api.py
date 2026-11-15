@@ -100,6 +100,15 @@ def test_incomplete_camera_delivery_is_an_http_failure(monkeypatch) -> None:
     assert caught.value.status_code == 502
 
 
+def test_shared_message_response_keeps_video_route_open_without_false_release(monkeypatch) -> None:
+    monkeypatch.setattr(intercom, "send_audio_message", lambda *_: AudioMessageResult(
+        20, 1, 1, 1, False, True, False, shared_session=True, microphone_stop_acknowledged=True))
+    result = asyncio.run(intercom.create_audio_message(_request(bytes(640)), Response(), CAMERA_ID))
+    assert result["completed"] and result["shared_session"]
+    assert result["microphone_stop_acknowledged"]
+    assert not result["route_released"] and not result["direct_connection"]
+
+
 class _AudioBrowser:
     def __init__(self, consumed: threading.Event) -> None:
         self.headers = Headers({"host": "testserver"})

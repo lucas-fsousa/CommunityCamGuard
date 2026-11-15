@@ -2,16 +2,16 @@
 
 import time
 
-from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, downsample_to_8khz
+from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, downsample_to_8khz, duration_ms
 from ...db.p2p import P2PEnrollment
-from ..contracts import ControlNotReady, ControlOperationError
+from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
 from .p2p.amr_nb import encode_pcm16le
 from .p2p.talk_inbox import TalkOutcome
 from .shared_control_reads import session_for
 
 
 def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
-    """Internal physical-review operation, NOT a capability or dashboard selection."""
+    """Low-level submission; caller owns diagnostic permission or exact route proof."""
     if not isinstance(pcm, bytes) or not PCM_FRAME_BYTES <= len(pcm) <= MAX_PCM_BYTES or len(pcm) % PCM_FRAME_BYTES:
         raise ValueError("complete bounded canonical PCM frames required")
     session = session_for(entry)
@@ -29,6 +29,8 @@ def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
         while time.monotonic() < deadline:
             result = session.take_talk(ticket)
             if result is not None:
+                if result.status == "transport_received" and session_for(entry) is not session:
+                    raise ControlOperationError("native owner changed after audio; not repeated")
                 return result
             if session_for(entry) is not session:
                 raise ControlOperationError("native owner changed during audio; not repeated")
@@ -36,3 +38,20 @@ def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
         raise ControlOperationError("native talk timed out; not repeated")
     finally:
         session.abandon_talk(ticket)
+
+
+def send_message(entry: P2PEnrollment, pcm: bytes) -> AudioMessageResult:
+    """Selected only by explicit per-unit shared-message proof, not legacy AMR proof."""
+    try:
+        outcome = send_candidate(entry, pcm)
+    except (ControlNotReady, ControlOperationError):
+        raise
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ControlOperationError("shared audio transport failed; not repeated") from exc
+    frames = len(pcm) // PCM_FRAME_BYTES
+    if (outcome.status != "transport_received" or outcome.acknowledged_frames != frames
+            or not outcome.stop_acknowledged):
+        raise ControlOperationError("shared audio transmission unconfirmed; not repeated")
+    return AudioMessageResult(duration_ms(pcm), frames, frames, frames,
+        direct_connection=False, session_completed=True, route_released=False,
+        shared_session=True, microphone_stop_acknowledged=True)

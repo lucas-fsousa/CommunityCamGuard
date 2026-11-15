@@ -51,6 +51,11 @@ Neither software correction activates P2P voice in the dashboard.
 Delivered `66155b2`/`2aae3fb`, CI/Image green, normal image `2e6889c0b4ef`:
 physical diagnostic disabled/404, native sources327/57/54, all online/recording,
 camera3 read-only30s HD delivery passed; no physical command or fault injection.
+Finite-message dispatch through the existing API is prepared behind a distinct
+exact-unit `shared_p2p_amr` proof, not granted to any production camera. Generic
+results now represent retained shared sessions without claiming route release.
+No activation before physical acceptance; incremental native hold-to-speak remains
+unimplemented and cannot be enabled by the message proof.
 
 ### Recovery-worker fairness — 2026-11-14
 

@@ -21,6 +21,7 @@ STREAM = "audio_stream"
 OPERATIONS = frozenset({MESSAGE, STREAM})
 RTSP = "rtsp_pcm"
 P2P = "p2p_amr"
+SHARED = "shared_p2p_amr"
 
 
 def unavailable_audio(camera: Camera, operation: str) -> None:
@@ -33,7 +34,8 @@ def unavailable_audio(camera: Camera, operation: str) -> None:
             proofs = {proof.key: proof for proof in profile.operations}
             proof = proofs.get(operation)
             if (len(proofs) == len(profile.operations) and proof is not None
-                    and proof.writable is True and {RTSP, P2P}.intersection(proof.options)):
+                    and proof.writable is True and ({RTSP, P2P} | (
+                        {SHARED} if operation == MESSAGE else set())).intersection(proof.options)):
                 raise ControlNotReady("validated camera audio is temporarily unavailable")
     raise Unsupported(operation)
 
@@ -72,6 +74,11 @@ Fresh identity plus a trusted writable route proof is required for each operatio
     if proof is None or proof.writable is not True:
         return frozenset()
     available = {P2P}
+    if operation == MESSAGE and SHARED in proof.options:
+        from .shared_control_reads import has_session
+
+        if has_session(camera.camera_id):
+            available.add(SHARED)
     if rtsp_backchannel.supported(camera):
         available.add(RTSP)
     return frozenset(available.intersection(proof.options))

@@ -143,6 +143,8 @@ class AudioMessageResult:
     direct_connection: bool
     session_completed: bool
     route_released: bool
+    shared_session: bool = False
+    microphone_stop_acknowledged: bool = False
 
     def __post_init__(self) -> None:
         if not 20 <= self.duration_ms <= 10_000 or self.duration_ms % 20:
@@ -157,13 +159,13 @@ class AudioMessageResult:
             and self.requested_frames > 0
             and self.sent_frames == self.requested_frames
             and self.acknowledged_frames == self.requested_frames
-            and self.direct_connection
             and self.session_completed
-            and self.route_released
+            and ((self.shared_session and self.microphone_stop_acknowledged)
+                 or (not self.shared_session and self.direct_connection and self.route_released))
         )
 
     def public(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "duration_ms": self.duration_ms,
             "requested_frames": self.requested_frames,
             "sent_frames": self.sent_frames,
@@ -173,6 +175,10 @@ class AudioMessageResult:
             "route_released": self.route_released,
             "completed": self.completed,
         }
+        if self.shared_session:
+            result.update(shared_session=True,
+                          microphone_stop_acknowledged=self.microphone_stop_acknowledged)
+        return result
 
 
 @dataclass(frozen=True, slots=True)

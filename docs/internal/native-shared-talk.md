@@ -78,8 +78,8 @@ on the returned handle mean transport receipt only, never sound reproduction.
 
 ## What remains before selecting this in production
 
-- PCM capture/encoding and hold-to-speak adapters using that bridge, preserving
-  the generic driver's per-unit capability decision and current working fallback.
+- Incremental hold-to-speak adapter using that bridge, preserving the generic
+  driver's per-unit capability decision and current working fallback.
 - One announced, authorized known-speech test on camera3, with speaker confirmation
   and video/recording observation. No family-wide `p2p_amr` grant from video success.
 
@@ -222,3 +222,30 @@ observation. App352.2MiB/1GiB,81.44% of one CPU core; hub6.25MiB/0%; OOM=false,
 restart count0. This checks ordinary delivery, not live talk-fault recovery or
 acoustic acceptance. No sound/light/PTZ command, camera configuration change,
 new audio proof or dashboard transport selection was performed.
+
+## Dashboard message dispatch prepared, NOT activated
+
+The existing message service/HTTP path can now dispatch a finite PCM message to
+the shared owner **only** when the exact current unit/firmware has an explicit
+writable `audio_message` proof with route `shared_p2p_amr`. That is distinct from
+legacy `p2p_amr` and `rtsp_pcm`; neither old proof nor native-video success grants
+it. No production profile/enrollment was changed. Existing installed cameras
+continue selecting RTSP/PCM. Physical acceptance must precede any operator grant.
+
+The generic `AudioMessageResult` now distinguishes a retained shared session and
+microphone STOP transport receipt from an exclusively opened/released route.
+Shared success leaves `route_released=false` and `direct_connection=false` rather
+than fabricating either. Its optional shared fields do not change legacy response
+shape. Completion still needs every frame and STOP receipt; it is not acoustic
+verification. Backend route failures do not replay the message via RTSP or another
+P2P login. The existing UI consumes the same `completed` outcome; no new button,
+automatic test or default route change is needed.
+
+This route is message-only: declaring its option for `audio_stream` cannot enable
+hold-to-speak, consume its microphone iterator or infer independent stream proof.
+That incremental adapter and both corresponding physical checks remain pending.
+
+62focused driver/capability/PCM/HTTP regressions passed under160MiB/no swap/25%CPU
+(72.9MiB peak); Ruff/mypy passed. This final dispatch preparation is source-only,
+not another container rollout: the running recovery image remains `2e6889c0b4ef`.
+No physical test, capability registration or route activation was performed.

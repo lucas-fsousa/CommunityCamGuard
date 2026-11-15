@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ...audio_format import downsample_to_8khz, duration_ms
 from ...db import p2p
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
-from . import audio_capabilities, rtsp_backchannel
+from . import audio_capabilities, rtsp_backchannel, shared_talk
 from .p2p import P2PProbeError, send_pcm_intercom
 from .p2p.intercom_stream import send_pcm_intercom_chunks
 
@@ -28,16 +28,27 @@ def supported(camera: Camera, *, streaming: bool = False) -> bool:
 
 
 def _use_rtsp(camera: Camera, operation: str) -> bool:
+    return _route(camera, operation) == audio_capabilities.RTSP
+
+
+def _route(camera: Camera, operation: str) -> str:
     routes = audio_capabilities.allowed_routes(camera, operation)
     if routes is not None:
         if not routes:
             raise ControlNotReady("camera audio has no currently validated route")
-        return audio_capabilities.RTSP in routes
-    return rtsp_backchannel.supported(camera)
+        if audio_capabilities.SHARED in routes:
+            return audio_capabilities.SHARED
+        return audio_capabilities.RTSP if audio_capabilities.RTSP in routes else audio_capabilities.P2P
+    return audio_capabilities.RTSP if rtsp_backchannel.supported(camera) else audio_capabilities.P2P
 
 
 def send(camera: Camera, pcm16le: bytes) -> AudioMessageResult:
-    if _use_rtsp(camera, audio_capabilities.MESSAGE):
+    route = _route(camera, audio_capabilities.MESSAGE)
+    if route == audio_capabilities.SHARED:
+        if not camera.camera_id or (entry := p2p.get_enrollment_for_camera(camera.camera_id)) is None:
+            raise ControlNotReady("camera has no linked native owner")
+        return shared_talk.send_message(entry, pcm16le)
+    if route == audio_capabilities.RTSP:
         try:
             return rtsp_backchannel.send(camera, pcm16le)
         except (OSError, RuntimeError, ValueError) as exc:
