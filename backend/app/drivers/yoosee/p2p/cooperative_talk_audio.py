@@ -13,7 +13,11 @@ MAX_INFLIGHT = 8  # At most640ms/32 AMR frames awaiting receipts, never unbounde
 class TalkAudioWindow:
     def __init__(self, peer: tuple[str, int], link: int, cookie: bytes,
                  frames: TalkFrames, allocate: Callable[[bool], int], *,
-                 clock: Callable[[], float], wall_us: Callable[[], int]):
+                 clock: Callable[[], float], wall_us: Callable[[], int],
+                 frame_seconds: float = .02, burst_frames: int = 4):
+        if (frame_seconds, burst_frames) not in ((.02, 4), (.064, 1)):
+            raise ValueError('reviewed SDK audio cadence required')
+        self._frame_seconds, self._burst_frames = frame_seconds, burst_frames
         self._peer, self._link, self._cookie = peer, link, cookie
         self._stream = frames if isinstance(frames, StreamingTalkInput) else None
         self._frames = frames if isinstance(frames, tuple) else ()
@@ -56,13 +60,13 @@ class TalkAudioWindow:
         if (not self._cancelled and (self._stream is not None or self._offset < len(self._frames))
                 and len(self._pending) < MAX_INFLIGHT and now >= self._next_audio):
             frames = (self._stream.take_burst() if self._stream is not None
-                      else self._frames[self._offset:self._offset + 4])
+                      else self._frames[self._offset:self._offset + self._burst_frames])
             if frames:
                 body = encrypt_media_tlv(build_v1_audio_packet(frames, self._wall_us()), self._cookie)
                 request = ReliableKcpPush(self._peer, self._link, self._allocate(False), body, clock=self._clock)
                 self._pending.append((request, len(frames)))
                 self._offset += len(frames)
-                self._next_audio = now + len(frames) * .02
+                self._next_audio = now + len(frames) * self._frame_seconds
                 return request.due()
         for request, _ in self._pending:
             wire = request.due()

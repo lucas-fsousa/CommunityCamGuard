@@ -132,3 +132,58 @@ by-default server flag, server-pinned camera, primary login and direct-loopback
 checks. Both review paths consume **one shared single-use guard**; arbitrary
 protocol/target query parameters are refused. A physical comparison, not an ACK,
 must establish whether this firmware accepts the legacy microphone path.
+
+Legacy comparison deployed from `6245d36` (image `6e45339a3968`), with CI and Image
+workflows successful. Local focused contracts64passed (82.6MiB peak), Ruff and
+app-wide mypy passed (113.3MiB peak); all capped with no swap and25%CPU.
+After startup readiness, the reference test completed in10.518seconds,
+500frames/OFF transport receipt. The HD observer received24binary messages,
+8916147bytes, maximum gap1.048seconds, no error. All sources remained native and
+available in unchanged revisions345/75/72 throughout the attempt. Physical
+The owner subsequently confirmed **no sound**. The legacy comparison failed
+acoustically as well; no capability grant follows. Speaker volume remains at the
+explicitly tested100%.
+
+## Encoder reconfiguration after initial AMR setup
+
+The saved `df/a.smali`, method `P(MonitorDataResource)`, creates a fresh
+`LivePlayer`, calls `getIntercom()` and configures AMR8000/160/mono/16-bit/option0
+as part of player setup. This establishes an initial setting, not necessarily
+the encoder used after the camera's first encoding header arrives.
+
+In the same pinned ARM64 SDK, `LivePlayer::on_rcv_enc_hdr` at0x104da8 caches the
+received21-byte AudioFormat in player offsets0x99..0xad. If an intercom exists,
+0x104f24..0x104f50 calls its `config_audio_format` slot with a callback. GOT
+0x23fae8 resolves the callback vtable at0x237ed8; its callable entry0x237f18
+resolves0x109270. That function copies **all21bytes** of the cached received
+AudioFormat into the mutable intercom format. `Intercom::config_audio_format`
+at0xff16c delegates that callback to the audio input. Merely finding AMR in the
+earlier Java setup therefore does not establish final TX AMR. The actual app's
+timing and final physical output still need confirmation; do not replace one
+unverified unconditional codec assumption with another.
+
+The reviewed next comparison uses the exact AAC descriptor already validated by
+the live native ingress: codec4/option2/mono/16-bit/16000Hz/1024samples. The
+account-thread AV owner independently matches every audio descriptor field before
+allocating any sequence or sending microphone ON. Modern V1 microphone commands
+are unchanged. AAC carries full MPEG-4 ADTS and one1024-sample frame per64ms,
+matching the SDK's64ms burst threshold, rather than four AMR20ms frames.
+
+The finite input accepts at most160frames/64KiB and900bytes per frame; neither
+network callers nor profiles can supply arbitrary descriptors. The existing
+AAC encoder accepts canonical16kHz PCM without downsample/upsample, uses one
+FFmpeg thread and feeds small chunks while draining output, avoiding a pipe
+deadlock on an entire ten-second stdin write. Offline known-phrase check:
+320000PCM bytes ->158ADTS frames/28166bytes, maximum frame471bytes, padded
+duration10.112seconds;2.583seconds total,102.8MiB peak under128MiB/no-swap/25%CPU.
+This was an offline encoding check, not playback or camera I/O.
+
+The pinned `/native-talk-negotiated` diagnostic shares the same one-use guard,
+server pin, primary/direct-loopback checks and disabled-by-default flag as the
+other two comparisons. Production routing and capability proofs are unchanged.
+
+Cifragem cross-check: `iv_mtp_session_new` copies CALLING+0x78 into session+0x83c
+at0x20b4cc..0x20b4dc, initializes an8-byte-block/6-round RC5 context at0x20b584
+and installs that8-byte key at0x20b5d8. `iv_send_av_ringbuf` uses that context at
+0x211354..0x211384 on full8-byte blocks after the TLV header. This matches the
+current transmitter; no speculative key/cipher change was made.

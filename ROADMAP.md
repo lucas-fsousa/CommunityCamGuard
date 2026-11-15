@@ -78,6 +78,11 @@ logged zero correlated microphone replies. No shared audio proof is granted.
 The next explicit comparison uses the independently recovered legacy V1 header
 and type5 microphone controls on the same AV owner. It is pinned diagnostic work,
 not an automatic fallback, a family-wide grant, or a change to dashboard routing.
+The legacy V1 comparison also produced no sound, explicitly confirmed by owner.
+SDK reinspection then established that the received-header callback reconfigures
+the intercom encoder after the initial Java AMR setup. A pinned exact-descriptor
+AAC comparison is prepared (full MPEG-4 ADTS,1024samples/64ms, same AV owner);
+no production codec selection or audio proof changes before physical acceptance.
 
 ### Recovery-worker fairness — 2026-11-14
 

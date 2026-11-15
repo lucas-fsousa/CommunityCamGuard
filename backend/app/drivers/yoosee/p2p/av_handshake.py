@@ -15,6 +15,7 @@ from .av_receive import AvReceiveBatch, AvReceiver
 from .cooperative_talk import CooperativeTalk
 from .kcp_receive import ReceiveError
 from .media_policy import MediaPolicy, validate_media_policy
+from .negotiated_talk_input import NegotiatedAacTalkInput, matches_aac_talk
 from .talk_stream_input import TalkFrames
 
 
@@ -82,6 +83,8 @@ the same parser/decoder owner, but do not claim ready or present a live source y
         self.poll()
         if not self.ready or (self._talk is not None and not self._talk.done):
             raise ReceiveError("native talk requires an idle, active AV route")
+        if isinstance(frames, NegotiatedAacTalkInput) and not matches_aac_talk(self._receiver.encoding):
+            raise ValueError('native talk requires the matching negotiated AAC descriptor')
         candidate = CooperativeTalk(self._peer, self._link_id, self._cookie,
             frames, self._allocate, clock=self._clock, wall_us=wall_us)
         if self._talk is not None:

@@ -58,6 +58,22 @@ def test_legacy_review_is_explicit_and_consumes_the_same_one_use_guard(setup, mo
     assert client.post(PATH+'-legacy', content=PCM, headers={'content-type': 'audio/pcm'}).status_code == 409
 
 
+def test_negotiated_review_is_pinned_and_shares_the_single_use_guard(setup, monkeypatch):
+    client, _, _ = setup
+    calls = []
+
+    def send(camera_id, pcm, *, negotiated_aac=False):
+        calls.append((camera_id, pcm, negotiated_aac))
+        return dict(status='transport_received', acknowledged_frames=1, stop_acknowledged=True)
+
+    monkeypatch.setattr(api, '_send', send)
+    r = client.post(PATH+'-negotiated', content=PCM, headers={'content-type': 'audio/pcm'})
+    assert r.status_code == 200 and r.json()['speaker_verified'] is False
+    assert calls == [(CAMERA, PCM, True)]
+    assert post(client).status_code == 409
+    assert client.post(PATH+'-legacy', content=PCM, headers={'content-type': 'audio/pcm'}).status_code == 409
+
+
 def test_legacy_review_requires_enabled_pin_and_direct_authenticated_operator(setup):
     client, settings, calls = setup
     headers = {'content-type': 'audio/pcm'}

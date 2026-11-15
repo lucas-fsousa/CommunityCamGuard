@@ -5,24 +5,45 @@ import time
 from ...audio_format import MAX_PCM_BYTES, PCM_FRAME_BYTES, PCM_FRAME_MS, downsample_to_8khz
 from ...db.p2p import P2PEnrollment
 from ..contracts import AudioMessageResult, ControlNotReady, ControlOperationError
+from .p2p.aac_lc import AacLcAdtsEncoder
 from .p2p.amr_nb import encode_pcm16le
 from .p2p.legacy_talk_input import LegacyTalkInput
+from .p2p.negotiated_talk_input import NegotiatedAacTalkInput
 from .p2p.talk_inbox import TalkOutcome
+from .p2p.talk_stream_input import TalkFrames
 from .shared_control_reads import session_for
 
 
-def send_candidate(entry: P2PEnrollment, pcm: bytes, *, legacy: bool = False) -> TalkOutcome:
+def send_candidate(entry: P2PEnrollment, pcm: bytes, *, legacy: bool = False,
+                   negotiated_aac: bool = False) -> TalkOutcome:
     """Low-level submission; caller owns diagnostic permission or exact route proof."""
     if not isinstance(pcm, bytes) or not PCM_FRAME_BYTES <= len(pcm) <= MAX_PCM_BYTES or len(pcm) % PCM_FRAME_BYTES:
         raise ValueError("complete bounded canonical PCM frames required")
     session = session_for(entry)
     if session is None:
         raise ControlNotReady("shared native talk requires an existing media owner")
-    frames = encode_pcm16le(downsample_to_8khz(pcm))
+    if legacy and negotiated_aac:
+        raise ValueError('one reviewed talk variant required')
+    frames: TalkFrames
+    if negotiated_aac:
+        encoded: list[bytes] = []
+        encoder = AacLcAdtsEncoder(input_rate=16000)
+        try:
+            # Small feeds keep both pipes moving; never block on a whole 10s
+            # stdin write while FFmpeg is waiting for its stdout to be drained.
+            for offset in range(0, len(pcm), 2048):
+                encoded.extend(encoder.feed(pcm[offset:offset+2048]))
+            encoded.extend(encoder.feed(b'', final=True))
+        finally:
+            encoder.close()
+        frames = NegotiatedAacTalkInput(tuple(encoded))
+    else:
+        amr = encode_pcm16le(downsample_to_8khz(pcm))
+        frames = LegacyTalkInput(amr) if legacy else amr
     if session_for(entry) is not session:
         raise ControlNotReady("native owner changed before audio submission")
     try:
-        ticket = session.submit_talk(LegacyTalkInput(frames) if legacy else frames)
+        ticket = session.submit_talk(frames)
     except ValueError:
         raise ControlNotReady("native owner is not accepting this utterance") from None
     try:

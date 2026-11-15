@@ -21,13 +21,13 @@ router = APIRouter(prefix="/api/internal/diagnostics", include_in_schema=False)
 _guard = threading.Lock()
 
 
-def _send(camera_id: str, pcm: bytes, *, legacy: bool = False) -> dict:
+def _send(camera_id: str, pcm: bytes, *, legacy: bool = False, negotiated_aac: bool = False) -> dict:
     with _exclusive(camera_id):
         camera = registry.get_camera_by_id(camera_id)
         entry = p2p.get_enrollment_for_camera(camera_id)
         if camera is None or entry is None or for_camera(camera).key != "yoosee":
             raise ValueError("reviewed Yoosee target is unavailable")
-        return asdict(send_candidate(entry, pcm, legacy=legacy))
+        return asdict(send_candidate(entry, pcm, legacy=legacy, negotiated_aac=negotiated_aac))
 
 
 @router.post("/native-talk", dependencies=[Depends(require_local_operator), Depends(require_primary_session)])
@@ -41,7 +41,13 @@ async def native_talk_legacy(request: Request) -> dict:
     return await _review(request, legacy=True)
 
 
-async def _review(request: Request, *, legacy: bool) -> dict:
+@router.post("/native-talk-negotiated", dependencies=[Depends(require_local_operator), Depends(require_primary_session)])
+async def native_talk_negotiated(request: Request) -> dict:
+    """SDK received-format comparison; the AV owner checks the exact descriptor."""
+    return await _review(request, legacy=False, negotiated_aac=True)
+
+
+async def _review(request: Request, *, legacy: bool, negotiated_aac: bool = False) -> dict:
     settings = get_settings()
     if not settings.native_talk_diagnostic_enabled:
         raise HTTPException(404, "diagnostic is disabled")
@@ -56,8 +62,12 @@ async def _review(request: Request, *, legacy: bool) -> dict:
             raise HTTPException(409, "diagnostic already attempted in this server process")
         request.app.state.native_talk_diagnostic_used = True
     try:
-        result = (await asyncio.to_thread(_send, camera_id, pcm, legacy=True) if legacy
-                  else await asyncio.to_thread(_send, camera_id, pcm))
+        if negotiated_aac:
+            result = await asyncio.to_thread(_send, camera_id, pcm, negotiated_aac=True)
+        elif legacy:
+            result = await asyncio.to_thread(_send, camera_id, pcm, legacy=True)
+        else:
+            result = await asyncio.to_thread(_send, camera_id, pcm)
     except (ControlNotReady, ControlBusy, ValueError):
         raise HTTPException(409, "native talk review unavailable; attempt consumed") from None
     except (ControlOperationError, RuntimeError, OSError):

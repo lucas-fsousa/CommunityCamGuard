@@ -1,4 +1,4 @@
-"""Bounded AMR message or incremental utterance on the already active AV route.
+"""Bounded reviewed audio on the already active AV route.
 
 Pinned IoTVideo LivePlayer TX: HEADER_ENC(0x0500), builtin microphone 0x32,
 four mode-7 frames per burst (SDK threshold 64ms), microphone OFF. This is a
@@ -13,6 +13,7 @@ from .cooperative_talk_audio import TalkAudioWindow
 from .kcp_receive import ReceiveError
 from .legacy_talk_input import LegacyTalkInput
 from .microphone_reply import MicrophoneReply
+from .negotiated_talk_input import AAC_TALK_FORMAT, NegotiatedAacTalkInput
 from .reliable_kcp_send import ReliableKcpPush
 from .stream_protocol import (
     V1EncodingHeader,
@@ -30,7 +31,7 @@ log = logging.getLogger(__name__)
 
 
 class CooperativeTalk:
-    """Account-thread only, at most16KiB audio and eight in-flight audio PUSHes.
+    """Account-thread only, at most64KiB finite audio and eight in-flight PUSHes.
 
     No sleeps, receive loop, sockets, authentication, or AV START/CLOSE. Sequence
     allocation belongs to the parent handshake. Missing receipts invalidate that
@@ -45,7 +46,9 @@ class CooperativeTalk:
             raise ValueError("invalid talk cookie")
         validate_talk_frames(frames)
         self._legacy = isinstance(frames, LegacyTalkInput)
-        if isinstance(frames, LegacyTalkInput):
+        negotiated_aac = isinstance(frames, NegotiatedAacTalkInput)
+        self._format = AAC_TALK_FORMAT if negotiated_aac else TALK_FORMAT
+        if isinstance(frames, (LegacyTalkInput, NegotiatedAacTalkInput)):
             frames = frames.frames
         self._stream = frames if isinstance(frames, StreamingTalkInput) else None
         if self._stream is not None:
@@ -54,7 +57,9 @@ class CooperativeTalk:
         self._frames, self._allocate, self._clock, self._wall_us = frames, allocate, clock, wall_us
         self._deadline = clock() + 16
         self._request: ReliableKcpPush | None = None
-        self._audio = TalkAudioWindow(peer, link, cookie, frames, allocate, clock=clock, wall_us=wall_us)
+        self._audio = TalkAudioWindow(peer, link, cookie, frames, allocate, clock=clock, wall_us=wall_us,
+                                     frame_seconds=.064 if negotiated_aac else .02,
+                                     burst_frames=1 if negotiated_aac else 4)
         self._stage = "header"
         self._cancelled = False
         self.done = self.closed = False
@@ -116,7 +121,7 @@ class CooperativeTalk:
                 self._complete()
                 return
             header = (pack_legacy_capture_header() if self._legacy
-                      else pack_v1_audio_encoding_header(TALK_FORMAT))
+                      else pack_v1_audio_encoding_header(self._format))
             body = encrypt_media_tlv(header, self._cookie)
         elif self._stage == "start":
             if self._cancelled:

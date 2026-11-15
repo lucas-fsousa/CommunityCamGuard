@@ -73,6 +73,10 @@ class AvReceiver:
         return self._accepted
 
     @property
+    def encoding(self) -> V1EncodingHeader | None:
+        return self._encoding
+
+    @property
     def peer_started(self) -> bool:
         return self._started
 

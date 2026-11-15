@@ -61,10 +61,12 @@ def extract_adts_frames(buffer: bytearray, *, final: bool = False) -> tuple[byte
 class AacLcAdtsEncoder:
     """Keep one low-latency FFmpeg encoder alive for a push-to-talk utterance."""
 
-    def __init__(self, *, max_seconds: float = MAX_SECONDS) -> None:
+    def __init__(self, *, max_seconds: float = MAX_SECONDS, input_rate: int = INPUT_RATE) -> None:
         if not 0.1 <= max_seconds <= MAX_SECONDS:
             raise ValueError("AAC intercom limit must be between 0.1 and 10 seconds")
-        self._max_input_bytes = int(max_seconds * INPUT_RATE * 2)
+        if input_rate not in (8000, 16000):
+            raise ValueError('reviewed AAC PCM input rate required')
+        self._max_input_bytes = int(max_seconds * input_rate * 2)
         self._max_frames = math.ceil(max_seconds / AAC_FRAME_INTERVAL_SECONDS) + 3
         self._input_bytes = 0
         self._frame_count = 0
@@ -79,7 +81,7 @@ class AacLcAdtsEncoder:
             "-f",
             "s16le",
             "-ar",
-            str(INPUT_RATE),
+            str(input_rate),
             "-ac",
             "1",
             "-probesize",
@@ -98,6 +100,8 @@ class AacLcAdtsEncoder:
             "aac",
             "-profile:a",
             "aac_low",
+            "-threads",
+            "1",
             "-b:a",
             str(OUTPUT_BIT_RATE),
             "-flush_packets",
