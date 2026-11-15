@@ -103,6 +103,11 @@ class AccountReadLifecycle:
             if self._lease_inbox is not None and ticket.generation == self._generation:
                 self._lease_inbox.talk.cancel(ticket)
 
+    def abandon_talk(self, ticket: TalkTicket) -> None:
+        with self._lock:
+            if self._lease_inbox is not None and ticket.generation == self._generation:
+                self._lease_inbox.talk.abandon(ticket)
+
     def submit(self, device_id: int, path: str, timeout: float = 2.0) -> MailboxTicket:
         with self._lock:
             if self._state != "active" or self._worker is None:

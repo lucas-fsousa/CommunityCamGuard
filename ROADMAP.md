@@ -45,6 +45,9 @@ classifies talk-session/KCP-send timeouts for the existing verified-retirement
 video recovery path, without repeating audio or bypassing cleanup fences. Route
 failure now returns `unavailable`, not a false user cancellation. The review-only
 operator override is disabled for subsequent deployments.
+Abandoned PCM requests now release their queue slot only after owned cleanup,
+rather than leaking an unread cancellation result and blocking later requests.
+Neither software correction activates P2P voice in the dashboard.
 
 ### Recovery-worker fairness — 2026-11-14
 

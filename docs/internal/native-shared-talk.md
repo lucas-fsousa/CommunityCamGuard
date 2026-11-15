@@ -195,3 +195,16 @@ its existing result and cooperative microphone-OFF drain.
 The ignored operator compose override now disables the physical-review endpoint
 for subsequent deployments. Local recovery/worker/bridge regressions passed
 210tests under160MiB/no swap/25%CPU (86.5MiB peak); no camera command was used.
+
+Caller-lifetime follow-up: the PCM adapter previously called ordinary cancellation
+when its18second wait expired. Queued cancellation retains an unread result by
+design, but that departed caller would never collect it, leaving the exact-camera
+slot permanently busy. It now abandons the ticket: queued work is discarded before
+claim; claimed work stays reserved/cancelled until the owner drains cleanup, then
+the result/slot is removed. Explicit cancellation still retains its inspectable
+result. Stale generation/serial abandonment cannot affect replacement work. No
+extra session, retry or microphone command is introduced by this API.
+
+36focused bridge/lifecycle/adapter regressions passed under160MiB/no swap/25%CPU
+(72.4MiB peak), including a simulated expired PCM request that can submit again
+after cleanup. Runtime rollout/disabled-diagnostic checks follow separately.

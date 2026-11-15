@@ -49,6 +49,9 @@ class SharedDeviceControls:
     def cancel_talk(self, ticket: TalkTicket) -> None:
         self._lifecycle.cancel_talk(ticket)
 
+    def abandon_talk(self, ticket: TalkTicket) -> None:
+        self._lifecycle.abandon_talk(ticket)
+
     def submit(self, path: str) -> MailboxTicket:
         """Only the fixed identity/state read scope; no caller device ID or write."""
         return self._lifecycle.submit(int(self._device_id), path)

@@ -35,4 +35,4 @@ def send_candidate(entry: P2PEnrollment, pcm: bytes) -> TalkOutcome:
             time.sleep(.01)
         raise ControlOperationError("native talk timed out; not repeated")
     finally:
-        session.cancel_talk(ticket)
+        session.abandon_talk(ticket)

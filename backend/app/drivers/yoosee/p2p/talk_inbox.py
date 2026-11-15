@@ -25,6 +25,7 @@ class _Utterance:
     frames: tuple[bytes, ...] = field(repr=False)
     claimed: bool = False
     cancelled: bool = False
+    abandoned: bool = False
     result: TalkOutcome | None = None
 
 
@@ -80,12 +81,31 @@ class TalkInbox:
             item = self._items.get(ticket)
             return self._closed or item is None or item.cancelled
 
+    def abandon(self, ticket: TalkTicket) -> None:
+        """Caller exited: discard queued work, or retain its slot until owner cleanup.
+
+        A claimed utterance must still drain microphone OFF. Removing that slot
+        early would allow another utterance to overlap it on the same camera.
+        """
+        with self._lock:
+            item = self._items.get(ticket)
+            if item is None:
+                return
+            item.frames = ()
+            if not item.claimed or item.result is not None:
+                del self._items[ticket]
+            else:
+                item.cancelled = item.abandoned = True
+
     def finish(self, ticket: TalkTicket, result: TalkOutcome) -> None:
         with self._lock:
             item = self._items.get(ticket)
             if item is not None and item.claimed and item.result is None:
                 item.frames = ()
-                item.result = result
+                if item.abandoned:
+                    del self._items[ticket]
+                else:
+                    item.result = result
 
     def take(self, ticket: TalkTicket) -> TalkOutcome | None:
         with self._lock:
