@@ -48,6 +48,9 @@ operator override is disabled for subsequent deployments.
 Abandoned PCM requests now release their queue slot only after owned cleanup,
 rather than leaking an unread cancellation result and blocking later requests.
 Neither software correction activates P2P voice in the dashboard.
+Delivered `66155b2`/`2aae3fb`, CI/Image green, normal image `2e6889c0b4ef`:
+physical diagnostic disabled/404, native sources327/57/54, all online/recording,
+camera3 read-only30s HD delivery passed; no physical command or fault injection.
 
 ### Recovery-worker fairness — 2026-11-14
 

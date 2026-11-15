@@ -208,3 +208,17 @@ extra session, retry or microphone command is introduced by this API.
 36focused bridge/lifecycle/adapter regressions passed under160MiB/no swap/25%CPU
 (72.4MiB peak), including a simulated expired PCM request that can submit again
 after cleanup. Runtime rollout/disabled-diagnostic checks follow separately.
+
+Software-only rollout completed: commits `66155b2` and `2aae3fb`, both CI/Image
+green; image `2e6889c0b4ef`, promoted to the normal `latest` tag and started through
+the base compose file (no physical-review environment override). The running
+configuration explicitly reports diagnostic=false; a primary-authenticated empty
+local diagnostic request returned404 before any audio parsing/submission.
+
+Read-only post-deploy camera3 HD observation:30seconds,32 binary WebSocket
+messages/11303163bytes, max measured gap1.061seconds, no observer error. Final
+sources native/active327/57/54; all three online/recording before and after the
+observation. App352.2MiB/1GiB,81.44% of one CPU core; hub6.25MiB/0%; OOM=false,
+restart count0. This checks ordinary delivery, not live talk-fault recovery or
+acoustic acceptance. No sound/light/PTZ command, camera configuration change,
+new audio proof or dashboard transport selection was performed.
