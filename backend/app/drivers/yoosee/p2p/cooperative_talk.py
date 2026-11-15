@@ -1,6 +1,6 @@
 """Bounded reviewed audio on the already active AV route.
 
-Pinned IoTVideo LivePlayer TX: HEADER_ENC(0x0500), builtin microphone 0x32,
+Pinned IoTVideo LivePlayer TX: HEADER_ONLY(0x0102), builtin microphone 0x32,
 four mode-7 frames per burst (SDK threshold 64ms), microphone OFF. This is a
 transport candidate, not a claim of speaker compatibility or acoustic success.
 """

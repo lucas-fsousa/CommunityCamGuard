@@ -210,9 +210,14 @@ def test_modern_audio_header_is_sent_by_live_player_start_callback() -> None:
         )
     )
     assert pack_v1_audio_encoding_header(camera_header) == bytes.fromhex(
-        "ff ff ff 88 00 05 00 00 00 01 00 02 00 00 80 3e "
-        "00 00 00 04 01 10 04 02 00 00 00 00"
+        "ff ff ff 88 02 01 00 00 04 02 00 01 80 3e 00 00 "
+        "00 04 00 00 00 00 00 00 00 00 00 00"
     )
+    compact = unpack_v1_encoding_header(pack_v1_audio_encoding_header(camera_header))
+    assert compact.marker == 0x0102
+    assert (compact.audio_codec, compact.audio_codec_option, compact.audio_channels,
+            compact.audio_bit_width, compact.audio_sample_rate, compact.audio_frame_size) == (4, 2, 1, 16, 16000, 1024)
+    assert (compact.video_codec, compact.video_frame_rate, compact.video_width, compact.video_height) == (0, 0, 0, 0)
 
 
 def test_compact_v1_command_notifications_can_be_concatenated() -> None:

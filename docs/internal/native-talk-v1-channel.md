@@ -1,5 +1,10 @@
 # V1 microphone channel correction — 2026-11-15
 
+**Latest correction: LivePlayer's outgoing header is DataType2/HEADER_ONLY,
+marker0x0102, not DataType6/HEADER_ENC0x0500.** The historical header conclusions
+below were based on the wrong packer. The dispatcher evidence and correction
+at the end of this document supersede them; physical success is still not implied.
+
 Physical retest on the prior build again produced silence:500/500 audio frames
 and OFF transport receipt in10.680seconds, but owner explicitly confirmed no
 speaker sound. Concurrent HD delivered23binary messages/8399766bytes, max gap
@@ -207,3 +212,45 @@ normal driver routing. A selective ACK is not a guarantee that prior sequence
 gaps have been filled and the byte stream has reached the application. No raw
 packets, audio, endpoint, key or timestamp are logged. A short silent PCM sample
 can measure this distinction without another acoustic acceptance request.
+
+Silent100ms transport check on `7bf34d8`, image `5c862ce67a87`, after successful
+CI/Image:5AMR frames/OFF receipt. Cumulative progress was header sn1/UNA2,
+microphone ON sn2/UNA3, first audio sn3/UNA4, OFF sn5/UNA6. Thus there was no
+outgoing KCP sequence gap in this attempt; no speculative sequence reset,
+retransmission or audio fallback was introduced. No acoustic claim follows from
+this silent sample.
+
+## Corrected HEADER_ONLY dispatch — decisive serializer discrepancy
+
+`LivePlayer::send_av_enc_info` explicitly writes DataType2 into `send_data_args`
+at0x1058c4..0x1058cc. `Connection::Impl::__send_data` copies that type and the
+descriptor vector into `Unpacked` without converting it (0xfd194..0xfd1fc).
+`trans_proto_v1::packing_data` (0x145f60) selects a function from its seven-entry
+table at0x23acd8. The actual dynamic relocations establish:
+
+| DataType | Table function slot | Resolved packer |
+| --- | --- | --- |
+| 0 / 1 | 0x23ace0 / 0x23acf0 | `packing_avdata`,0x1462c4 |
+| **2** | **0x23ad00** | **`packing_header_only`,0x146758** |
+| 3 | 0x23ad10 | `packing_user_data`,0x14689c |
+| 4 | 0x23ad20 | `packing_sequence_user_data`,0x1469d4 |
+| 5 | 0x23ad30 | `packing_file_data`,0x146b5c |
+| **6** | **0x23ad40** | **`packing_header_enc`,0x146ce4** |
+
+The prior serializer reconstructed the last row because of its name, without
+checking which row LivePlayer actually selects. Its passing tests repeated that
+assumption and never established speaker compatibility.
+
+`packing_header_only` initializes marker0x0102 at0x146788..0x146798, walks the
+stream descriptors and converts their audio fields at0x1467d4..0x1467f8, then
+emits the compact28-byte header at0x146834..0x146870. It does **not** copy a stream
+count plus descriptor behind0x0500. The corrected serializer emits codec/option
+at offsets8/9, channel-minus-one/bit-width-divided-by-eight-minus-one at10/11,
+sample rate u32 at12, frame samples u16 at16, and zero video fields. This matches
+the SDK-selected packer, irrespective of choosing AMR or negotiated AAC.
+
+This is a concrete output-byte correction shared by modern finite/incremental
+transmitters. It changes neither KCP sequence allocation, cipher, microphone
+opcode, volume nor production route grants. Updated independent compact-header
+goldens and parser round-trip assertions reject the old0x0500 output. A fresh
+physical comparison with this corrected header remains necessary.

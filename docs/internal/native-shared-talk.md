@@ -22,7 +22,10 @@ The previously inspected IoTVideo `LivePlayer` path configures outgoing AMR-NB
 codec5/option0, mono/16bit/8000Hz,160 samples and mode7 (32-byte frames, TOC0x3c).
 It does not copy the incoming AAC descriptor. The recovered v1 serializer sends:
 
-1. Audio-only `HEADER_ENC`, marker0x0500, on the base KCP conversation.
+1. Audio-only `HEADER_ONLY`, marker0x0102, on the base KCP conversation.
+   SDK DataType2 dispatches to `packing_header_only`; the old0x0500 descriptor
+   serialization used the unrelated DataType6 packer. See the dispatch-table
+   correction in `native-talk-v1-channel.md`; earlier tests preserved that error.
 2. Encrypted sequenced builtin0x32 with payload1 on the base AV conversation.
 3. V1 audio records with epoch-microsecond PTS and four20ms frames per burst
    (native threshold64000us), followed by any one-to-three-frame tail.

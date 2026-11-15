@@ -39,7 +39,7 @@ def test_message_shares_sequences_and_reader_without_starting_or_closing_video()
     _, encoding = sent(s)
     assert (encoding.conv, encoding.sequence) == (42, 1)
     assert decrypt_media_tlv(encoding.body, COOKIE).hex() == (
-        "ffffff8800050000000100020000401f0000a0000110050000000000")
+        "ffffff880201000005000001401f0000a00000000000000000000000")
     _, start = sent(s)
     assert (start.conv, start.sequence) == (42, 2)
     assert start.body[:2] == b"\x04\x02"

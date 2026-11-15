@@ -87,6 +87,12 @@ The exact-descriptor AAC reference also produced no sound, confirmed by owner;
 do not describe the format correction as acoustic success. Next narrow check:
 peer cumulative KCP receive progress, using short silent input, not another
 unmodified voice replay or any automatic fallback.
+Silent KCP check proved cumulative progress through OFF (sn5/UNA6), so no sequence
+reset/replay was introduced. Further SDK dispatch inspection then found a concrete
+serializer error: LivePlayer emits DataType2, mapped by the relocation table to
+`packing_header_only`/0x0102, not the DataType6 `packing_header_enc`/0x0500 that
+our transmitter used. Corrected modern header serialization; acoustic retest is
+still required. See exact table addresses in `native-talk-v1-channel.md`.
 
 ### Recovery-worker fairness — 2026-11-14
 

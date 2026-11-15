@@ -169,12 +169,11 @@ def pack_microphone_command(enabled: bool, *, timestamp_us: int | None = None) -
 
 
 def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
-    """Build the audio-only HEADER_ENC record sent by ``send_av_enc_info(2)``.
+    """Build LivePlayer's DataType2 HEADER_ONLY through the V1 dispatch table.
 
-    ``LivePlayer`` first serializes a two-byte stream count followed by one
-    20-byte audio descriptor. ``trans_proto_v1::packing_header_enc`` then
-    copies the first 20 payload bytes behind marker ``0x0500``. This is not the
-    camera-originated ``0x01xx`` encoding-header layout parsed below.
+    The SDK first builds stream descriptors, but packing_data maps DataType2 to
+    packing_header_only (0x146758), not packing_header_enc (DataType6/0x0500).
+    That conversion emits a compact0x0102 header, not the descriptor bytes.
     """
 
     if header.audio_channels not in (1, 2):
@@ -186,22 +185,12 @@ def pack_v1_audio_encoding_header(header: V1EncodingHeader) -> bytes:
     if not 1 <= header.audio_frame_size <= 0xFFFF:
         raise ValueError("intercom frame size must fit in the native u16 field")
 
-    descriptor = bytearray(20)
-    # ARM64 0x105648..0x105688 builds this descriptor directly. It is not the
-    # same layout as the camera-originated 0x01xx header parsed below.
-    descriptor[1] = 2  # audio stream
-    struct.pack_into("<I", descriptor, 4, header.audio_sample_rate)
-    struct.pack_into("<H", descriptor, 8, header.audio_frame_size)
-    descriptor[10] = header.audio_channels
-    descriptor[11] = header.audio_bit_width
-    descriptor[12] = header.audio_codec & 0xFF
-    descriptor[13] = header.audio_codec_option & 0xFF
-
     frame = bytearray(28)
     frame[:4] = V1_MAGIC
-    struct.pack_into("<H", frame, 4, 0x0500)
-    serialized = bytes((0, 1)) + bytes(descriptor)
-    frame[8:] = serialized[:20]
+    struct.pack_into("<H", frame, 4, 0x0102)
+    frame[8:12] = bytes((header.audio_codec & 0xFF, header.audio_codec_option & 0xFF,
+                        header.audio_channels - 1, header.audio_bit_width // 8 - 1))
+    struct.pack_into("<IH", frame, 12, header.audio_sample_rate, header.audio_frame_size)
     return bytes(frame)
 
 
