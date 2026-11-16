@@ -54,3 +54,31 @@ bug that prevented recovering from it.
 
 No sound, light, movement, camera reboot or real fault injection was performed.
 Deployment and real-stream observation are recorded separately after completion.
+
+## Deployment and observed result
+
+Deployed `c3b93fa`, local image `6cb7c7870e08`, after CI43797467440 and
+Image43797467456 succeeded. Only the application container was replaced; no
+camera reboot/reset, database unblock or recording deletion. The server-side
+native talk diagnostic flag is now false.
+
+All sources returned native/active and available: test camera revision357,
+garage86, yard84. A simultaneous120-second HD WebSocket observation of garage
+and yard received123/243binary messages and70843830/75209773bytes respectively;
+maximum gaps1.254/0.817seconds, no disconnect/errors. Every15-second status
+sample showed all three online/recording, with no revision change or availability
+violation. This checks delivery and recording activity, not physical image quality
+or a claim that future network/decoder stalls are impossible.
+
+Read-only current/previous-hour archive checks confirmed actual file growth:
+garage9699328 ->18874368bytes, yard7602176 ->14942208bytes; both latest file
+modification ages remained under two seconds at the final check. No footage was
+read in full, transcoded, moved or deleted.
+
+An additional bounded before/after synthetic check loaded the previous committed
+lease implementation: it raised `P2PProbeError` at simulated6seconds and left
+the lease undetached. The corrected implementation collected the delayed clean
+outcome at8seconds after requesting owner retirement, without camera I/O. Measured
+peak70.2MiB under128MiB/no-swap/25%CPU. Actual physical account-close ordering is
+covered independently by the account-worker regression, not faked by this timer
+comparison. No real failure was injected into the live cameras for acceptance.

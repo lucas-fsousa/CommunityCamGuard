@@ -14,7 +14,13 @@ blocking. The correction escalates an overdue cancelled exact lease to the
 existing sole-reader account retirement path, waits boundedly for actual socket/
 channel cleanup, then reaches normal recovery/backoff. No optimistic unblock,
 second concurrent account or fabricated restart checkpoint. Synthetic integrated
-regression and86focused checks pass; real deployment/observation pending.
+regression and86focused checks pass. Deployed `c3b93fa`/`6cb7c7870e08` with
+CI/Image green; all three native/active, online and recording. Both affected HD
+streams passed simultaneous120s observation with no disconnect, unavailable
+sample or generation change, and their archive files grew again. Old/new bounded
+synthetic comparison confirmed failure at6s versus collected clean result at8s.
+Audio diagnostics remain off; initial decoder-stall causes remain distinct from
+this corrected permanent recovery dead end and have richer sanitized logging.
 Details: docs/internal/native-retirement-overdue.md.
 
 ### Native delivery deadline — owner request, 2026-11-14
