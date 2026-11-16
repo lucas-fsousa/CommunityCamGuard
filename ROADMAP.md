@@ -4,6 +4,19 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Priority incident — garage/yard unavailable, 2026-11-16
+
+Two sources were native/blocked and not recording after local decoder timeouts;
+camera3 stayed available, container OOM=false/restarts=0. Audio work is suspended.
+Found a recovery dead end: leased source abandoned its terminal outcome after5s
+while the account reader still owned cleanup, causing permanent registry/policy
+blocking. The correction escalates an overdue cancelled exact lease to the
+existing sole-reader account retirement path, waits boundedly for actual socket/
+channel cleanup, then reaches normal recovery/backoff. No optimistic unblock,
+second concurrent account or fabricated restart checkpoint. Synthetic integrated
+regression and86focused checks pass; real deployment/observation pending.
+Details: docs/internal/native-retirement-overdue.md.
+
 ### Native delivery deadline — owner request, 2026-11-14
 
 Owner authorized gradual native migration and set end of next week as the delivery

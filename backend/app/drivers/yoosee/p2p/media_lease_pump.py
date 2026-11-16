@@ -55,6 +55,10 @@ class MediaLeasePump:
 
     def poll(self, prepare: Callable[[MediaRouteSpec], MediaRouteJob], *,
              defer_stop_device: int | None = None) -> None:
+        if self.inbox.account_retirement_requested:
+            # Existing worker finally owns motor cleanup, every media channel,
+            # broker release and physical socket close before lease completion.
+            raise MediaAccountRetirement
         self._talk.poll(self._talk_channel)
         for ticket, channel in tuple(self._active.items()):
             if channel.bootstrap.spec.device.device_id == defer_stop_device:

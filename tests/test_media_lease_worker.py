@@ -101,6 +101,34 @@ def test_idle_account_accepts_a_later_source_without_another_login(monkeypatch):
     assert sock.opens == sock.closes == sock.closed == 1
 
 
+def test_overdue_lease_requests_owner_cleanup_before_any_terminal_receipt(monkeypatch):
+    sock, inbox, pumps, owner = setup(monkeypatch)
+    first = inbox.submit(camera(0), bootstrap(0))
+    second = inbox.submit(camera(1), bootstrap(1))
+    receive, close = sock.recvfrom, sock.close
+    requested = []
+
+    def poll(size):
+        if sock.now >= .02 and not requested:
+            inbox.cancel(first)
+            assert inbox.request_account_retirement(first)
+            requested.append(True)
+        return receive(size)
+
+    def physical_close():
+        # No successful detach receipt may precede actual socket retirement.
+        assert inbox.take(first) is None and inbox.take(second) is None
+        close()
+
+    monkeypatch.setattr(sock, 'recvfrom', poll)
+    monkeypatch.setattr(sock, 'close', physical_close)
+    result = execute(sock, inbox, owner)
+    assert requested and result.reason == 'transport' and sock.closed == 1
+    assert not result.lease_cleanup_uncertain
+    assert all(p.closed == 1 for p in pumps)
+    assert inbox.take(first).status == inbox.take(second).status == 'closed'
+
+
 def test_cancel_before_claim_never_opens_camera_route(monkeypatch):
     sock, inbox, pumps, owner = setup(monkeypatch)
     ticket = inbox.submit(camera(0), bootstrap(0))

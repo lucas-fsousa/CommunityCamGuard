@@ -69,9 +69,28 @@ class MediaLeaseInbox:
         self._targets = targets
         self._lock = threading.Lock()
         self._closed = False
+        self._retirement_requested = False
         self._serial = 0
         self._leases: dict[MediaLeaseTicket, _Lease] = {}
         self.talk = TalkInbox(generation, capacity)
+
+    def request_account_retirement(self, ticket: MediaLeaseTicket) -> bool:
+        """Escalate only a cancelled, still-owned lease to its sole reader.
+
+        A caller timeout is not a cleanup receipt. The owner must close real
+        transports/socket and publish terminal outcomes before sources retry.
+        """
+        with self._lock:
+            lease = self._leases.get(ticket)
+            if lease is None or not lease.claimed or not lease.cancelled or lease.result is not None:
+                return False
+            self._retirement_requested = True
+            return True
+
+    @property
+    def account_retirement_requested(self) -> bool:
+        with self._lock:
+            return self._retirement_requested
 
     def submit_talk(self, camera_id: str, frames: TalkFrames) -> TalkTicket:
         """Bind to an already claimed exact-camera lease, never its replacement."""

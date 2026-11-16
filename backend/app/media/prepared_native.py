@@ -140,6 +140,7 @@ class PreparedNative:
                                     'session_worker', 'session_protocol_site', 'session_broker_socket_closed',
                                     'session_broker_release', 'session_tcp_receipt', 'session_tcp_socket_closed',
                                     'session_udp_detached', 'session_udp_receipt',
+                                    'session_lease_detached', 'decoder_failure', 'decoder_returncode',
                                     'session_motion_started', 'session_motion_cleanup_confirmed',
                                     'consumer_error', 'consumer_site', 'consumer_alive', 'cleanup_failed',
                                     'consumer_mp4_size', 'consumer_mp4_box',

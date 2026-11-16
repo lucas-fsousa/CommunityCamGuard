@@ -1,5 +1,6 @@
 """Per-camera video/control binding to an existing account; never logs in."""
 
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -22,6 +23,8 @@ from .p2p.ptz_authority import PtzAuthority, PtzGrant
 from .p2p.video_delivery import VideoDelivery
 from .shared_device_controls import SharedDeviceControls
 from .shared_read_session import SharedReadResult
+
+log = logging.getLogger(__name__)
 
 
 class LeasedReadSession(SharedDeviceControls):
@@ -128,6 +131,7 @@ class LeasedReadSession(SharedDeviceControls):
         deadline: float | None = None
         reason = ""
         failure: BaseException | None = None
+        retirement_requested = False
         next_check = self._clock() + 1
         while True:
             outcome = self._inbox.take(ticket)
@@ -159,5 +163,15 @@ class LeasedReadSession(SharedDeviceControls):
                     self._inbox.cancel(ticket)
                     deadline = self._clock() + 5
             if deadline is not None and self._clock() >= deadline:
-                raise P2PProbeError("native media lease cleanup deadline exceeded")
+                if retirement_requested:
+                    raise P2PProbeError("native media lease cleanup deadline exceeded")
+                # Do not abandon a pending result and permanently block this
+                # source while the reader still owns its transport. Escalate to
+                # the existing account retirement path and await its actual
+                # completion. Unknown/failed cleanup still fails closed.
+                requested = self._inbox.request_account_retirement(ticket)
+                log.warning('native lease retirement overdue camera_id=%s owner_retirement_requested=%s',
+                            self._camera_id, requested)
+                retirement_requested = True
+                deadline = self._clock() + 10
             self._wait(0.01)

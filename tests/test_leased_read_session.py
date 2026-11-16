@@ -88,10 +88,52 @@ def test_no_cleanup_receipt_means_no_success_and_no_slot_reuse():
     delivery = VideoDelivery()
     with pytest.raises(P2PProbeError, match="deadline"):
         source.run(video_delivery=delivery, cancelled=lambda: now[0] >= 1)
-    assert now[0] == 6 and owner.active and delivery.closed
+    assert now[0] == 16 and owner.active and delivery.closed
+    assert inbox.account_retirement_requested
     assert not source.diagnostics()["session_lease_detached"]
     with pytest.raises(ValueError, match="duplicate"):
         inbox.submit(camera(0), bootstrap(0))
+
+
+def test_overdue_cancel_waits_for_owner_account_retirement_instead_of_abandoning_result():
+    from backend.app.drivers.yoosee.p2p.cooperative_udp_media import UdpMediaResult
+
+    source, owner, inbox, now = setup()
+    claimed = []
+
+    def wait(_seconds):
+        now[0] += 1
+        if not claimed:
+            claimed.append(inbox.claim()[0])
+        if now[0] == 7:
+            assert inbox.account_retirement_requested
+            assert not source.diagnostics()['session_lease_detached']
+        if now[0] == 8:
+            owner.active = False  # Sole reader has closed its real account socket.
+            inbox.finish(claimed[0], MediaChannelSummary(100,
+                MediaRouteResult(True, True, False), None, 'protocol',
+                udp=UdpMediaResult(True, False, True, 1, 1, 1)), account_retired=True)
+
+    source._wait = wait
+    result = source.run(video_delivery=VideoDelivery(), cancelled=lambda: now[0] >= 1)
+    assert result.reason == 'account_ended' and now[0] == 8
+    assert source.diagnostics()['session_lease_detached'] is True
+    assert source.diagnostics()['session_broker_socket_closed'] is True
+    assert inbox.take(claimed[0]) is None
+
+
+def test_only_a_cancelled_claimed_exact_ticket_can_request_account_retirement():
+    from backend.app.drivers.yoosee.p2p.media_lease_inbox import MediaLeaseTicket
+
+    _, _, inbox, _ = setup()
+    ticket = inbox.submit(camera(0), bootstrap(0))
+    assert not inbox.request_account_retirement(ticket)
+    inbox.claim()
+    assert not inbox.request_account_retirement(ticket)
+    assert not inbox.request_account_retirement(MediaLeaseTicket(2, ticket.serial))
+    inbox.cancel(ticket)
+    assert inbox.request_account_retirement(ticket)
+    assert inbox.account_retirement_requested
 
 
 def test_changed_enrollment_never_submits_or_authenticates():
