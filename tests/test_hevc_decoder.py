@@ -95,6 +95,28 @@ def test_input_and_incremental_progress(decoder):
     assert calls == ["terminate", "wait"]
 
 
+def test_output_progress_prevents_false_input_timeout_but_logs_do_not(decoder):
+    value, process, now, _read, write, calls = decoder
+    assert value.offer(b'x' * (128 * 1024))
+    for _ in range(64):
+        value.step()  # Fill the input pipe without reading it.
+    assert value.pending_bytes
+    now[0] = 1.5
+    os.write(write, b'frame=1\nprogress=continue\n')
+    value.step()
+    assert value.pending_bytes and not calls
+    if process.output is not None:
+        now[0] = 3
+        os.write(process.media_write, box(b'ftyp', b'header'))
+        value.step()  # Actual MP4 bytes, even before the next progress report.
+        assert not calls
+    now[0] += 1
+    os.write(write, b'progress=continue\n')  # A repeated/log-only report is not progress.
+    with pytest.raises(TimeoutError, match='decoder input stalled'):
+        value.step()
+    assert calls == ['terminate', 'wait']
+
+
 def test_archive_closes_input_before_bounded_flush_and_keeps_termination_fallback(decoder, monkeypatch):
     value, _process, _now, _read, _write, calls = decoder
     value._archive = True

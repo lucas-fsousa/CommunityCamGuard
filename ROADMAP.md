@@ -4,6 +4,19 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Physical retest blocked by local stream recovery — 2026-11-23
+
+- Native AAC after the V1 INIT barrier removal still stopped before audio:
+  `unavailable`, zero frames, no OFF receipt; not acoustically validated.
+- AMR comparison did not POST because the HD socket closed before first media.
+  Garage `stdin_timeout` preceded sibling account recovery; volume GETs were
+  intermittent. Do not record speaker acceptance for these attempts.
+- Reproduced and corrected the full-duplex watchdog defect: actual MP4 output
+  or an increasing decoded frame counter prevents a false stdin-only timeout.
+  Genuine no-progress and five-second frame deadlines remain.94focused tests,
+  Ruff and mypy passed; deploy/observe before retrying physical speech.
+- Evidence and exact limits: `docs/internal/native-talk-v1-channel.md`.
+
 ### Native voice physical retest — 2026-11-23
 
 Owner reauthorized physical tests. Camera3 preflight confirmed100% volume and

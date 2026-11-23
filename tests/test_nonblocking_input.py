@@ -180,3 +180,26 @@ def test_failed_initialization_releases_owned_descriptor():
             os.fstat(write)
     finally:
         os.close(read)
+
+
+def test_real_output_progress_keeps_full_duplex_input_alive_but_not_forever(pipe):
+    read, writer, now = pipe
+    payload = b'x' * (128 * 1024)
+    writer.offer(payload)
+    while writer.pump():
+        pass  # FFmpeg's input pipe is full while its output still needs draining.
+    for instant in (1.5, 3.0, 4.5):
+        now[0] = instant
+        assert writer.pump(output_progress=True) == 0 and not writer.closed
+    received = bytearray(os.read(read, 65536))
+    while writer.pending_bytes:
+        assert writer.pump() > 0
+        received.extend(os.read(read, 65536))
+    assert received == payload
+    writer.offer(payload)
+    while writer.pump():
+        pass
+    now[0] = 5.5  # Neither input nor output now progresses: still fail closed.
+    with pytest.raises(TimeoutError, match='decoder input stalled'):
+        writer.pump()
+    assert writer.closed

@@ -112,12 +112,14 @@ class HevcDecoder:
                     category=self._failure_category if category == 'unknown' else category)
             assert self._process.stdout is not None and self._input is not None
             assert self._progress is not None
+            output_progress = False
             if self._output is not None:
                 try:
                     media = os.read(self._process.stdout.fileno(), 16384)
                 except (BlockingIOError, InterruptedError):
                     media = b""
                 self._output.feed(media)
+                output_progress = bool(media)
             try:
                 chunk = os.read(self._progress.fileno(), 4096)
             except (BlockingIOError, InterruptedError):
@@ -141,9 +143,10 @@ class HevcDecoder:
                     if frames > self.frames:
                         self.frames = frames
                         self._deadline = now + 5
+                        output_progress = True
             if now >= self._deadline:
                 raise TimeoutError("continuous decoder made no frame progress")
-            self._input.pump()
+            self._input.pump(output_progress=output_progress)
         except Exception:
             self.close()
             raise

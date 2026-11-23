@@ -257,6 +257,48 @@ physical comparison with this corrected header remains necessary.
 
 ## Renewed authorization and pre-audio transport failure — 2026-11-23
 
+### Deployed comparison on15437ba
+
+The independent-base-channel change passed Ruff, mypy (444source files),98focused
+tests and remote CI45200912168/Image45200912169. Image `1c1aedcac3a8` was deployed
+app-only. Verified speaker volume was100% and the HD observer was receiving real
+binary fragments before the ten-second negotiated-AAC request.
+
+The request returned `unavailable` in6.969seconds with **zero audio frames** and
+no OFF receipt. The log again reported `kcp_send_timeout`, without a header
+receipt. Removing the obsolete INIT drain is therefore **not a demonstrated fix
+for this timeout or for acoustic output**. HD delivered16fragments/3575063bytes,
+maximum gap1.922seconds, no observer error. All sources remained available at
+the final snapshot (revisions381/110/108), not proof of long-term stability.
+No sound confirmation was requested for this pre-audio transport failure.
+
+The following AMR comparison never reached its diagnostic POST: the HD socket
+closed before its first fragment. No AMR audio was transmitted. Read-only volume
+GETs also alternated502/409/200. Event facts showed garage `consumer_failed`,
+`decoder_failure=stdin_timeout`, followed by sibling `account_ended` and `busy`
+recoveries. This is an invalid acoustic baseline, not another silent completed
+utterance. A30-second camera3 packet-header-only observation retained no payloads
+or addresses; a baseSN1/UNA2 receipt during retirement cannot be counted as talk.
+
+### Local full-duplex watchdog correction
+
+Code inspection reproduced a false timeout with real OS pipes: pending stdin can
+remain full while FFmpeg is still producing MP4 or advancing encoded frames.
+`HevcDecoder` drains stdout before pumping stdin, but the latter previously
+ignored that output progress and could expire its independent one-second timer.
+The writer now renews that timer only when its owner actually reads media bytes
+or sees an increased frame counter. Mere stderr/log/repeated-progress reports
+do not renew it. The separate five-second frame-progress watchdog remains;
+an input/output stall still terminates the child. No timeout increase, camera
+configuration change, extra process or queue was introduced.
+
+Real-pipe regression tests exercise a blocked input with ongoing output, exact
+remaining-byte delivery, and subsequent genuine stall. Decoder tests prove that
+media bytes/frame increases count but log-only reports do not.94focused tests,
+Ruff and mypy passed. Deployment observation is required: this fixes a reproduced
+watchdog defect, not yet proof that it explains every observed FFmpeg stall or
+the microphone header timeout.
+
 Physical tests were authorized again, still restricted operationally to camera3.
 Initial read-only checks found all sources repeatedly recovering; persistent
 events showed `stdin_timeout`/account-ended retries predating this audio attempt.

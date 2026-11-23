@@ -66,13 +66,21 @@ class NonblockingInput:
             self.close()
             raise
 
-    def pump(self) -> int:
+    def pump(self, *, output_progress: bool = False) -> int:
+        """Drain input; real child output also proves a full-duplex pipe is live.
+
+        FFmpeg can fill stdout while temporarily not consuming stdin. The caller
+        must drain that output before pumping input; a full input pipe at that
+        point is backpressure, not a dead child. Log bytes alone are not progress.
+        """
         if self._fd is None:
             raise ValueError("decoder input closed")
         try:
             now = self._now()
             if self._pending is None:
                 return 0
+            if output_progress:
+                self._deadline = now + self._timeout
             try:
                 count = os.write(self._fd, self._pending[:WRITE_SLICE])
             except (BlockingIOError, InterruptedError):
