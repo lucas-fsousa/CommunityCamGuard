@@ -246,6 +246,12 @@ should use `--no-ws-per-message-deflate` together with `--no-proxy-headers`.
   then `wsl --shutdown` and reopen (fully reversible). Outbound setups like `cloudflared` tunnels and
   `nginx` via `localhost` keep working; only setups hard-coding the old `172.x` WSL IP need care.
 
+  To keep footage on another Windows disk, set `RECORDINGS_HOST_DIR=/mnt/d/Cameras/Gravacoes`
+  (for `D:\Cameras\Gravacoes`) in `.env` and recreate the app container
+  (`docker compose up -d --no-deps app`). Only the host side of the bind mount changes; the app
+  still sees `/app/recordings`, and recordings are indexed from the folder layout, so no database
+  change is needed.
+
 ## Setup
 
 ```bash

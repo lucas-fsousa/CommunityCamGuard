@@ -46,7 +46,9 @@ services:
       PROVISIONING_BLE_MATERIAL_FILE: "/app/temp/ble-provision-material.json"
       PROVISIONING_REMOTE_BLE_ENABLED: "${PROVISIONING_REMOTE_BLE_ENABLED:-false}"
     volumes:
-      - ./recordings:/app/recordings
+      # Host folder for footage; override with RECORDINGS_HOST_DIR in .env (e.g. a second disk
+      # under WSL: /mnt/d/Cameras/Gravacoes). The in-container path stays /app/recordings.
+      - ${RECORDINGS_HOST_DIR:-./recordings}:/app/recordings
       - ./data:/app/data
       - ./frontend:/app/frontend      # live-editable dashboard (no rebuild for UI tweaks)
       - ./temp:/app/temp:ro           # ignored, owner-only, short-lived BLE research material
