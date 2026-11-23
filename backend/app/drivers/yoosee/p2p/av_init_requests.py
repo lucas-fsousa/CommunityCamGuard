@@ -21,7 +21,6 @@ class AvInitRequests:
         self._requests: list[ReliableAvControl] = []
         self._next = clock()
         self._count = 0
-        self._confirmed: set[int] = set()
         self._stopped = False
         self.attempts = 0
         self.acknowledged = False
@@ -31,11 +30,6 @@ class AvInitRequests:
     def next_sequence(self) -> int:
         """First unused high-channel sequence, including superseded INITs."""
         return self._count
-
-    @property
-    def all_sequences_acknowledged(self) -> bool:
-        """Stricter TX gate; media readiness alone cannot rule out high-channel gaps."""
-        return self._count > 0 and len(self._confirmed) == self._count
 
     def _clear(self) -> None:
         for request in self._requests:
@@ -57,13 +51,6 @@ class AvInitRequests:
         for request in self._requests:
             if not request.acknowledged:
                 request.suspend_receipt()
-
-    def drain_pending(self) -> None:
-        if not self._stopped or not self.acknowledged:
-            raise ReceiveError("INIT drain requires accepted media")
-        for request in self._requests:
-            if not request.acknowledged:
-                request.resume_receipt()
 
     def poll(self) -> None:
         if self.closed:
@@ -94,9 +81,7 @@ class AvInitRequests:
     def receive_ack(self, wire: bytes, peer: tuple[str, int]) -> bool:
         self.poll()
         received = False
-        for sequence, request in enumerate(self._requests):
+        for request in self._requests:
             received = request.receive_ack(wire, peer) or received
-            if request.acknowledged:
-                self._confirmed.add(sequence)
         self.acknowledged |= received
         return received

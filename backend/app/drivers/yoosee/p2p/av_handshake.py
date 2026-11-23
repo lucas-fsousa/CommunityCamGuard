@@ -90,8 +90,6 @@ the same parser/decoder owner, but do not claim ready or present a live source y
         if self._talk is not None:
             self._talk.close()
         self._talk = candidate
-        if isinstance(self._init, AvInitRequests) and not self._init.all_sequences_acknowledged:
-            self._init.drain_pending()
         return self._talk
 
     @property
@@ -139,8 +137,6 @@ the same parser/decoder owner, but do not claim ready or present a live source y
                 raise ReceiveError("AV handshake is closed")
             if not self._finish_requested and not self.ready and self._clock() - self._created >= 5:
                 raise ReceiveError("AV handshake readiness deadline exceeded")
-            if self._talk is not None and self._talk.cancelled and isinstance(self._init, AvInitRequests):
-                self._init.suspend_pending()
             self._init.poll()
             if self._start is not None:
                 self._start.poll()
@@ -160,14 +156,11 @@ the same parser/decoder owner, but do not claim ready or present a live source y
             if self._finish is not None:
                 wire = self._finish.due()
             elif self._talk is not None and not self._talk.done:
-                if isinstance(self._init, AvInitRequests) and not self._init.all_sequences_acknowledged:
-                    if self._talk.cancelled:
-                        self._init.suspend_pending()
-                        wire = self._talk.due()
-                    else:
-                        wire = self._init.due()
-                else:
-                    wire = self._talk.due()
+                # V1 speech uses only the base AV conversation, whose START
+                # receipt is already required by ready. Superseded INITs belong
+                # to the independent high conversation; reviving their expired
+                # deadlines can kill a healthy AV route before any speech frame.
+                wire = self._talk.due()
             elif self._finish_requested:
                 self._prepare_finish()
                 assert self._finish is not None

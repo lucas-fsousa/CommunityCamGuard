@@ -4,6 +4,18 @@
 
 This section overrides the priorities and pending labels in the chronological history below.
 
+### Native voice physical retest — 2026-11-23
+
+Owner reauthorized physical tests. Camera3 preflight confirmed100% volume and
+native video; other units received no physical controls. The corrected-header
+AAC attempt failed before audio (unavailable/0frames, KCP send timeout), not a
+new acoustic failure. Also observed independent pre-existing stdin-timeout/
+account recovery cycles before the test. Removed the obsolete barrier that
+resumed/waited for high-channel INIT receipts even though V1 speech now uses
+only the independent base AV channel. Actual handshake and speech receipts stay
+mandatory; late high ACK handling stays intact.98focused checks passed; CI,
+deployment and a new physical reference test follow. No audio route grant yet.
+
 ### Priority incident — garage/yard unavailable, 2026-11-16
 
 Two sources were native/blocked and not recording after local decoder timeouts;

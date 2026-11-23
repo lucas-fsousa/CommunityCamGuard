@@ -18,9 +18,11 @@ connects the driver view to that owner, but no dashboard route selects it yet.
 
 ## Recovered protocol, not a codec guess
 
-The previously inspected IoTVideo `LivePlayer` path configures outgoing AMR-NB
-codec5/option0, mono/16bit/8000Hz,160 samples and mode7 (32-byte frames, TOC0x3c).
-It does not copy the incoming AAC descriptor. The recovered v1 serializer sends:
+The Java setup initially configures outgoing AMR-NB codec5/option0,
+mono/16bit/8000Hz,160 samples and mode7 (32-byte frames, TOC0x3c). Later SDK
+received-header callbacks can reconfigure the intercom format; initial Java AMR
+alone does not establish final TX. The exact-descriptor AAC comparison and its
+limits are recorded in `native-talk-v1-channel.md`. The v1 serializer sends:
 
 1. Audio-only `HEADER_ONLY`, marker0x0102, on the base KCP conversation.
    SDK DataType2 dispatches to `packing_header_only`; the old0x0500 descriptor
@@ -52,11 +54,13 @@ not high-channel INIT sequences. Repeated messages never reset that counter.
 
 If a superseded UDP INIT lacked its receipt, video reception may legitimately be
 ready under the existing policy. Its exact emitted wire is now retained for late
-ACKs without a video deadline. A requested utterance resumes a bounded receipt
-drain of those identical wires before allocating audio/microphone commands: no
-new INIT sequence, application request, authentication or camera connection.
-Cancellation before microphone use suspends that drain and leaves video active.
-An unsuccessful active drain still fails rather than inventing receipt evidence.
+ACKs without a video deadline. **V1 speech must not resume or wait on those
+high-channel requests:** it uses only the independent base AV conversation, whose
+START receipt is already a readiness prerequisite. The former drain gate was
+left over from the incorrect V2-style high-channel microphone implementation.
+Resuming it could fail a live V1 route before sending the first speech frame.
+It was removed on2026-11-23. Retained INITs still accept real late receipts;
+neither acceptance nor base START/header/audio/OFF receipts are fabricated.
 
 The existing reader feeds ACKs to the outstanding talk request AND feeds the same
 datagram to the AV receiver. UDP uses its existing validated route; TCP keeps its

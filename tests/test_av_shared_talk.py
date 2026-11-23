@@ -249,7 +249,7 @@ def test_v1_microphone_uses_base_channel_not_the_sdk_init_sequence_space():
 
 
 @pytest.mark.parametrize("cancel", [False, True])
-def test_missing_superseded_init_receipt_drains_identical_bytes_before_talk_not_new_login(cancel):
+def test_missing_superseded_high_init_receipt_cannot_block_base_talk_or_expire_video(cancel):
     from tests.test_av_receive_channels import CONTROL, start
     from tests.test_captured_media import control
 
@@ -266,18 +266,22 @@ def test_missing_superseded_init_receipt_drains_identical_bytes_before_talk_not_
     now[0] = 3
     s.receive(packet(2, 0, media(av())), PEER)
     talk = s.begin_talk((FRAME,))
-    retried, = s.due()
-    assert retried == missing and s.ready
-    assert s.receive(packet(3, 0, media(av())), PEER).records[0].video == b"video"
     if cancel:
         talk.cancel()
         now[0] = 6
-        assert s.receive(packet(4, 0, media(av())), PEER).records[0].video == b"video"
+        assert s.receive(packet(3, 0, media(av())), PEER).records[0].video == b"video"
         assert not s.due() and talk.done and not talk.microphone_started and s.ready
         return
-    s.receive(ack(retried), PEER)
-    assert sent(s)[1].sequence == 1  # Only now send the audio encoding header.
-    assert sent(s)[1].sequence == 2  # Mic command after both INIT sequences.
+    for sequence in (1, 2, 3):  # Header, ON and audio must not wait for high INIT1.
+        wire, segment = sent(s)
+        assert wire != missing and (segment.conv, segment.sequence) == (42, sequence)
+    now[0] += .021
+    assert sent(s)[1].sequence == 4  # OFF retains the base sequence space.
+    assert talk.done and talk.microphone_stopped and talk.acknowledged_frames == 1
+    now[0] = 6
+    assert s.receive(packet(3, 0, media(av())), PEER).records[0].video == b'video'
+    s.receive(ack(missing), PEER)  # A real late INIT receipt is still accepted.
+    assert s.ready and not s.due()
 
 
 @pytest.mark.parametrize('frames', [(), (FRAME,) * 501, (b"invalid",), [FRAME], (bytearray(FRAME),)])

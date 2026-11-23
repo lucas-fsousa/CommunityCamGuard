@@ -254,3 +254,38 @@ transmitters. It changes neither KCP sequence allocation, cipher, microphone
 opcode, volume nor production route grants. Updated independent compact-header
 goldens and parser round-trip assertions reject the old0x0500 output. A fresh
 physical comparison with this corrected header remains necessary.
+
+## Renewed authorization and pre-audio transport failure — 2026-11-23
+
+Physical tests were authorized again, still restricted operationally to camera3.
+Initial read-only checks found all sources repeatedly recovering; persistent
+events showed `stdin_timeout`/account-ended retries predating this audio attempt.
+Storage was not full and container OOM=false/restarts=0. This instability is a
+separate baseline concern, not evidence that outgoing speech caused it.
+
+The same deployed image `6cb7c7870e08` already contained the corrected0x0102
+header. After enabling the pinned one-use diagnostic and app-only recreation,
+preflight confirmed camera3 native availability and speaker volume100%. The
+known-phrase negotiated-AAC attempt returned HTTP200 **unavailable**, zero audio
+frames acknowledged and no OFF receipt in4.645seconds. HD observer received
+10binary messages/2261978bytes, max gap1.281seconds; the UDP owner logged
+`kcp_send_timeout` without a header/start receipt log. No new acoustic judgment
+was requested: this was a pre-audio transport failure, not another completed
+silent speaker test. No shared audio capability was granted.
+
+Code review found an obsolete cross-conversation dependency: `begin_talk`
+resumed superseded INIT requests and `due` waited for every high-channel INIT
+receipt before emitting base-channel speech. That barrier belonged to the old
+incorrect high-channel microphone route. With corrected V1 speech entirely on
+the base conversation, a lost old high-channel receipt can neither fill nor
+create a gap in the base sequence space. Reactivating its timeout can instead
+terminate healthy video before speech starts.
+
+The correction removes that barrier/resumption, not actual AV readiness or
+header/ON/audio/OFF receipts. Superseded INITs stay suspended and bounded, and
+their real late ACKs are still processed. Unused all-INIT confirmation tracking
+and the drain method were removed. Regressions leave an extra INIT unacknowledged,
+send header/ON/audio/OFF on the base channel, keep video alive beyond the former
+deadline and accept the late high ACK. Cancellation before transmission still
+emits nothing.98focused protocol/lease/adapter checks passed under160MiB/no swap/
+25%CPU (110.6MiB peak). Physical retest on the corrected owner remains pending.
