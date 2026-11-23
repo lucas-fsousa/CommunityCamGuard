@@ -177,6 +177,12 @@ class CooperativeTcpMedia:
 
     def _begin_finish(self) -> None:
         if not self._closing:
+            # An incomplete negotiation has no AV session to send CLOSE to.
+            # In group retirement this is normal: a sibling can already be live.
+            if not self._owner.ready:
+                if self._close().socket_close_failed:
+                    raise P2PProbeError("TCP media physical close unconfirmed")
+                return
             self._owner.begin_finish()
             self._closing = True
             self._deadline = min(self._deadline, self._clock() + 2)

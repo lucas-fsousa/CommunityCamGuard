@@ -27,6 +27,16 @@ class OwnedSocket(Socket):
         if self.fault == "physical_close": raise OSError("close unknown")
 
 
+def test_group_close_before_negotiation_retires_socket_without_av_receipt():
+    now = [1.0]
+    sock = OwnedSocket(now)
+    pump = CooperativeTcpMedia(sock, PEER, session(now), clock=lambda: now[0])
+    pump.begin_finish()
+    assert pump.result and not pump.result.close_acknowledged
+    assert not pump.result.socket_close_failed and sock.closed == 1
+    assert not sock.actions
+
+
 def test_finite_pump_consumes_records_without_second_reader_or_history():
     now = [1.0]
     sock, owner = OwnedSocket(now), session(now)
