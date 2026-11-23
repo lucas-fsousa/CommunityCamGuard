@@ -299,6 +299,33 @@ Ruff and mypy passed. Deployment observation is required: this fixes a reproduce
 watchdog defect, not yet proof that it explains every observed FFmpeg stall or
 the microphone header timeout.
 
+The full-duplex fix was deployed as image `7ccc839b9259` (commit0911235);
+CI45203302546 and Image45203302488 both passed. The120-second live observation
+**failed**: garage50fragments/18537361bytes, yard48/17998887bytes, both sockets
+closed; recording dropped at30seconds, all sources were recovering at92seconds
+and available/recording again at107seconds. Camera3's30-second observer also
+closed after39fragments/14440001bytes. Do not call this a stability acceptance.
+The sampled subsequent event facts reported `account_ended` without the earlier
+stdin-timeout label; the account's original stop cause still needs to be retained
+instead of interpreting that generic result as decoder or authentication failure.
+
+A final preflight admitted the known-speech **AMR** comparison with100% verified
+volume and actual HD fragments. It returned `unavailable` in2.504seconds,
+zero audio frames, no OFF receipt, with `kcp_send_timeout` and no header receipt.
+Concurrent video received7fragments/990400bytes, max gap0.383seconds, no observer
+error during that short request. Neither AMR nor negotiated AAC has completed
+with the compact header. No microphone command or acoustic acceptance follows.
+Next useful observation is exact outgoing-header PUSH/returned-ACK metadata on
+the same admitted route, not another uninstrumented sound replay.
+
+Selected static follow-up also confirms the current header-before-ON order:
+`Intercom::start_intercom` invokes its start callback at0xff50c..0xff51c before
+calling `send_intercom_cmd(1)` at0xff5e4..0xff5e8; the LivePlayer start lambda at
+0x105568..0x105574 tail-calls `send_av_enc_info(2,false)`. Merely swapping those
+stages would contradict this saved SDK, not fix a proven discrepancy. Inspection
+was limited to selected function windows, capped96MiB/no swap/25%CPU, measured
+23.9–33.7MiB peak; no emulator or camera binary was executed.
+
 Physical tests were authorized again, still restricted operationally to camera3.
 Initial read-only checks found all sources repeatedly recovering; persistent
 events showed `stdin_timeout`/account-ended retries predating this audio attempt.

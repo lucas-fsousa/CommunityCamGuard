@@ -14,7 +14,11 @@ This section overrides the priorities and pending labels in the chronological hi
 - Reproduced and corrected the full-duplex watchdog defect: actual MP4 output
   or an increasing decoded frame counter prevents a false stdin-only timeout.
   Genuine no-progress and five-second frame deadlines remain.94focused tests,
-  Ruff and mypy passed; deploy/observe before retrying physical speech.
+  Ruff and mypy passed.0911235 deployed; CI/Image passed. The120-second live
+  observation still failed with account recovery: stability is **not accepted**.
+- The final AMR comparison also stopped at the header (`kcp_send_timeout`,
+  zero audio frames,2.504s). Next: exact header PUSH/ACK metadata on that route
+  and the shared account's original stop cause, not another blind sound replay.
 - Evidence and exact limits: `docs/internal/native-talk-v1-channel.md`.
 
 ### Native voice physical retest — 2026-11-23
